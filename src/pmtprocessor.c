@@ -146,7 +146,7 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
 			esentry = newpmt->p_first_es;
 			
 			// Store PCR PID
-			pids[0].pid = newpmt->i_pcrpid;
+			pids[0].pid = newpmt->i_pcr_pid;
 			pids[0].type = 0;
 			pids[0].subtype = 0;
 			

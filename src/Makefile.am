@@ -4,10 +4,10 @@
 ## If you don't want it to overwrite it,
 ## 	Please disable it in the Anjuta project configuration
 
-INCLUDES =\
-	 -I../include
+INCLUDES =
 
 AM_CFLAGS =\
+	-I$(srcdir)/../include\
 	 -Wall\
 	 -g
 
