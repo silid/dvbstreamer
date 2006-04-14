@@ -1,0 +1,35 @@
+## Process this file with automake to produce Makefile.in
+
+## Created by Anjuta - will be overwritten
+## If you don't want it to overwrite it,
+## 	Please disable it in the Anjuta project configuration
+
+INCLUDES =\
+	 -I../include
+
+AM_CFLAGS =\
+	 -Wall\
+	 -g
+
+bin_PROGRAMS = dvbstreamer
+
+dvbstreamer_SOURCES = \
+	main.c\
+	dvb.c\
+	parsezap.c\
+	multiplexes.c\
+	services.c\
+	udpsend.c\
+	ts.c\
+	udpoutput.c\
+	pipeoutput.c\
+	patprocessor.c\
+	pmtprocessor.c\
+	dbase.c\
+	cache.c
+
+dvbstreamer_LDFLAGS = 
+
+dvbstreamer_LDADD = \
+	 -ldvbpsi -lpthread -lsqlite3 -lreadline -ltermcap
+
