@@ -116,21 +116,21 @@ module.doc.files=
 module.po.files=
 
 compiler.options.supports=
-compiler.options.include.paths=\
-	../include
+compiler.options.include.paths=
 compiler.options.library.paths=
 compiler.options.libraries=\
 	dvbpsi\
 	pthread\
 	sqlite3\
-	readline
-compiler.options.libraries.selected=1 1 1 1 
+	readline\
+	termcap
+compiler.options.libraries.selected=1 1 1 1 1 
 compiler.options.defines=
-compiler.options.defines.selected=1 1 1 1 
+compiler.options.defines.selected=1 1 1 1 1 
 compiler.options.warning.buttons=0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 
 compiler.options.optimize.buttons=1 0 0 0 
 compiler.options.other.buttons=1 0 
-compiler.options.other.c.flags=
+compiler.options.other.c.flags=-I$(srcdir)/../include
 compiler.options.other.l.flags=
 compiler.options.other.l.libs=
 
