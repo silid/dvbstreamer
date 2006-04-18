@@ -1,7 +1,7 @@
 
 [filenumbers]
-0=43
-1=31
+0=149
+1=1
 2=55
 3=23
 4=129
@@ -49,20 +49,8 @@ RunInTerminal=true
 clean before build=false
 
 [filelist]
-0=/home/adam/Projects/DVBStreamer/include/ts.h
-1=/home/adam/Projects/DVBStreamer/include/dbase.h
-2=/home/adam/Projects/DVBStreamer/include/services.h
-3=/home/adam/Projects/DVBStreamer/include/cache.h
-4=/home/adam/Projects/DVBStreamer/src/cache.c
-5=/home/adam/Projects/DVBStreamer/src/dvb.c
-6=/home/adam/Projects/DVBStreamer/src/ts.c
-7=/home/adam/Projects/DVBStreamer/src/pmtprocessor.c
-8=/home/adam/Projects/DVBStreamer/src/patprocessor.c
-9=/home/adam/Projects/DVBStreamer/src/services.c
-10=/home/adam/Projects/DVBStreamer/src/parsezap.c
-11=/home/adam/Projects/DVBStreamer/include/multiplexes.h
-12=/home/adam/Projects/DVBStreamer/src/multiplexes.c
-13=/home/adam/Projects/DVBStreamer/src/main.c
+0=/home/adam/Projects/DVBStreamer/src/pmtprocessor.c
+1=/home/adam/Projects/DVBStreamer/src/Makefile.in
 
 [Project Tree]
 0=0
