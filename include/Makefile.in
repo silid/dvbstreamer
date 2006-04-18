@@ -177,7 +177,6 @@ dvbstreamer_include_DATA = \
 	ts.h\
 	udpoutput.h\
 	main.h\
-	pipeoutput.h\
 	patprocessor.h\
 	pmtprocessor.h\
 	dbase.h

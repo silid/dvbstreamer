@@ -74,6 +74,7 @@ static void CommandMultiplex(char *argument);
 static void CommandSelect(char *argument);
 static void CommandPids(char *argument);
 static void CommandStats(char *argument);
+static void CommandHelp(char *argument);
 
 volatile Multiplex_t *CurrentMultiplex = NULL;
 volatile Service_t *CurrentService = NULL;
@@ -117,6 +118,11 @@ static Command_t commands[] = {
 		"Display the stats for the PAT,PMT and service PID filters",
 		CommandStats
 	},
+    {
+        "help",
+        "Display the list of commands",
+        CommandHelp
+    },
 	{NULL,NULL,NULL}
 };
 
@@ -168,6 +174,7 @@ int main(int argc, char *argv[])
 	if (outputArg == NULL)
 	{
 		printlog(0, "No output set!\n");
+        usage();
 		exit(1);
 	}
 
@@ -465,21 +472,29 @@ static void CommandStats(char *argument)
 	printf("Service packets filtered : %d\n", pidfilters[PIDFilterIndex_Service]->packetsprocessed);
 	printf("Service Filter Count     : %d\n", ServiceFilterCount);
 }
+
+static void CommandHelp(char *argument)
+{
+    int i;
+    for (i = 0; commands[i].command; i ++)
+    {
+        printf("%10s - %s\n", commands[i].command, commands[i].help);
+    }
+}
 /****************** Static functions **************************/
-// Print out command usage
+/*
+ * Output command line usage and help.
+ */
 static void usage()
 {
     fprintf(stderr,"Usage:dvbstream <options>\n"
                    "      Options:\n"
                    "      -v            : Increase the amount of debug output,\n"
                    "                      can be used multiple times for more output\n"
-                   "      -p <fifo>     : Output transport stream to a name pipe <fifo>\n"
-				   "                      (Only one method of output can be selected)"
-				   "      -u <host:port>: Output transport stream via UDP to the given host and port\n"
-				   "                      (Only one method of output can be selected)"
+				   "      -o <host:port>: Output transport stream via UDP to the given host and port\n"
+				   "                      (Only one method of output can be selected)\n"
                    "      -a <adapter>  : Use adapter number\n"
-                   "      -c <file>     : channels.conf file to use\n"
-                   "                     (default is ~/.dvbstream/channels.conf\n"
+                   "      -t <file>     : channels.conf file to import services and multiplexes from\n"
            );
 }
 

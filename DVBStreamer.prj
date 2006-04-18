@@ -75,7 +75,6 @@ module.include.files=\
 	ts.h\
 	udpoutput.h\
 	main.h\
-	pipeoutput.h\
 	patprocessor.h\
 	pmtprocessor.h\
 	dbase.h
@@ -91,7 +90,6 @@ module.source.files=\
 	udpsend.c\
 	ts.c\
 	udpoutput.c\
-	pipeoutput.c\
 	patprocessor.c\
 	pmtprocessor.c\
 	dbase.c\

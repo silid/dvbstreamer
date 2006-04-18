@@ -22,7 +22,6 @@ dvbstreamer_SOURCES = \
 	udpsend.c\
 	ts.c\
 	udpoutput.c\
-	pipeoutput.c\
 	patprocessor.c\
 	pmtprocessor.c\
 	dbase.c\
