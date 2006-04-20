@@ -27,6 +27,7 @@ Majority of the parsing code taken from the xine input_dvb plugin code.
 #include <stdio.h>
 #include "multiplexes.h"
 #include "services.h"
+#include "logging.h"
 
 typedef struct {
 	char *name;
@@ -181,7 +182,7 @@ static int parsezapline(char * str)
 
     NEXTFIELD();
     front_param.u.ofdm.hierarchy_information = find_param(hierarchy_list, field);
-	printlog(2,"Adding frequency %d\n", front_param.frequency);
+	printlog(LOG_DEBUGV,"Adding frequency %d\n", front_param.frequency);
     MultiplexAdd(FE_OFDM, &front_param);
     
     /* Video PID - not used but we'll take it anyway */
@@ -191,7 +192,7 @@ static int parsezapline(char * str)
     /* service ID */
     NEXTFIELD();
     id = strtoul(field, NULL, 0);
-    printlog(2, "Adding service \"%s\" %d\n", name, id);
+    printlog(LOG_DEBUGV, "Adding service \"%s\" %d\n", name, id);
     ServiceAdd(front_param.frequency, name, id, -1, -1);    
 	return 0;
 }

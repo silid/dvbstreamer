@@ -29,6 +29,7 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 
 #include "dbase.h"
 #include "main.h"
+#include "logging.h"
 
 #define VERSION 0.1
 
@@ -50,7 +51,7 @@ int DBaseInit(int adapter)
 	rc = sqlite3_open(file, &DBaseInstance);
 	if( rc )
 	{
-		printlog(0, "Can't open database: %s\n", sqlite3_errmsg(DBaseInstance));
+		printlog(LOG_ERROR, "Can't open database: %s\n", sqlite3_errmsg(DBaseInstance));
 		sqlite3_close(DBaseInstance);
 	}
 	else
@@ -86,7 +87,7 @@ int DBaseCreateTables()
 {
 	int rc;
 	
-	printlog(1, "Creating tables\n");
+	printlog(LOG_DEBUG, "Creating tables\n");
 	rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " SERVICES_TABLE " ( "
 									 SERVICE_MPLEXFREQ ","
 									 SERVICE_ID ","
@@ -97,7 +98,7 @@ int DBaseCreateTables()
 									 ");", NULL, NULL, NULL);
 	if (rc)
 	{
-		printlog(0, "Failed to create Services table: %s\n", sqlite3_errmsg(DBaseInstance));
+		printlog(LOG_ERROR, "Failed to create Services table: %s\n", sqlite3_errmsg(DBaseInstance));
 		return rc;
 	}
 	
@@ -109,7 +110,7 @@ int DBaseCreateTables()
 									 ");", NULL, NULL, NULL);
 	if (rc)
 	{
-		printlog(0, "Failed to create Multiplexes table: %s\n", sqlite3_errmsg(DBaseInstance));
+		printlog(LOG_ERROR, "Failed to create Multiplexes table: %s\n", sqlite3_errmsg(DBaseInstance));
 		return rc;
 	}
 	/*
@@ -141,7 +142,7 @@ int DBaseCreateTables()
 									 ");", NULL, NULL, NULL);
 	if (rc)
 	{
-		printlog(0, "Failed to create OFDMParameters table: %s\n", sqlite3_errmsg(DBaseInstance));
+		printlog(LOG_ERROR, "Failed to create OFDMParameters table: %s\n", sqlite3_errmsg(DBaseInstance));
 		return rc;
 	}
 	rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " PIDS_TABLE " ( "
@@ -155,7 +156,7 @@ int DBaseCreateTables()
 									 ");", NULL, NULL, NULL);
 	if (rc)
 	{
-		printlog(0, "Failed to create OFDMParameters table: %s\n", sqlite3_errmsg(DBaseInstance));
+		printlog(LOG_ERROR, "Failed to create OFDMParameters table: %s\n", sqlite3_errmsg(DBaseInstance));
 		return rc;
 	}
 	
@@ -164,7 +165,7 @@ int DBaseCreateTables()
 									 ");", NULL, NULL, NULL);
 	if (rc)
 	{
-		printlog(0, "Failed to create Version table: %s\n", sqlite3_errmsg(DBaseInstance));
+		printlog(LOG_ERROR, "Failed to create Version table: %s\n", sqlite3_errmsg(DBaseInstance));
 		return rc;
 	}
 

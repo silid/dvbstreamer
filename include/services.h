@@ -25,7 +25,6 @@ Manage services and PIDs.
 
 #include "multiplexes.h"
 
-#define MAX_PIDS 10
 #define MAX_SERVICES 400
 
 typedef struct Service_t

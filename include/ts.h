@@ -22,7 +22,9 @@ Transport stream processing and filter management.
 */
 #ifndef _TS_H
 #define _TS_H
+#include <stdint.h>
 #include <pthread.h>
+
 #include "dvb.h"
 #include "services.h"
 #include "multiplexes.h"
@@ -32,8 +34,8 @@ Transport stream processing and filter management.
 
 typedef struct TSPacket_t
 {
-	char header[4];
-	char payload[TSPACKET_SIZE - 4];
+	uint8_t header[4];
+	uint8_t payload[TSPACKET_SIZE - 4];
 }TSPacket_t;
 
 #define TSPACKET_GETPID(packet) \
@@ -53,8 +55,9 @@ typedef struct TSPacket_t
 
 
 /*---- Filter function pointer type----*/
-typedef int (*PacketProcessor)(void *userarg, TSPacket_t* packet);
-
+typedef int (*PacketFilter)(void *userarg, uint16_t pid, TSPacket_t* packet);
+typedef TSPacket_t* (*PacketProcessor)(void *userarg, TSPacket_t* packet);
+typedef void (*PacketOutput)(void *userarg, TSPacket_t* packet);
 
 /*---- PID Filter Structures ----*/
 typedef struct PIDFilter_t
@@ -62,23 +65,27 @@ typedef struct PIDFilter_t
 	struct TSFilter_t *tsfilter;
 	volatile int enabled;
 	
-	volatile PacketProcessor filterpacket;
+	volatile PacketFilter filterpacket;
 	volatile void *fparg;
 
 	volatile PacketProcessor processpacket;
 	volatile void *pparg;
 	
-	volatile PacketProcessor outputpacket;
+	volatile PacketOutput outputpacket;
 	volatile void *oparg;
 	
+	/* Variables for statistics */
+	volatile int packetsfiltered;
 	volatile int packetsprocessed;
+	volatile int packetsoutput;
 }PIDFilter_t;
 
 /*---- Simple PID Filter structures ---*/
+#define MAX_PIDS 20 
 typedef struct PIDFilterSimpleFilter_t
 {
 	int pidcount;
-	unsigned short pids[MAX_PIDS];
+	uint16_t pids[MAX_PIDS];
 }PIDFilterSimpleFilter_t;
 
 /*---- Transport Stream Filter structure ----*/
@@ -88,11 +95,13 @@ typedef struct PIDFilterSimpleFilter_t
 typedef struct TSFilter_t
 {
 	int quit;
-	TSPacket_t readBuffer[MAX_PACKETS];
+	TSPacket_t readbuffer[MAX_PACKETS];
 	DVBAdapter_t *adapter;
 	pthread_t thread;
 	int enable;
 	//pthread_mutex_t pidmutex;	
+	
+	int totalpackets;
 	
 	struct {
 		int allocated;
@@ -107,6 +116,6 @@ void TSFilterEnable(TSFilter_t * tsfilter, int enable);
 PIDFilter_t* PIDFilterAllocate(TSFilter_t* tsfilter);
 void PIDFilterFree(PIDFilter_t * pidfilter);
 
-int PIDFilterSimpleFilter(void *arg, TSPacket_t *packet);
+int PIDFilterSimpleFilter(void *arg, uint16_t pid, TSPacket_t *packet);
 
 #endif

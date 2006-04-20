@@ -37,6 +37,7 @@ Rewrite the PAT so that only the current service appears in the PAT.
 #include "ts.h"
 #include "patprocessor.h"
 #include "cache.h"
+#include "logging.h"
 #include "main.h"
 
 typedef struct PATProcessor_t
@@ -68,8 +69,9 @@ void PATProcessorDestroy(void *arg)
 	free(state);
 }
 
-int PATProcessorProcessPacket(void *arg, TSPacket_t *packet)
+TSPacket_t *PATProcessorProcessPacket(void *arg, TSPacket_t *packet)
 {
+	TSPacket_t *result = NULL;
 	PATProcessor_t *state= (PATProcessor_t*)arg;
 	
 	if (state->multiplex != CurrentMultiplex)
@@ -102,18 +104,18 @@ int PATProcessorProcessPacket(void *arg, TSPacket_t *packet)
 	
 	if (state->service)
 	{
-		memcpy(packet, &state->patpacket, sizeof(TSPacket_t));
-		TSPACKET_SETCOUNT(*packet, state->packetcounter ++);
-		return 1;
+		TSPACKET_SETCOUNT(state->patpacket, state->packetcounter ++);
+		result = &state->patpacket;
 	}
-	return 0;
+	
+	return result;
 }
 
 static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
 {
 	PATProcessor_t *state = (PATProcessor_t*)arg;
     Multiplex_t *multiplex = state->multiplex;
-	printlog(1,"PAT recieved, version %d (old version %d)\n", newpat->i_version, multiplex->patversion);
+	printlog(LOG_DEBUG,"PAT recieved, version %d (old version %d)\n", newpat->i_version, multiplex->patversion);
     if (multiplex->patversion != newpat->i_version)
     {
         // Version has changed update the services

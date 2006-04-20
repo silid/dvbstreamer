@@ -26,7 +26,7 @@ Entry point to the application.
 #include <string.h>
 #include <pthread.h>
 #include <getopt.h>
-#include <stdarg.h>
+#include <ctype.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -41,8 +41,11 @@ Entry point to the application.
 #include "patprocessor.h"
 #include "pmtprocessor.h"
 #include "cache.h"
+#include "logging.h"
 
 #define PROMPT "DVBStream>"
+
+#define MAX_OUTPUTS (MAX_FILTERS - 3)
 
 enum PIDFilterIndex
 {
@@ -53,20 +56,39 @@ enum PIDFilterIndex
 	PIDFilterIndex_Count
 };
 
+static char *PIDFilterNames[] = {
+	"PAT",
+	"PMT",
+	"Service",
+};
+
+typedef struct Output_t
+{
+	char *name;
+	PIDFilter_t *filter;
+	PIDFilterSimpleFilter_t pids;
+}Output_t;
+
 typedef struct Command_t
 {
 	char *command;
-	char *help;
+	char *shorthelp;
+	char *longhelp;
 	void (*commandfunc)(char *argument);
 }Command_t;
 
-static void usage();
-static int ServiceFilterPacket(void *arg, TSPacket_t *packet);
+
+static int ServiceFilterPacket(void *arg, uint16_t pid, TSPacket_t *packet);
 static PIDFilter_t *SetupPIDFilter(TSFilter_t *tsfilter,
-								   PacketProcessor filterpacket,  void *fparg,
+								   PacketFilter filterpacket,  void *fparg,
 								   PacketProcessor processpacket, void *pparg,
-								   PacketProcessor outputpacket,  void *oparg);
+								   PacketOutput outputpacket,  void *oparg);
+static void usage();
+static void CommandLoop(void);
+static int ProcessFile(char *file);
 static void GetCommand(char **command, char **argument);
+static int ProcessCommand(char *command, char *argument);
+static void ParseLine(char *line, char **command, char **argument);
 
 static void CommandQuit(char *argument);
 static void CommandServices(char *argument);
@@ -74,53 +96,98 @@ static void CommandMultiplex(char *argument);
 static void CommandSelect(char *argument);
 static void CommandPids(char *argument);
 static void CommandStats(char *argument);
+static void CommandAddOutput(char *argument);
+static void CommandRmOutput(char *argument);
+static void CommandAddPID(char *argument);
+static void CommandRmPID(char *argument);
+static Output_t *ParseOutputPID(char *argument, uint16_t *pid);
+static Output_t *FindOutput(char *name);
 static void CommandHelp(char *argument);
 
 volatile Multiplex_t *CurrentMultiplex = NULL;
 volatile Service_t *CurrentService = NULL;
 
-int verbosity = 0;
-
-
 static int quit = 0;
 static DVBAdapter_t *adapter;
 static TSFilter_t *tsfilter;
 static PIDFilter_t *pidfilters[3];
+static Output_t outputs[MAX_OUTPUTS];
 
 static Command_t commands[] = {
 	{
 		"quit",
 		"Exit the program",
+		"Exit the program, can be used in the startup file to stop further processing.",
 		CommandQuit
 	},
 	{
 		"services",
 		"List all available services",
+		"Lists all the services currently in the database. This list will be "
+		"updated as updates to the PAT are detected",
 		CommandServices
 	},
 	{
 		"multiplex",
 		"List all the services on the current multiplex",
+		"List only the services on the same multiplex as the currently selected service",
 		CommandMultiplex,
 	},
 	{
 		"select",
 		"Select a new service to stream",
+		"select <service name>\n"
+		"Sets <service name> as the current service, this may mean tuning to a different multiplex.",
 		CommandSelect
 	},
 	{
 		"pids",
 		"List the PIDs for a specified service",
+		"pids <service name>\n"
+		"List the PIDs for <service name>.",
 		CommandPids
 	},
 	{
 		"stats",
 		"Display the stats for the PAT,PMT and service PID filters",
+		"Display the number of packets processed and the number of packets filtered by each filter.",
 		CommandStats
+	},
+	{
+		"addoutput",
+		"Add a new destination for manually filtered PIDs.",
+		"addoutput <output name> <ipaddress>:<udp port>\n"
+		"Adds a new destination for sending packets to. This is only used for manually filtered packets"
+		"To send packets to this destination you'll need to also call \'filterpid\' "
+		"with this output as an argument.",
+		CommandAddOutput
+	},
+	{
+		"rmoutput",
+		"Remove a destination for manually filtered PIDs.",
+		"rmoutput <output name>\n"
+		"Removes the destination and stops all filters associated with this output.",
+		CommandRmOutput
+	},
+	{
+		"addpid",
+		"Adds a PID to filter to an output",
+		"addpid <output name> <pid>\n"
+		"Adds a PID to the filter to be sent to the specified output.",
+		CommandAddPID
+	},
+	{
+		"rmpid",
+		"Removes a PID to filter from an output",
+		"rmpid <output name> <pid>\n"
+		"Removes the PID from the filter that is sending packets to the specified output.",
+		CommandRmPID
 	},
     {
         "help",
-        "Display the list of commands",
+        "Display the list of commands or help on a specific command",
+		"help <command>\n"
+		"Displays help for the specified command.",
         CommandHelp
     },
 	{NULL,NULL,NULL}
@@ -129,6 +196,7 @@ static Command_t commands[] = {
 
 int main(int argc, char *argv[])
 {
+	char *startupFile = NULL;
     char channelsFile[PATH_MAX];
 	void *outputArg = NULL;
 	int i;
@@ -142,7 +210,7 @@ int main(int argc, char *argv[])
 	while (1) 
 	{
         char c;
-        c = getopt(argc, argv, "vo:a:t:");
+        c = getopt(argc, argv, "vo:a:t:s:c:f:");
         if (c == -1) {
             break;
         }
@@ -155,17 +223,25 @@ int main(int argc, char *argv[])
 					  outputArg = UDPOutputCreate(optarg);
 					  if (outputArg == NULL)
 					  {
-					      printlog(0, "Error creating UDP output!\n");
+					      printlog(LOG_ERROR, "Error creating UDP output!\n");
 						  exit(1);
 					  }
-					  printlog(1,"Output will be via UDP to %s\n", optarg);
+					  printlog(LOG_INFOV, "Output will be via UDP to %s\n", optarg);
 					  break;
             case 'a': adapterNumber = atoi(optarg);
-                      printlog(1,"Using adapter %d\n", adapterNumber);
+                      printlog(LOG_INFOV, "Using adapter %d\n", adapterNumber);
                       break;
+			case 'f': startupFile = strdup(optarg);
+					  printlog(LOG_INFOV, "Using startup script %s\n", startupFile);
+					  break;
+			/* Database initialisation options*/
             case 't': strcpy(channelsFile, optarg);
-                      printlog(1,"Using channels file %s\n", channelsFile);
+                      printlog(LOG_INFOV, "Using channels file %s\n", channelsFile);
                       break;
+			case 's': 
+			case 'c':
+					  printf("Not implemented yet!\n");
+					  break;
             default:
                 usage();
                 exit(1);
@@ -173,37 +249,39 @@ int main(int argc, char *argv[])
     }
 	if (outputArg == NULL)
 	{
-		printlog(0, "No output set!\n");
+		printlog(LOG_ERROR, "No output set!\n");
         usage();
 		exit(1);
 	}
 
 	if (DBaseInit(adapterNumber))
 	{
-		printlog(1, "Failed to initialise database\n");
+		printlog(LOG_ERROR, "Failed to initialise database\n");
 		exit(1);
 	}
 	
 	if (CacheInit())
 	{
-		printlog(1,"Failed to initialise cache\n");
+		printlog(LOG_ERROR,"Failed to initialise cache\n");
 		exit(1);
 	}
 
 	if (strlen(channelsFile))
 	{
-		printlog(1,"Importing services from %s\n", channelsFile);
+		printlog(LOG_INFO,"Importing services from %s\n", channelsFile);
 		if (!parsezapfile(channelsFile))
 		{
 		  exit(1);
 		}
     }
-	printlog(1, "%d Services available on %d Multiplexes\n", ServiceCount(), MultiplexCount());
+	
+	printlog(LOG_INFO, "%d Services available on %d Multiplexes\n", ServiceCount(), MultiplexCount());
+	
 	/* Initialise the DVB adapter */
 	adapter = DVBInit(adapterNumber);
 	if (!adapter)
 	{
-		printlog(0, "Failed to open DVB adapter!\n");
+		printlog(LOG_ERROR, "Failed to open DVB adapter!\n");
 		exit(1);
 	}
 
@@ -213,7 +291,7 @@ int main(int argc, char *argv[])
 	tsfilter = TSFilterCreate(adapter);
 	if (!tsfilter)
 	{
-		printlog(0, "Failed to create filter!\n");
+		printlog(LOG_ERROR, "Failed to create filter!\n");
 		exit(1);
 	}
 
@@ -224,85 +302,60 @@ int main(int argc, char *argv[])
 	pidfilters[PIDFilterIndex_PAT] = SetupPIDFilter(tsfilter, 
 		PIDFilterSimpleFilter, &patsimplefilter,
 		PATProcessorProcessPacket, patprocessor,
-		(PacketProcessor)UDPOutputPacketOutput,outputArg);
+		UDPOutputPacketOutput,outputArg);
 	
 	/* Create PMT filter */	
 	pmtprocessor = PMTProcessorCreate();	
 	pidfilters[PIDFilterIndex_PMT] = SetupPIDFilter(tsfilter, 
 		PMTProcessorFilterPacket, NULL,
 		PMTProcessorProcessPacket, pmtprocessor,
-		(PacketProcessor)UDPOutputPacketOutput,outputArg);
+		UDPOutputPacketOutput,outputArg);
 
 	/* Create Service filter */
 	pidfilters[PIDFilterIndex_Service] = SetupPIDFilter(tsfilter, 
 		ServiceFilterPacket, NULL,
 		NULL, NULL,
-		(PacketProcessor)UDPOutputPacketOutput,outputArg);
+		UDPOutputPacketOutput,outputArg);
 	
+	/* Enable all the filters */
 	for (i = 0; i < PIDFilterIndex_Count; i ++)
 	{
 		pidfilters[i]->enabled = 1;
 	}
 	
-	/* Start Command loop */
-	while(!quit)
+	/* Clear all outputs */
+	memset(&outputs, 0, sizeof(outputs));
+	
+	if (startupFile)
 	{
-		char *command, *argument;
-		GetCommand(&command, &argument);
-		if (command)
+		if (ProcessFile(startupFile))
 		{
-			int commandFound = 0;
-			for (i = 0; commands[i].command; i ++)
-			{
-				if (strcasecmp(command,commands[i].command) == 0)
-				{
-					commands[i].commandfunc(argument);
-					commandFound = 1;
-					break;
-				}
-			}
-			if (!commandFound)
-			{
-				printf("Unknown command \"%s\"\n", command);
-			}
+			printlog(LOG_ERROR, "%s not found!\n", startupFile);
 		}
-
+		free(startupFile);
 	}
 	
+	CommandLoop();
+	
+	/* Close the adapter and shutdown the filter etc*/
 	DVBDispose(adapter);
 	TSFilterDestroy(tsfilter);
 	
-	// Close output
 	UDPOutputClose(outputArg);
+	
 	CacheDeInit();
 	DBaseDeInit();
     return 0;
 }
 
-// Print out a log message to stderr depending on verbosity
-void printlog(int level, char *format, ...)
+
+static int ServiceFilterPacket(void *arg, uint16_t pid, TSPacket_t *packet)
 {
-    if (level <= verbosity)
-    {
-        va_list valist;
-        char *logline;
-        va_start(valist, format);
-        vasprintf(&logline, format, valist);
-        fprintf(stderr, logline);
-        va_end(valist);
-        free(logline);
-    }
-}
-int ServiceFilterCount = 0;
-int ServiceFilterPacket(void *arg, TSPacket_t *packet)
-{
-	unsigned short pid = TSPACKET_GETPID(*packet);
 	int i;
 	if (CurrentService)
 	{
 		int count;
 		PID_t *pids;
-		ServiceFilterCount ++;
 		pids = CachePIDsGet(CurrentService, &count);
 		for (i = 0; i < count; i ++)
 		{
@@ -315,14 +368,16 @@ int ServiceFilterPacket(void *arg, TSPacket_t *packet)
 	return 0;
 }
 
-// Find the service named <name> and tune to the new frequency for the multiplex the service is
-// on (if required) and then select the new service id to filter packets for.
+/*
+ * Find the service named <name> and tune to the new frequency for the multiplex the service is
+ * on (if required) and then select the new service id to filter packets for.
+ */
 Service_t *SetCurrentService(DVBAdapter_t *adapter, TSFilter_t *tsfilter, char *name)
 {
 	Multiplex_t *multiplex;
 	Service_t *service = CacheServiceFindName(name, &multiplex);
 	
-	printlog(1,"Writing changes back to database.\n");
+	printlog(LOG_DEBUG,"Writing changes back to database.\n");
 	CacheWriteback();
 	
 	if (!service)
@@ -330,15 +385,15 @@ Service_t *SetCurrentService(DVBAdapter_t *adapter, TSFilter_t *tsfilter, char *
 		return NULL;
 	}
 	
-	printlog(1, "Service found id:0x%04x Multiplex:%d\n", service->id, service->multiplexfreq);
+	printlog(LOG_DEBUG, "Service found id:0x%04x Multiplex:%d\n", service->id, service->multiplexfreq);
 	if ((CurrentService == NULL) || (!ServiceAreEqual(service,CurrentService)))
 	{
-		printlog(1,"Disabling filters\n");
+		printlog(LOG_DEBUGV,"Disabling filters\n");
 		TSFilterEnable(tsfilter, 0);
 		
 		if ((CurrentMultiplex!= NULL) && MultiplexAreEqual(multiplex, CurrentMultiplex))
 		{
-			printlog(1,"Same multiplex\n");
+			printlog(LOG_DEBUGV,"Same multiplex\n");
 			CurrentService = service;
 		}
 		else
@@ -349,36 +404,213 @@ Service_t *SetCurrentService(DVBAdapter_t *adapter, TSFilter_t *tsfilter, char *
 				free(CurrentMultiplex);
 			}
 						
-			printlog(1,"Caching Services\n");
+			printlog(LOG_DEBUGV,"Caching Services\n");
 			CacheLoad(multiplex);
 			CurrentMultiplex = multiplex;
 			
-			printlog(1,"Getting Frondend parameters\n");
+			printlog(LOG_DEBUGV,"Getting Frondend parameters\n");
 			MultiplexFrontendParametersGet(CurrentMultiplex, &feparams);
 			
-			printlog(1,"Tuning\n");
+			printlog(LOG_DEBUGV,"Tuning\n");
 			DVBFrontEndTune(adapter, &feparams);
 
 			CurrentService = CacheServiceFindId(service->id);
 			ServiceFree(service);
-			{
-				int i;
-				int count;
-				PID_t *pids = CachePIDsGet(CurrentService, &count);
-				printf("PID count = %d\n", count);
-				for (i = 0; i < count; i ++)
-				{
-					printf("%2d: %d\n", i, pids[i].pid, pids[i].type, pids[i].subtype);
-				}
-			}
 		}
-		printlog(1,"Enabling filters\n");
+		printlog(LOG_DEBUGV,"Enabling filters\n");
 		TSFilterEnable(tsfilter, 1);
 	}
 	
 	return CurrentService;
 }
-/******************** Command Functions ********************/
+
+/*
+ * Output command line usage and help.
+ */
+static void usage()
+{
+    fprintf(stderr,"Usage:dvbstream <options>\n"
+                   "      Options:\n"
+                   "      -v            : Increase the amount of debug output, can be used multiple times for more\n"
+				   "                      output\n"
+				   "      -o <host:port>: Output transport stream via UDP to the given host and port\n"
+                   "      -a <adapter>  : Use adapter number\n"
+				   "      -f <file>     : Run startup script file before starting the command prompt.\n"
+                   "      -t <file>     : Terrestrial channels.conf file to import services and multiplexes from.\n"
+				   "      -s <file>     : Satellite channels.conf file to import services and multiplexes from.\n(NOT IMPLEMENTED)\n"
+				   "      -c <file>     : Cable channels.conf file to import services and multiplexes from.\n(NOT IMPLEMENTED)\n"
+           );
+}
+static PIDFilter_t *SetupPIDFilter(TSFilter_t *tsfilter,
+								   PacketFilter filterpacket,  void *fparg,
+								   PacketProcessor processpacket, void *pparg,
+								   PacketOutput outputpacket,  void *oparg)
+{
+	PIDFilter_t *filter;
+	filter = PIDFilterAllocate(tsfilter);
+
+	filter->filterpacket = filterpacket;
+	filter->fparg = fparg;
+	
+	filter->processpacket = processpacket;
+	filter->pparg = pparg;
+	
+	filter->outputpacket = outputpacket;
+	filter->oparg = oparg;
+	return filter;
+}
+
+
+
+/**************** Command Loop/Startup file functions ************************/
+static void CommandLoop(void)
+{
+	char *command;
+	char *argument;
+	quit = 0;
+	/* Start Command loop */
+	while(!quit)
+	{
+		GetCommand(&command, &argument);
+		
+		if (command)
+		{
+			if (!ProcessCommand(command, argument))
+			{
+				printf("Unknown command \"%s\"\n", command);
+			}
+			free(command);
+			if (argument)
+			{
+				free(argument);
+			}
+		}
+	}
+}
+
+static int ProcessFile(char *file)
+{
+	int lineno = 0;
+	FILE *fp;
+	char *command;
+	char *argument;
+	
+	fp = fopen(file, "r");
+	if (!fp)
+	{
+		return 1;
+	}
+	rl_instream = fp;
+	
+	quit = 0;
+	while(!feof(fp) && !quit)
+	{
+		lineno ++;
+		GetCommand(&command, &argument);
+		if (command)
+		{
+			if (!ProcessCommand(command, argument))
+			{
+				printf("%s(%d): Unknown command \"%s\"\n", file, lineno, command);
+			}
+			free(command);
+			if (argument)
+			{
+				free(argument);
+			}
+		}		
+	}
+	rl_instream = NULL;
+	fclose(fp);
+	return 0;
+}
+/*************** Command parsing functions ***********************************/
+static void GetCommand(char **command, char **argument)
+{
+	char *line = readline(PROMPT);
+	*command = NULL;
+	*argument = NULL;
+
+	/* If the user has entered a non blank line process it */
+	if (line && line[0])
+	{
+		add_history(line);
+		ParseLine(line, command, argument);
+	}
+	
+	/* Make sure we free the line buffer */
+	if (line)
+	{
+		free(line);
+	}
+}
+
+
+static int ProcessCommand(char *command, char *argument)
+{
+	int i;
+	int commandFound = 0;
+	for (i = 0; commands[i].command; i ++)
+	{
+		if (strcasecmp(command,commands[i].command) == 0)
+		{
+			commands[i].commandfunc(argument);
+			commandFound = 1;
+			break;
+		}
+	}
+	return commandFound;
+}
+
+static void ParseLine(char *line, char **command, char **argument)
+{
+	char *space;
+	char *hash;
+	
+	*command = NULL;
+	*argument = NULL;
+		
+	/* Trim leading spaces */
+	for (;*line && isspace(*line); line ++);
+	
+	/* Handle null/comment lines */
+	if (*line == '#')
+	{
+		return;
+	}
+	
+	/* Handle end of line comments */
+	hash = strchr(line, '#');
+	if (hash)
+	{
+		*hash = 0;
+	}
+	
+	/* Find first space after command */
+	space = strchr(line, ' ');
+	if (space)
+	{
+		*space = 0;
+		*argument = strdup(space + 1);
+	}
+	*command = strdup(line);
+}
+
+char *Trim(char *str)
+{
+	char *result;
+	char *end;
+	/* Trim spaces from the start of the address */
+	for(result = str; *result && isspace(*result); result ++);
+	
+	/* Trim spaces from the end of the address */
+	for (end = result + (strlen(result) - 1); (result != end) && isspace(*end); end --)
+	{
+		*end = 0;
+	}
+	return result;
+}
+/************************** Command Functions ********************************/
 static void CommandQuit(char *argument)
 {
 	quit = 1;
@@ -423,7 +655,14 @@ static void CommandMultiplex(char *argument)
 
 static void CommandSelect(char *argument)
 {
-	Service_t *service = SetCurrentService(adapter, tsfilter, argument);
+	Service_t *service;
+	if (argument == NULL)
+	{
+		printf("No service specified!\n");
+		return;
+	}
+	
+	service = SetCurrentService(adapter, tsfilter, argument);
 	if (service)
 	{
 		printf("Name      = %s\n", service->name);
@@ -437,7 +676,15 @@ static void CommandSelect(char *argument)
 
 static void CommandPids(char *argument)
 {
-	Service_t *service = ServiceFindName(argument);
+	Service_t *service;
+	
+	if (argument == NULL)
+	{
+		printf("No service specified!\n");
+		return;
+	}
+	
+	service = ServiceFindName(argument);
 	if (service)
 	{
 		int i;
@@ -453,7 +700,7 @@ static void CommandPids(char *argument)
 				ServicePIDGet(service, pids, &count);
 				for (i = 0; i < count; i ++)
 				{
-					printf("%2d: %d\n", i, pids[i].pid, pids[i].type, pids[i].subtype);
+					printf("%2d: %d %d %d\n", i, pids[i].pid, pids[i].type, pids[i].subtype);
 				}
 			}
 		}
@@ -467,91 +714,199 @@ static void CommandPids(char *argument)
 
 static void CommandStats(char *argument)
 {
-	printf("PAT packets filtered     : %d\n", pidfilters[PIDFilterIndex_PAT]->packetsprocessed);
-	printf("PMT packets filtered     : %d\n", pidfilters[PIDFilterIndex_PMT]->packetsprocessed);
-	printf("Service packets filtered : %d\n", pidfilters[PIDFilterIndex_Service]->packetsprocessed);
-	printf("Service Filter Count     : %d\n", ServiceFilterCount);
+	int i;
+	printf("Packet Statistics\n"
+	       "-----------------\n");
+	
+	for (i = 0; i < PIDFilterIndex_Count; i ++);
+	{
+		printf("%s Filter :\n", PIDFilterNames[i]);
+		printf("\tFiltered  : %d\n", pidfilters[i]->packetsfiltered);
+		printf("\tProcessed : %d\n", pidfilters[i]->packetsprocessed);
+		printf("\tOutput    : %d\n", pidfilters[i]->packetsoutput);
+	}
+	printf("\n");
+	printf("Total packets processed: %d\n", tsfilter->totalpackets);
+}
+
+static void CommandAddOutput(char *argument)
+{
+	int i;
+	Output_t *output = NULL;
+	char *name;
+	char *destination;
+	
+	/* Work out the name */
+	name = argument;
+	destination = strchr(name, ' ');
+	*destination = 0;
+	/* Trim spaces from the start of the address */
+	destination = Trim(destination + 1);
+	
+	printlog(LOG_DEBUGV,"Name = \"%s\" Destination = \"%s\"\n", name, destination);
+	
+	for (i = 0; i < MAX_OUTPUTS; i ++) 
+	{
+		if (strcmp(name, outputs[i].name) == 0)
+		{
+			printf("Output already exists!\n");
+			return;
+		}
+		if ((output == NULL ) && (outputs[i].name == NULL))
+		{
+			output = &outputs[i];
+		}
+	}
+	if (!output)
+	{
+		printf("No free output slots!\n");
+		return;
+	}
+	
+	output->filter = PIDFilterAllocate(tsfilter);
+	if (output->filter)
+	{
+		printf("Failed to allocate PID filter!\n");
+		return;
+	}
+	output->pids.pidcount = 0;
+	output->filter->filterpacket = PIDFilterSimpleFilter;
+	output->filter->fparg = &output->pids;
+	output->filter->enabled = 1;
+	output->name = strdup(argument);
+	
+}
+
+static void CommandRmOutput(char *argument)
+{
+	int i;
+	Output_t *output = NULL;
+	char *name = Trim(argument);
+	
+	for (i = 0; i < MAX_OUTPUTS; i ++) 
+	{
+		if (strcmp(outputs[i].name,name) == 0)
+		{
+			output = &outputs[i];
+			break;
+		}
+	}
+	if (!output)
+	{
+		printf("Could not find output \"%s\"\n", argument);
+		return;
+	}
+	output->filter->enabled = 0;
+	PIDFilterFree(output->filter);
+	free(output->name);
+	memset(output, 0, sizeof(Output_t));
+}
+
+static void CommandAddPID(char *argument)
+{
+	uint16_t pid;
+	Output_t *output = ParseOutputPID(argument, &pid);
+	if (output)
+	{
+		output->pids.pids[output->pids.pidcount] = pid;
+		output->pids.pidcount ++;
+	}
+}
+
+static void CommandRmPID(char *argument)
+{
+	uint16_t pid;
+	Output_t *output = ParseOutputPID(argument, &pid);
+	if (output)
+	{
+		int i;
+		for ( i = 0; i < output->pids.pidcount; i ++)
+		{
+			if (output->pids.pids[i] == pid)
+			{
+				memcpy(&output->pids.pids[i], &output->pids.pids[i + 1], 
+					(output->pids.pidcount - (i + 1)) * sizeof(uint16_t));
+			}
+		}
+	}
+}
+
+static Output_t *ParseOutputPID(char *argument, uint16_t *pid)
+{
+	char *name;
+	char *pidstr;
+	char *formatstr;
+	
+	name = argument;
+	pidstr = strchr(argument, ' ');
+	*pidstr = 0;
+	pidstr ++;
+	
+	if ((pidstr[0] == '0') && (tolower(pidstr[1])=='x'))
+	{
+		pidstr[1] = 'x';
+		formatstr = "0x%x";
+	}
+	else
+	{
+		formatstr = "%d";
+	}
+	
+	if (sscanf(pidstr, formatstr, &pid) == 0)
+	{
+		printf("Failed to parse \"%s\"\n", pidstr);
+		return NULL;
+	}
+	
+	
+	return FindOutput(name);
+}
+
+static Output_t *FindOutput(char *name)
+{
+	Output_t *output = NULL;
+	int i;
+	for (i = 0; i < MAX_OUTPUTS; i ++) 
+	{
+		if (strcmp(outputs[i].name,name) == 0)
+		{
+			output = &outputs[i];
+			break;
+		}
+	}
+	
+	if (output == NULL)
+	{
+		printf("Failed to find output \"%s\"\n", name);
+	}
+	return output;
 }
 
 static void CommandHelp(char *argument)
 {
     int i;
-    for (i = 0; commands[i].command; i ++)
-    {
-        printf("%10s - %s\n", commands[i].command, commands[i].help);
-    }
-}
-/****************** Static functions **************************/
-/*
- * Output command line usage and help.
- */
-static void usage()
-{
-    fprintf(stderr,"Usage:dvbstream <options>\n"
-                   "      Options:\n"
-                   "      -v            : Increase the amount of debug output,\n"
-                   "                      can be used multiple times for more output\n"
-				   "      -o <host:port>: Output transport stream via UDP to the given host and port\n"
-				   "                      (Only one method of output can be selected)\n"
-                   "      -a <adapter>  : Use adapter number\n"
-                   "      -t <file>     : channels.conf file to import services and multiplexes from\n"
-           );
-}
-
-static PIDFilter_t *SetupPIDFilter(TSFilter_t *tsfilter,
-								   PacketProcessor filterpacket,  void *fparg,
-								   PacketProcessor processpacket, void *pparg,
-								   PacketProcessor outputpacket,  void *oparg)
-{
-	PIDFilter_t *filter;
-	filter = PIDFilterAllocate(tsfilter);
-
-	filter->filterpacket = filterpacket;
-	filter->fparg = fparg;
-	
-	filter->processpacket = processpacket;
-	filter->pparg = pparg;
-	
-	filter->outputpacket = outputpacket;
-	filter->oparg = oparg;
-}
-
-static void GetCommand(char **command, char **argument)
-{
-	char *line = readline(PROMPT);
-	*command = NULL;
-	*argument = NULL;
-
-	/* If the user has entered a non blank line process it */
-	if (line && line[0])
+	if (argument)
 	{
-		char *space = strchr(line, ' ');
-
-		add_history(line);
-
-		if (space)
+		int commandFound = 0;
+		for (i = 0; commands[i].command; i ++)
 		{
-			*space = 0;
-			*argument = malloc(strlen(space + 1) + 1);
-			if (*argument)
+			if (strcasecmp(commands[i].command,argument) == 0)
 			{
-				strcpy(*argument, space + 1);
+				printf("%s\n", commands[i].longhelp);
+				commandFound = 1;
+				break;
 			}
 		}
-		else
+		if (!commandFound)
 		{
-			*argument = "";
-		}
-		*command = malloc(strlen(line) + 1);
-		if (*command)
-		{
-			strcpy(*command, line);
+			printf("No help for unknown command \"%s\"\n", argument);
 		}
 	}
-	
-	/* Make sure we free the line buffer */
-	if (line)
+	else
 	{
-		free(line);
+	    for (i = 0; commands[i].command; i ++)
+	    {
+	        printf("%10s - %s\n", commands[i].command, commands[i].shorthelp);
+	    }
 	}
 }

@@ -35,6 +35,7 @@ Process Program Map Tables and update the services information and PIDs.
 #include "ts.h"
 #include "main.h"
 #include "cache.h"
+#include "logging.h"
 
 #define MAX_HANDLES 20
 
@@ -69,14 +70,14 @@ void PMTProcessorDestroy(void *arg)
 	free(state);
 }
 
-int PMTProcessorFilterPacket(void *arg, TSPacket_t *packet)
+int PMTProcessorFilterPacket(void *arg, uint16_t pid, TSPacket_t *packet)
 {
 	if (CurrentMultiplex)
 	{
 		int i;
 		int count;
 		Service_t **services;
-		unsigned short pid = TSPACKET_GETPID(*packet);
+
 		services = CacheServicesGet(&count);
 		for (i = 0; i < count; i ++)
 		{
@@ -89,8 +90,9 @@ int PMTProcessorFilterPacket(void *arg, TSPacket_t *packet)
 	return 0;
 }
 
-int PMTProcessorProcessPacket(void *arg, TSPacket_t *packet)
+TSPacket_t * PMTProcessorProcessPacket(void *arg, TSPacket_t *packet)
 {
+	TSPacket_t *result = NULL;
 	PMTProcessor_t *state = (PMTProcessor_t *)arg;
 	unsigned short pid = TSPACKET_GETPID(*packet);
 	int i;
@@ -133,17 +135,17 @@ int PMTProcessorProcessPacket(void *arg, TSPacket_t *packet)
 		}
 	}
 	
-	if (CurrentService == NULL)
+	if ((CurrentService != NULL) && (pid == CurrentService->pmtpid))
 	{
-		return 0;
+		result = packet;
 	}
-	return pid == CurrentService->pmtpid;
+	return result;
 }
 
 static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
 {
     Service_t *service = (Service_t*)arg;
-	printlog(1,"PMT recieved, version %d on PID %d (old version %d)\n", newpmt->i_version, service->pmtpid, service->pmtversion);
+	printlog(LOG_DEBUG,"PMT recieved, version %d on PID %d (old version %d)\n", newpmt->i_version, service->pmtpid, service->pmtversion);
     if (service->pmtversion != newpmt->i_version)
     {
         // Version has changed update the pids
@@ -156,7 +158,7 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
             esentry = esentry->p_next;
             count ++;
         }
-		printlog(2,"%d PIDs in PMT\n", count);
+		printlog(LOG_DEBUGV,"%d PIDs in PMT\n", count);
 		pids = calloc(count, sizeof(PID_t));
 		
 		if (pids)
@@ -171,7 +173,7 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
 			
 			for (i = 1; i < count; i ++)
 			{
-				printlog(2, "0x%04x %d\n", esentry->i_pid, esentry->i_type);
+				printlog(LOG_DEBUGV, "0x%04x %d\n", esentry->i_pid, esentry->i_type);
 				pids[i].pid = esentry->i_pid;
 				pids[i].type = esentry->i_type;
 				#if 0
@@ -180,7 +182,7 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
 					dvbpsi_descriptor_t *desc = esentry->p_first_descriptor;
 					while(desc)
 					{
-						printlog(2,"Descriptor %d\n", desc->i_tag);
+						printlog(LOG_DEBUGV,"Descriptor %d\n", desc->i_tag);
 						if (desc->i_tag == 10) /* ISO 639 Language Descriptor */
 						{
 							dvbpsi_iso639_dr_t *iso639 = (dvbpsi_iso639_dr_t*)desc->p_decoded;
@@ -196,7 +198,7 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
 				}
 				esentry = esentry->p_next;
 			}
-			printlog(2,"About to update cache\n");
+			printlog(LOG_DEBUGV,"About to update cache\n");
 			CacheUpdatePIDs(service, pids, count, newpmt->i_version);
 		}
     }

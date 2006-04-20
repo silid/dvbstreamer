@@ -25,6 +25,6 @@ Process Program Map Tables and update the services information and PIDs.
 
 void *PMTProcessorCreate();
 void PMTProcessorDestroy(void *arg);
-int PMTProcessorFilterPacket(void *arg, TSPacket_t *packet);
-int PMTProcessorProcessPacket(void *arg, TSPacket_t *packet);
+int PMTProcessorFilterPacket(void *arg, uint16_t pid, TSPacket_t *packet);
+TSPacket_t *PMTProcessorProcessPacket(void *arg, TSPacket_t *packet);
 #endif

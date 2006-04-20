@@ -14,8 +14,6 @@
 
 @SET_MAKE@
 
-SOURCES = $(dvbstreamer_SOURCES)
-
 srcdir = @srcdir@
 top_srcdir = @top_srcdir@
 VPATH = @srcdir@
@@ -56,7 +54,7 @@ am_dvbstreamer_OBJECTS = main.$(OBJEXT) dvb.$(OBJEXT) \
 	parsezap.$(OBJEXT) multiplexes.$(OBJEXT) services.$(OBJEXT) \
 	udpsend.$(OBJEXT) ts.$(OBJEXT) udpoutput.$(OBJEXT) \
 	patprocessor.$(OBJEXT) pmtprocessor.$(OBJEXT) dbase.$(OBJEXT) \
-	cache.$(OBJEXT)
+	cache.$(OBJEXT) logging.$(OBJEXT)
 dvbstreamer_OBJECTS = $(am_dvbstreamer_OBJECTS)
 dvbstreamer_DEPENDENCIES =
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
@@ -202,7 +200,8 @@ dvbstreamer_SOURCES = \
 	patprocessor.c\
 	pmtprocessor.c\
 	dbase.c\
-	cache.c
+	cache.c\
+	logging.c
 
 dvbstreamer_LDFLAGS = 
 dvbstreamer_LDADD = \
@@ -282,6 +281,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dbase.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dvb.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/logging.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/multiplexes.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/parsezap.Po@am__quote@

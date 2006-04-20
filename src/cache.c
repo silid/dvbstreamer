@@ -25,6 +25,7 @@ Caches service and PID information from the database for the current multiplex.
 #include "ts.h"
 #include "multiplexes.h"
 #include "services.h"
+#include "logging.h"
 
 #define SERVICES_MAX (256)
 
@@ -61,7 +62,7 @@ void CacheDeInit()
 int CacheLoad(Multiplex_t *multiplex)
 {
 	int count = ServiceForMultiplexCount(multiplex->freq);
-	printlog(1,"Loading %d services for %d\n", count, multiplex->freq);
+	printlog(LOG_DEBUG,"Loading %d services for %d\n", count, multiplex->freq);
 	if (count > 0)
 	{
 		int i;
@@ -73,7 +74,7 @@ int CacheLoad(Multiplex_t *multiplex)
 		for (i=0; i < count; i++)
 		{
 			cachedServices[i] = ServiceGetNext(enumerator);
-			printlog(1,"Loaded 0x%04x %s\n", cachedServices[i]->id, cachedServices[i]->name);
+			printlog(LOG_DEBUG,"Loaded 0x%04x %s\n", cachedServices[i]->id, cachedServices[i]->name);
 			CachePIDsLoad(cachedServices[i], i);
 			cacheFlags[i] = CacheFlag_Clean;
 		}
@@ -110,14 +111,14 @@ Service_t *CacheServiceFindName(char *name, Multiplex_t **multiplex)
 	int i;
 	if (cachedServices)
 	{
-		printlog(1,"Checking cached services..");
+		printlog(LOG_DEBUGV,"Checking cached services..");
 		for (i = 0; i < cachedServicesCount; i ++)
 		{
 			if (strcmp(cachedServices[i]->name, name) == 0)
 			{
 				result = cachedServices[i];
 				*multiplex = cachedServicesMultiplex;
-				printlog(1,"Found in cached services!\n");
+				printlog(LOG_DEBUGV,"Found in cached services!\n");
 				break;
 			}
 		}
@@ -126,7 +127,7 @@ Service_t *CacheServiceFindName(char *name, Multiplex_t **multiplex)
 	{
 		if (cachedServices)
 		{
-			printlog(1,"Not found in cached services\n");
+			printlog(LOG_DEBUGV,"Not found in cached services\n");
 		}
 		result = ServiceFindName(name);
 		if (result)

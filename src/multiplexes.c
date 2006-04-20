@@ -25,6 +25,7 @@ Manage multiplexes and tuning parameters.
 
 #include "dbase.h"
 #include "multiplexes.h"
+#include "logging.h"
 
 static sqlite3_stmt *MultiplexCountStmt;
 static sqlite3_stmt *MultiplexAddStmt;
@@ -109,7 +110,7 @@ Multiplex_t *MultiplexGetNext(MultiplexEnumerator_t enumerator)
 		multiplex->type = STATEMENT_COLUMN_INT( 2);
 		multiplex->patversion = STATEMENT_COLUMN_INT( 4);
 		
-		printlog(2,"Multiplex: %d, 0x%04x %d %d\n", multiplex->freq ,
+		printlog(LOG_DEBUGV,"Multiplex: %d, 0x%04x %d %d\n", multiplex->freq ,
 		multiplex->tsid,
 		multiplex->type,
 		multiplex->patversion);
