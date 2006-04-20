@@ -1,0 +1,23 @@
+Installing DVBStreamer
+======================
+First you need to build DVBStreamer I would suggest building outside of the tree
+as in the following example as it allows you to cleanup a build very easily.
+
+First extract the tar file (you must have already done this part as you are 
+reading this file!)
+
+tar xjf dvbstreamer-<version>.tar.bz2
+
+then create a directory to build it in:
+
+mkdir dvbstreamer-build
+cd dvbstreamer-build
+
+Now run configure and then make:
+
+<path to extracted dvbstreamer>/configure
+make
+
+Once every thing has built you can simply install it by calling make again as root:
+
+make install
