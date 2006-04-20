@@ -75,10 +75,11 @@ PIDFilter_t* PIDFilterAllocate(TSFilter_t* tsfilter)
 	{
 		return NULL;
 	}
-	tsfilter->pidfilters[i].allocated = 1;
-	tsfilter->pidfilters[i].filter.tsfilter = tsfilter;
-	tsfilter->pidfilters[i].filter.enabled = 0;
+	
 	memset(&tsfilter->pidfilters[i].filter, 0, sizeof(PIDFilter_t));
+	tsfilter->pidfilters[i].filter.tsfilter = tsfilter;
+	tsfilter->pidfilters[i].allocated = 1;
+	
 	return &tsfilter->pidfilters[i].filter;
 }
 
@@ -94,11 +95,10 @@ void PIDFilterFree(PIDFilter_t * pidfilter)
 	}
 }
 
-int PIDFilterSimpleFilter(void *arg, TSPacket_t *packet)
+int PIDFilterSimpleFilter(void *arg, uint16_t pid, TSPacket_t *packet)
 {
 	PIDFilterSimpleFilter_t *filter = (PIDFilterSimpleFilter_t*)arg;
 	int i;
-	unsigned short pid = TSPACKET_GETPID(*packet);
 	for (i = 0; i < filter->pidcount; i ++)
 	{
 		if (pid == filter->pids[i])
@@ -118,40 +118,48 @@ static void *FilterTS(void *arg)
     DVBAdapter_t *adapter = state->adapter;
 	int count = 0;
 
-    printf("FilterTS(%p): Started\n", state);
     while (!state->quit)
     {
         int p;
         //Read in packet
-        count = DVBDVRRead(adapter, (char*)state->readBuffer, sizeof(state->readBuffer), 100);
+        count = DVBDVRRead(adapter, (char*)state->readbuffer, sizeof(state->readbuffer), 100);
 		for (p = 0; (p < (count / TSPACKET_SIZE)) && state->enable; p ++)
 		{
-				ProcessPacket(state, &state->readBuffer[p]);
+			ProcessPacket(state, &state->readbuffer[p]);
+			state->totalpackets ++;
 		}
     }
-	printf("FilterTS(%p): Finished\n", state);
 	return NULL;
 }
 
 static void ProcessPacket(TSFilter_t *state, TSPacket_t *packet)
 {
 	int i;
+	uint16_t pid = TSPACKET_GETPID(*packet);
+	
 	for (i = 0; i < MAX_FILTERS; i ++)
 	{
 		if (state->pidfilters[i].allocated && state->pidfilters[i].filter.enabled)
 		{
 			PIDFilter_t *filter = &state->pidfilters[i].filter;
-			if (filter->filterpacket && filter->filterpacket(filter->fparg, packet))
+			if (filter->filterpacket && filter->filterpacket(filter->fparg, pid, packet))
 			{
 				int output = 1;
-				filter->packetsprocessed ++;
+				TSPacket_t *outputPacket = packet;
+				
+				filter->packetsfiltered ++;
+				
 				if (filter->processpacket)
 				{
-					output = filter->processpacket(filter->pparg, packet);
+					outputPacket = filter->processpacket(filter->pparg, packet);
+					output = (outputPacket) ? 1:0;
+					filter->packetsprocessed ++;
 				}
+				
 				if (output && filter->outputpacket)
 				{
-					filter->outputpacket(filter->oparg, packet);
+					filter->outputpacket(filter->oparg, outputPacket);
+					filter->packetsoutput ++;
 				}
 			}
 		}

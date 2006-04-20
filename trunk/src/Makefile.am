@@ -25,7 +25,8 @@ dvbstreamer_SOURCES = \
 	patprocessor.c\
 	pmtprocessor.c\
 	dbase.c\
-	cache.c
+	cache.c\
+	logging.c
 
 dvbstreamer_LDFLAGS = 
 

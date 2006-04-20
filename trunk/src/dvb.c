@@ -35,6 +35,7 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 #include <linux/dvb/frontend.h>
 
 #include "dvb.h"
+#include "logging.h"
 
 DVBAdapter_t *DVBInit(int adapter)
 {
@@ -52,21 +53,21 @@ DVBAdapter_t *DVBInit(int adapter)
         result->frontendfd = open(result->frontendPath, O_RDWR);
         if (result->frontendfd == -1)
         {
-			printlog(0,"Failed to open %s : %s\n",result->frontendPath, strerror(errno));
+			printlog(LOG_ERROR,"Failed to open %s : %s\n",result->frontendPath, strerror(errno));
            	DVBDispose(result);
            	return NULL;
         }
         result->demuxfd = open(result->demuxPath, O_RDWR);
         if (result->demuxfd == -1)
         {
-			printlog(0,"Failed to open %s : %s\n",result->demuxPath, strerror(errno));
+			printlog(LOG_ERROR,"Failed to open %s : %s\n",result->demuxPath, strerror(errno));
            DVBDispose(result);
            return NULL;
         }
         result->dvrfd = open(result->dvrPath, O_RDONLY | O_NONBLOCK);
         if (result->dvrfd == -1)
         {
-			printlog(0,"Failed to open %s : %s\n",result->dvrPath, strerror(errno));
+			printlog(LOG_ERROR,"Failed to open %s : %s\n",result->dvrPath, strerror(errno));
            DVBDispose(result);
            return NULL;
         }
@@ -77,17 +78,17 @@ void DVBDispose(DVBAdapter_t *adapter)
 {
      if (adapter->dvrfd > 0)
      {
-		 printlog(1,"Closing DVR file descriptor\n");
+		 printlog(LOG_DEBUGV,"Closing DVR file descriptor\n");
          close(adapter->dvrfd);
      }
      if (adapter->demuxfd > 0)
      {
-		 printlog(1,"Closing Demux file descriptor\n");
+		 printlog(LOG_DEBUGV,"Closing Demux file descriptor\n");
          close(adapter->demuxfd);
      }
      if (adapter->frontendfd > 0)
      {
-		 printlog(1,"Closing Frontend file descriptor\n");
+		 printlog(LOG_DEBUGV,"Closing Frontend file descriptor\n");
          close(adapter->frontendfd);
      }
      free(adapter);
@@ -103,7 +104,7 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
     
     if (ioctl(adapter->frontendfd, FE_SET_FRONTEND, frontend) < 0)
     {
-       printlog(2,"setfront front: %s\n", strerror(errno));
+       printlog(LOG_ERROR,"setfront front: %s\n", strerror(errno));
        return 0;
     }
     
@@ -116,7 +117,7 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
         {
             if (ioctl(adapter->frontendfd, FE_GET_EVENT, &event) == -EOVERFLOW)
             {
-                printlog(2,"EOVERFLOW");
+                printlog(LOG_ERROR,"EOVERFLOW");
                 return 0;
             }
             if (event.parameters.frequency <= 0)
@@ -131,21 +132,21 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
         status = 0;
         if (ioctl(adapter->frontendfd, FE_READ_STATUS, &status) < 0) 
         {
-          printlog(2,"fe get event: %s\n", strerror(errno));
+          printlog(LOG_ERROR,"fe get event: %s\n", strerror(errno));
           return 0;
         }
         
-        printlog(2,"status: %x\n", status);
+        printlog(LOG_DEBUGV,"status: %x\n", status);
         if (status & FE_HAS_LOCK)
         {
            break;
         }
         usleep(500000);
-        printlog(2,"Trying to get lock...");
+        printlog(LOG_DEBUGV,"Trying to get lock...");
     } while (!(status & FE_TIMEDOUT));
     
     /* inform the user of frontend status */ 
-   printlog(2,"Tuner status:  %c%c%c%c%c%c\n",
+   printlog(LOG_INFO,"Tuner status:  %c%c%c%c%c%c\n",
     (status & FE_HAS_SIGNAL)?'S':' ',
     (status & FE_TIMEDOUT)?'T':' ',
     (status & FE_HAS_LOCK)?'L':' ',
@@ -156,24 +157,24 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
     
     strength=0;
     if(ioctl(adapter->frontendfd,FE_READ_BER,&strength) >= 0)
-    printlog(2," Bit error rate: %i\n",strength);
+    printlog(LOG_INFO," Bit error rate: %i\n",strength);
     
     strength=0;
     if(ioctl(adapter->frontendfd,FE_READ_SIGNAL_STRENGTH,&strength) >= 0)
-    printlog(2," Signal strength: %i\n",strength);
+    printlog(LOG_INFO," Signal strength: %i\n",strength);
     
     strength=0;
     if(ioctl(adapter->frontendfd,FE_READ_SNR,&strength) >= 0)
-    printlog(2," Signal/Noise Ratio: %i\n",strength);
+    printlog(LOG_INFO," Signal/Noise Ratio: %i\n",strength);
     
     if (status & FE_HAS_LOCK && !(status & FE_TIMEDOUT)) 
     {
-        printlog(2," Lock achieved at %lu Hz\n",(unsigned long)frontend->frequency);   
+        printlog(LOG_DEBUGV," Lock achieved at %lu Hz\n",(unsigned long)frontend->frequency);   
         return 1;
     }
     else 
     {
-        printlog(2,"Unable to achieve lock at %lu Hz\n",(unsigned long)frontend->frequency);
+        printlog(LOG_DEBUGV,"Unable to achieve lock at %lu Hz\n",(unsigned long)frontend->frequency);
         return 0;
     }
     return 1;
@@ -195,7 +196,7 @@ int DVBDemuxSetPESFilter(DVBAdapter_t *adapter, ushort pid, int pidtype, int tap
     pesFilterParam.flags = DMX_IMMEDIATE_START;
     if (ioctl(adapter->demuxfd, DMX_SET_PES_FILTER, &pesFilterParam) < 0)
     {
-	   printlog(2,"set_pid: %s\n", strerror(errno));
+	   printlog(LOG_ERROR,"set_pid: %s\n", strerror(errno));
 	   return 0;
     }
     return 1;

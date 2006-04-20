@@ -26,6 +26,6 @@ Rewrite the PAT so that only the current service appears in the PAT.
 
 void *PATProcessorCreate();
 void PATProcessorDestroy(void *arg);
-int PATProcessorProcessPacket(void *arg, TSPacket_t *packet);
+TSPacket_t *PATProcessorProcessPacket(void *arg, TSPacket_t *packet);
 
 #endif

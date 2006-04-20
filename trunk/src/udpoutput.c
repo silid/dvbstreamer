@@ -26,6 +26,7 @@ UDP Output functions
 
 #include "ts.h"
 #include "udpsend.h"
+#include "logging.h"
 
 #define MTU 1400 /* Conservative estimate */
 #define IP_HEADER (5*4)
@@ -48,13 +49,13 @@ void *UDPOutputCreate(char *arg)
 	struct UDPOutputState_t *state = calloc(1, sizeof(struct UDPOutputState_t));
 	if (state == NULL)
 	{
-		printlog(2, "Failed to allocate UDP Output state\n");
+		printlog(LOG_DEBUG, "Failed to allocate UDP Output state\n");
 		return NULL;
 	}
 	state->socket = UDPCreateSocket();
 	if (state->socket == -1)
 	{
-		printlog(2, "Failed to create UDP socket\n");
+		printlog(LOG_DEBUG, "Failed to create UDP socket\n");
 		free(state);
 		return NULL;
 	}
@@ -76,7 +77,7 @@ void *UDPOutputCreate(char *arg)
 			host = arg;
 		}
 	}
-	printlog(1,"UDP Host \"%s\" Port \"%d\"\n", host, port);
+	printlog(LOG_DEBUG,"UDP Host \"%s\" Port \"%d\"\n", host, port);
 	if (UDPSetupSocketAddress(host, port, &state->address) == 0)
 	{
 		close(state->socket);
@@ -98,7 +99,7 @@ void UDPOutputClose(void *arg)
 	free(state);
 }
 
-int UDPOutputPacketOutput(void *arg, TSPacket_t *packet)
+void UDPOutputPacketOutput(void *arg, TSPacket_t *packet)
 {
 	struct UDPOutputState_t *state = arg;
 	state->outputbuffer[state->tspacketcount++] = *packet;
@@ -108,5 +109,4 @@ int UDPOutputPacketOutput(void *arg, TSPacket_t *packet)
 			MAX_TS_PACKETS_PER_DATAGRAM * TSPACKET_SIZE, &state->address);
 		state->tspacketcount = 0;
 	}
-	return 0;
 }

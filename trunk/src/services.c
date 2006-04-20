@@ -25,6 +25,7 @@ Manage services and PIDs.
 #include "dbase.h"
 #include "multiplexes.h"
 #include "services.h"
+#include "logging.h"
 
 int ServiceCount()
 {
@@ -103,7 +104,7 @@ int ServicePMTPIDSet(Service_t  *service, int pmtpid)
 	STATEMENT_STEP();
 	if (rc == SQLITE_DONE)
 	{
-		printlog(1,"Updated 0x%04x %d\n", service->id, service->multiplexfreq);
+		printlog(LOG_DEBUGV,"Updated 0x%04x %d\n", service->id, service->multiplexfreq);
 		service->pmtpid = pmtpid;
 		rc = SQLITE_OK;
 	}
@@ -294,7 +295,7 @@ int ServicePIDCount(Service_t *service)
 	if (rc == SQLITE_ROW)
 	{
 		result = STATEMENT_COLUMN_INT( 0);
-		printlog(1,"PID Count = %d\n", result);
+		printlog(LOG_DEBUGV,"PID Count = %d\n", result);
 		rc = 0;
 	}
 	STATEMENT_FINALIZE();

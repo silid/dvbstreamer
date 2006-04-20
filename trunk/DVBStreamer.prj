@@ -93,7 +93,8 @@ module.source.files=\
 	patprocessor.c\
 	pmtprocessor.c\
 	dbase.c\
-	cache.c
+	cache.c\
+	logging.c
 
 module.pixmap.name=pixmaps
 module.pixmap.type=
