@@ -718,7 +718,7 @@ static void CommandStats(char *argument)
 	printf("Packet Statistics\n"
 	       "-----------------\n");
 	
-	for (i = 0; i < PIDFilterIndex_Count; i ++);
+	for (i = 0; i < PIDFilterIndex_Count; i ++)
 	{
 		printf("%s Filter :\n", PIDFilterNames[i]);
 		printf("\tFiltered  : %d\n", pidfilters[i]->packetsfiltered);
@@ -747,7 +747,7 @@ static void CommandAddOutput(char *argument)
 	
 	for (i = 0; i < MAX_OUTPUTS; i ++) 
 	{
-		if (strcmp(name, outputs[i].name) == 0)
+		if (outputs[i].name && (strcmp(name, outputs[i].name) == 0))
 		{
 			printf("Output already exists!\n");
 			return;
@@ -783,17 +783,9 @@ static void CommandRmOutput(char *argument)
 	Output_t *output = NULL;
 	char *name = Trim(argument);
 	
-	for (i = 0; i < MAX_OUTPUTS; i ++) 
+	output = FindOutput(name);
+	if (output == NULL)
 	{
-		if (strcmp(outputs[i].name,name) == 0)
-		{
-			output = &outputs[i];
-			break;
-		}
-	}
-	if (!output)
-	{
-		printf("Could not find output \"%s\"\n", argument);
 		return;
 	}
 	output->filter->enabled = 0;
@@ -839,6 +831,11 @@ static Output_t *ParseOutputPID(char *argument, uint16_t *pid)
 	
 	name = argument;
 	pidstr = strchr(argument, ' ');
+	if (pidstr == NULL)
+	{
+		printf("Missing PID!\n");
+		return;
+	}
 	*pidstr = 0;
 	pidstr ++;
 	
@@ -851,8 +848,8 @@ static Output_t *ParseOutputPID(char *argument, uint16_t *pid)
 	{
 		formatstr = "%d";
 	}
-	
-	if (sscanf(pidstr, formatstr, &pid) == 0)
+
+	if (sscanf(pidstr, formatstr, pid) == 0)
 	{
 		printf("Failed to parse \"%s\"\n", pidstr);
 		return NULL;
@@ -868,7 +865,7 @@ static Output_t *FindOutput(char *name)
 	int i;
 	for (i = 0; i < MAX_OUTPUTS; i ++) 
 	{
-		if (strcmp(outputs[i].name,name) == 0)
+		if (outputs[i].name && (strcmp(outputs[i].name,name) == 0))
 		{
 			output = &outputs[i];
 			break;
