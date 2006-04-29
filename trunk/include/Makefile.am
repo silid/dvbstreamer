@@ -6,17 +6,9 @@
 
 dvbstreamer_includedir = $(pkgincludedir)
 
-dvbstreamer_include_DATA = \
-	dvb.h\
-	multiplexes.h\
-	parsezap.h\
-	services.h\
-	udpsend.h\
-	ts.h\
-	udpoutput.h\
-	main.h\
-	patprocessor.h\
-	pmtprocessor.h\
-	dbase.h
+dvbstreamer_include_DATA = dvb.h multiplexes.h parsezap.h services.h udpsend.h \
+	ts.h udpoutput.h main.h patprocessor.h pmtprocessor.h dbase.h logging.h
 
 EXTRA_DIST = $(dvbstreamer_include_DATA)
+noinst_HEADERS = dbase.h dvb.h logging.h main.h parsezap.h patprocessor.h\
+	pmtprocessor.h services.h ts.h udpoutput.h udpsend.h
