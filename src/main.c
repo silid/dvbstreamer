@@ -80,9 +80,9 @@ typedef struct Command_t
 
 static int ServiceFilterPacket(void *arg, uint16_t pid, TSPacket_t *packet);
 static PIDFilter_t *SetupPIDFilter(TSFilter_t *tsfilter,
-								   PacketFilter filterpacket,  void *fparg,
-								   PacketProcessor processpacket, void *pparg,
-								   PacketOutput outputpacket,  void *oparg);
+                                   PacketFilter filterpacket,  void *fparg,
+                                   PacketProcessor processpacket, void *pparg,
+                                   PacketOutput outputpacket,  void *oparg);
 static void usage();
 static void CommandLoop(void);
 static int ProcessFile(char *file);
@@ -98,8 +98,12 @@ static void CommandPids(char *argument);
 static void CommandStats(char *argument);
 static void CommandAddOutput(char *argument);
 static void CommandRmOutput(char *argument);
+static void CommandOutputs(char *argument);
+
 static void CommandAddPID(char *argument);
 static void CommandRmPID(char *argument);
+static void CommandOutputPIDs(char *argument);
+
 static Output_t *ParseOutputPID(char *argument, uint16_t *pid);
 static Output_t *FindOutput(char *name);
 static void CommandHelp(char *argument);
@@ -137,7 +141,8 @@ static Command_t commands[] = {
 		"select",
 		"Select a new service to stream",
 		"select <service name>\n"
-		"Sets <service name> as the current service, this may mean tuning to a different multiplex.",
+		"Sets <service name> as the current service, this may mean tuning to a different" 
+		"multiplex.",
 		CommandSelect
 	},
 	{
@@ -150,14 +155,16 @@ static Command_t commands[] = {
 	{
 		"stats",
 		"Display the stats for the PAT,PMT and service PID filters",
-		"Display the number of packets processed and the number of packets filtered by each filter.",
+		"Display the number of packets processed and the number of packets"
+		" filtered by each filter.",
 		CommandStats
 	},
 	{
 		"addoutput",
 		"Add a new destination for manually filtered PIDs.",
 		"addoutput <output name> <ipaddress>:<udp port>\n"
-		"Adds a new destination for sending packets to. This is only used for manually filtered packets"
+		"Adds a new destination for sending packets to. This is only used for"
+		" manually filtered packets."
 		"To send packets to this destination you'll need to also call \'filterpid\' "
 		"with this output as an argument.",
 		CommandAddOutput
@@ -168,6 +175,12 @@ static Command_t commands[] = {
 		"rmoutput <output name>\n"
 		"Removes the destination and stops all filters associated with this output.",
 		CommandRmOutput
+	},
+	{
+		"outputs",
+		"List current outputs",
+		"List all active additonal output names and destinations.",
+		CommandOutputs
 	},
 	{
 		"addpid",
@@ -183,13 +196,19 @@ static Command_t commands[] = {
 		"Removes the PID from the filter that is sending packets to the specified output.",
 		CommandRmPID
 	},
-    {
-        "help",
-        "Display the list of commands or help on a specific command",
+	{
+		"outputpids",
+		"List PIDs for output",
+		"List the PIDs being filtered for a specific output",
+		CommandOutputPIDs
+	},
+	{
+		"help",
+		"Display the list of commands or help on a specific command",
 		"help <command>\n"
 		"Displays help for the specified command.",
         CommandHelp
-    },
+	},
 	{NULL,NULL,NULL}
 };
 
@@ -197,7 +216,7 @@ static Command_t commands[] = {
 int main(int argc, char *argv[])
 {
 	char *startupFile = NULL;
-    char channelsFile[PATH_MAX];
+	char channelsFile[PATH_MAX];
 	void *outputArg = NULL;
 	int i;
 	int adapterNumber = 0;
@@ -427,24 +446,29 @@ Service_t *SetCurrentService(DVBAdapter_t *adapter, TSFilter_t *tsfilter, char *
 /*
  * Output command line usage and help.
  */
-static void usage()
+static void usage(char *appname)
 {
-    fprintf(stderr,"Usage:dvbstream <options>\n"
-                   "      Options:\n"
-                   "      -v            : Increase the amount of debug output, can be used multiple times for more\n"
-				   "                      output\n"
-				   "      -o <host:port>: Output transport stream via UDP to the given host and port\n"
-                   "      -a <adapter>  : Use adapter number\n"
-				   "      -f <file>     : Run startup script file before starting the command prompt.\n"
-                   "      -t <file>     : Terrestrial channels.conf file to import services and multiplexes from.\n"
-				   "      -s <file>     : Satellite channels.conf file to import services and multiplexes from.\n(NOT IMPLEMENTED)\n"
-				   "      -c <file>     : Cable channels.conf file to import services and multiplexes from.\n(NOT IMPLEMENTED)\n"
-           );
+  fprintf(stderr,"Usage:%s <options>\n"
+          "      Options:\n"
+          "      -v            : Increase the amount of debug output, can be used multiple\n" 
+          "                      times for more output\n"
+          "      -o <host:port>: Output transport stream via UDP to the given host and port\n"
+          "      -a <adapter>  : Use adapter number\n"
+          "      -f <file>     : Run startup script file before starting the command prompt\n"
+          "      -t <file>     : Terrestrial channels.conf file to import services and \n"
+          "                      multiplexes from.\n"
+          "      -s <file>     : Satellite channels.conf file to import services and \n" 
+          "                      multiplexes from.(NOT IMPLEMENTED)\n"
+          "      -c <file>     : Cable channels.conf file to import services and \n"
+          "                      multiplexes from.(NOT IMPLEMENTED)\n",
+	appname
+         );
 }
+
 static PIDFilter_t *SetupPIDFilter(TSFilter_t *tsfilter,
-								   PacketFilter filterpacket,  void *fparg,
-								   PacketProcessor processpacket, void *pparg,
-								   PacketOutput outputpacket,  void *oparg)
+                                   PacketFilter filterpacket,  void *fparg,
+                                   PacketProcessor processpacket, void *pparg,
+                                   PacketOutput outputpacket,  void *oparg)
 {
 	PIDFilter_t *filter;
 	filter = PIDFilterAllocate(tsfilter);
@@ -494,20 +518,32 @@ static int ProcessFile(char *file)
 	FILE *fp;
 	char *command;
 	char *argument;
-	
+	char line[256];
+	char *nl;
+
 	fp = fopen(file, "r");
 	if (!fp)
 	{
 		return 1;
 	}
-	rl_instream = fp;
 	
 	quit = 0;
 	while(!feof(fp) && !quit)
 	{
+		fgets(line, sizeof(line), fp);
+		nl = strchr(line, '\n');
+		if (nl)
+		{
+			*nl = 0;
+		}
+		nl = strchr(line, '\r');
+		if (nl)
+		{
+			*nl = 0;
+		}
 		lineno ++;
-		GetCommand(&command, &argument);
-		if (command)
+		ParseLine(line, &command, &argument);
+		if (command && (strlen(command) > 0))
 		{
 			if (!ProcessCommand(command, argument))
 			{
@@ -518,9 +554,10 @@ static int ProcessFile(char *file)
 			{
 				free(argument);
 			}
-		}		
+		}
+		
 	}
-	rl_instream = NULL;
+
 	fclose(fp);
 	return 0;
 }
@@ -726,6 +763,20 @@ static void CommandStats(char *argument)
 		printf("\tOutput    : %d\n", pidfilters[i]->packetsoutput);
 	}
 	printf("\n");
+
+	printf("Manual Output Statistics\n"
+	       "------------------------\n");
+	for (i = 0; i < MAX_OUTPUTS; i ++)
+	{
+		if (!outputs[i].name)
+		{
+			continue;
+		}
+		printf("%s Filter :\n", outputs[i].name);
+		printf("\tFiltered  : %d\n", outputs[i].filter->packetsfiltered);
+		printf("\tOutput    : %d\n", outputs[i].filter->packetsoutput);
+	}
+
 	printf("Total packets processed: %d\n", tsfilter->totalpackets);
 }
 
@@ -764,7 +815,7 @@ static void CommandAddOutput(char *argument)
 	}
 	
 	output->filter = PIDFilterAllocate(tsfilter);
-	if (output->filter)
+	if (!output->filter)
 	{
 		printf("Failed to allocate PID filter!\n");
 		return;
@@ -772,8 +823,17 @@ static void CommandAddOutput(char *argument)
 	output->pids.pidcount = 0;
 	output->filter->filterpacket = PIDFilterSimpleFilter;
 	output->filter->fparg = &output->pids;
+	output->filter->outputpacket = UDPOutputPacketOutput;
+	output->filter->oparg = UDPOutputCreate(destination);
+	if (!output->filter->oparg)
+	{
+		printf("Failed to parse ip and udp port!\n");
+		PIDFilterFree(output->filter);
+		return;
+	}
 	output->filter->enabled = 1;
-	output->name = strdup(argument);
+        output->name = strdup(argument);
+
 	
 }
 
@@ -792,6 +852,19 @@ static void CommandRmOutput(char *argument)
 	PIDFilterFree(output->filter);
 	free(output->name);
 	memset(output, 0, sizeof(Output_t));
+}
+
+static void CommandOutputs(char *argument)
+{
+	int i;
+	for (i = 0; i < MAX_OUTPUTS; i ++) 
+	{
+		if (outputs[i].name)
+		{
+			printf("%10s : %s\n",outputs[i].name,
+				 UDPOutputDestination(outputs[i].filter->oparg));
+		}
+	}
 }
 
 static void CommandAddPID(char *argument)
@@ -818,9 +891,41 @@ static void CommandRmPID(char *argument)
 			{
 				memcpy(&output->pids.pids[i], &output->pids.pids[i + 1], 
 					(output->pids.pidcount - (i + 1)) * sizeof(uint16_t));
+				output->pids.pidcount --;
+				break;
 			}
 		}
 	}
+}
+
+static void CommandOutputPIDs(char *argument)
+{
+	int i;
+	Output_t *output = NULL;
+	char *name;
+
+	if (argument == NULL)
+	{
+		printf("Missing output\n");
+		return;
+	}
+
+	name = Trim(argument);
+	
+	output = FindOutput(name);
+
+	if (!output)
+	{
+		return;
+	}
+
+	printf("PIDs for \'%s\' (%d):\n", name, output->pids.pidcount);
+	
+	for (i = 0; i < output->pids.pidcount; i ++)
+	{
+		printf("0x%x\n", output->pids.pids[i]);
+	}
+
 }
 
 static Output_t *ParseOutputPID(char *argument, uint16_t *pid)
@@ -834,7 +939,7 @@ static Output_t *ParseOutputPID(char *argument, uint16_t *pid)
 	if (pidstr == NULL)
 	{
 		printf("Missing PID!\n");
-		return;
+		return NULL;
 	}
 	*pidstr = 0;
 	pidstr ++;
@@ -842,11 +947,11 @@ static Output_t *ParseOutputPID(char *argument, uint16_t *pid)
 	if ((pidstr[0] == '0') && (tolower(pidstr[1])=='x'))
 	{
 		pidstr[1] = 'x';
-		formatstr = "0x%x";
+		formatstr = "0x%hx";
 	}
 	else
 	{
-		formatstr = "%d";
+		formatstr = "%hd";
 	}
 
 	if (sscanf(pidstr, formatstr, pid) == 0)
@@ -855,7 +960,7 @@ static Output_t *ParseOutputPID(char *argument, uint16_t *pid)
 		return NULL;
 	}
 	
-	
+	printf("%s 0x%x %d\n", name, *pid, *pid);
 	return FindOutput(name);
 }
 
