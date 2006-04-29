@@ -1,26 +1,26 @@
-/* 
+/*
 Copyright (C) 2006  Adam Charrett
-
+ 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
-
+ 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
-
+ 
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
-
+ 
 parsezap.c
-
+ 
 Parse channels.conf file and add services to the database.
-
+ 
 Majority of the parsing code taken from the xine input_dvb plugin code.
-
+ 
 */
 #include <stdlib.h>
 #include <string.h>
@@ -29,132 +29,141 @@ Majority of the parsing code taken from the xine input_dvb plugin code.
 #include "services.h"
 #include "logging.h"
 
-typedef struct {
-	char *name;
-	int value;
-} Param;
+typedef struct
+{
+    char *name;
+    int value;
+}
+Param;
 
-static const Param inversion_list [] = {
-	{ "INVERSION_OFF", INVERSION_OFF },
-	{ "INVERSION_ON", INVERSION_ON },
-	{ "INVERSION_AUTO", INVERSION_AUTO },
+static const Param inversion_list [] =
+    {
+        { "INVERSION_OFF", INVERSION_OFF },
+        { "INVERSION_ON", INVERSION_ON },
+        { "INVERSION_AUTO", INVERSION_AUTO },
         { NULL, 0 }
-};
+    };
 
-static const Param bw_list [] = {
-	{ "BANDWIDTH_6_MHZ", BANDWIDTH_6_MHZ },
-	{ "BANDWIDTH_7_MHZ", BANDWIDTH_7_MHZ },
-	{ "BANDWIDTH_8_MHZ", BANDWIDTH_8_MHZ },
+static const Param bw_list [] =
+    {
+        { "BANDWIDTH_6_MHZ", BANDWIDTH_6_MHZ },
+        { "BANDWIDTH_7_MHZ", BANDWIDTH_7_MHZ },
+        { "BANDWIDTH_8_MHZ", BANDWIDTH_8_MHZ },
         { NULL, 0 }
-};
+    };
 
-static const Param fec_list [] = {
-	{ "FEC_1_2", FEC_1_2 },
-	{ "FEC_2_3", FEC_2_3 },
-	{ "FEC_3_4", FEC_3_4 },
-	{ "FEC_4_5", FEC_4_5 },
-	{ "FEC_5_6", FEC_5_6 },
-	{ "FEC_6_7", FEC_6_7 },
-	{ "FEC_7_8", FEC_7_8 },
-	{ "FEC_8_9", FEC_8_9 },
-	{ "FEC_AUTO", FEC_AUTO },
-	{ "FEC_NONE", FEC_NONE },
+static const Param fec_list [] =
+    {
+        { "FEC_1_2", FEC_1_2 },
+        { "FEC_2_3", FEC_2_3 },
+        { "FEC_3_4", FEC_3_4 },
+        { "FEC_4_5", FEC_4_5 },
+        { "FEC_5_6", FEC_5_6 },
+        { "FEC_6_7", FEC_6_7 },
+        { "FEC_7_8", FEC_7_8 },
+        { "FEC_8_9", FEC_8_9 },
+        { "FEC_AUTO", FEC_AUTO },
+        { "FEC_NONE", FEC_NONE },
         { NULL, 0 }
-};
+    };
 
-static const Param guard_list [] = {
-	{"GUARD_INTERVAL_1_16", GUARD_INTERVAL_1_16},
-	{"GUARD_INTERVAL_1_32", GUARD_INTERVAL_1_32},
-	{"GUARD_INTERVAL_1_4", GUARD_INTERVAL_1_4},
-	{"GUARD_INTERVAL_1_8", GUARD_INTERVAL_1_8},
+static const Param guard_list [] =
+    {
+        {"GUARD_INTERVAL_1_16", GUARD_INTERVAL_1_16},
+        {"GUARD_INTERVAL_1_32", GUARD_INTERVAL_1_32},
+        {"GUARD_INTERVAL_1_4", GUARD_INTERVAL_1_4},
+        {"GUARD_INTERVAL_1_8", GUARD_INTERVAL_1_8},
         { NULL, 0 }
-};
+    };
 
-static const Param hierarchy_list [] = {
-	{ "HIERARCHY_1", HIERARCHY_1 },
-	{ "HIERARCHY_2", HIERARCHY_2 },
-	{ "HIERARCHY_4", HIERARCHY_4 },
-	{ "HIERARCHY_NONE", HIERARCHY_NONE },
+static const Param hierarchy_list [] =
+    {
+        { "HIERARCHY_1", HIERARCHY_1 },
+        { "HIERARCHY_2", HIERARCHY_2 },
+        { "HIERARCHY_4", HIERARCHY_4 },
+        { "HIERARCHY_NONE", HIERARCHY_NONE },
         { NULL, 0 }
-};
+    };
 
-static const Param qam_list [] = {
-	{ "QPSK", QPSK },
-	{ "QAM_128", QAM_128 },
-	{ "QAM_16", QAM_16 },
-	{ "QAM_256", QAM_256 },
-	{ "QAM_32", QAM_32 },
-	{ "QAM_64", QAM_64 },
+static const Param qam_list [] =
+    {
+        { "QPSK", QPSK },
+        { "QAM_128", QAM_128 },
+        { "QAM_16", QAM_16 },
+        { "QAM_256", QAM_256 },
+        { "QAM_32", QAM_32 },
+        { "QAM_64", QAM_64 },
         { NULL, 0 }
-};
+    };
 
-static const Param transmissionmode_list [] = {
-	{ "TRANSMISSION_MODE_2K", TRANSMISSION_MODE_2K },
-	{ "TRANSMISSION_MODE_8K", TRANSMISSION_MODE_8K },
+static const Param transmissionmode_list [] =
+    {
+        { "TRANSMISSION_MODE_2K", TRANSMISSION_MODE_2K },
+        { "TRANSMISSION_MODE_8K", TRANSMISSION_MODE_8K },
         { NULL, 0 }
-};
+    };
 
 static int find_param(const Param *list, const char *name)
 {
-  while (list->name && strcmp(list->name, name))
-    list++;
-  return list->value;;
+    while (list->name && strcmp(list->name, name))
+        list++;
+    return list->value;;
 }
 
 static int parsezapline(char * str)
 {
-	/*
-		try to extract channel data from a string in the following format
-		(DVBT) OFDM: <channel name>:<frequency>:<inversion>:
-						<bw>:<fec_hp>:<fec_lp>:<qam>:
-						<transmissionm>:<guardlist>:<hierarchinfo>:<vpid>:<apid>
-		
-		<channel name> = any string not containing ':'
-		<frequency>    = unsigned long
-		<polarisation> = 'v' or 'h'
-		<sat_no>       = unsigned long, usually 0 :D
-		<sym_rate>     = symbol rate in MSyms/sec
-		
-		
-		<inversion>    = INVERSION_ON | INVERSION_OFF | INVERSION_AUTO
-		<fec>          = FEC_1_2, FEC_2_3, FEC_3_4 .... FEC_AUTO ... FEC_NONE
-		<qam>          = QPSK, QAM_128, QAM_16 ...
+    /*
+    	try to extract channel data from a string in the following format
+    	(DVBT) OFDM: <channel name>:<frequency>:<inversion>:
+    					<bw>:<fec_hp>:<fec_lp>:<qam>:
+    					<transmissionm>:<guardlist>:<hierarchinfo>:<vpid>:<apid>
+    	
+    	<channel name> = any string not containing ':'
+    	<frequency>    = unsigned long
+    	<polarisation> = 'v' or 'h'
+    	<sat_no>       = unsigned long, usually 0 :D
+    	<sym_rate>     = symbol rate in MSyms/sec
+    	
+    	
+    	<inversion>    = INVERSION_ON | INVERSION_OFF | INVERSION_AUTO
+    	<fec>          = FEC_1_2, FEC_2_3, FEC_3_4 .... FEC_AUTO ... FEC_NONE
+    	<qam>          = QPSK, QAM_128, QAM_16 ...
 
-		<bw>           = BANDWIDTH_6_MHZ, BANDWIDTH_7_MHZ, BANDWIDTH_8_MHZ
-		<fec_hp>       = <fec>
-		<fec_lp>       = <fec>
-		<transmissionm> = TRANSMISSION_MODE_2K, TRANSMISSION_MODE_8K
-		<vpid>         = video program id
-		<apid>         = audio program id
+    	<bw>           = BANDWIDTH_6_MHZ, BANDWIDTH_7_MHZ, BANDWIDTH_8_MHZ
+    	<fec_hp>       = <fec>
+    	<fec_lp>       = <fec>
+    	<transmissionm> = TRANSMISSION_MODE_2K, TRANSMISSION_MODE_8K
+    	<vpid>         = video program id
+    	<apid>         = audio program id
 
-	*/
-	unsigned long freq;
-	char *field, *tmp;
+    */
+    unsigned long freq;
+    char *field, *tmp;
     struct dvb_frontend_parameters   front_param;
     char *name;
-	int id;
-	
-	tmp = str;
-    #define NEXTFIELD() if(!(field = strsep(&tmp, ":")))return -1
-    
-	/* find the channel name */
-	NEXTFIELD();
-	name = strdup(field);
+    int id;
 
-	/* find the frequency */
-	NEXTFIELD();
-	freq = strtoul(field,NULL,0);
+    tmp = str;
+#define NEXTFIELD() if(!(field = strsep(&tmp, ":")))return -1
+
+    /* find the channel name */
+    NEXTFIELD();
+    name = strdup(field);
+
+    /* find the frequency */
+    NEXTFIELD();
+    freq = strtoul(field,NULL,0);
 
     /* DVB-T frequency is in kHz - workaround broken channels.confs */
-    if (freq < 1000000) 
+    if (freq < 1000000)
     {
         freq*=1000;
     }
     front_param.frequency = freq;
 
-	/* find out the inversion */
-	NEXTFIELD();
-	front_param.inversion = find_param(inversion_list, field);
+    /* find out the inversion */
+    NEXTFIELD();
+    front_param.inversion = find_param(inversion_list, field);
 
     /* find out the bandwidth */
     NEXTFIELD();
@@ -182,9 +191,9 @@ static int parsezapline(char * str)
 
     NEXTFIELD();
     front_param.u.ofdm.hierarchy_information = find_param(hierarchy_list, field);
-	printlog(LOG_DEBUGV,"Adding frequency %d\n", front_param.frequency);
+    printlog(LOG_DEBUGV,"Adding frequency %d\n", front_param.frequency);
     MultiplexAdd(FE_OFDM, &front_param);
-    
+
     /* Video PID - not used but we'll take it anyway */
     NEXTFIELD();
     /* Audio PID - it's only for mpegaudio so we don't use it anymore */
@@ -193,27 +202,27 @@ static int parsezapline(char * str)
     NEXTFIELD();
     id = strtoul(field, NULL, 0);
     printlog(LOG_DEBUGV, "Adding service \"%s\" %d\n", name, id);
-    ServiceAdd(front_param.frequency, name, id, -1, -1);    
-	return 0;
+    ServiceAdd(front_param.frequency, name, id, -1, -1);
+    return 0;
 }
 
-int parsezapfile(char *path) 
+int parsezapfile(char *path)
 {
-  FILE      *f;
-  char       str[255];
-  int        result;
+    FILE      *f;
+    char       str[255];
+    int        result;
 
-  f = fopen(path, "rb");
-  if (!f) 
-  {
-     fprintf( stderr, "Failed to open dvb channel file '%s'\n", path); 
-     return 0;
-  }
+    f = fopen(path, "rb");
+    if (!f)
+    {
+        fprintf( stderr, "Failed to open dvb channel file '%s'\n", path);
+        return 0;
+    }
 
-  while ( fgets (str, sizeof(str), f))
-  {
+    while ( fgets (str, sizeof(str), f))
+    {
         result = parsezapline(str);
-  }
+    }
 
-  return 1;
+    return 1;
 }
