@@ -202,4 +202,5 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
 			CacheUpdatePIDs(service, pids, count, newpmt->i_version);
 		}
     }
+	dvbpsi_DeletePMT(newpmt);
 }

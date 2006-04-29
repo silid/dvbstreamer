@@ -114,7 +114,7 @@ TSPacket_t *PATProcessorProcessPacket(void *arg, TSPacket_t *packet)
 static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
 {
 	PATProcessor_t *state = (PATProcessor_t*)arg;
-    Multiplex_t *multiplex = state->multiplex;
+	Multiplex_t *multiplex = state->multiplex;
 	printlog(LOG_DEBUG,"PAT recieved, version %d (old version %d)\n", newpat->i_version, multiplex->patversion);
     if (multiplex->patversion != newpat->i_version)
     {
@@ -131,6 +131,7 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
         }
 		CacheUpdateMultiplex(multiplex, newpat->i_version, newpat->i_ts_id);
     }
+	dvbpsi_DeletePAT(newpat);
 }
 
 static void PATRewrite(TSPacket_t *packet, int tsid, int version, int serviceid, int pmtpid)
