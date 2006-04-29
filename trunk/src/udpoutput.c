@@ -23,7 +23,7 @@ UDP Output functions
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
+#include <sys/socket.h>
 #include "ts.h"
 #include "udpsend.h"
 #include "logging.h"
@@ -109,4 +109,19 @@ void UDPOutputPacketOutput(void *arg, TSPacket_t *packet)
 			MAX_TS_PACKETS_PER_DATAGRAM * TSPACKET_SIZE, &state->address);
 		state->tspacketcount = 0;
 	}
+}
+
+char destinationBuffer[24]; /* 255.255.255.255:63536 */
+
+char *UDPOutputDestination(void *arg)
+{
+	struct UDPOutputState_t *state = arg;
+	unsigned int addr = ntohl(state->address.sin_addr.s_addr);
+	sprintf(destinationBuffer, "%d.%d.%d.%d:%d",
+		(addr & 0xff000000) >> 24,
+		(addr & 0x00ff0000) >> 16,
+		(addr & 0x0000ff00) >> 8,
+		(addr & 0x000000ff) >> 0,
+		ntohs(state->address.sin_port));
+	return destinationBuffer;
 }

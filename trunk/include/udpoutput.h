@@ -25,4 +25,5 @@ UDP Output functions
 void *UDPOutputCreate(char *arg);
 void UDPOutputClose(void *udpoutput);
 void UDPOutputPacketOutput(void *arg, TSPacket_t *packet);
+char *UDPOutputDestination(void *arg);
 #endif
