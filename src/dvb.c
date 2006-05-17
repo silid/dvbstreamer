@@ -41,11 +41,11 @@ DVBAdapter_t *DVBInit(int adapter)
 {
     DVBAdapter_t *result = NULL;
     result = (DVBAdapter_t*)calloc(sizeof(DVBAdapter_t), 1);
-    result->frontendfd = -1;
-    result->demuxfd = -1;
-    result->dvrfd = -1;
     if (result)
     {
+        result->frontendfd = -1;
+        result->demuxfd = -1;
+        result->dvrfd = -1;
         result->adapter = adapter;
         sprintf(result->frontendPath, "/dev/dvb/adapter%d/frontend0", adapter);
         sprintf(result->demuxPath, "/dev/dvb/adapter%d/demux0", adapter);
@@ -76,17 +76,17 @@ DVBAdapter_t *DVBInit(int adapter)
 }
 void DVBDispose(DVBAdapter_t *adapter)
 {
-    if (adapter->dvrfd > 0)
+    if (adapter->dvrfd > -1)
     {
         printlog(LOG_DEBUGV,"Closing DVR file descriptor\n");
         close(adapter->dvrfd);
     }
-    if (adapter->demuxfd > 0)
+    if (adapter->demuxfd > -1)
     {
         printlog(LOG_DEBUGV,"Closing Demux file descriptor\n");
         close(adapter->demuxfd);
     }
-    if (adapter->frontendfd > 0)
+    if (adapter->frontendfd > -1)
     {
         printlog(LOG_DEBUGV,"Closing Frontend file descriptor\n");
         close(adapter->frontendfd);
