@@ -27,18 +27,12 @@ Manage multiplexes and tuning parameters.
 #include "multiplexes.h"
 #include "logging.h"
 
-static sqlite3_stmt *MultiplexCountStmt;
-static sqlite3_stmt *MultiplexAddStmt;
-static sqlite3_stmt *MultiplexFindStmt;
-static sqlite3_stmt *MultiplexPATVersionSetStmt;
-static sqlite3_stmt *MultiplexNameSetStmt;
-static sqlite3_stmt *MultiplexTSIdSetStmt;
-
-static sqlite3_stmt *FEParamsOFDMGetStmt;
-static sqlite3_stmt *FEParamsOFDMAddStmt;
-
 int OFDMParametersGet(int freq, struct dvb_frontend_parameters *feparams);
 int OFDMParametersAdd(struct dvb_frontend_parameters *feparams);
+int QPSKParametersGet(int freq, struct dvb_frontend_parameters *feparams);
+int QPSKParametersAdd(struct dvb_frontend_parameters *feparams);
+int QAMParametersGet(int freq, struct dvb_frontend_parameters *feparams);
+int QAMParametersAdd(struct dvb_frontend_parameters *feparams);
 
 int MultiplexCount()
 {
@@ -124,9 +118,19 @@ Multiplex_t *MultiplexGetNext(MultiplexEnumerator_t enumerator)
 int MultiplexFrontendParametersGet(Multiplex_t *multiplex, struct dvb_frontend_parameters *feparams)
 {
 	int result = -1;
-	if (multiplex->type == FE_OFDM)
+	switch(multiplex->type)
 	{
+		case FE_QPSK:
+		result = QPSKParametersGet(multiplex->freq, feparams);
+		break;
+		case FE_QAM:
+		result = QAMParametersGet(multiplex->freq, feparams);
+		break;
+		case FE_OFDM:
 		result = OFDMParametersGet(multiplex->freq, feparams);
+		break;
+		default:
+		break;
 	}
 	return result;
 }
@@ -134,10 +138,19 @@ int MultiplexFrontendParametersGet(Multiplex_t *multiplex, struct dvb_frontend_p
 int MultiplexAdd(fe_type_t type, struct dvb_frontend_parameters *feparams)
 {
 	STATEMENT_INIT;
-
-	if (type == FE_OFDM)
+	switch(type)
 	{
+		case FE_QPSK:
+		rc = QPSKParametersAdd(feparams);
+		break;
+		case FE_QAM:
+		rc = QAMParametersAdd(feparams);
+		break;
+		case FE_OFDM:
 		rc = OFDMParametersAdd(feparams);
+		break;
+		default:
+		return -1;
 	}
 	RETURN_RC_ON_ERROR;
 	STATEMENT_PREPAREVA("INSERT INTO " MULTIPLEXES_TABLE "("
@@ -241,6 +254,123 @@ int OFDMParametersAdd(struct dvb_frontend_parameters *feparams)
 						feparams->u.ofdm.transmission_mode,
 						feparams->u.ofdm.guard_interval,
 						feparams->u.ofdm.hierarchy_information);
+	RETURN_RC_ON_ERROR;
+	
+	STATEMENT_STEP();
+	
+	STATEMENT_FINALIZE();
+	return rc;
+}
+
+int QPSKParametersGet(int freq, struct dvb_frontend_parameters *feparams)
+{
+	STATEMENT_INIT;
+	STATEMENT_PREPAREVA("SELECT "	OFDMPARAM_FREQ ","
+						OFDMPARAM_INVERSION ","
+						OFDMPARAM_BW ","
+						OFDMPARAM_FEC_HP ","
+						OFDMPARAM_FEC_LP ","
+						OFDMPARAM_QAM ","
+						OFDMPARAM_TRANSMISSIONM ","
+						OFDMPARAM_GUARDLIST ","
+						OFDMPARAM_HIERARCHINFO " "
+						"FROM " OFDMPARAMS_TABLE " WHERE " OFDMPARAM_FREQ "=%d;"
+						,freq);
+	RETURN_RC_ON_ERROR;
+	
+	STATEMENT_STEP();
+	if (rc == SQLITE_ROW)
+	{
+		feparams->frequency                    = STATEMENT_COLUMN_INT( 0);
+		feparams->inversion                    = STATEMENT_COLUMN_INT( 1);
+		feparams->u.ofdm.bandwidth             = STATEMENT_COLUMN_INT( 2);
+		feparams->u.ofdm.code_rate_HP          = STATEMENT_COLUMN_INT( 3);
+		feparams->u.ofdm.code_rate_LP          = STATEMENT_COLUMN_INT( 4);
+		feparams->u.ofdm.constellation         = STATEMENT_COLUMN_INT( 5);
+		feparams->u.ofdm.transmission_mode     = STATEMENT_COLUMN_INT( 6);
+		feparams->u.ofdm.guard_interval        = STATEMENT_COLUMN_INT( 7);
+		feparams->u.ofdm.hierarchy_information = STATEMENT_COLUMN_INT( 8);
+		rc = 0;
+	}
+	STATEMENT_FINALIZE();
+	return rc;
+}
+
+int QPSKParametersAdd(struct dvb_frontend_parameters *feparams)
+{
+	STATEMENT_INIT;
+	STATEMENT_PREPAREVA("INSERT INTO " OFDMPARAMS_TABLE " "
+						"VALUES (" 
+						"%d," /* OFDMPARAM_FREQ */
+						"%d," /* OFDMPARAM_INVERSION */
+						"%d," /* OFDMPARAM_BW */
+						"%d," /* OFDMPARAM_FEC_HP */
+						"%d," /* OFDMPARAM_FEC_LP */
+						"%d," /* OFDMPARAM_QAM */
+						"%d," /* OFDMPARAM_TRANSMISSIONM */
+						"%d," /* OFDMPARAM_GUARDLIST */
+						"%d"  /* OFDMPARAM_HIERARCHINFO */
+						");",
+						feparams->frequency,
+						feparams->inversion,
+						feparams->u.ofdm.bandwidth,
+						feparams->u.ofdm.code_rate_HP,
+						feparams->u.ofdm.code_rate_LP,
+						feparams->u.ofdm.constellation,
+						feparams->u.ofdm.transmission_mode,
+						feparams->u.ofdm.guard_interval,
+						feparams->u.ofdm.hierarchy_information);
+	RETURN_RC_ON_ERROR;
+	
+	STATEMENT_STEP();
+	
+	STATEMENT_FINALIZE();
+	return rc;
+}
+
+int QAMParametersGet(int freq, struct dvb_frontend_parameters *feparams)
+{
+	STATEMENT_INIT;
+	STATEMENT_PREPAREVA("SELECT "	
+						QAMPARAM_FREQ ","
+	                    QAMPARAM_INVERSION ","
+	                    QAMPARAM_SYMBOL_RATE ","
+	                    QAMPARAM_FEC_INNER ","
+	                    QAMPARAM_MODULATION
+						"FROM " QAMPARAMS_TABLE " WHERE " QAMPARAM_FREQ "=%d;"
+						,freq);
+	RETURN_RC_ON_ERROR;
+	
+	STATEMENT_STEP();
+	if (rc == SQLITE_ROW)
+	{
+		feparams->frequency           = STATEMENT_COLUMN_INT( 0);
+		feparams->inversion           = STATEMENT_COLUMN_INT( 1);
+		feparams->u.qam.symbol_rate   = STATEMENT_COLUMN_INT( 2);
+		feparams->u.qam.fec_inner     = STATEMENT_COLUMN_INT( 3);
+		feparams->u.qam.modulation    = STATEMENT_COLUMN_INT( 4);
+		rc = 0;
+	}
+	STATEMENT_FINALIZE();
+	return rc;
+}
+
+int QAMParametersAdd(struct dvb_frontend_parameters *feparams)
+{
+	STATEMENT_INIT;
+	STATEMENT_PREPAREVA("INSERT INTO " OFDMPARAMS_TABLE " "
+						"VALUES (" 
+						"%d," /* QAMPARAM_FREQ */
+						"%d," /* QAMPARAM_INVERSION */
+						"%d," /* QAMPARAM_SYMBOL_RATE */
+						"%d," /* QAMPARAM_FEC_INNER */
+						"%d" /* QAMPARAM_MODULATION */
+						");",
+						feparams->frequency,
+						feparams->inversion,
+						feparams->u.qam.symbol_rate,
+						feparams->u.qam.fec_inner,
+						feparams->u.qam.modulation);
 	RETURN_RC_ON_ERROR;
 	
 	STATEMENT_STEP();

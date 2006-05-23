@@ -22,7 +22,7 @@ Manage multiplexes and tuning parameters.
 */
 #ifndef _MULTIPLEX_H_
 #define _MULTIPLEX_H_
-#include <linux/types.h>
+#include <sys/types.h>
 #include <linux/dvb/dmx.h>
 #include <linux/dvb/frontend.h>
 
