@@ -31,11 +31,15 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 #include "main.h"
 #include "logging.h"
 
-#define VERSION 0.1
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
+/* This is the version of the database not the application!*/
+#define DBASE_VERSION 0.2
 
 sqlite3 *DBaseInstance;
 
-int DBaseCreateTables();
+int DBaseCreateTables(double version);
 int DBaseCheckVersion();
 
 int DBaseInit(int adapter)
@@ -69,106 +73,136 @@ void DBaseDeInit()
 
 int DBaseCheckVersion()
 {
-    int rc;
-    char **results;
-    int nrow, ncolumn;
-    rc = sqlite3_get_table(DBaseInstance, "select version from Version;",  &results, &nrow, &ncolumn, NULL);
-    if (rc)
+    STATEMENT_INIT;
+	double version;
+	STATEMENT_PREPARE("select " VERSION_VERSION " from " VERSION_TABLE ";");
+    STATEMENT_STEP();
+    if ((rc != SQLITE_OK) && (rc != SQLITE_ROW) && (rc != SQLITE_DONE))
     {
-        return DBaseCreateTables();
+		printlog(LOG_DEBUG, "Failed to get contents of version table (%d)\n", rc);
+		version = 0.0f;
     }
+	else
+	{
+		version = STATEMENT_COLUMN_DOUBLE(0);
+	}
+	STATEMENT_FINALIZE();
+	printlog(LOG_DEBUG, "Current version of database is %f\n", version);
     /* Check version number and upgrade tables for future releases ? */
-
-    sqlite3_free_table(results);
+	rc = DBaseCreateTables(version);
     return rc;
 }
 
-int DBaseCreateTables()
+int DBaseCreateTables(double version)
 {
     int rc;
 
     printlog(LOG_DEBUG, "Creating tables\n");
-    rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " SERVICES_TABLE " ( "
-                      SERVICE_MPLEXFREQ ","
-                      SERVICE_ID ","
-                      SERVICE_NAME ","
-                      SERVICE_PMTPID ","
-                      SERVICE_PMTVERSION ","
-                      "PRIMARY KEY ( "SERVICE_MPLEXFREQ "," SERVICE_ID ")"
-                      ");", NULL, NULL, NULL);
-    if (rc)
-    {
-        printlog(LOG_ERROR, "Failed to create Services table: %s\n", sqlite3_errmsg(DBaseInstance));
-        return rc;
-    }
+	/* Version 0.1 - 0.2 tables */
+	if (version < 0.1)
+	{
+	    rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " SERVICES_TABLE " ( "
+	                      SERVICE_MPLEXFREQ ","
+	                      SERVICE_ID ","
+	                      SERVICE_NAME ","
+	                      SERVICE_PMTPID ","
+	                      SERVICE_PMTVERSION ","
+	                      "PRIMARY KEY ( "SERVICE_MPLEXFREQ "," SERVICE_ID ")"
+	                      ");", NULL, NULL, NULL);
+	    if (rc)
+	    {
+	        printlog(LOG_ERROR, "Failed to create Services table: %s\n", sqlite3_errmsg(DBaseInstance));
+	        return rc;
+	    }
 
-    rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " MULTIPLEXES_TABLE " ( "
-                      MULTIPLEX_FREQ " PRIMARY KEY,"
-                      MULTIPLEX_ID ","
-                      MULTIPLEX_TYPE ","
-                      MULTIPLEX_PATVERSION
-                      ");", NULL, NULL, NULL);
-    if (rc)
-    {
-        printlog(LOG_ERROR, "Failed to create Multiplexes table: %s\n", sqlite3_errmsg(DBaseInstance));
-        return rc;
-    }
-    /*
-    (DVBT) OFDM: <frequency>:<inversion>:<bw>:<fec_hp>:<fec_lp>:<qam>:<transmissionm>:<guardlist>:<hierarchinfo>
-    	<frequency>    = unsigned long
-    	
-    	
-    	<inversion>    = INVERSION_ON | INVERSION_OFF | INVERSION_AUTO
-    	<fec>          = FEC_1_2, FEC_2_3, FEC_3_4 .... FEC_AUTO ... FEC_NONE
-    	<qam>          = QPSK, QAM_128, QAM_16 ...
+	    rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " MULTIPLEXES_TABLE " ( "
+	                      MULTIPLEX_FREQ " PRIMARY KEY,"
+	                      MULTIPLEX_ID ","
+	                      MULTIPLEX_TYPE ","
+	                      MULTIPLEX_PATVERSION
+	                      ");", NULL, NULL, NULL);
+	    if (rc)
+	    {
+	        printlog(LOG_ERROR, "Failed to create Multiplexes table: %s\n", sqlite3_errmsg(DBaseInstance));
+	        return rc;
+	    }
+	    /*
+	    (DVBT) OFDM: <frequency>:<inversion>:<bw>:<fec_hp>:<fec_lp>:<qam>:<transmissionm>:<guardlist>:<hierarchinfo>
+	    */
+	    rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " OFDMPARAMS_TABLE " ( "
+	                      OFDMPARAM_FREQ " PRIMARY KEY,"
+	                      OFDMPARAM_INVERSION ","
+	                      OFDMPARAM_BW ","
+	                      OFDMPARAM_FEC_HP ","
+	                      OFDMPARAM_FEC_LP ","
+	                      OFDMPARAM_QAM ","
+	                      OFDMPARAM_TRANSMISSIONM ","
+	                      OFDMPARAM_GUARDLIST ","
+	                      OFDMPARAM_HIERARCHINFO
+	                      ");", NULL, NULL, NULL);
+	    if (rc)
+	    {
+	        printlog(LOG_ERROR, "Failed to create OFDMParameters table: %s\n", sqlite3_errmsg(DBaseInstance));
+	        return rc;
+	    }
+		
+	    rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " PIDS_TABLE " ( "
+	                      PID_MPLEXFREQ ","
+	                      PID_SERVICEID ","
+	                      PID_PID ","
+	                      PID_TYPE ","
+	                      PID_SUBTYPE ","
+	                      PID_PMTVERSION ","
+	                      "PRIMARY KEY(" PID_MPLEXFREQ "," PID_SERVICEID "," PID_PID ")"
+	                      ");", NULL, NULL, NULL);
+	    if (rc)
+	    {
+	        printlog(LOG_ERROR, "Failed to create OFDMParameters table: %s\n", sqlite3_errmsg(DBaseInstance));
+	        return rc;
+	    }
 
-    	<bw>           = BANDWIDTH_6_MHZ, BANDWIDTH_7_MHZ, BANDWIDTH_8_MHZ
-    	<fec_hp>       = <fec>
-    	<fec_lp>       = <fec>
-    	<transmissionm> = TRANSMISSION_MODE_2K, TRANSMISSION_MODE_8K
-    	
-    	489833330:INVERSION_AUTO:BANDWIDTH_8_MHZ:FEC_3_4:FEC_3_4:QAM_16:TRANSMISSION_MODE_2K:GUARD_INTERVAL_1_32:HIERARCHY_NONE:
-    */
-    rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " OFDMPARAMS_TABLE " ( "
-                      OFDMPARAM_FREQ " PRIMARY KEY,"
-                      OFDMPARAM_INVERSION ","
-                      OFDMPARAM_BW ","
-                      OFDMPARAM_FEC_HP ","
-                      OFDMPARAM_FEC_LP ","
-                      OFDMPARAM_QAM ","
-                      OFDMPARAM_TRANSMISSIONM ","
-                      OFDMPARAM_GUARDLIST ","
-                      OFDMPARAM_HIERARCHINFO
-                      ");", NULL, NULL, NULL);
-    if (rc)
-    {
-        printlog(LOG_ERROR, "Failed to create OFDMParameters table: %s\n", sqlite3_errmsg(DBaseInstance));
-        return rc;
-    }
-    rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " PIDS_TABLE " ( "
-                      PID_MPLEXFREQ ","
-                      PID_SERVICEID ","
-                      PID_PID ","
-                      PID_TYPE ","
-                      PID_SUBTYPE ","
-                      PID_PMTVERSION ","
-                      "PRIMARY KEY(" PID_MPLEXFREQ "," PID_SERVICEID "," PID_PID ")"
-                      ");", NULL, NULL, NULL);
-    if (rc)
-    {
-        printlog(LOG_ERROR, "Failed to create OFDMParameters table: %s\n", sqlite3_errmsg(DBaseInstance));
-        return rc;
-    }
-
-    rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " VERSION_TABLE " ( "
-                      VERSION_VERSION
-                      ");", NULL, NULL, NULL);
-    if (rc)
-    {
-        printlog(LOG_ERROR, "Failed to create Version table: %s\n", sqlite3_errmsg(DBaseInstance));
-        return rc;
-    }
-
-    rc = sqlite3_exec(DBaseInstance, "INSERT INTO " VERSION_TABLE " VALUES ( 0.1 );", NULL, NULL, NULL);
+	    rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " VERSION_TABLE " ( "
+	                      VERSION_VERSION
+	                      ");", NULL, NULL, NULL);
+	    if (rc)
+	    {
+	        printlog(LOG_ERROR, "Failed to create Version table: %s\n", sqlite3_errmsg(DBaseInstance));
+	        return rc;
+	    }
+	}
+	/* Version 0.2 tables */
+	if (version < 0.2)
+	{
+		/*
+		(DVBS) QPSK: <channel name>:<frequency>:<polarisation>:<sat_no>:<sym_rate>
+		(DVBC) QAM: <channel name>:<frequency>:<inversion>:<sym_rate>:<fec>:<qam>
+		*/
+		rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " QPSKPARAMS_TABLE " ( "
+	                      QPSKPARAM_FREQ " PRIMARY KEY,"
+	                      QPSKPARAM_INVERSION ","
+	                      QPSKPARAM_SYMBOL_RATE ","
+	                      QPSKPARAM_FEC_INNER
+	                      ");", NULL, NULL, NULL);
+	    if (rc)
+	    {
+	        printlog(LOG_ERROR, "Failed to create OFDMParameters table: %s\n", sqlite3_errmsg(DBaseInstance));
+	        return rc;
+	    }
+		rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " QAMPARAMS_TABLE " ( "
+	                      QAMPARAM_FREQ " PRIMARY KEY,"
+	                      QAMPARAM_INVERSION ","
+	                      QAMPARAM_SYMBOL_RATE ","
+	                      QAMPARAM_FEC_INNER ","
+	                      QAMPARAM_MODULATION
+	                      ");", NULL, NULL, NULL);
+	    if (rc)
+	    {
+	        printlog(LOG_ERROR, "Failed to create OFDMParameters table: %s\n", sqlite3_errmsg(DBaseInstance));
+	        return rc;
+	    }
+	}
+	
+    rc = sqlite3_exec(DBaseInstance, "DELETE FROM " VERSION_TABLE ";", NULL, NULL, NULL);
+	rc = sqlite3_exec(DBaseInstance, "INSERT INTO " VERSION_TABLE " VALUES ( " TOSTRING(DBASE_VERSION) " );", NULL, NULL, NULL);
     return rc;
 }
