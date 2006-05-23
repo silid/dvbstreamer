@@ -49,6 +49,19 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 #define OFDMPARAM_GUARDLIST     "guardlist"
 #define OFDMPARAM_HIERARCHINFO  "hierarchinfo"
 
+#define QPSKPARAMS_TABLE		"QPSKParameters"
+#define QPSKPARAM_FREQ          "freq"
+#define QPSKPARAM_INVERSION     "inversion"
+#define QPSKPARAM_SYMBOL_RATE    "symbol_rate"
+#define QPSKPARAM_FEC_INNER      "fec_inner"
+
+#define QAMPARAMS_TABLE			"QAMParameters"
+#define QAMPARAM_FREQ           "freq"
+#define QAMPARAM_INVERSION      "inversion"
+#define QAMPARAM_SYMBOL_RATE    "symbol_rate"
+#define QAMPARAM_FEC_INNER      "fec_inner"
+#define QAMPARAM_MODULATION     "modulation"
+
 #define PIDS_TABLE              "PIDs"
 #define PID_MPLEXFREQ           "mplexfreq"
 #define PID_SERVICEID           "serviceid"
@@ -78,10 +91,11 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
         }\
     }while(0)
 
-#define STATEMENT_STEP()              rc = sqlite3_step(stmt)
-#define STATEMENT_COLUMN_INT(_index)  sqlite3_column_int(stmt, _index)
-#define STATEMENT_COLUMN_TEXT(_index) (char*)sqlite3_column_text( stmt, _index)
-#define STATEMENT_FINALIZE()          rc = sqlite3_finalize(stmt)
+#define STATEMENT_STEP()                rc = sqlite3_step(stmt)
+#define STATEMENT_COLUMN_INT(_index)    sqlite3_column_int(stmt, _index)
+#define STATEMENT_COLUMN_DOUBLE(_index) sqlite3_column_double(stmt, _index)
+#define STATEMENT_COLUMN_TEXT(_index)   (char*)sqlite3_column_text( stmt, _index)
+#define STATEMENT_FINALIZE()            rc = sqlite3_finalize(stmt)
 
 #define PRINTLOG_SQLITE3ERROR() \
     do{\
