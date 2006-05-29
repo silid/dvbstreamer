@@ -122,6 +122,10 @@ void TSFilterEnable(TSFilter_t * tsfilter, int enable);
 
 PIDFilter_t* PIDFilterAllocate(TSFilter_t* tsfilter);
 void PIDFilterFree(PIDFilter_t * pidfilter);
+PIDFilter_t *PIDFilterSetup(TSFilter_t *tsfilter,
+                            PacketFilter filterpacket,  void *fparg,
+                            PacketProcessor processpacket, void *pparg,
+                            PacketOutput outputpacket,  void *oparg);
 
 int PIDFilterSimpleFilter(void *arg, uint16_t pid, TSPacket_t *packet);
 

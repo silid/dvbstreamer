@@ -87,10 +87,7 @@ Command_t;
 
 
 static int ServiceFilterPacket(void *arg, uint16_t pid, TSPacket_t *packet);
-static PIDFilter_t *SetupPIDFilter(TSFilter_t *tsfilter,
-                                   PacketFilter filterpacket,  void *fparg,
-                                   PacketProcessor processpacket, void *pparg,
-                                   PacketOutput outputpacket,  void *oparg);
+
 static void usage(char *appname);
 static void version(void);
 
@@ -349,20 +346,20 @@ int main(int argc, char *argv[])
     patsimplefilter.pidcount = 1;
     patsimplefilter.pids[0] = 0;
     patprocessor = PATProcessorCreate();
-    pidfilters[PIDFilterIndex_PAT] = SetupPIDFilter(tsfilter,
+    pidfilters[PIDFilterIndex_PAT] = PIDFilterSetup(tsfilter,
                                      PIDFilterSimpleFilter, &patsimplefilter,
                                      PATProcessorProcessPacket, patprocessor,
                                      UDPOutputPacketOutput,outputArg);
 
     /* Create PMT filter */
     pmtprocessor = PMTProcessorCreate();
-    pidfilters[PIDFilterIndex_PMT] = SetupPIDFilter(tsfilter,
+    pidfilters[PIDFilterIndex_PMT] = PIDFilterSetup(tsfilter,
                                     PMTProcessorFilterPacket, NULL,
                                     PMTProcessorProcessPacket, pmtprocessor,
                                     UDPOutputPacketOutput,outputArg);
 
     /* Create Service filter */
-    pidfilters[PIDFilterIndex_Service] = SetupPIDFilter(tsfilter,
+    pidfilters[PIDFilterIndex_Service] = PIDFilterSetup(tsfilter,
                                         ServiceFilterPacket, NULL,
                                         NULL, NULL,
                                         UDPOutputPacketOutput,outputArg);
@@ -371,7 +368,7 @@ int main(int argc, char *argv[])
     sdtsimplefilter.pidcount = 1;
     sdtsimplefilter.pids[0] = 0x11;
     sdtprocessor = SDTProcessorCreate();
-    pidfilters[PIDFilterIndex_SDT] = SetupPIDFilter(tsfilter,
+    pidfilters[PIDFilterIndex_SDT] = PIDFilterSetup(tsfilter,
                                     PIDFilterSimpleFilter, &sdtsimplefilter,
                                     SDTProcessorProcessPacket, sdtprocessor,
                                     NULL,NULL);
@@ -583,28 +580,6 @@ static void version(void)
            "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n",
            PACKAGE, VERSION);
 }
-
-static PIDFilter_t *SetupPIDFilter(TSFilter_t *tsfilterarg,
-                                   PacketFilter filterpacket,  void *fparg,
-                                   PacketProcessor processpacket, void *pparg,
-                                   PacketOutput outputpacket,  void *oparg)
-{
-    PIDFilter_t *filter;
-
-    filter = PIDFilterAllocate(tsfilterarg);
-
-    filter->filterpacket = filterpacket;
-    filter->fparg = fparg;
-
-    filter->processpacket = processpacket;
-    filter->pparg = pparg;
-
-    filter->outputpacket = outputpacket;
-    filter->oparg = oparg;
-
-    return filter;
-}
-
 
 
 /**************** Command Loop/Startup file functions ************************/
@@ -901,7 +876,7 @@ static void CommandStats(char *argument)
     }
 
     printf("Total packets processed: %d\n", tsfilter->totalpackets);
-    printf("Approximate TS bitrate : %dMbs\n", (tsfilter->bitrate / (1024 * 1024)));
+    printf("Approximate TS bitrate : %gMbs\n", ((double)tsfilter->bitrate / (1024.0 * 1024.0)));
 }
 
 static void CommandAddOutput(char *argument)

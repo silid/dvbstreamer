@@ -25,6 +25,8 @@ Transport stream processing and filter management.
 #include <unistd.h>
 #include <string.h>
 #include <stdint.h>
+#include <sys/time.h>
+
 #include <dvbpsi/dvbpsi.h>
 #include <dvbpsi/descriptor.h>
 #include <dvbpsi/psi.h>
@@ -94,6 +96,28 @@ void PIDFilterFree(PIDFilter_t * pidfilter)
             pidfilter->tsfilter->pidfilters[i].allocated = 0;
         }
     }
+}
+
+PIDFilter_t *PIDFilterSetup(TSFilter_t *tsfilter,
+                            PacketFilter filterpacket,  void *fparg,
+                            PacketProcessor processpacket, void *pparg,
+                            PacketOutput outputpacket,  void *oparg)
+{
+    PIDFilter_t *filter;
+
+    filter = PIDFilterAllocate(tsfilter);
+    if (filter)
+    {
+        filter->filterpacket = filterpacket;
+        filter->fparg = fparg;
+
+        filter->processpacket = processpacket;
+        filter->pparg = pparg;
+
+        filter->outputpacket = outputpacket;
+        filter->oparg = oparg;
+    }
+    return filter;
 }
 
 int PIDFilterSimpleFilter(void *arg, uint16_t pid, TSPacket_t *packet)
