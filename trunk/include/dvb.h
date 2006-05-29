@@ -22,7 +22,7 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 */
 #ifndef _DVB_H
 #define _DVB_H
-#include <linux/types.h>
+#include <sys/types.h>
 #include <linux/dvb/dmx.h>
 #include <linux/dvb/frontend.h>
 
