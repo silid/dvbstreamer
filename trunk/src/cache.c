@@ -32,10 +32,14 @@ Caches service and PID information from the database for the current multiplex.
 
 enum CacheFlags
 {
-    CacheFlag_Clean        = 0x00,
-    CacheFlag_Dirty_PMTPID = 0x01,
-    CacheFlag_Dirty_PIDs   = 0x02, /* Also means PMT Version needs to be updated */
+    CacheFlag_Clean         = 0x00,
+    CacheFlag_Dirty_PMTPID  = 0x01,
+    CacheFlag_Dirty_PIDs    = 0x02, /* Also means PMT Version needs to be updated */
+    CacheFlag_Dirty_Name    = 0x04,
+    CacheFlag_Dirty_Deleted = 0x10,
+    CacheFlag_Dirty_Added   = 0x20,
 };
+
 static int cachedServicesMultiplexDirty = 0;
 static Multiplex_t *cachedServicesMultiplex = NULL;
 static int cachedServicesCount = 0;
@@ -51,12 +55,13 @@ static int CachePIDsLoad(Service_t *service, int index);
 
 int CacheInit()
 {
-    // Do nothing for the moment;
+    /* Do nothing for the moment */
     return 0;
 }
 
 void CacheDeInit()
 {
+    CacheWriteback();
     CacheServicesFree();
     CachePIDsFree();
 }
@@ -64,13 +69,16 @@ void CacheDeInit()
 int CacheLoad(Multiplex_t *multiplex)
 {
     int count = ServiceForMultiplexCount(multiplex->freq);
+
+    /* Free the services and PIDs from the previous multiplex */
+    CacheServicesFree();
+    CachePIDsFree();
+
     printlog(LOG_DEBUG,"Loading %d services for %d\n", count, multiplex->freq);
     if (count > 0)
     {
         int i;
         ServiceEnumerator_t *enumerator;
-
-        CacheServicesFree();
 
         enumerator = ServiceEnumeratorForMultiplex(multiplex->freq);
         for (i=0; i < count; i++)
@@ -188,6 +196,7 @@ void CacheUpdateMultiplex(Multiplex_t *multiplex, int patversion, int tsid)
         cachedServicesMultiplexDirty = 1;
     }
 }
+
 void CacheUpdateService(Service_t *service, int pmtpid)
 {
     int i;
@@ -197,6 +206,21 @@ void CacheUpdateService(Service_t *service, int pmtpid)
         {
             cachedServices[i]->pmtpid = pmtpid;
             cacheFlags[i] |= CacheFlag_Dirty_PMTPID;
+            break;
+        }
+    }
+}
+
+void CacheUpdateServiceName(Service_t *service, char *name)
+{
+    int i;
+    for (i = 0; i < cachedServicesCount; i ++)
+    {
+        if ((cachedServices[i]) && ServiceAreEqual(service, cachedServices[i]))
+        {
+            free(cachedServices[i]->name);
+            cachedServices[i]->name = strdup(name);
+            cacheFlags[i] |= CacheFlag_Dirty_Name;
             break;
         }
     }
@@ -217,6 +241,37 @@ void CacheUpdatePIDs(Service_t *service, PID_t *pids, int count, int pmtversion)
             cachedPIDsCount[i] = count;
             cachedServices[i]->pmtversion = pmtversion;
             cacheFlags[i] |= CacheFlag_Dirty_PIDs;
+            break;
+        }
+    }
+}
+
+Service_t *CacheServiceAdd(int id)
+{
+    Service_t *result = calloc(1, sizeof(Service_t));
+    if (result)
+    {
+        result->pmtversion = -1;
+        result->pmtpid = 8192;
+        result->name = strdup("<NO NAME>");
+        result->multiplexfreq = cachedServicesMultiplex->freq;
+        cachedServices[cachedServicesCount] = result;
+        cachedPIDs[cachedServicesCount] = NULL;
+        cachedPIDsCount[cachedServicesCount] = 0;
+        cacheFlags[cachedServicesCount]  = CacheFlag_Dirty_Added;
+        cachedServicesCount ++;
+    }
+    return result;
+}
+
+void CacheServiceDelete(Service_t *service)
+{
+    int i;
+    for (i = 0; i < cachedServicesCount; i ++)
+    {
+        if ((cachedServices[i]) && ServiceAreEqual(service, cachedServices[i]))
+        {
+            cacheFlags[i] |= CacheFlag_Dirty_Deleted;
             break;
         }
     }
@@ -246,11 +301,24 @@ void CacheWriteback()
 
     for (i = 0; i < cachedServicesCount; i ++)
     {
+        if (cacheFlags[i] & CacheFlag_Dirty_Deleted)
+        {
+            printlog(LOG_DEBUG, "Deleting service %s\n", cachedServices[i]->name);
+            ServiceDelete(cachedServices[i]);
+            continue;
+        }
+
+        if (cacheFlags[i] & CacheFlag_Dirty_Added)
+        {
+            printlog(LOG_DEBUG, "Adding service %s (0x%04x)\n", cachedServices[i]->name, cachedServices[i]->id);
+            ServiceAdd(cachedServices[i]->multiplexfreq, cachedServices[i]->name, cachedServices[i]->id, cachedServices[i]->pmtversion, cachedServices[i]->pmtpid);
+            continue;
+        }
+
         if (cacheFlags[i] & CacheFlag_Dirty_PMTPID)
         {
             printlog(LOG_DEBUG, "Updating PMT PID for %s\n", cachedServices[i]->name);
             ServicePMTPIDSet(cachedServices[i], cachedServices[i]->pmtpid);
-            cacheFlags[i] ^= CacheFlag_Dirty_PMTPID;
         }
         if (cacheFlags[i] & CacheFlag_Dirty_PIDs)
         {
@@ -263,8 +331,19 @@ void CacheWriteback()
                 ServicePIDAdd(cachedServices[i], pids[p].pid, pids[p].type, pids[p].subtype, cachedServices[i]->pmtversion);
             }
             ServicePMTVersionSet(cachedServices[i], cachedServices[i]->pmtversion);
-            cacheFlags[i] ^= CacheFlag_Dirty_PIDs;
         }
+
+        if (cacheFlags[i] & CacheFlag_Dirty_Name)
+        {
+            printlog(LOG_DEBUG, "Updating name for 0x%04x new name %s\n", cachedServices[i]->id, cachedServices[i]->name);
+            ServiceNameSet(cachedServices[i], cachedServices[i]->name);
+        }
+    }
+
+    /* Reload cache to remove any deleted services */
+    if (cachedServicesMultiplex)
+    {
+        CacheLoad(cachedServicesMultiplex);
     }
 }
 
@@ -275,7 +354,10 @@ static void CacheServicesFree()
         int i;
         for (i = 0; i < cachedServicesCount; i ++)
         {
-            ServiceFree(cachedServices[i]);
+            if (cachedServices[i])
+            {
+                ServiceFree(cachedServices[i]);
+            }
         }
         cachedServicesCount = 0;
         cachedServicesMultiplex = NULL;
@@ -289,7 +371,10 @@ static void CachePIDsFree()
         int i;
         for (i = 0; i < cachedServicesCount; i ++)
         {
-            free(cachedPIDs[i]);
+            if (cachedPIDs[i])
+            {
+                free(cachedPIDs[i]);
+            }
             cachedPIDsCount[i] = 0;
         }
     }

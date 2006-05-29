@@ -46,7 +46,10 @@ PID_t *CachePIDsGet(Service_t *service, int *count);
 void CacheUpdateMultiplex(Multiplex_t *multiplex, int patversion, int tsid);
 
 void CacheUpdateService(Service_t *service, int pmtpid);
+void CacheUpdateServiceName(Service_t *service, char *name);
 
 void CacheUpdatePIDs(Service_t *service, PID_t *pids, int count, int pmtversion);
 
+Service_t *CacheServiceAdd(int id);
+void CacheServiceDelete(Service_t *service);
 #endif
