@@ -24,6 +24,7 @@ dvbstreamer_SOURCES = \
 	udpoutput.c\
 	patprocessor.c\
 	pmtprocessor.c\
+	sdtprocessor.c\
 	dbase.c\
 	cache.c\
 	logging.c
