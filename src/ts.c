@@ -114,11 +114,16 @@ int PIDFilterSimpleFilter(void *arg, uint16_t pid, TSPacket_t *packet)
 ******************************************************************************/
 static void *FilterTS(void *arg)
 {
-
+	struct timeval now, last;
+	int diff;
+	int prevpackets = 0;
+	
     TSFilter_t *state = (TSFilter_t*)arg;
     DVBAdapter_t *adapter = state->adapter;
     int count = 0;
-
+	
+	gettimeofday(&last, 0);
+	
     while (!state->quit)
     {
         int p;
@@ -130,7 +135,17 @@ static void *FilterTS(void *arg)
             ProcessPacket(state, &state->readbuffer[p]);
             state->totalpackets ++;
         }
-        pthread_mutex_unlock(&state->mutex);
+		
+		gettimeofday(&now, 0);
+		diff =(now.tv_sec - last.tv_sec) * 1000 + (now.tv_usec - last.tv_usec) / 1000;
+		if (diff > 1000) 
+		{
+			// Work out bit rates
+			state->bitrate = ((state->totalpackets - prevpackets) * (188 * 8));
+			prevpackets = state->totalpackets;
+			last = now;
+		}
+		pthread_mutex_unlock(&state->mutex);
     }
     return NULL;
 }
