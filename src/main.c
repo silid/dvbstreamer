@@ -20,6 +20,8 @@ main.c
 Entry point to the application.
  
 */
+#include "config.h"
+
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,18 +42,21 @@ Entry point to the application.
 #include "main.h"
 #include "patprocessor.h"
 #include "pmtprocessor.h"
+#include "sdtprocessor.h"
 #include "cache.h"
 #include "logging.h"
 
 #define PROMPT "DVBStream>"
 
-#define MAX_OUTPUTS (MAX_FILTERS - 3)
+#define MAX_OUTPUTS (MAX_FILTERS - PIDFilterIndex_Count)
 
 enum PIDFilterIndex
 {
     PIDFilterIndex_PAT = 0,
     PIDFilterIndex_PMT,
-    PIDFilterIndex_Service,
+    PIDFilterIndex_SDT,
+    PIDFilterIndex_Service ,
+
 
     PIDFilterIndex_Count
 };
@@ -59,6 +64,7 @@ enum PIDFilterIndex
 static char *PIDFilterNames[] = {
                                     "PAT",
                                     "PMT",
+                                    "SDT",
                                     "Service",
                                 };
 
@@ -85,7 +91,9 @@ static PIDFilter_t *SetupPIDFilter(TSFilter_t *tsfilter,
                                    PacketFilter filterpacket,  void *fparg,
                                    PacketProcessor processpacket, void *pparg,
                                    PacketOutput outputpacket,  void *oparg);
-static void usage();
+static void usage(char *appname);
+static void version(void);
+
 static void CommandLoop(void);
 static int ProcessFile(char *file);
 static void GetCommand(char **command, char **argument);
@@ -116,7 +124,7 @@ volatile Service_t *CurrentService = NULL;
 static int quit = 0;
 static DVBAdapter_t *adapter;
 static TSFilter_t *tsfilter;
-static PIDFilter_t *pidfilters[3];
+static PIDFilter_t *pidfilters[PIDFilterIndex_Count];
 static Output_t outputs[MAX_OUTPUTS];
 
 static Command_t commands[] = {
@@ -218,20 +226,23 @@ static Command_t commands[] = {
 int main(int argc, char *argv[])
 {
     char *startupFile = NULL;
+    fe_type_t channelsFileType = FE_OFDM;
     char channelsFile[PATH_MAX];
     void *outputArg = NULL;
     int i;
     int adapterNumber = 0;
     PIDFilterSimpleFilter_t patsimplefilter;
+    PIDFilterSimpleFilter_t sdtsimplefilter;
     void *patprocessor;
     void *pmtprocessor;
+    void *sdtprocessor;
 
     channelsFile[0] = 0;
 
     while (1)
     {
         char c;
-        c = getopt(argc, argv, "vo:a:t:s:c:f:");
+        c = getopt(argc, argv, "vVo:a:t:s:c:f:");
         if (c == -1)
         {
             break;
@@ -240,6 +251,9 @@ int main(int argc, char *argv[])
         {
                 case 'v': verbosity ++;
                 break;
+                case 'V':
+                version();
+                exit(0);
                 break;
                 case 'o':
                 outputArg = UDPOutputCreate(optarg);
@@ -257,22 +271,30 @@ int main(int argc, char *argv[])
                 printlog(LOG_INFOV, "Using startup script %s\n", startupFile);
                 break;
                 /* Database initialisation options*/
-                case 't': strcpy(channelsFile, optarg);
-                printlog(LOG_INFOV, "Using channels file %s\n", channelsFile);
+                case 't':
+                strcpy(channelsFile, optarg);
+                channelsFileType = FE_OFDM;
+                printlog(LOG_INFOV, "Using DVB-T channels file %s\n", channelsFile);
                 break;
                 case 's':
+                strcpy(channelsFile, optarg);
+                channelsFileType = FE_QPSK;
+                printlog(LOG_INFOV, "Using DVB-S channels file %s\n", channelsFile);
+                break;
                 case 'c':
-                printf("Not implemented yet!\n");
+                strcpy(channelsFile, optarg);
+                channelsFileType = FE_QAM;
+                printlog(LOG_INFOV, "Using DVB-C channels file %s\n", channelsFile);
                 break;
                 default:
-                usage();
+                usage(argv[0]);
                 exit(1);
         }
     }
     if (outputArg == NULL)
     {
         printlog(LOG_ERROR, "No output set!\n");
-        usage();
+        usage(argv[0]);
         exit(1);
     }
 
@@ -281,20 +303,23 @@ int main(int argc, char *argv[])
         printlog(LOG_ERROR, "Failed to initialise database\n");
         exit(1);
     }
+    printlog(LOG_DEBUGV, "Database initalised\n");
 
     if (CacheInit())
     {
         printlog(LOG_ERROR,"Failed to initialise cache\n");
         exit(1);
     }
+    printlog(LOG_DEBUGV, "Cache initalised\n");
 
     if (strlen(channelsFile))
     {
         printlog(LOG_INFO,"Importing services from %s\n", channelsFile);
-        if (!parsezapfile(channelsFile))
+        if (!parsezapfile(channelsFile, channelsFileType))
         {
             exit(1);
         }
+        printlog(LOG_DEBUGV, "Channels file imported\n");
     }
 
     printlog(LOG_INFO, "%d Services available on %d Multiplexes\n", ServiceCount(), MultiplexCount());
@@ -306,8 +331,10 @@ int main(int argc, char *argv[])
         printlog(LOG_ERROR, "Failed to open DVB adapter!\n");
         exit(1);
     }
+    printlog(LOG_DEBUGV, "DVB adapter initalised\n");
 
     DVBDemuxStreamEntireTSToDVR(adapter);
+    printlog(LOG_DEBUGV, "Streaming complete TS to DVR done\n");
 
     /* Create Transport stream filter thread */
     tsfilter = TSFilterCreate(adapter);
@@ -316,6 +343,7 @@ int main(int argc, char *argv[])
         printlog(LOG_ERROR, "Failed to create filter!\n");
         exit(1);
     }
+    printlog(LOG_DEBUGV, "TSFilter created\n");
 
     /* Create PAT filter */
     patsimplefilter.pidcount = 1;
@@ -329,21 +357,30 @@ int main(int argc, char *argv[])
     /* Create PMT filter */
     pmtprocessor = PMTProcessorCreate();
     pidfilters[PIDFilterIndex_PMT] = SetupPIDFilter(tsfilter,
-                                     PMTProcessorFilterPacket, NULL,
-                                     PMTProcessorProcessPacket, pmtprocessor,
-                                     UDPOutputPacketOutput,outputArg);
+                                    PMTProcessorFilterPacket, NULL,
+                                    PMTProcessorProcessPacket, pmtprocessor,
+                                    UDPOutputPacketOutput,outputArg);
 
     /* Create Service filter */
     pidfilters[PIDFilterIndex_Service] = SetupPIDFilter(tsfilter,
-                                         ServiceFilterPacket, NULL,
-                                         NULL, NULL,
-                                         UDPOutputPacketOutput,outputArg);
+                                        ServiceFilterPacket, NULL,
+                                        NULL, NULL,
+                                        UDPOutputPacketOutput,outputArg);
 
+    /* Create SDT Filter */
+    sdtsimplefilter.pidcount = 1;
+    sdtsimplefilter.pids[0] = 0x11;
+    sdtprocessor = SDTProcessorCreate();
+    pidfilters[PIDFilterIndex_SDT] = SetupPIDFilter(tsfilter,
+                                    PIDFilterSimpleFilter, &sdtsimplefilter,
+                                    SDTProcessorProcessPacket, sdtprocessor,
+                                    NULL,NULL);
     /* Enable all the filters */
     for (i = 0; i < PIDFilterIndex_Count; i ++)
     {
         pidfilters[i]->enabled = 1;
     }
+    printlog(LOG_DEBUGV, "PID filters started\n");
 
     /* Clear all outputs */
     memset(&outputs, 0, sizeof(outputs));
@@ -356,17 +393,37 @@ int main(int argc, char *argv[])
         }
         free(startupFile);
     }
+    printlog(LOG_DEBUGV, "Startup file processed\n");
 
     CommandLoop();
+    printlog(LOG_DEBUGV, "Command loop finished, shutting down\n");
 
+    /* Disable all the filters */
+    for (i = 0; i < PIDFilterIndex_Count; i ++)
+    {
+        pidfilters[i]->enabled = 0;
+    }
+    printlog(LOG_DEBUGV, "PID filters stopped\n");
+
+    PATProcessorDestroy( patprocessor);
+    PMTProcessorDestroy( pmtprocessor);
+    SDTProcessorDestroy( sdtprocessor);
+    printlog(LOG_DEBUGV, "Processors destroyed\n");
     /* Close the adapter and shutdown the filter etc*/
     DVBDispose(adapter);
+    printlog(LOG_DEBUGV, "DVB Adapter shutdown\n");
+
     TSFilterDestroy(tsfilter);
+    printlog(LOG_DEBUGV, "TSFilter destroyed\n");
 
     UDPOutputClose(outputArg);
+    printlog(LOG_DEBUGV, "UDPOutput closed\n");
 
     CacheDeInit();
+    printlog(LOG_DEBUGV, "Cache deinitalised\n");
+    
     DBaseDeInit();
+    printlog(LOG_DEBUGV, "Database deinitalised\n");
     return 0;
 }
 
@@ -426,7 +483,7 @@ Service_t *SetCurrentService(DVBAdapter_t *adapter, TSFilter_t *tsfilter, char *
         else
         {
             printlog(LOG_DEBUG,"No current Multiplex!\n");
-        } 
+        }
 
         if (multiplex)
         {
@@ -435,7 +492,7 @@ Service_t *SetCurrentService(DVBAdapter_t *adapter, TSFilter_t *tsfilter, char *
         else
         {
             printlog(LOG_DEBUG,"No new Multiplex!\n");
-        } 
+        }
 
         if ((CurrentMultiplex!= NULL) && MultiplexAreEqual(multiplex, CurrentMultiplex))
         {
@@ -499,26 +556,42 @@ static void usage(char *appname)
             "      Options:\n"
             "      -v            : Increase the amount of debug output, can be used multiple\n"
             "                      times for more output\n"
+            "      -V            : Print version information then exit\n"
             "      -o <host:port>: Output transport stream via UDP to the given host and port\n"
-            "      -a <adapter>  : Use adapter number\n"
+            "      -a <adapter>  : Use adapter number (ie /dev/dvb/adapter<adapter>/...)\n"
             "      -f <file>     : Run startup script file before starting the command prompt\n"
             "      -t <file>     : Terrestrial channels.conf file to import services and \n"
             "                      multiplexes from.\n"
             "      -s <file>     : Satellite channels.conf file to import services and \n"
-            "                      multiplexes from.(NOT IMPLEMENTED)\n"
+            "                      multiplexes from.(EXPERIMENTAL)\n"
             "      -c <file>     : Cable channels.conf file to import services and \n"
-            "                      multiplexes from.(NOT IMPLEMENTED)\n",
+            "                      multiplexes from.(EXPERIMENTAL)\n",
             appname
            );
 }
 
-static PIDFilter_t *SetupPIDFilter(TSFilter_t *tsfilter,
+/*
+ * Output version and license conditions
+ */
+static void version(void)
+{
+    printf("%s - %s\n"
+           "Written by Adam Charrett (charrea6@sourceforge.net).\n"
+           "\n"
+           "Copyright 2006 Adam Charrett\n"
+           "This is free software; see the source for copying conditions.  There is NO\n"
+           "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n",
+           PACKAGE, VERSION);
+}
+
+static PIDFilter_t *SetupPIDFilter(TSFilter_t *tsfilterarg,
                                    PacketFilter filterpacket,  void *fparg,
                                    PacketProcessor processpacket, void *pparg,
                                    PacketOutput outputpacket,  void *oparg)
 {
     PIDFilter_t *filter;
-    filter = PIDFilterAllocate(tsfilter);
+
+    filter = PIDFilterAllocate(tsfilterarg);
 
     filter->filterpacket = filterpacket;
     filter->fparg = fparg;
@@ -528,6 +601,7 @@ static PIDFilter_t *SetupPIDFilter(TSFilter_t *tsfilter,
 
     filter->outputpacket = outputpacket;
     filter->oparg = oparg;
+
     return filter;
 }
 
@@ -827,6 +901,7 @@ static void CommandStats(char *argument)
     }
 
     printf("Total packets processed: %d\n", tsfilter->totalpackets);
+    printf("Approximate TS bitrate : %dMbs\n", (tsfilter->bitrate / (1024 * 1024)));
 }
 
 static void CommandAddOutput(char *argument)
