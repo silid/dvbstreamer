@@ -104,8 +104,9 @@ typedef struct TSFilter_t
     int enabled;
     pthread_mutex_t mutex;
 
-    int totalpackets;
-
+    volatile int totalpackets;
+	volatile int bitrate;
+	
     struct
     {
         int allocated;
