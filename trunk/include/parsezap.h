@@ -24,5 +24,7 @@ Majority of the parsing code taken from the xine input_dvb plugin code.
 */
 #ifndef _PARSEZAP_H
 #define _PARSEZAP_H
-int parsezapfile(char *path);
+#include <linux/dvb/frontend.h>
+
+int parsezapfile(char *path, fe_type_t fe_type);
 #endif
