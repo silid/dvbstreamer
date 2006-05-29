@@ -36,6 +36,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
+LIBOBJDIR =
 bin_PROGRAMS = dvbstreamer$(EXEEXT)
 subdir = src
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
@@ -53,8 +54,9 @@ PROGRAMS = $(bin_PROGRAMS)
 am_dvbstreamer_OBJECTS = main.$(OBJEXT) dvb.$(OBJEXT) \
 	parsezap.$(OBJEXT) multiplexes.$(OBJEXT) services.$(OBJEXT) \
 	udpsend.$(OBJEXT) ts.$(OBJEXT) udpoutput.$(OBJEXT) \
-	patprocessor.$(OBJEXT) pmtprocessor.$(OBJEXT) dbase.$(OBJEXT) \
-	cache.$(OBJEXT) logging.$(OBJEXT)
+	patprocessor.$(OBJEXT) pmtprocessor.$(OBJEXT) \
+	sdtprocessor.$(OBJEXT) dbase.$(OBJEXT) cache.$(OBJEXT) \
+	logging.$(OBJEXT)
 dvbstreamer_OBJECTS = $(am_dvbstreamer_OBJECTS)
 dvbstreamer_DEPENDENCIES =
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
@@ -199,6 +201,7 @@ dvbstreamer_SOURCES = \
 	udpoutput.c\
 	patprocessor.c\
 	pmtprocessor.c\
+	sdtprocessor.c\
 	dbase.c\
 	cache.c\
 	logging.c
@@ -287,6 +290,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/parsezap.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/patprocessor.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pmtprocessor.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sdtprocessor.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/services.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ts.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/udpoutput.Po@am__quote@
