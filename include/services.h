@@ -55,10 +55,12 @@ typedef void *ServiceEnumerator_t;
 int ServiceCount();
 int ServiceForMultiplexCount(int freq);
 
+int ServiceDelete(Service_t  *service);
 int ServiceAdd(int multiplexfreq, char *name, int id, int pmtversion, int pmtpid);
 Service_t *ServiceGet(int i);
 int ServicePMTVersionSet(Service_t  *service, int pmtversion);
 int ServicePMTPIDSet(Service_t  *service, int pmtpid);
+int ServiceNameSet(Service_t  *service, char *name);
 
 Service_t *ServiceFindName(char *name);
 Service_t *ServiceFindId(Multiplex_t *multiplex, int id);

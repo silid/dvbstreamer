@@ -45,6 +45,21 @@ int ServiceCount()
     return result;
 }
 
+int ServiceDelete(Service_t  *service)
+{
+    STATEMENT_INIT;
+
+    STATEMENT_PREPAREVA("DELETE FROM " SERVICES_TABLE " "
+                        "WHERE " SERVICE_MPLEXFREQ "=%d AND " SERVICE_ID "=%d;",
+                        service->multiplexfreq, service->id);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+
+    STATEMENT_FINALIZE();
+    return 0;
+}
+
 int ServiceAdd(int multiplexfreq, char *name, int id, int pmtversion, int pmtpid)
 {
     STATEMENT_INIT;
@@ -106,6 +121,32 @@ int ServicePMTPIDSet(Service_t  *service, int pmtpid)
     {
         printlog(LOG_DEBUGV,"Updated 0x%04x %d\n", service->id, service->multiplexfreq);
         service->pmtpid = pmtpid;
+        rc = SQLITE_OK;
+    }
+    else
+    {
+        PRINTLOG_SQLITE3ERROR();
+    }
+    STATEMENT_FINALIZE();
+    return rc;
+}
+
+int ServiceNameSet(Service_t  *service, char *name)
+{
+    STATEMENT_INIT;
+
+    STATEMENT_PREPAREVA("UPDATE " SERVICES_TABLE " "
+                        "SET " SERVICE_NAME "='%q' "
+                        "WHERE " SERVICE_MPLEXFREQ "=%d AND " SERVICE_ID "=%d;",
+                        name, service->multiplexfreq,  service->id);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+    if (rc == SQLITE_DONE)
+    {
+        printlog(LOG_DEBUGV,"Updated 0x%04x %d\n", service->id, service->multiplexfreq);
+		free(service->name);
+		service->name = strdup(name);
         rc = SQLITE_OK;
     }
     else
