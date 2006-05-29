@@ -113,23 +113,54 @@ TSPacket_t *PATProcessorProcessPacket(void *arg, TSPacket_t *packet)
 }
 
 static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
+
 {
     PATProcessor_t *state = (PATProcessor_t*)arg;
     Multiplex_t *multiplex = state->multiplex;
     printlog(LOG_DEBUG,"PAT recieved, version %d (old version %d)\n", newpat->i_version, multiplex->patversion);
     if (multiplex->patversion != newpat->i_version)
     {
-        // Version has changed update the services
+        int count,i;
+        Service_t **services;
+
+        /* Version has changed update the services */
         dvbpsi_pat_program_t *patentry = newpat->p_first_program;
         while(patentry)
         {
             Service_t *service = CacheServiceFindId(patentry->i_number);
+            if (!service && (patentry->i_number != 0x0000))
+            {
+                service = CacheServiceAdd(patentry->i_number);
+            }
+
             if (service && (service->pmtpid != patentry->i_pid))
             {
                 CacheUpdateService(service, patentry->i_pid);
             }
             patentry = patentry->p_next;
         }
+
+        /* Delete any services that no longer exist */
+        services = CacheServicesGet(&count);
+        for (i = 0; i < count; i ++)
+        {
+            int found = 0;
+            patentry = newpat->p_first_program;
+            while(patentry)
+            {
+                if (services[i]->id == patentry->i_number)
+                {
+                    found = 1;
+                    break;
+                }
+                patentry = patentry->p_next;
+            }
+            if (!found)
+            {
+                CacheServiceDelete(services[i]);
+            }
+        }
+
         CacheUpdateMultiplex(multiplex, newpat->i_version, newpat->i_ts_id);
     }
     dvbpsi_DeletePAT(newpat);
@@ -158,9 +189,9 @@ static void PATRewrite(TSPacket_t *packet, int tsid, int version, int serviceid,
 
     if (len > (sizeof(TSPacket_t) - 5))
     {
-        printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-        printf("! ERROR PAT too big to fit in 1 TS packet !\n");
-        printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+        printlog(LOG_ERROR, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
+							"! ERROR PAT too big to fit in 1 TS packet !\n"
+							"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     }
 
     for (i = 0; i < len; i ++)
