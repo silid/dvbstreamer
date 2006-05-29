@@ -30,7 +30,6 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 #include <sys/types.h>
 #include <sys/poll.h>
 #include <sys/ioctl.h>
-#include <linux/types.h>
 #include <linux/dvb/dmx.h>
 #include <linux/dvb/frontend.h>
 
