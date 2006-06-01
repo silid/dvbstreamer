@@ -123,15 +123,18 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
                 dvbpsi_service_dr_t* servicedesc = dvbpsi_DecodeServiceDr(descriptor);
                 if (servicedesc)
                 {
-                    char name[255];
                     Service_t *service = CacheServiceFindId(sdtservice->i_service_id);
-                    memcpy(name, servicedesc->i_service_name, servicedesc->i_service_name_length);
-                    name[servicedesc->i_service_name_length] = 0;
-                    /* Only update the name if it has changed */
-                    if (strcmp(name, service->name))
+                    if (service)
                     {
-                        printlog(LOG_DEBUG,"Updating service 0x%04x = %s\n", sdtservice->i_service_id, name);
-                        CacheUpdateServiceName(service, name);
+                        char name[255];
+                        memcpy(name, servicedesc->i_service_name, servicedesc->i_service_name_length);
+                        name[servicedesc->i_service_name_length] = 0;
+                        /* Only update the name if it has changed */
+                        if (strcmp(name, service->name))
+                        {
+                            printlog(LOG_DEBUG,"Updating service 0x%04x = %s\n", sdtservice->i_service_id, name);
+                            CacheUpdateServiceName(service, name);
+                        }
                     }
                     break;
                 }
