@@ -272,7 +272,7 @@ int QPSKParametersGet(int freq, struct dvb_frontend_parameters *feparams)
                         QPSKPARAM_FREQ ","
 						QPSKPARAM_INVERSION ","
 						QPSKPARAM_SYMBOL_RATE ","
-						QPSKPARAM_FEC_INNER ","
+						QPSKPARAM_FEC_INNER " "
 						"FROM " QPSKPARAMS_TABLE " WHERE " QPSKPARAM_FREQ "=%d;"
 						,freq);
 	RETURN_RC_ON_ERROR;
@@ -320,7 +320,7 @@ int QAMParametersGet(int freq, struct dvb_frontend_parameters *feparams)
 	                    QAMPARAM_INVERSION ","
 	                    QAMPARAM_SYMBOL_RATE ","
 	                    QAMPARAM_FEC_INNER ","
-	                    QAMPARAM_MODULATION
+	                    QAMPARAM_MODULATION " "
 						"FROM " QAMPARAMS_TABLE " WHERE " QAMPARAM_FREQ "=%d;"
 						,freq);
 	RETURN_RC_ON_ERROR;

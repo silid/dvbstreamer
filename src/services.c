@@ -278,8 +278,11 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
 
         return service;
     }
-
-    PRINTLOG_SQLITE3ERROR();
+    
+    if (rc != SQLITE_DONE)
+    {
+        PRINTLOG_SQLITE3ERROR();
+    }
     return NULL;
 }
 
