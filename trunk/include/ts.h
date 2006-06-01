@@ -54,14 +54,16 @@ TSPacket_t;
 #define TSPACKET_SETCOUNT(packet, count) \
 	((packet).header[3] = ((packet).header[3] & 0xf0) | ((count) & 0x0f))
 
+/* forward define of type to solve compile warnings */
+typedef struct PIDFilter_t PIDFilter_t;
 
 /*---- Filter function pointer type----*/
-typedef int (*PacketFilter)(void *userarg, uint16_t pid, TSPacket_t* packet);
-typedef TSPacket_t* (*PacketProcessor)(void *userarg, TSPacket_t* packet);
-typedef void (*PacketOutput)(void *userarg, TSPacket_t* packet);
+typedef int (*PacketFilter)(PIDFilter_t *pidfilter, void *userarg, uint16_t pid, TSPacket_t* packet);
+typedef TSPacket_t* (*PacketProcessor)(PIDFilter_t *pidfilter, void *userarg, TSPacket_t* packet);
+typedef void (*PacketOutput)(PIDFilter_t *pidfilter, void *userarg, TSPacket_t* packet);
 
 /*---- PID Filter Structures ----*/
-typedef struct PIDFilter_t
+struct PIDFilter_t
 {
     struct TSFilter_t *tsfilter;
     volatile int enabled;
@@ -79,8 +81,7 @@ typedef struct PIDFilter_t
     volatile int packetsfiltered;
     volatile int packetsprocessed;
     volatile int packetsoutput;
-}
-PIDFilter_t;
+};
 
 /*---- Simple PID Filter structures ---*/
 #define MAX_PIDS 20
@@ -127,6 +128,6 @@ PIDFilter_t *PIDFilterSetup(TSFilter_t *tsfilter,
                             PacketProcessor processpacket, void *pparg,
                             PacketOutput outputpacket,  void *oparg);
 
-int PIDFilterSimpleFilter(void *arg, uint16_t pid, TSPacket_t *packet);
+int PIDFilterSimpleFilter(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet);
 
 #endif

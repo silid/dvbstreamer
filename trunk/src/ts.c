@@ -120,7 +120,7 @@ PIDFilter_t *PIDFilterSetup(TSFilter_t *tsfilter,
     return filter;
 }
 
-int PIDFilterSimpleFilter(void *arg, uint16_t pid, TSPacket_t *packet)
+int PIDFilterSimpleFilter(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet)
 {
     PIDFilterSimpleFilter_t *filter = (PIDFilterSimpleFilter_t*)arg;
     int i;
@@ -184,7 +184,7 @@ static void ProcessPacket(TSFilter_t *state, TSPacket_t *packet)
         if (state->pidfilters[i].allocated && state->pidfilters[i].filter.enabled)
         {
             PIDFilter_t *filter = &state->pidfilters[i].filter;
-            if (filter->filterpacket && filter->filterpacket(filter->fparg, pid, packet))
+            if (filter->filterpacket && filter->filterpacket(filter, filter->fparg, pid, packet))
             {
                 int output = 1;
                 TSPacket_t *outputPacket = packet;
@@ -193,14 +193,14 @@ static void ProcessPacket(TSFilter_t *state, TSPacket_t *packet)
 
                 if (filter->processpacket)
                 {
-                    outputPacket = filter->processpacket(filter->pparg, packet);
+                    outputPacket = filter->processpacket(filter, filter->pparg, packet);
                     output = (outputPacket) ? 1:0;
                     filter->packetsprocessed ++;
                 }
 
                 if (output && filter->outputpacket)
                 {
-                    filter->outputpacket(filter->oparg, outputPacket);
+                    filter->outputpacket(filter, filter->oparg, outputPacket);
                     filter->packetsoutput ++;
                 }
             }

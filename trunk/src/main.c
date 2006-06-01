@@ -86,7 +86,7 @@ typedef struct Command_t
 Command_t;
 
 
-static int ServiceFilterPacket(void *arg, uint16_t pid, TSPacket_t *packet);
+static int ServiceFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet);
 
 static void usage(char *appname);
 static void version(void);
@@ -135,20 +135,20 @@ static Command_t commands[] = {
                                       "services",
                                       "List all available services",
                                       "Lists all the services currently in the database. This list will be "
-                                      "updated as updates to the PAT are detected",
+                                      "updated as updates to the PAT are detected.",
                                       CommandServices
                                   },
                                   {
                                       "multiplex",
                                       "List all the services on the current multiplex",
-                                      "List only the services on the same multiplex as the currently selected service",
+                                      "List only the services on the same multiplex as the currently selected service.",
                                       CommandMultiplex,
                                   },
                                   {
                                       "select",
                                       "Select a new service to stream",
                                       "select <service name>\n"
-                                      "Sets <service name> as the current service, this may mean tuning to a different"
+                                      "Sets <service name> as the current service, this may mean tuning to a different "
                                       "multiplex.",
                                       CommandSelect
                                   },
@@ -162,16 +162,16 @@ static Command_t commands[] = {
                                   {
                                       "stats",
                                       "Display the stats for the PAT,PMT and service PID filters",
-                                      "Display the number of packets processed and the number of packets"
-                                      " filtered by each filter.",
+                                      "Display the number of packets processed and the number of packets "
+                                      "filtered by each filter.",
                                       CommandStats
                                   },
                                   {
                                       "addoutput",
                                       "Add a new destination for manually filtered PIDs.",
                                       "addoutput <output name> <ipaddress>:<udp port>\n"
-                                      "Adds a new destination for sending packets to. This is only used for"
-                                      " manually filtered packets."
+                                      "Adds a new destination for sending packets to. This is only used for "
+                                      "manually filtered packets. "
                                       "To send packets to this destination you'll need to also call \'filterpid\' "
                                       "with this output as an argument.",
                                       CommandAddOutput
@@ -425,7 +425,7 @@ int main(int argc, char *argv[])
 }
 
 
-static int ServiceFilterPacket(void *arg, uint16_t pid, TSPacket_t *packet)
+static int ServiceFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet)
 {
     int i;
     if (CurrentService)
