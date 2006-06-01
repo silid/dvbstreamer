@@ -22,8 +22,10 @@ UDP Output functions
 */
 #ifndef _UDPOUTPUT_H
 #define _UDPOUTPUT_H
+#include "ts.h"
+
 void *UDPOutputCreate(char *arg);
 void UDPOutputClose(void *udpoutput);
-void UDPOutputPacketOutput(void *arg, TSPacket_t *packet);
+void UDPOutputPacketOutput(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
 char *UDPOutputDestination(void *arg);
 #endif

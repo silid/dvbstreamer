@@ -72,7 +72,7 @@ void SDTProcessorDestroy(void *arg)
 }
 
 
-TSPacket_t * SDTProcessorProcessPacket(void *arg, TSPacket_t *packet)
+TSPacket_t * SDTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet)
 {
     SDTProcessor_t *state = (SDTProcessor_t *)arg;
 

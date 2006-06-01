@@ -25,6 +25,6 @@ Process Service Description Tables and update the services information.
 
 void *SDTProcessorCreate();
 void SDTProcessorDestroy(void *arg);
-TSPacket_t *SDTProcessorProcessPacket(void *arg, TSPacket_t *packet);
+TSPacket_t *SDTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
 
 #endif

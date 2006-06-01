@@ -99,7 +99,7 @@ void UDPOutputClose(void *arg)
     free(state);
 }
 
-void UDPOutputPacketOutput(void *arg, TSPacket_t *packet)
+void UDPOutputPacketOutput(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet)
 {
     struct UDPOutputState_t *state = arg;
     state->outputbuffer[state->tspacketcount++] = *packet;

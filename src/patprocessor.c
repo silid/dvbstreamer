@@ -70,7 +70,7 @@ void PATProcessorDestroy(void *arg)
     free(state);
 }
 
-TSPacket_t *PATProcessorProcessPacket(void *arg, TSPacket_t *packet)
+TSPacket_t *PATProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet)
 {
     TSPacket_t *result = NULL;
     PATProcessor_t *state= (PATProcessor_t*)arg;
