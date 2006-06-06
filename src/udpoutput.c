@@ -20,6 +20,7 @@ udpoutput.c
 UDP Output functions
  
 */
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -37,6 +38,7 @@ struct UDPOutputState_t
 {
     int socket;
     struct sockaddr_in address;
+    int datagramfullcount;
     int tspacketcount;
     TSPacket_t outputbuffer[MAX_TS_PACKETS_PER_DATAGRAM];
 };
@@ -86,9 +88,9 @@ void *UDPOutputCreate(char *arg)
     }
     if (colon)
     {
-        *colon = ';';
+        *colon = ':';
     }
-
+    state->datagramfullcount = MAX_TS_PACKETS_PER_DATAGRAM;
     return state;
 }
 
@@ -99,11 +101,26 @@ void UDPOutputClose(void *arg)
     free(state);
 }
 
+void UDPOutputDatagramFullCountSet(void *udpoutput, int fullcount)
+{
+    struct UDPOutputState_t *state = udpoutput;
+    if ((fullcount > 0) && (fullcount <= MAX_TS_PACKETS_PER_DATAGRAM))
+    {
+        state->datagramfullcount = fullcount;
+    }
+}
+
+int UDPOutputDatagramFullCountGet(void *udpoutput)
+{
+    struct UDPOutputState_t *state = udpoutput;
+    return state->datagramfullcount;
+}
+
 void UDPOutputPacketOutput(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet)
 {
     struct UDPOutputState_t *state = arg;
     state->outputbuffer[state->tspacketcount++] = *packet;
-    if (state->tspacketcount >= MAX_TS_PACKETS_PER_DATAGRAM)
+    if (state->tspacketcount >= state->datagramfullcount)
     {
         UDPSendTo(state->socket, (char*)state->outputbuffer,
                   MAX_TS_PACKETS_PER_DATAGRAM * TSPACKET_SIZE, &state->address);

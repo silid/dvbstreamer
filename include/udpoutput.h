@@ -26,6 +26,8 @@ UDP Output functions
 
 void *UDPOutputCreate(char *arg);
 void UDPOutputClose(void *udpoutput);
+void UDPOutputDatagramFullCountSet(void *udpoutput, int fullcount);
+int UDPOutputDatagramFullCountGet(void *udpoutput);
 void UDPOutputPacketOutput(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
 char *UDPOutputDestination(void *arg);
 #endif
