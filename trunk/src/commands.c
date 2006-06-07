@@ -64,6 +64,8 @@ typedef struct Command_t
 Command_t;
 
 static void GetCommand(char **command, char **argument);
+static char **AttemptComplete (const char *text, int start, int end);
+static char *CompleteCommand(const char *text, int state);
 static int ProcessCommand(char *command, char *argument);
 char **Tokenise(char *arguments, int *argc);
 static void ParseLine(char *line, char **command, char **argument);
@@ -189,6 +191,7 @@ static Command_t commands[] = {
                                       "outputpids",
                                       1, 1, 1,
                                       "List PIDs for output",
+                                      "outputpids <output name>\n"
                                       "List the PIDs being filtered for a specific output",
                                       CommandOutputPIDs
                                   },
@@ -211,6 +214,9 @@ int CommandInit(void)
 {
     /* Clear all outputs */
     memset(&outputs, 0, sizeof(outputs));
+    
+    rl_readline_name = "DVBStreamer";
+    rl_attempted_completion_function = AttemptComplete;
     return 0;
 }
 
@@ -323,6 +329,43 @@ static void GetCommand(char **command, char **argument)
     }
 }
 
+static char **AttemptComplete (const char *text, int start, int end)
+{
+    char **matches = (char **)NULL;
+
+    if (start == 0)
+    {
+        matches = rl_completion_matches (text, CompleteCommand);
+    }
+    else 
+    {
+        rl_attempted_completion_over = 1;
+    }
+    return (matches);
+}
+
+static char *CompleteCommand(const char *text, int state)
+{
+    static int lastIndex = -1, textlen;
+    int i;
+    
+    if (state == 0)
+    {
+        lastIndex = -1;
+        textlen = strlen(text);
+    }
+    
+    for ( i = lastIndex + 1; commands[i].command; i ++)
+    {
+        if (strncasecmp(text, commands[i].command, textlen) == 0)
+        {
+            lastIndex = i;
+            return strdup(commands[i].command);
+        }
+    }
+    return NULL;
+}
+
 
 static int ProcessCommand(char *command, char *argument)
 {
@@ -344,14 +387,13 @@ static int ProcessCommand(char *command, char *argument)
                 {
                     argv = Tokenise(argument, &argc);
                 }
-                
-                if ((commands[i].minargs >= argc) && (commands[i].maxargs <= argc))
+                if ((argc >= commands[i].minargs) && (argc <= commands[i].maxargs))
                 {
                     commands[i].commandfunc(argc, argv );
                 }
                 else
                 {
-                    printf("Incorrect number of arguments see help for more information!\n");
+                    printf("Incorrect number of arguments see help for more information!\n\n%s\n\n",commands[i].longhelp);
                 }
                 
                 /* Free the arguments but not the array as that is a static array */
@@ -702,7 +744,7 @@ static void CommandHelp(int argc, char **argv)
         {
             if (strcasecmp(commands[i].command,argv[0]) == 0)
             {
-                printf("%s\n", commands[i].longhelp);
+                printf("%s\n\n", commands[i].longhelp);
                 commandFound = 1;
                 break;
             }
