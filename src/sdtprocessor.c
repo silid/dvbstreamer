@@ -26,6 +26,8 @@ Process Service Description Tables and update the services information.
 #include <stdio.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <assert.h>
+
 #include <dvbpsi/dvbpsi.h>
 #include <dvbpsi/descriptor.h>
 #include <dvbpsi/dr.h>
@@ -47,23 +49,42 @@ Process Service Description Tables and update the services information.
 
 typedef struct SDTProcessor_t
 {
+    PIDFilterSimpleFilter_t simplefilter;
     Multiplex_t *multiplex;
     dvbpsi_handle demuxhandle;
 }
 SDTProcessor_t;
 
+static TSPacket_t * SDTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
 static void SubTableHandler(void * state, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension);
 static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT);
 
-void *SDTProcessorCreate()
+PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter)
 {
-    SDTProcessor_t *result = calloc(1, sizeof(SDTProcessor_t));
+    PIDFilter_t *result = NULL;
+    SDTProcessor_t *state = calloc(1, sizeof(SDTProcessor_t));
+    if (state)
+    {
+        state->simplefilter.pidcount = 1;
+        state->simplefilter.pids[0] = 0x11;
+        result = PIDFilterSetup(tsfilter,
+                    PIDFilterSimpleFilter, &state->simplefilter,
+                    SDTProcessorProcessPacket, state,
+                    NULL,NULL);
+        if (result == NULL)
+        {
+            free(state);
+        }
+    }
     return result;
 }
 
-void SDTProcessorDestroy(void *arg)
+void SDTProcessorDestroy(PIDFilter_t *filter)
 {
-    SDTProcessor_t *state = (SDTProcessor_t *)arg;
+    SDTProcessor_t *state = (SDTProcessor_t *)filter->pparg;
+    assert(filter->processpacket == SDTProcessorProcessPacket);
+    PIDFilterFree(filter);
+    
     if (state->multiplex)
     {
         dvbpsi_DetachDemux(state->demuxhandle);
@@ -72,7 +93,7 @@ void SDTProcessorDestroy(void *arg)
 }
 
 
-TSPacket_t * SDTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet)
+static TSPacket_t * SDTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet)
 {
     SDTProcessor_t *state = (SDTProcessor_t *)arg;
 

@@ -36,16 +36,17 @@ enum CacheFlags
     CacheFlag_Dirty_PMTPID  = 0x01,
     CacheFlag_Dirty_PIDs    = 0x02, /* Also means PMT Version needs to be updated */
     CacheFlag_Dirty_Name    = 0x04,
-    CacheFlag_Dirty_Deleted = 0x10,
-    CacheFlag_Dirty_Added   = 0x20,
+    CacheFlag_Dirty_Added   = 0x10,
 };
 
 static int cachedServicesMultiplexDirty = 0;
 static Multiplex_t *cachedServicesMultiplex = NULL;
 static int cachedServicesCount = 0;
+static int cachedDeletedServicesCount = 0;
 
 static enum CacheFlags cacheFlags[SERVICES_MAX];
 static Service_t*      cachedServices[SERVICES_MAX];
+static Service_t*      cachedDeletedServices[SERVICES_MAX];
 static int             cachedPIDsCount[SERVICES_MAX];
 static PID_t*          cachedPIDs[SERVICES_MAX];
 
@@ -266,14 +267,34 @@ Service_t *CacheServiceAdd(int id)
 
 void CacheServiceDelete(Service_t *service)
 {
+    int deletedIndex = -1;
     int i;
     for (i = 0; i < cachedServicesCount; i ++)
     {
         if ((cachedServices[i]) && ServiceAreEqual(service, cachedServices[i]))
         {
-            cacheFlags[i] |= CacheFlag_Dirty_Deleted;
+            deletedIndex = i;
             break;
         }
+    }
+    
+    if (deletedIndex != -1)
+    {
+        /* Get rid of the pids as we don't need them any more! */
+        free(cachedPIDs[deletedIndex]);
+        /* Remove the deleted service from the list */
+        for (i = deletedIndex; i < cachedServicesCount; i ++)
+        {
+            cachedPIDs[i] = cachedPIDs[i + 1];
+            cachedServices[i] = cachedServices[i +1];
+            cacheFlags[i] = cacheFlags [i + 1];
+        }
+        cachedServicesCount --;
+        /* Add the deleted service to the list of deleted services for removal 
+            when we writeback the cache.
+         */
+        cachedDeletedServices[cachedDeletedServicesCount] = service;
+        cachedDeletedServicesCount ++;
     }
 }
 
@@ -301,13 +322,6 @@ void CacheWriteback()
 
     for (i = 0; i < cachedServicesCount; i ++)
     {
-        if (cacheFlags[i] & CacheFlag_Dirty_Deleted)
-        {
-            printlog(LOG_DEBUG, "Deleting service %s\n", cachedServices[i]->name);
-            ServiceDelete(cachedServices[i]);
-            continue;
-        }
-
         if (cacheFlags[i] & CacheFlag_Dirty_Added)
         {
             printlog(LOG_DEBUG, "Adding service %s (0x%04x)\n", cachedServices[i]->name, cachedServices[i]->id);
@@ -339,12 +353,16 @@ void CacheWriteback()
             ServiceNameSet(cachedServices[i], cachedServices[i]->name);
         }
     }
-
-    /* Reload cache to remove any deleted services */
-    if (cachedServicesMultiplex)
+    
+    /* Delete deleted services from the database along with their PIDs*/
+    for (i = 0; i < cachedDeletedServicesCount; i ++)
     {
-        CacheLoad(cachedServicesMultiplex);
+        printlog(LOG_DEBUG, "Deleting service %s (0x%04x)\n", cachedDeletedServices[i]->name, cachedDeletedServices[i]->id);
+        ServiceDelete(cachedDeletedServices[i]);
+        ServicePIDRemove(cachedDeletedServices[i]);
+        ServiceFree(cachedDeletedServices[i]);
     }
+    cachedDeletedServicesCount = 0;
 }
 
 static void CacheServicesFree()

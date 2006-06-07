@@ -15,15 +15,20 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
  
-sdtprocessor.h
+servicefilter.h
  
-Process Service Description Tables and update the services information.
- 
-*/
-#ifndef _SDTPROCESSOR_H
-#define _SDTPROCESSOR_H
+Filter all packets for a service include the PMT, rewriting the PAT sent out in
+the output to only include this service.
 
-PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter);
-void SDTProcessorDestroy(PIDFilter_t *filter);
+*/
+#ifndef _SERVICFILTER_H
+#define _SERVICFILTER_H
+#include "ts.h"
+
+PIDFilter_t *ServiceFilterCreate(TSFilter_t *tsfilter, PacketOutput outputpacket,void *oparg);
+void ServiceFilterDestroy(PIDFilter_t *filter);
+
+void ServiceFilterServiceSet(PIDFilter_t *filter, Service_t *service);
+Service_t *ServiceFilterServiceGet(PIDFilter_t *filter);
 
 #endif

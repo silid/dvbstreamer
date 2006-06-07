@@ -58,6 +58,7 @@ TSPacket_t;
 typedef struct PIDFilter_t PIDFilter_t;
 
 /*---- Filter function pointer type----*/
+typedef void (*TSStructureChanged)(PIDFilter_t *pidfilter, void *userarg);
 typedef int (*PacketFilter)(PIDFilter_t *pidfilter, void *userarg, uint16_t pid, TSPacket_t* packet);
 typedef TSPacket_t* (*PacketProcessor)(PIDFilter_t *pidfilter, void *userarg, TSPacket_t* packet);
 typedef void (*PacketOutput)(PIDFilter_t *pidfilter, void *userarg, TSPacket_t* packet);
@@ -67,15 +68,18 @@ struct PIDFilter_t
 {
     struct TSFilter_t *tsfilter;
     volatile int enabled;
+    
+    TSStructureChanged tsstructurechanged;
+    void *tscarg;
+    
+    PacketFilter filterpacket;
+    void *fparg;
 
-    volatile PacketFilter filterpacket;
-    volatile void *fparg;
+    PacketProcessor processpacket;
+    void *pparg;
 
-    volatile PacketProcessor processpacket;
-    volatile void *pparg;
-
-    volatile PacketOutput outputpacket;
-    volatile void *oparg;
+    PacketOutput outputpacket;
+    void *oparg;
 
     /* Variables for statistics */
     volatile int packetsfiltered;
@@ -104,7 +108,8 @@ typedef struct TSFilter_t
     pthread_t thread;
     int enabled;
     pthread_mutex_t mutex;
-
+    int tsstructurechanged;
+    
     volatile int totalpackets;
 	volatile int bitrate;
 	
@@ -120,6 +125,9 @@ TSFilter_t;
 TSFilter_t* TSFilterCreate(DVBAdapter_t *adapter);
 void TSFilterDestroy(TSFilter_t * tsfilter);
 void TSFilterEnable(TSFilter_t * tsfilter, int enable);
+void TSFilterZeroStats(TSFilter_t *tsfilter);
+#define TSFilterLock(tsfilter)   pthread_mutex_lock(&(tsfilter)->mutex)
+#define TSFilterUnLock(tsfilter) pthread_mutex_unlock(&(tsfilter)->mutex)
 
 PIDFilter_t* PIDFilterAllocate(TSFilter_t* tsfilter);
 void PIDFilterFree(PIDFilter_t * pidfilter);
@@ -127,6 +135,18 @@ PIDFilter_t *PIDFilterSetup(TSFilter_t *tsfilter,
                             PacketFilter filterpacket,  void *fparg,
                             PacketProcessor processpacket, void *pparg,
                             PacketOutput outputpacket,  void *oparg);
+                            
+#define PIDFilterFilterPacketSet(_pidfilter, _callback, _arg) \
+    do{ (_pidfilter)->fparg = _arg; (_pidfilter)->filterpacket = _callback; } while(0)
+
+#define PIDFilterProcessPacketSet(_pidfilter, _callback, _arg) \
+    do{ (_pidfilter)->pparg = _arg; (_pidfilter)->processpacket = _callback; } while(0)
+
+#define PIDFilterOutputPacketSet(_pidfilter, _callback, _arg) \
+    do{ (_pidfilter)->oparg = _arg; (_pidfilter)->outputpacket = _callback; } while(0)
+    
+#define PIDFilterTSStructureChangeSet(_pidfilter, _callback, _arg) \
+    do{ (_pidfilter)->tscarg = _arg; (_pidfilter)->tsstructurechanged = _callback; } while(0)
 
 int PIDFilterSimpleFilter(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet);
 

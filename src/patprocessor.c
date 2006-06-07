@@ -18,7 +18,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 patprocessor.c
  
 Process Program Association Tables and update the services information.
-Rewrite the PAT so that only the current service appears in the PAT.
  
 */
 #include <stdlib.h>
@@ -26,6 +25,7 @@ Rewrite the PAT so that only the current service appears in the PAT.
 #include <unistd.h>
 #include <string.h>
 #include <stdint.h>
+#include <assert.h>
 #include <dvbpsi/dvbpsi.h>
 #include <dvbpsi/descriptor.h>
 #include <dvbpsi/psi.h>
@@ -42,27 +42,42 @@ Rewrite the PAT so that only the current service appears in the PAT.
 
 typedef struct PATProcessor_t
 {
+    TSFilter_t *tsfilter;
+    PIDFilterSimpleFilter_t simplefilter;
     Multiplex_t *multiplex;
-    Service_t   *service;
     dvbpsi_handle pathandle;
-    unsigned int version;
-    unsigned char packetcounter;
-    TSPacket_t patpacket;
 }
 PATProcessor_t;
 
+static TSPacket_t *PATProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
 static void PATHandler(void* arg, dvbpsi_pat_t* newpat);
-static void PATRewrite(TSPacket_t *packet, int tsid, int version, int serviceid, int pmtpid);
 
-void *PATProcessorCreate()
+PIDFilter_t *PATProcessorCreate(TSFilter_t *tsfilter)
 {
-    PATProcessor_t *result = calloc(1, sizeof(PATProcessor_t));
+    PIDFilter_t *result = NULL; 
+    PATProcessor_t *state = calloc(1, sizeof(PATProcessor_t));
+    if (state)
+    {
+        state->simplefilter.pidcount = 1;
+        state->simplefilter.pids[0] = 0;
+        state->tsfilter = tsfilter;
+        result =  PIDFilterSetup(tsfilter,
+                    PIDFilterSimpleFilter, &state->simplefilter,
+                    PATProcessorProcessPacket, state,
+                    NULL,NULL);
+        if (result == NULL)
+        {
+            free(state);
+        }
+    }
     return result;
 }
 
-void PATProcessorDestroy(void *arg)
+void PATProcessorDestroy(PIDFilter_t *filter)
 {
-    PATProcessor_t *state= (PATProcessor_t*)arg;
+    PATProcessor_t *state= (PATProcessor_t*)filter->pparg;
+    assert(filter->processpacket == PATProcessorProcessPacket);
+    PIDFilterFree(filter);
     if (state->multiplex)
     {
         dvbpsi_DetachPAT(state->pathandle);
@@ -70,7 +85,7 @@ void PATProcessorDestroy(void *arg)
     free(state);
 }
 
-TSPacket_t *PATProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet)
+static TSPacket_t *PATProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet)
 {
     TSPacket_t *result = NULL;
     PATProcessor_t *state= (PATProcessor_t*)arg;
@@ -91,22 +106,6 @@ TSPacket_t *PATProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacke
     if (state->multiplex)
     {
         dvbpsi_PushPacket(state->pathandle, (uint8_t*)packet);
-    }
-
-    if (state->service != CurrentService)
-    {
-        state->service = (Service_t*)CurrentService;
-        if (state->service)
-        {
-            state->version ++;
-            PATRewrite(&state->patpacket, state->multiplex->tsid, state->version, state->service->id, state->service->pmtpid);
-        }
-    }
-
-    if (state->service)
-    {
-        TSPACKET_SETCOUNT(state->patpacket, state->packetcounter ++);
-        result = &state->patpacket;
     }
 
     return result;
@@ -130,7 +129,10 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
             Service_t *service = CacheServiceFindId(patentry->i_number);
             if (!service && (patentry->i_number != 0x0000))
             {
+                printlog(LOG_DEBUG, "Service not found in cache while processing PAT, adding 0x%04x\n", patentry->i_number);
                 service = CacheServiceAdd(patentry->i_number);
+                /* Cause a TS Structure change call back*/
+                state->tsfilter->tsstructurechanged = 1;
             }
 
             if (service && (service->pmtpid != patentry->i_pid))
@@ -157,51 +159,15 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
             }
             if (!found)
             {
+                printlog(LOG_DEBUG, "Service not found in PAT while checking cache, deleting 0x%04x (%s)\n", 
+                    services[i]->id, services[i]->name);
                 CacheServiceDelete(services[i]);
+                /* Cause a TS Structure change call back*/
+                state->tsfilter->tsstructurechanged = 1;
             }
         }
 
         CacheUpdateMultiplex(multiplex, newpat->i_version, newpat->i_ts_id);
     }
     dvbpsi_DeletePAT(newpat);
-}
-
-static void PATRewrite(TSPacket_t *packet, int tsid, int version, int serviceid, int pmtpid)
-{
-    dvbpsi_pat_t pat;
-    dvbpsi_psi_section_t* section;
-    uint8_t *data;
-    int len,i;
-    dvbpsi_InitPAT(&pat, tsid, version, 1);
-    dvbpsi_PATAddProgram(&pat, serviceid, pmtpid);
-
-    section = dvbpsi_GenPATSections(&pat, 1);
-
-    // Fill in header
-    packet->header[0] = 0x47;
-    packet->header[1] = 0x40; // Payload unit start set
-    packet->header[2] = 0x00;
-    packet->header[3] = 0x10;
-    packet->payload[0] = 0;   // Pointer field
-
-    data = section->p_data;
-    len = section->i_length + 3;
-
-    if (len > (sizeof(TSPacket_t) - 5))
-    {
-        printlog(LOG_ERROR, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
-							"! ERROR PAT too big to fit in 1 TS packet !\n"
-							"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-    }
-
-    for (i = 0; i < len; i ++)
-    {
-        packet->payload[1 + i] = data[i];
-    }
-    for (i = len + 1; i < 184; i ++)
-    {
-        packet->payload[i] = 0xff;
-    }
-    dvbpsi_DeletePSISections(section);
-    dvbpsi_EmptyPAT(&pat);
 }

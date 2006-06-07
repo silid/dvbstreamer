@@ -15,15 +15,17 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
  
-sdtprocessor.h
+commands.h
  
-Process Service Description Tables and update the services information.
+Command Processing and command functions.
  
 */
-#ifndef _SDTPROCESSOR_H
-#define _SDTPROCESSOR_H
+#ifndef _COMMANDS_H
+#define _COMMANDS_H
 
-PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter);
-void SDTProcessorDestroy(PIDFilter_t *filter);
+int CommandInit(void);
+void CommandDeInit(void);
+void CommandLoop(void);
+int CommandProcessFile(char *file);
 
 #endif

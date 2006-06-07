@@ -27,10 +27,22 @@ Entry point to the application.
 #include "services.h"
 #include "multiplexes.h"
 
+enum PIDFilterIndex
+{
+    PIDFilterIndex_PAT = 0,
+    PIDFilterIndex_PMT,
+    PIDFilterIndex_SDT,
+    PIDFilterIndex_Service ,
+
+    PIDFilterIndex_Count
+};
+
 extern volatile Multiplex_t *CurrentMultiplex;
 extern volatile Service_t *CurrentService;
-extern volatile int CurrentMultiplexServiceChanges;
 
-extern Service_t *SetCurrentService(DVBAdapter_t *adapter, TSFilter_t *tsfilter, char *name);
+extern PIDFilter_t  *PIDFilters[];
+extern TSFilter_t   *TSFilter;
+extern DVBAdapter_t *DVBAdapter;
+extern Service_t *SetCurrentService(char *name);
 
 #endif
