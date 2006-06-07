@@ -326,8 +326,11 @@ static void GetCommand(char **command, char **argument)
 
 static int ProcessCommand(char *command, char *argument)
 {
+    char **argv = NULL;
+    int argc = 0;
     int i;
     int commandFound = 0;
+    
     for (i = 0; commands[i].command; i ++)
     {
         if (strcasecmp(command,commands[i].command) == 0)
@@ -335,9 +338,13 @@ static int ProcessCommand(char *command, char *argument)
             if (commands[i].tokenise)
             {
                 int a;
-                int argc;
                 
-                char **argv = Tokenise(argument, &argc);
+                
+                if (argument)
+                {
+                    argv = Tokenise(argument, &argc);
+                }
+                
                 if ((commands[i].minargs >= argc) && (commands[i].maxargs <= argc))
                 {
                     commands[i].commandfunc(argc, argv );
@@ -355,8 +362,13 @@ static int ProcessCommand(char *command, char *argument)
             }
             else
             {
-                args[0] = argument;
-                commands[i].commandfunc(1, args);
+                if (argument)
+                {
+                    argc = 1;
+                    argv = args;
+                    args[0] = argument;
+                }
+                commands[i].commandfunc(argc, argv);
             }
             commandFound = 1;
             break;
