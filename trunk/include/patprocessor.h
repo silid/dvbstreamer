@@ -18,14 +18,13 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 patprocessor.h
  
 Process Program Association Tables and update the services information.
-Rewrite the PAT so that only the current service appears in the PAT.
- 
 */
 #ifndef _PATPROCESSOR_H
 #define _PATPROCESSOR_H
+#include "ts.h"
 
-void *PATProcessorCreate();
-void PATProcessorDestroy(void *arg);
-TSPacket_t *PATProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
+PIDFilter_t *PATProcessorCreate(TSFilter_t *tsfilter);
+void PATProcessorDestroy(PIDFilter_t *filter);
+
 
 #endif

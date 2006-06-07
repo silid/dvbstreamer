@@ -22,9 +22,9 @@ Process Program Map Tables and update the services information and PIDs.
 */
 #ifndef _PMTPROCESSOR_H
 #define _PMTPROCESSOR_H
+#include "ts.h"
 
-void *PMTProcessorCreate();
-void PMTProcessorDestroy(void *arg);
-int PMTProcessorFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet);
-TSPacket_t *PMTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
+PIDFilter_t *PMTProcessorCreate(TSFilter_t *tsfilter);
+void PMTProcessorDestroy(PIDFilter_t *filter);
+
 #endif

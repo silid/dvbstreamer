@@ -24,6 +24,7 @@ Process Program Map Tables and update the services information and PIDs.
 #include <stdio.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <assert.h>
 #include <dvbpsi/dvbpsi.h>
 #include <dvbpsi/descriptor.h>
 #include <dvbpsi/dr.h>
@@ -41,24 +42,44 @@ Process Program Map Tables and update the services information and PIDs.
 
 typedef struct PMTProcessor_t
 {
-    Multiplex_t *multiplex;
+    Multiplex_t   *multiplex;
+    Service_t     *services[MAX_HANDLES];
     unsigned short pmtpids[MAX_HANDLES];
-    dvbpsi_handle pmthandles[MAX_HANDLES];
+    dvbpsi_handle  pmthandles[MAX_HANDLES];
 }
 PMTProcessor_t;
 
+static int PMTProcessorFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet);
+static TSPacket_t *PMTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
+static void PMTProcessorTSStructureChanged(PIDFilter_t *pidfilter, void *arg);
 static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt);
 
-void *PMTProcessorCreate()
+PIDFilter_t *PMTProcessorCreate(TSFilter_t *tsfilter)
 {
-    PMTProcessor_t *result = calloc(1, sizeof(PMTProcessor_t));
+    PIDFilter_t *result = NULL;
+    PMTProcessor_t *state = calloc(1, sizeof(PMTProcessor_t));
+    if (state)
+    {
+        result =  PIDFilterSetup(tsfilter,
+                    PMTProcessorFilterPacket, state,
+                    PMTProcessorProcessPacket, state,
+                    NULL,NULL);
+        if (!result)
+        {
+            free(state);
+        }
+        PIDFilterTSStructureChangeSet(result, PMTProcessorTSStructureChanged, state);
+    }
     return result;
 }
 
-void PMTProcessorDestroy(void *arg)
+void PMTProcessorDestroy(PIDFilter_t *filter)
 {
-    PMTProcessor_t *state = (PMTProcessor_t *)arg;
+    PMTProcessor_t *state = (PMTProcessor_t *)filter->fparg;
     int i;
+    assert(filter->filterpacket == PMTProcessorFilterPacket);
+    PIDFilterFree(filter);
+    
     for (i = 0; i < MAX_HANDLES; i ++)
     {
         if (state->pmthandles[i])
@@ -66,12 +87,13 @@ void PMTProcessorDestroy(void *arg)
             dvbpsi_DetachPMT(state->pmthandles[i]);
             state->pmtpids[i]    = 0;
             state->pmthandles[i] = NULL;
+            state->services[i]   = NULL;
         }
     }
     free(state);
 }
 
-int PMTProcessorFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet)
+static int PMTProcessorFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet)
 {
     if (CurrentMultiplex)
     {
@@ -91,7 +113,7 @@ int PMTProcessorFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TS
     return 0;
 }
 
-TSPacket_t * PMTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet)
+static TSPacket_t * PMTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet)
 {
     TSPacket_t *result = NULL;
     PMTProcessor_t *state = (PMTProcessor_t *)arg;
@@ -115,6 +137,7 @@ TSPacket_t * PMTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPack
                 dvbpsi_DetachPMT(state->pmthandles[i]);
                 state->pmtpids[i]    = 0;
                 state->pmthandles[i] = NULL;
+                state->services[i]   = NULL;
             }
         }
 
@@ -122,6 +145,7 @@ TSPacket_t * PMTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPack
         for (i = 0; i < count; i ++)
         {
             state->pmtpids[i] = services[i]->pmtpid;
+            state->services[i] = services[i];
             state->pmthandles[i] = dvbpsi_AttachPMT(services[i]->id, PMTHandler, (void*)services[i]);
         }
         state->multiplex = (Multiplex_t*)CurrentMultiplex;
@@ -129,18 +153,65 @@ TSPacket_t * PMTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPack
 
     for (i = 0; i < MAX_HANDLES; i ++)
     {
-        if (state->pmtpids[i] == pid)
+        if (state->pmthandles[i] && state->pmtpids[i] == pid)
         {
             dvbpsi_PushPacket(state->pmthandles[i], (uint8_t*)packet);
             break;
         }
     }
 
-    if ((CurrentService != NULL) && (pid == CurrentService->pmtpid))
-    {
-        result = packet;
-    }
     return result;
+}
+
+static void PMTProcessorTSStructureChanged(PIDFilter_t *pidfilter, void *arg)
+{
+    PMTProcessor_t *state = (PMTProcessor_t *)arg;
+    int i,count;
+    Service_t **services;
+    services = CacheServicesGet(&count);
+
+    for (i = 0; i < MAX_HANDLES; i ++)
+    {
+        
+        if (state->pmthandles[i])
+        {
+            int found = 0;
+            int s;
+            for (s = 0; s < count; s ++)
+            {
+                if (ServiceAreEqual(state->services[i], services[s]))
+                {
+                    found = 1;
+                    break;
+                }
+            }
+            if (!found)
+            {
+                dvbpsi_DetachPMT(state->pmthandles[i]);
+                state->pmtpids[i]    = 0;
+                state->pmthandles[i] = NULL;
+            }
+        }
+    }
+
+    
+    for (i = 0; i < count; i ++)
+    {
+        int index;
+        for (index = 0; index < MAX_HANDLES; index++)
+        {
+            if (state->pmthandles[i] == NULL)
+            {
+                break;
+            }
+        }
+        if (index < MAX_HANDLES)
+        {
+            state->pmtpids[index] = services[i]->pmtpid;
+            state->services[index] = services[i];
+            state->pmthandles[index] = dvbpsi_AttachPMT(services[i]->id, PMTHandler, (void*)services[i]);
+        }
+    }
 }
 
 static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)

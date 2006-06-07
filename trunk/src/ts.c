@@ -38,6 +38,7 @@ Transport stream processing and filter management.
 
 static void *FilterTS(void *arg);
 static void ProcessPacket(TSFilter_t *state, TSPacket_t *packet);
+static void InformTSStructureChanged(TSFilter_t *state);
 
 TSFilter_t* TSFilterCreate(DVBAdapter_t *adapter)
 {
@@ -60,9 +61,29 @@ void TSFilterDestroy(TSFilter_t* tsfilter)
 
 void TSFilterEnable(TSFilter_t* tsfilter, int enable)
 {
+    pthread_mutex_lock(&tsfilter->mutex);
     tsfilter->enabled = enable;
+    pthread_mutex_unlock(&tsfilter->mutex);
 }
 
+void TSFilterZeroStats(TSFilter_t* tsfilter)
+{
+    int i;
+    
+    /* Clear all filter stats */
+    tsfilter->totalpackets = 0;
+    tsfilter->bitrate = 0;
+    
+    for (i = 0; i < MAX_FILTERS; i ++)
+    {
+        if (tsfilter->pidfilters[i].allocated)
+        {
+            tsfilter->pidfilters[i].filter.packetsfiltered  = 0;
+            tsfilter->pidfilters[i].filter.packetsprocessed = 0;
+            tsfilter->pidfilters[i].filter.packetsoutput    = 0;
+        }
+    }
+}
 
 PIDFilter_t* PIDFilterAllocate(TSFilter_t* tsfilter)
 {
@@ -158,6 +179,15 @@ static void *FilterTS(void *arg)
         {
             ProcessPacket(state, &state->readbuffer[p]);
             state->totalpackets ++;
+            /* The structure of the transport stream has changed in a major way, 
+                (ie new services, services removed) so inform all of the filters 
+                that are interested.
+              */
+            if (state->tsstructurechanged)
+            {
+                InformTSStructureChanged(state);
+                state->tsstructurechanged = 0;
+            }
         }
 		
 		gettimeofday(&now, 0);
@@ -204,6 +234,22 @@ static void ProcessPacket(TSFilter_t *state, TSPacket_t *packet)
                     filter->packetsoutput ++;
                 }
             }
+        }
+    }
+}
+
+static void InformTSStructureChanged(TSFilter_t *state)
+{
+    int i;
+
+    for (i = 0; i < MAX_FILTERS; i ++)
+    {
+        if (state->pidfilters[i].allocated && 
+            state->pidfilters[i].filter.enabled &&
+            state->pidfilters[i].filter.tsstructurechanged)
+        {
+            PIDFilter_t *filter = &state->pidfilters[i].filter;
+            filter->tsstructurechanged(filter, filter->tscarg);
         }
     }
 }
