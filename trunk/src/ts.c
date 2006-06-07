@@ -147,7 +147,8 @@ int PIDFilterSimpleFilter(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPac
     int i;
     for (i = 0; i < filter->pidcount; i ++)
     {
-        if (pid == filter->pids[i])
+        if ((pid == filter->pids[i]) || 
+            (filter->pids[i] == 8192)) /* Special case match all PIDs */
         {
             return 1;
         }
