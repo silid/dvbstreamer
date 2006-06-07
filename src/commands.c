@@ -36,6 +36,7 @@ Command Processing and command functions.
 #include "ts.h"
 #include "udpoutput.h"
 #include "logging.h"
+#include "cache.h"
 #include "main.h"
 
 #define PROMPT "DVBStream>"
@@ -571,21 +572,40 @@ static void CommandPids(int argc, char **argv)
     service = ServiceFindName(argv[0]);
     if (service)
     {
+        int cached = 1;
         int i;
         int count;
         PID_t *pids;
-        count = ServicePIDCount(service);
+        pids = CachePIDsGet(service, &count);
+        if (pids == NULL)
+        {
+            count = ServicePIDCount(service);
+            cached = 0;
+        }
+        printf("%d PIDs for \"%s\" %s\n", count, argv[0], cached ? "(Cached)":"");
         if (count > 0)
         {
-            printf("PIDs for \"%s\"\n", argv[0]);
-            pids = calloc(count, sizeof(PID_t));
-            if (pids)
+            if (!cached)
             {
-                ServicePIDGet(service, pids, &count);
-                for (i = 0; i < count; i ++)
+                pids = calloc(count, sizeof(PID_t));
+                if (pids)
                 {
-                    printf("%2d: %d %d %d\n", i, pids[i].pid, pids[i].type, pids[i].subtype);
+                    ServicePIDGet(service, pids, &count);
                 }
+                else
+                {
+                    printf("No memory to retrieve PIDs\n");
+                }
+            }
+            
+            for (i = 0; i < count; i ++)
+            {
+                printf("%2d: %d %d %d\n", i, pids[i].pid, pids[i].type, pids[i].subtype);
+            }
+            
+            if (!cached)
+            {
+                free(pids);
             }
         }
         ServiceFree(service);
