@@ -315,7 +315,7 @@ Service_t *SetCurrentService(char *name)
 
         TSFilterZeroStats(TSFilter);
         
-        ServiceFilterServiceSet(PIDFilters[PIDFilterIndex_PAT], service);
+        ServiceFilterServiceSet(PIDFilters[PIDFilterIndex_Service], CurrentService);
         
         printlog(LOG_DEBUGV,"Enabling filters\n");
         TSFilterEnable(TSFilter, 1);
