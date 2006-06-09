@@ -140,6 +140,7 @@ static int parsezapline(char * str, fe_type_t fe_type)
 
 
     */
+    Multiplex_t *multiplex;
     unsigned long freq;
     char *field, *tmp;
     struct dvb_frontend_parameters   front_param;
@@ -248,9 +249,16 @@ static int parsezapline(char * str, fe_type_t fe_type)
 		default:
 			break;
 	}
-	
-	printlog(LOG_DEBUGV,"Adding frequency %d (type %d)\n", front_param.frequency, fe_type);
-	MultiplexAdd(fe_type, &front_param);
+	multiplex = MultiplexFind(front_param.frequency);
+    if (multiplex == NULL)
+    {
+        printlog(LOG_DEBUGV,"Adding frequency %d (type %d)\n", front_param.frequency, fe_type);
+        MultiplexAdd(fe_type, &front_param);
+    }
+    else
+    {
+        free(multiplex);
+    }
 	
     /* Video PID - not used but we'll take it anyway */
     NEXTFIELD();
