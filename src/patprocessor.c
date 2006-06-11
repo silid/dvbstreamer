@@ -126,8 +126,10 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
         dvbpsi_pat_program_t *patentry = newpat->p_first_program;
         while(patentry)
         {
+            if (patentry->i_number != 0x0000)
+            {
             Service_t *service = CacheServiceFindId(patentry->i_number);
-            if (!service && (patentry->i_number != 0x0000))
+                if (!service)
             {
                 printlog(LOG_DEBUG, "Service not found in cache while processing PAT, adding 0x%04x\n", patentry->i_number);
                 service = CacheServiceAdd(patentry->i_number);
@@ -139,6 +141,7 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
             {
                 CacheUpdateService(service, patentry->i_pid);
             }
+            }
             patentry = patentry->p_next;
         }
 
@@ -147,21 +150,21 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
         for (i = 0; i < count; i ++)
         {
             int found = 0;
-            patentry = newpat->p_first_program;
-            while(patentry)
+            
+            for (patentry = newpat->p_first_program; patentry; patentry = patentry->p_next)
             {
                 if (services[i]->id == patentry->i_number)
                 {
                     found = 1;
                     break;
                 }
-                patentry = patentry->p_next;
             }
             if (!found)
             {
                 printlog(LOG_DEBUG, "Service not found in PAT while checking cache, deleting 0x%04x (%s)\n", 
                     services[i]->id, services[i]->name);
                 CacheServiceDelete(services[i]);
+                services = CacheServicesGet(&count);
                 /* Cause a TS Structure change call back*/
                 state->tsfilter->tsstructurechanged = 1;
             }

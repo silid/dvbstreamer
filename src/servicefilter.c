@@ -139,6 +139,7 @@ static TSPacket_t *ServiceFilterProcessPacket(PIDFilter_t *pidfilter, void *arg,
         {
             state->version ++;
             ServiceFilterPATRewrite(&state->patpacket, state->multiplex->tsid, state->version, state->service->id, state->service->pmtpid);
+            state->rewritepat = 0;
         }
 
         TSPACKET_SETCOUNT(state->patpacket, state->packetcounter ++);

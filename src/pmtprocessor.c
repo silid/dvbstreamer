@@ -38,7 +38,7 @@ Process Program Map Tables and update the services information and PIDs.
 #include "cache.h"
 #include "logging.h"
 
-#define MAX_HANDLES 20
+#define MAX_HANDLES 256
 
 typedef struct PMTProcessor_t
 {
@@ -142,6 +142,11 @@ static TSPacket_t * PMTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg,
         }
 
         services = CacheServicesGet(&count);
+        if (count > MAX_HANDLES)
+        {
+            printlog(LOG_ERROR,"Too many services in TS, cannot monitor them all only monitoring %d out of %d\n", MAX_HANDLES, count);
+            count = MAX_HANDLES;
+        }
         for (i = 0; i < count; i ++)
         {
             state->pmtpids[i] = services[i]->pmtpid;
@@ -166,6 +171,7 @@ static TSPacket_t * PMTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg,
 static void PMTProcessorTSStructureChanged(PIDFilter_t *pidfilter, void *arg)
 {
     PMTProcessor_t *state = (PMTProcessor_t *)arg;
+#if 0
     int i,count;
     Service_t **services;
     services = CacheServicesGet(&count);
@@ -190,28 +196,44 @@ static void PMTProcessorTSStructureChanged(PIDFilter_t *pidfilter, void *arg)
                 dvbpsi_DetachPMT(state->pmthandles[i]);
                 state->pmtpids[i]    = 0;
                 state->pmthandles[i] = NULL;
+                state->services[i]   = NULL;
             }
         }
     }
 
-    
+    /* Look for services that we are currently not monitoring ie 'new' services */
     for (i = 0; i < count; i ++)
     {
+        int found = 0;
+        int emptyIndex = -1;
         int index;
         for (index = 0; index < MAX_HANDLES; index++)
         {
-            if (state->pmthandles[i] == NULL)
+            if (state->pmthandles[index] == NULL)
             {
+                if (emptyIndex == -1)
+                {
+                    emptyIndex = i;
+                }
+                continue;
+            }
+            if ((state->pmthandles[index] != NULL) && ServiceAreEqual(state->services[index], services[i]))
+            {
+                found = 1;
                 break;
             }
         }
-        if (index < MAX_HANDLES)
+        if (!found && (emptyIndex != -1))
         {
-            state->pmtpids[index] = services[i]->pmtpid;
-            state->services[index] = services[i];
-            state->pmthandles[index] = dvbpsi_AttachPMT(services[i]->id, PMTHandler, (void*)services[i]);
+            state->pmtpids[emptyIndex] = services[i]->pmtpid;
+            state->services[emptyIndex] = services[i];
+            state->pmthandles[emptyIndex] = dvbpsi_AttachPMT(services[i]->id, PMTHandler, (void*)services[i]);
         }
     }
+#else
+    printlog(LOG_DEBUG,"PMTProcessor: TS Structure changed!\n");
+    state->multiplex = NULL;
+#endif
 }
 
 static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
