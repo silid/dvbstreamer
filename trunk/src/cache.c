@@ -20,6 +20,7 @@ cache.c
 Caches service and PID information from the database for the current multiplex.
  
 */
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "ts.h"
@@ -252,9 +253,11 @@ Service_t *CacheServiceAdd(int id)
     Service_t *result = calloc(1, sizeof(Service_t));
     if (result)
     {
+        result->id = id;
         result->pmtversion = -1;
         result->pmtpid = 8192;
-        result->name = strdup("<NO NAME>");
+        result->name = malloc(5);
+        sprintf(result->name, "%04x", id);
         result->multiplexfreq = cachedServicesMultiplex->freq;
         cachedServices[cachedServicesCount] = result;
         cachedPIDs[cachedServicesCount] = NULL;
