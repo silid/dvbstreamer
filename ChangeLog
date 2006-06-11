@@ -1,0 +1,30 @@
+0.3
+---
+* Command completion.
+* Automatic service addition/removal, new service are automatically added
+  to the database and services no longer signaled in the PAT are removed. 
+* All TS pid (use pid 8192 when adding a pid to a manual output to get the
+  entire TS)
+* Added SDT processing, can now get/update services names.
+* Refactored service filter and PAT/PMT handling so now PAT and PMT processor
+  only process the incoming PAT/PMT and service filter actually does the PAT
+  rewrite (should allow more than 1 service filter in the future).
+* Add DVB-S/C support (database has now changed slightly although shouldn't 
+  affect anyone upgrading from 0.2)
+* Fixed bug in cache.c when PAT version changed.
+* Several patches from Tero Pelander - Thanks! (including Bug ID 1487683)
+
+0.2
+---
+* Added some new commands
+* Rewrote the TS filter callbacks todo more what they say they do. ie filter 
+  now returns a bool, process now returns a packet or null, and output just 
+  sends the packets.
+* Fixed a couple of memory leaks where I wasn't freeing the PSI sections after
+  using them.
+* Continued general tidying up the project directory and getting to know 
+  subversion better.
+
+0.1
+---
+Initial release.
