@@ -26,12 +26,9 @@ UDP Output functions
 #include <unistd.h>
 #include <sys/socket.h>
 #include "ts.h"
-#include "udpsend.h"
+#include "udp.h"
 #include "logging.h"
 
-#define MTU 1400 /* Conservative estimate */
-#define IP_HEADER (5*4)
-#define UDP_HEADER (2*4)
 #define MAX_TS_PACKETS_PER_DATAGRAM ((MTU - (IP_HEADER+UDP_HEADER)) / sizeof(TSPacket_t))
 
 struct UDPOutputState_t
@@ -54,7 +51,7 @@ void *UDPOutputCreate(char *arg)
         printlog(LOG_DEBUG, "Failed to allocate UDP Output state\n");
         return NULL;
     }
-    state->socket = UDPCreateSocket();
+    state->socket = UDPCreateSocket(NULL, 0);
     if (state->socket == -1)
     {
         printlog(LOG_DEBUG, "Failed to create UDP socket\n");

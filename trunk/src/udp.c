@@ -26,38 +26,39 @@ Simplify UDP socket creation and packet sending.
 #include <sys/socket.h>
 #include <string.h>
 #include <netdb.h>
-#include "udpsend.h"
-#define PORT 54197 // 0xd3b5 ~= DVBS
+#include "udp.h"
 
-int UDPCreateSocket(void)
+
+int UDPCreateSocket(struct sockaddr_in *sockaddr, int reuse)
 {
     int socketfd = socket(AF_INET,	SOCK_DGRAM,	IPPROTO_UDP);
     int reuseAddr = 1;
-    struct	sockaddr_in	address;
+
     if (socketfd < 0)
     {
         perror("socket()");
         return -1;
     }
 
-    if (setsockopt(socketfd, SOL_SOCKET, SO_REUSEADDR, &reuseAddr, sizeof(int)))
+    if (reuse)
     {
-        perror("setsockopt(SOL_SOCKET, SO_REUSEADDR)");
-        close(socketfd);
-        return -1;
+        if (setsockopt(socketfd, SOL_SOCKET, SO_REUSEADDR, &reuseAddr, sizeof(int)))
+        {
+            perror("setsockopt(SOL_SOCKET, SO_REUSEADDR)");
+            close(socketfd);
+            return -1;
+        }
     }
 
-    memset((void*)&address, 0, sizeof(address));
-    address.sin_family=AF_INET;
-    address.sin_addr.s_addr=INADDR_ANY;
-    address.sin_port=htons(PORT);
-    if	(bind(socketfd, (struct sockaddr*)&address, sizeof(address))<0)
+    if (sockaddr)
     {
-        perror("bind()");
-        close(socketfd);
-        return	-1;
+        if	(bind(socketfd, (struct sockaddr*)&sockaddr, sizeof(struct sockaddr_in))<0)
+        {
+            perror("bind()");
+            close(socketfd);
+            return	-1;
+        }
     }
-
 
     return socketfd;
 }
@@ -79,4 +80,17 @@ int UDPSetupSocketAddress(char *host, int port, struct sockaddr_in *sockaddr)
 int UDPSendTo(int socketfd, char *data, int len, struct sockaddr_in *to)
 {
     return sendto(socketfd, data, len, 0, (struct sockaddr*)to, sizeof(struct sockaddr_in));
+}
+
+int UDPReceiveFrom(int socketfd, char *data, int *len, struct sockaddr_in *from)
+{
+    int fromlen;
+    int returnedLen = recvfrom(socketfd, data, *len, 0, (struct sockaddr*)from, &fromlen);
+    if (returnedLen == -1)
+    {
+        *len = 0;
+        return -1;
+    }
+    *len = returnedLen;
+    return 0;
 }

@@ -53,7 +53,7 @@ binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS)
 am_dvbstreamer_OBJECTS = main.$(OBJEXT) dvb.$(OBJEXT) \
 	parsezap.$(OBJEXT) multiplexes.$(OBJEXT) services.$(OBJEXT) \
-	udpsend.$(OBJEXT) ts.$(OBJEXT) udpoutput.$(OBJEXT) \
+	udp.$(OBJEXT) ts.$(OBJEXT) udpoutput.$(OBJEXT) \
 	patprocessor.$(OBJEXT) pmtprocessor.$(OBJEXT) \
 	sdtprocessor.$(OBJEXT) servicefilter.$(OBJEXT) dbase.$(OBJEXT) \
 	cache.$(OBJEXT) logging.$(OBJEXT) commands.$(OBJEXT)
@@ -196,7 +196,7 @@ dvbstreamer_SOURCES = \
 	parsezap.c\
 	multiplexes.c\
 	services.c\
-	udpsend.c\
+	udp.c\
 	ts.c\
 	udpoutput.c\
 	patprocessor.c\
@@ -297,8 +297,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/servicefilter.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/services.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ts.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/udp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/udpoutput.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/udpsend.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	if $(COMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \

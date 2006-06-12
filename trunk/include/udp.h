@@ -23,7 +23,13 @@ Simplify UDP socket creation and packet sending.
 #ifndef _UDPSEND_H
 #define _UDPSEND_H
 #include <netinet/in.h>
-int UDPCreateSocket(void);
+
+#define MTU 1400 /* Conservative estimate */
+#define IP_HEADER (5*4)
+#define UDP_HEADER (2*4)
+
+int UDPCreateSocket(struct sockaddr_in *sockaddr, int reuse);
 int UDPSetupSocketAddress(char *host, int port, struct sockaddr_in *sockaddr);
 int UDPSendTo(int socket, char *data, int len, struct sockaddr_in *to);
+int UDPReceiveFrom(int socketfd, char *data, int *len, struct sockaddr_in *from);
 #endif

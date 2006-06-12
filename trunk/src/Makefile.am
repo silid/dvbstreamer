@@ -19,7 +19,7 @@ dvbstreamer_SOURCES = \
 	parsezap.c\
 	multiplexes.c\
 	services.c\
-	udpsend.c\
+	udp.c\
 	ts.c\
 	udpoutput.c\
 	patprocessor.c\
