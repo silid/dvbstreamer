@@ -68,13 +68,15 @@ static void GetCommand(char **command, char **argument);
 static char **AttemptComplete (const char *text, int start, int end);
 static char *CompleteCommand(const char *text, int state);
 static int ProcessCommand(char *command, char *argument);
-char **Tokenise(char *arguments, int *argc);
+static char **Tokenise(char *arguments, int *argc);
 static void ParseLine(char *line, char **command, char **argument);
+static char *Trim(char *str);
 
 static void CommandQuit(int argc, char **argv);
 static void CommandServices(int argc, char **argv);
 static void CommandMultiplex(int argc, char **argv);
 static void CommandSelect(int argc, char **argv);
+static void CommandCurrent(int argc, char **argv);
 static void CommandPids(int argc, char **argv);
 static void CommandStats(int argc, char **argv);
 static void CommandAddOutput(int argc, char **argv);
@@ -129,6 +131,13 @@ static Command_t commands[] = {
                                       "Sets <service name> as the current service, this may mean tuning to a different "
                                       "multiplex.",
                                       CommandSelect
+                                  },
+								  {
+                                      "current",
+                                      0, 0, 0,
+                                      "Print out the service currently being streamed.",
+                                      "Shows the service that is currently being streamed to the default output.",
+                                      CommandCurrent
                                   },
                                   {
                                       "pids",
@@ -379,40 +388,47 @@ static int ProcessCommand(char *command, char *argument)
     {
         if (strcasecmp(command,commands[i].command) == 0)
         {
-            if (commands[i].tokenise)
+            
+            if (argument)
             {
-                int a;
-                
-                
-                if (argument)
+                if (commands[i].tokenise)
                 {
                     argv = Tokenise(argument, &argc);
                 }
-                if ((argc >= commands[i].minargs) && (argc <= commands[i].maxargs))
-                {
-                    commands[i].commandfunc(argc, argv );
-                }
                 else
                 {
-                    printf("Incorrect number of arguments see help for more information!\n\n%s\n\n",commands[i].longhelp);
+                    argc = 1;
+                    argv = args;
+                    args[0] = argument;
                 }
-                
+            }
+            else
+            {
+                argc = 0;
+                argv = args;
+                args[0] = NULL;
+            }
+            
+            if ((argc >= commands[i].minargs) && (argc <= commands[i].maxargs))
+            {
+                commands[i].commandfunc(argc, argv );
+            }
+            else
+            {
+                printf("Incorrect number of arguments see help for more information!\n\n%s\n\n",commands[i].longhelp);
+            }
+            
+            if (commands[i].tokenise)
+            {
+                int a;
+
                 /* Free the arguments but not the array as that is a static array */
                 for (a = 0; a < argc; a ++)
                 {
                     free(argv[a]);
                 }
             }
-            else
-            {
-                if (argument)
-                {
-                    argc = 1;
-                    argv = args;
-                    args[0] = argument;
-                }
-                commands[i].commandfunc(argc, argv);
-            }
+           
             commandFound = 1;
             break;
         }
@@ -448,13 +464,18 @@ static void ParseLine(char *line, char **command, char **argument)
     space = strchr(line, ' ');
     if (space)
     {
+        char *tmp;
         *space = 0;
-        *argument = strdup(space + 1);
+        tmp = Trim(space + 1);
+        if (strlen(tmp) > 0)
+        {
+            *argument = strdup(tmp);
+        }
     }
     *command = strdup(line);
 }
 
-char **Tokenise(char *arguments, int *argc)
+static char **Tokenise(char *arguments, int *argc)
 {
     int currentarg = 0;
     char *start = arguments;
@@ -490,7 +511,7 @@ char **Tokenise(char *arguments, int *argc)
     return args;
 }
 
-char *Trim(char *str)
+static char *Trim(char *str)
 {
     char *result;
     char *end;
@@ -563,6 +584,19 @@ static void CommandSelect(int argc, char **argv)
     {
         printf("Could not find \"%s\"\n", argv[0]);
     }
+}
+
+static void CommandCurrent(int argc, char **argv)
+{
+	if ( CurrentService)
+	{
+		printf("Current Service : \"%s\" (0x%04x) Multiplex: %f MHz\n", 
+			CurrentService->name, CurrentService->id, (double)CurrentMultiplex->freq / 1000000.0);
+	}
+	else
+	{
+		printf("No current service\n");
+	}
 }
 
 static void CommandPids(int argc, char **argv)
