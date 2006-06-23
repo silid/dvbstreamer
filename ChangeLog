@@ -1,3 +1,9 @@
+dev
+---
+* Signal handling (No exit in a nice clean manner, making sure the database is
+  updated).
+* IPv6 support added.
+
 0.3
 ---
 * Command completion.
