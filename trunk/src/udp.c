@@ -23,74 +23,53 @@ Simplify UDP socket creation and packet sending.
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 #include <string.h>
 #include <netdb.h>
+#include "logging.h"
 #include "udp.h"
 
+#define PORT "54197" // 0xd3b5 ~= DVBS
 
-int UDPCreateSocket(struct sockaddr_in *sockaddr, int reuse)
+int UDPCreateSocket(sa_family_t family)
 {
-    int socketfd = socket(AF_INET,	SOCK_DGRAM,	IPPROTO_UDP);
+    int socketfd = socket(family, SOCK_DGRAM, IPPROTO_UDP);
     int reuseAddr = 1;
+    struct addrinfo *addrinfo, hints;
+    int ret;
 
     if (socketfd < 0)
     {
-        perror("socket()");
+        printlog(LOG_ERROR, "socket() failed\n");
         return -1;
     }
 
-    if (reuse)
+    if (setsockopt(socketfd, SOL_SOCKET, SO_REUSEADDR, &reuseAddr, sizeof(int)))
     {
-        if (setsockopt(socketfd, SOL_SOCKET, SO_REUSEADDR, &reuseAddr, sizeof(int)))
-        {
-            perror("setsockopt(SOL_SOCKET, SO_REUSEADDR)");
-            close(socketfd);
-            return -1;
-        }
+        printlog(LOG_ERROR,"setsockopt(SOL_SOCKET, SO_REUSEADDR) failed\n");
+        close(socketfd);
+        return -1;
     }
 
-    if (sockaddr)
+    memset((void *)&hints, 0, sizeof(hints));
+    hints.ai_family = family;
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_flags = AI_PASSIVE | AI_NUMERICSERV;
+    ret = getaddrinfo(NULL, PORT, &hints, &addrinfo);
+    if (ret != 0 || addrinfo == NULL)
     {
-        if	(bind(socketfd, (struct sockaddr*)&sockaddr, sizeof(struct sockaddr_in))<0)
-        {
-            perror("bind()");
-            close(socketfd);
-            return	-1;
-        }
+        printlog(LOG_ERROR, "getaddrinfo() failed with error %s\n", gai_strerror(ret));
+        return -1;
     }
+
+    if	(bind(socketfd, addrinfo->ai_addr, addrinfo->ai_addrlen)<0)
+    {
+        printlog(LOG_ERROR, "bind() failed\n");
+        close(socketfd);
+        socketfd = -1;
+    }
+    freeaddrinfo(addrinfo);
 
     return socketfd;
-}
-
-int UDPSetupSocketAddress(char *host, int port, struct sockaddr_in *sockaddr)
-{
-    struct hostent *hostinfo;
-    sockaddr->sin_port=htons(port);
-    hostinfo = gethostbyname(host);
-    if (hostinfo != NULL)
-    {
-        sockaddr->sin_family = hostinfo->h_addrtype;
-        memcpy((char *)&(sockaddr->sin_addr), hostinfo->h_addr, hostinfo->h_length);
-        return 1;
-    }
-    return 0;
-}
-
-int UDPSendTo(int socketfd, char *data, int len, struct sockaddr_in *to)
-{
-    return sendto(socketfd, data, len, 0, (struct sockaddr*)to, sizeof(struct sockaddr_in));
-}
-
-int UDPReceiveFrom(int socketfd, char *data, int *len, struct sockaddr_in *from)
-{
-    int fromlen;
-    int returnedLen = recvfrom(socketfd, data, *len, 0, (struct sockaddr*)from, &fromlen);
-    if (returnedLen == -1)
-    {
-        *len = 0;
-        return -1;
-    }
-    *len = returnedLen;
-    return 0;
 }

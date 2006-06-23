@@ -25,16 +25,25 @@ UDP Output functions
 #include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <netdb.h>
 #include "ts.h"
 #include "udp.h"
 #include "logging.h"
 
+#define MTU 1400 /* Conservative estimate */
+#define IP_HEADER (5*4)
+#define UDP_HEADER (2*4)
 #define MAX_TS_PACKETS_PER_DATAGRAM ((MTU - (IP_HEADER+UDP_HEADER)) / sizeof(TSPacket_t))
+
+/* Default output targets if only host or port part is given */
+#define DEFAULT_HOST "localhost"
+#define DEFAULT_PORT "1234"
 
 struct UDPOutputState_t
 {
     int socket;
-    struct sockaddr_in address;
+    socklen_t address_len;
+    struct sockaddr_storage address;
     int datagramfullcount;
     int tspacketcount;
     TSPacket_t outputbuffer[MAX_TS_PACKETS_PER_DATAGRAM];
@@ -42,50 +51,114 @@ struct UDPOutputState_t
 
 void *UDPOutputCreate(char *arg)
 {
-    int port = 0;
-    char *colon = NULL;
-    char *host = "127.0.0.1";
-    struct UDPOutputState_t *state = calloc(1, sizeof(struct UDPOutputState_t));
+    char *host_start;
+    int host_len;
+    char hostbuffer[256];
+    char *host = NULL;
+    char *port = NULL;
+    struct UDPOutputState_t *state;
+    struct addrinfo *addrinfo, hints;
+
+    if (arg[0] == '[') 
+    {
+        host_start = arg + 1;
+        port = strchr(arg, ']');
+        if (port == NULL) 
+        {
+            return NULL;
+        }
+        host_len = port - host_start;
+        port++;
+    } 
+    else
+    {
+        port = strchr(arg, ':');
+        if (port == NULL ) 
+        {
+            host = strlen(arg) ? arg : DEFAULT_HOST;
+        } 
+        else 
+        {
+            host_start = arg;
+            host_len = port - host_start;
+        }
+    }
+    
+    if (host == NULL) 
+    {
+        if (host_len == 0) 
+        {
+            host = DEFAULT_HOST;
+        } 
+        else 
+        {
+            if (host_len + 1 > sizeof(hostbuffer)) 
+            {
+                return NULL;
+            }
+            memcpy((void *)hostbuffer, host_start, host_len);
+            hostbuffer[host_len] = 0;
+            host = hostbuffer;
+        }
+    }
+
+    if (port == NULL) 
+    {
+        port = DEFAULT_PORT;
+    } 
+    else 
+    {
+        switch( *port ) 
+        {
+            case ':':
+                port++;
+                if (strlen(port))
+                {
+                    break;
+                }
+            /* fall though */
+            case 0:
+                port = DEFAULT_PORT; 
+                break;
+            default:
+                return NULL;
+        }
+    }
+
+    state = calloc(1, sizeof(struct UDPOutputState_t));
     if (state == NULL)
     {
         printlog(LOG_DEBUG, "Failed to allocate UDP Output state\n");
         return NULL;
     }
-    state->socket = UDPCreateSocket(NULL, 0);
+    printlog(LOG_DEBUG,"UDP Host \"%s\" Port \"%s\"\n", host, port);
+
+    memset((void *)&hints, 0, sizeof(hints));
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_flags = AI_ADDRCONFIG;
+    if ((getaddrinfo(host, port, &hints, &addrinfo) != 0) || (addrinfo == NULL))
+    {
+        printlog(LOG_DEBUG, "Failed to set UDP target address\n");
+        free(state);
+        return NULL;
+    }
+    
+    if (addrinfo->ai_addrlen > sizeof(struct sockaddr_storage))
+    {
+        freeaddrinfo(addrinfo);
+        free(state);
+        return NULL;
+    }
+    state->address_len = addrinfo->ai_addrlen;
+    memcpy(&state->address, addrinfo->ai_addr, addrinfo->ai_addrlen);
+    freeaddrinfo(addrinfo);
+
+    state->socket = UDPCreateSocket(state->address.ss_family);
     if (state->socket == -1)
     {
         printlog(LOG_DEBUG, "Failed to create UDP socket\n");
         free(state);
         return NULL;
-    }
-    colon = strchr(arg, ':');
-    if (colon == NULL)
-    {
-        port = atoi(arg);
-        if (port == 0)
-        {
-            port = 9999;
-        }
-    }
-    else
-    {
-        *colon = 0;
-        port = atoi(colon + 1);
-        if (strlen(arg) > 0)
-        {
-            host = arg;
-        }
-    }
-    printlog(LOG_DEBUG,"UDP Host \"%s\" Port \"%d\"\n", host, port);
-    if (UDPSetupSocketAddress(host, port, &state->address) == 0)
-    {
-        close(state->socket);
-        free(state);
-        return NULL;
-    }
-    if (colon)
-    {
-        *colon = ':';
     }
     state->datagramfullcount = MAX_TS_PACKETS_PER_DATAGRAM;
     return state;
@@ -120,22 +193,42 @@ void UDPOutputPacketOutput(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet
     if (state->tspacketcount >= state->datagramfullcount)
     {
         UDPSendTo(state->socket, (char*)state->outputbuffer,
-                  MAX_TS_PACKETS_PER_DATAGRAM * TSPACKET_SIZE, &state->address);
+                  MAX_TS_PACKETS_PER_DATAGRAM * TSPACKET_SIZE,
+		  (struct sockaddr *)(&state->address), state->address_len);
         state->tspacketcount = 0;
     }
 }
 
-char destinationBuffer[24]; /* 255.255.255.255:63536 */
+/* [ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff]:65535 */
+char destinationBuffer[48];
 
 char *UDPOutputDestination(void *arg)
 {
     struct UDPOutputState_t *state = arg;
-    unsigned int addr = ntohl(state->address.sin_addr.s_addr);
-    sprintf(destinationBuffer, "%d.%d.%d.%d:%d",
-            (addr & 0xff000000) >> 24,
-            (addr & 0x00ff0000) >> 16,
-            (addr & 0x0000ff00) >> 8,
-            (addr & 0x000000ff) >> 0,
-            ntohs(state->address.sin_port));
-    return destinationBuffer;
+    char portBuffer[6];
+    char *result, *p;
+
+    if (getnameinfo((struct sockaddr *)&state->address, state->address_len,
+                    destinationBuffer+1, sizeof(destinationBuffer)-3-sizeof(portBuffer),
+                    portBuffer, sizeof(portBuffer), NI_NUMERICHOST) != 0)
+    {
+        return NULL;
+    }
+    
+    if (strchr(destinationBuffer+1, ':') != NULL) 
+    {
+        destinationBuffer[0] = '[';
+        result = destinationBuffer;
+        p = result + strlen(result);
+        *p++ = ']';
+    } 
+    else
+    {
+        result = destinationBuffer + 1;
+        p = result + strlen(result);
+    }
+    *p++ = ':';
+    strcpy(p, portBuffer);
+
+    return result;
 }
