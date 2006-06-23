@@ -250,7 +250,7 @@ void CommandLoop(void)
     char *argument;
     quit = 0;
     /* Start Command loop */
-    while(!quit)
+    while(!quit && !ExitProgram)
     {
         GetCommand(&command, &argument);
 
@@ -258,7 +258,7 @@ void CommandLoop(void)
         {
             if (!ProcessCommand(command, argument))
             {
-                printf("Unknown command \"%s\"\n", command);
+                fprintf(rl_outstream, "Unknown command \"%s\"\n", command);
             }
             free(command);
             if (argument)
@@ -304,7 +304,7 @@ int CommandProcessFile(char *file)
         {
             if (!ProcessCommand(command, argument))
             {
-                printf("%s(%d): Unknown command \"%s\"\n", file, lineno, command);
+                fprintf(stderr, "%s(%d): Unknown command \"%s\"\n", file, lineno, command);
             }
             free(command);
             if (argument)
@@ -415,7 +415,7 @@ static int ProcessCommand(char *command, char *argument)
             }
             else
             {
-                printf("Incorrect number of arguments see help for more information!\n\n%s\n\n",commands[i].longhelp);
+                fprintf(rl_outstream, "Incorrect number of arguments see help for more information!\n\n%s\n\n",commands[i].longhelp);
             }
             
             if (commands[i].tokenise)
@@ -540,18 +540,18 @@ static void CommandServices(int argc, char **argv)
         service = ServiceGetNext(enumerator);
         if (service)
         {
-            printf("%4x: %s\n", service->id, service->name);
+            fprintf(rl_outstream, "%4x: %s\n", service->id, service->name);
             ServiceFree(service);
         }
     }
-    while(service);
+    while(service && !ExitProgram);
 }
 
 static void CommandMultiplex(int argc, char **argv)
 {
     if (CurrentMultiplex == NULL)
     {
-        printf("No multiplex currently selected!\n");
+        fprintf(rl_outstream, "No multiplex currently selected!\n");
     }
     else
     {
@@ -562,11 +562,11 @@ static void CommandMultiplex(int argc, char **argv)
             service = ServiceGetNext(enumerator);
             if (service)
             {
-                printf("%4x: %s\n", service->id, service->name);
+                fprintf(rl_outstream, "%4x: %s\n", service->id, service->name);
                 ServiceFree(service);
             }
         }
-        while(service);
+        while(service && !ExitProgram);
     }
 }
 
@@ -577,12 +577,12 @@ static void CommandSelect(int argc, char **argv)
     service = SetCurrentService(argv[0]);
     if (service)
     {
-        printf("Name      = %s\n", service->name);
-        printf("ID        = %04x\n", service->id);
+        fprintf(rl_outstream, "Name      = %s\n", service->name);
+        fprintf(rl_outstream, "ID        = %04x\n", service->id);
     }
     else
     {
-        printf("Could not find \"%s\"\n", argv[0]);
+        fprintf(rl_outstream, "Could not find \"%s\"\n", argv[0]);
     }
 }
 
@@ -590,12 +590,12 @@ static void CommandCurrent(int argc, char **argv)
 {
 	if ( CurrentService)
 	{
-		printf("Current Service : \"%s\" (0x%04x) Multiplex: %f MHz\n", 
+		fprintf(rl_outstream, "Current Service : \"%s\" (0x%04x) Multiplex: %f MHz\n", 
 			CurrentService->name, CurrentService->id, (double)CurrentMultiplex->freq / 1000000.0);
 	}
 	else
 	{
-		printf("No current service\n");
+		fprintf(rl_outstream, "No current service\n");
 	}
 }
 
@@ -616,7 +616,7 @@ static void CommandPids(int argc, char **argv)
             count = ServicePIDCount(service);
             cached = 0;
         }
-        printf("%d PIDs for \"%s\" %s\n", count, argv[0], cached ? "(Cached)":"");
+        fprintf(rl_outstream, "%d PIDs for \"%s\" %s\n", count, argv[0], cached ? "(Cached)":"");
         if (count > 0)
         {
             if (!cached)
@@ -628,13 +628,13 @@ static void CommandPids(int argc, char **argv)
                 }
                 else
                 {
-                    printf("No memory to retrieve PIDs\n");
+                    fprintf(rl_outstream, "No memory to retrieve PIDs\n");
                 }
             }
             
             for (i = 0; i < count; i ++)
             {
-                printf("%2d: %d %d %d\n", i, pids[i].pid, pids[i].type, pids[i].subtype);
+                fprintf(rl_outstream, "%2d: %d %d %d\n", i, pids[i].pid, pids[i].type, pids[i].subtype);
             }
             
             if (!cached)
@@ -646,26 +646,26 @@ static void CommandPids(int argc, char **argv)
     }
     else
     {
-        printf("Could not find \"%s\"\n", argv[0]);
+        fprintf(rl_outstream, "Could not find \"%s\"\n", argv[0]);
     }
 }
 
 static void CommandStats(int argc, char **argv)
 {
     int i;
-    printf("Packet Statistics\n"
+    fprintf(rl_outstream, "Packet Statistics\n"
            "-----------------\n");
 
     for (i = 0; i < PIDFilterIndex_Count; i ++)
     {
-        printf("%s Filter :\n", PIDFilterNames[i]);
-        printf("\tFiltered  : %d\n", PIDFilters[i]->packetsfiltered);
-        printf("\tProcessed : %d\n", PIDFilters[i]->packetsprocessed);
-        printf("\tOutput    : %d\n", PIDFilters[i]->packetsoutput);
+        fprintf(rl_outstream, "%s Filter :\n", PIDFilterNames[i]);
+        fprintf(rl_outstream, "\tFiltered  : %d\n", PIDFilters[i]->packetsfiltered);
+        fprintf(rl_outstream, "\tProcessed : %d\n", PIDFilters[i]->packetsprocessed);
+        fprintf(rl_outstream, "\tOutput    : %d\n", PIDFilters[i]->packetsoutput);
     }
-    printf("\n");
+    fprintf(rl_outstream, "\n");
 
-    printf("Manual Output Statistics\n"
+    fprintf(rl_outstream, "Manual Output Statistics\n"
            "------------------------\n");
     for (i = 0; i < MAX_OUTPUTS; i ++)
     {
@@ -673,13 +673,13 @@ static void CommandStats(int argc, char **argv)
         {
             continue;
         }
-        printf("%s Filter :\n", outputs[i].name);
-        printf("\tFiltered  : %d\n", outputs[i].filter->packetsfiltered);
-        printf("\tOutput    : %d\n", outputs[i].filter->packetsoutput);
+        fprintf(rl_outstream, "%s Filter :\n", outputs[i].name);
+        fprintf(rl_outstream, "\tFiltered  : %d\n", outputs[i].filter->packetsfiltered);
+        fprintf(rl_outstream, "\tOutput    : %d\n", outputs[i].filter->packetsoutput);
     }
 
-    printf("Total packets processed: %d\n", TSFilter->totalpackets);
-    printf("Approximate TS bitrate : %gMbs\n", ((double)TSFilter->bitrate / (1024.0 * 1024.0)));
+    fprintf(rl_outstream, "Total packets processed: %d\n", TSFilter->totalpackets);
+    fprintf(rl_outstream, "Approximate TS bitrate : %gMbs\n", ((double)TSFilter->bitrate / (1024.0 * 1024.0)));
 }
 
 static void CommandAddOutput(int argc, char **argv)
@@ -710,7 +710,7 @@ static void CommandOutputs(int argc, char **argv)
     {
         if (outputs[i].name)
         {
-            printf("%10s : %s\n",outputs[i].name,
+            fprintf(rl_outstream, "%10s : %s\n",outputs[i].name,
                    UDPOutputDestination((void*)outputs[i].filter->oparg));
         }
     }
@@ -779,11 +779,11 @@ static void CommandOutputPIDs(int argc, char **argv)
         return;
     }
 
-    printf("PIDs for \'%s\' (%d):\n", name, output->pids.pidcount);
+    fprintf(rl_outstream, "PIDs for \'%s\' (%d):\n", name, output->pids.pidcount);
 
     for (i = 0; i < output->pids.pidcount; i ++)
     {
-        printf("0x%x\n", output->pids.pids[i]);
+        fprintf(rl_outstream, "0x%x\n", output->pids.pids[i]);
     }
 
 }
@@ -798,21 +798,21 @@ static void CommandHelp(int argc, char **argv)
         {
             if (strcasecmp(commands[i].command,argv[0]) == 0)
             {
-                printf("%s\n\n", commands[i].longhelp);
+                fprintf(rl_outstream, "%s\n\n", commands[i].longhelp);
                 commandFound = 1;
                 break;
             }
         }
         if (!commandFound)
         {
-            printf("No help for unknown command \"%s\"\n", argv[0]);
+            fprintf(rl_outstream, "No help for unknown command \"%s\"\n", argv[0]);
         }
     }
     else
     {
         for (i = 0; commands[i].command; i ++)
         {
-            printf("%10s - %s\n", commands[i].command, commands[i].shorthelp);
+            fprintf(rl_outstream, "%10s - %s\n", commands[i].command, commands[i].shorthelp);
         }
     }
 }
@@ -826,7 +826,7 @@ static Output_t *OutputAllocate(char *name, char *destination)
     {
         if (outputs[i].name && (strcmp(name, outputs[i].name) == 0))
         {
-            printf("Output already exists!\n");
+            fprintf(rl_outstream, "Output already exists!\n");
             return NULL;
         }
         if ((output == NULL ) && (outputs[i].name == NULL))
@@ -836,14 +836,14 @@ static Output_t *OutputAllocate(char *name, char *destination)
     }
     if (!output)
     {
-        printf("No free output slots!\n");
+        fprintf(rl_outstream, "No free output slots!\n");
         return NULL;
     }
 
     output->filter = PIDFilterAllocate(TSFilter);
     if (!output->filter)
     {
-        printf("Failed to allocate PID filter!\n");
+        fprintf(rl_outstream, "Failed to allocate PID filter!\n");
         return NULL;
     }
     output->pids.pidcount = 0;
@@ -853,7 +853,7 @@ static Output_t *OutputAllocate(char *name, char *destination)
     output->filter->oparg = UDPOutputCreate(destination);
     if (!output->filter->oparg)
     {
-        printf("Failed to parse ip and udp port!\n");
+        fprintf(rl_outstream, "Failed to parse ip and udp port!\n");
         PIDFilterFree(output->filter);
         return NULL;
     }
@@ -887,7 +887,7 @@ static Output_t *OutputFind(char *name)
 
     if (output == NULL)
     {
-        printf("Failed to find output \"%s\"\n", name);
+        fprintf(rl_outstream, "Failed to find output \"%s\"\n", name);
     }
     return output;
 }
@@ -909,7 +909,7 @@ static int ParsePID(char *argument)
 
     if (sscanf(argument, formatstr, &pid) == 0)
     {
-        printf("Failed to parse \"%s\"\n", argument);
+        fprintf(rl_outstream, "Failed to parse \"%s\"\n", argument);
         return -1;
     }
 

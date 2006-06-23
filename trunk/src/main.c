@@ -51,12 +51,16 @@ Entry point to the application.
 
 static void usage(char *appname);
 static void version(void);
+static void sighandler(int signum);
+static void installsighandler(void);
 
 volatile Multiplex_t *CurrentMultiplex = NULL;
 volatile Service_t *CurrentService = NULL;
 PIDFilter_t *PIDFilters[PIDFilterIndex_Count];
 TSFilter_t *TSFilter;
 DVBAdapter_t *DVBAdapter;
+
+int ExitProgram = 0;
 
 int main(int argc, char *argv[])
 {
@@ -68,8 +72,9 @@ int main(int argc, char *argv[])
     int adapterNumber = 0;
 
     channelsFile[0] = 0;
-
-    while (1)
+    installsighandler();
+    
+    while (!ExitProgram)
     {
         char c;
         c = getopt(argc, argv, "vVo:a:t:s:c:f:");
@@ -92,7 +97,7 @@ int main(int argc, char *argv[])
                     printlog(LOG_ERROR, "Error creating UDP output!\n");
                     exit(1);
                 }
-                printlog(LOG_INFOV, "Output will be via UDP to %s\n", optarg);
+                printlog(LOG_INFOV, "Output will be via UDP to %s\n", UDPOutputDestination(outputArg));
                 break;
                 case 'a': adapterNumber = atoi(optarg);
                 printlog(LOG_INFOV, "Using adapter %d\n", adapterNumber);
@@ -121,6 +126,12 @@ int main(int argc, char *argv[])
                 exit(1);
         }
     }
+    
+    if (ExitProgram)
+    {
+        exit(1);
+    }
+    
     if (outputArg == NULL)
     {
         printlog(LOG_ERROR, "No output set!\n");
@@ -361,3 +372,25 @@ static void version(void)
            PACKAGE, VERSION);
 }
 
+static void installsighandler(void)
+{
+    rl_catch_signals = 0;
+    signal(SIGTERM, sighandler);
+    signal(SIGINT, sighandler);
+    signal(SIGQUIT, sighandler);
+}
+
+static void sighandler(int signum)
+{
+    switch (signum)
+    {
+        case SIGINT:
+            rl_free_line_state ();
+        case SIGTERM:
+        case SIGQUIT:
+            rl_cleanup_after_signal();
+            fclose(rl_instream);
+            ExitProgram = 1;
+            break;
+    }
+}

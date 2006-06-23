@@ -45,4 +45,6 @@ extern TSFilter_t   *TSFilter;
 extern DVBAdapter_t *DVBAdapter;
 extern Service_t *SetCurrentService(char *name);
 
+extern int ExitProgram;
+
 #endif
