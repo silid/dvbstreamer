@@ -339,7 +339,6 @@ int ServicePIDCount(Service_t *service)
     if (rc == SQLITE_ROW)
     {
         result = STATEMENT_COLUMN_INT( 0);
-        printlog(LOG_DEBUGV,"PID Count = %d\n", result);
         rc = 0;
     }
     STATEMENT_FINALIZE();
