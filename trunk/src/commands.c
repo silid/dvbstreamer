@@ -1,24 +1,24 @@
 /*
 Copyright (C) 2006  Adam Charrett
- 
+
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
- 
+
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
- 
+
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
- 
+
 commands.c
- 
+
 Command Processing and command functions.
- 
+
 */
 #include <limits.h>
 #include <stdio.h>
@@ -37,25 +37,17 @@ Command Processing and command functions.
 #include "udpoutput.h"
 #include "logging.h"
 #include "cache.h"
+#include "outputs.h"
 #include "main.h"
 
 #define PROMPT "DVBStream>"
 
 #define MAX_ARGS (10)
-#define MAX_OUTPUTS (MAX_FILTERS - PIDFilterIndex_Count)
-
-typedef struct Output_t
-{
-    char *name;
-    PIDFilter_t *filter;
-    PIDFilterSimpleFilter_t pids;
-}
-Output_t;
 
 typedef struct Command_t
 {
     char *command;
-    int   tokenise;
+    bool  tokenise;
     int   minargs;
     int   maxargs;
     char *shorthelp;
@@ -67,7 +59,7 @@ Command_t;
 static void GetCommand(char **command, char **argument);
 static char **AttemptComplete (const char *text, int start, int end);
 static char *CompleteCommand(const char *text, int state);
-static int ProcessCommand(char *command, char *argument);
+static bool ProcessCommand(char *command, char *argument);
 static char **Tokenise(char *arguments, int *argc);
 static void ParseLine(char *line, char **command, char **argument);
 static char *Trim(char *str);
@@ -85,13 +77,13 @@ static void CommandOutputs(int argc, char **argv);
 static void CommandAddPID(int argc, char **argv);
 static void CommandRmPID(int argc, char **argv);
 static void CommandOutputPIDs(int argc, char **argv);
+static void CommandAddSSF(int argc, char **argv);
+static void CommandRemoveSSF(int argc, char **argv);
+static void CommandSSFS(int argc, char **argv);
+static void CommandSetSSF(int argc, char **argv);
 static void CommandHelp(int argc, char **argv);
 
 static int ParsePID(char *argument);
-static Output_t *OutputAllocate(char *name, char *destination);
-static void OutputFree(Output_t *output);
-static Output_t *OutputFind(char *name);
-
 
 static char *PIDFilterNames[] = {
                                     "PAT",
@@ -103,14 +95,14 @@ static char *PIDFilterNames[] = {
 static Command_t commands[] = {
                                   {
                                       "quit",
-                                      0, 0, 0,
+                                      FALSE, 0, 0,
                                       "Exit the program",
                                       "Exit the program, can be used in the startup file to stop further processing.",
                                       CommandQuit
                                   },
                                   {
                                       "services",
-                                      0, 0, 0,
+                                      FALSE, 0, 0,
                                       "List all available services",
                                       "Lists all the services currently in the database. This list will be "
                                       "updated as updates to the PAT are detected.",
@@ -118,14 +110,14 @@ static Command_t commands[] = {
                                   },
                                   {
                                       "multiplex",
-                                      0, 0, 0,
+                                      FALSE, 0, 0,
                                       "List all the services on the current multiplex",
                                       "List only the services on the same multiplex as the currently selected service.",
                                       CommandMultiplex,
                                   },
                                   {
                                       "select",
-                                      0, 1, 1,
+                                      FALSE, 1, 1,
                                       "Select a new service to stream",
                                       "select <service name>\n"
                                       "Sets <service name> as the current service, this may mean tuning to a different "
@@ -134,14 +126,14 @@ static Command_t commands[] = {
                                   },
 								  {
                                       "current",
-                                      0, 0, 0,
+                                      FALSE, 0, 0,
                                       "Print out the service currently being streamed.",
                                       "Shows the service that is currently being streamed to the default output.",
                                       CommandCurrent
                                   },
                                   {
                                       "pids",
-                                      0, 1, 1,
+                                      FALSE, 1, 1,
                                       "List the PIDs for a specified service",
                                       "pids <service name>\n"
                                       "List the PIDs for <service name>.",
@@ -149,7 +141,7 @@ static Command_t commands[] = {
                                   },
                                   {
                                       "stats",
-                                      0, 0, 0,
+                                      FALSE, 0, 0,
                                       "Display the stats for the PAT,PMT and service PID filters",
                                       "Display the number of packets processed and the number of packets "
                                       "filtered by each filter.",
@@ -157,7 +149,7 @@ static Command_t commands[] = {
                                   },
                                   {
                                       "addoutput",
-                                      1, 2, 2,
+                                      TRUE, 2, 2,
                                       "Add a new destination for manually filtered PIDs.",
                                       "addoutput <output name> <ipaddress>:<udp port>\n"
                                       "Adds a new destination for sending packets to. This is only used for "
@@ -168,7 +160,7 @@ static Command_t commands[] = {
                                   },
                                   {
                                       "rmoutput",
-                                      1, 1, 1,
+                                      TRUE, 1, 1,
                                       "Remove a destination for manually filtered PIDs.",
                                       "rmoutput <output name>\n"
                                       "Removes the destination and stops all filters associated with this output.",
@@ -176,14 +168,14 @@ static Command_t commands[] = {
                                   },
                                   {
                                       "outputs",
-                                      0, 0, 0,
+                                      FALSE, 0, 0,
                                       "List current outputs",
                                       "List all active additonal output names and destinations.",
                                       CommandOutputs
                                   },
                                   {
                                       "addpid",
-                                      1, 2, 2,
+                                      TRUE, 2, 2,
                                       "Adds a PID to filter to an output",
                                       "addpid <output name> <pid>\n"
                                       "Adds a PID to the filter to be sent to the specified output.",
@@ -191,7 +183,7 @@ static Command_t commands[] = {
                                   },
                                   {
                                       "rmpid",
-                                      1, 2, 2,
+                                      TRUE, 2, 2,
                                       "Removes a PID to filter from an output",
                                       "rmpid <output name> <pid>\n"
                                       "Removes the PID from the filter that is sending packets to the specified output.",
@@ -199,32 +191,59 @@ static Command_t commands[] = {
                                   },
                                   {
                                       "outputpids",
-                                      1, 1, 1,
+                                      TRUE, 1, 1,
                                       "List PIDs for output",
                                       "outputpids <output name>\n"
                                       "List the PIDs being filtered for a specific output",
                                       CommandOutputPIDs
                                   },
                                   {
+                                      "addssf",
+                                      TRUE, 2, 2,
+                                      "Add a service filter for secondary services",
+                                      "addsf <output name> <ipaddress>:<udp port>\n"
+                                      "Adds a new destination for sending a secondary service to.",
+                                      CommandAddSSF
+                                  },
+                                  {
+                                      "rmssf",
+                                      TRUE, 1, 1,
+                                      "Remove a service filter for secondary services",
+                                      "rmsf <output name>\n"
+                                      "Remove a destination for sending secondary services to.",
+                                      CommandRemoveSSF
+                                  },
+                                  {
+                                      "ssfs",
+                                      FALSE,0,0,
+                                      "List all secondary service filters",
+                                      "List all secondary service filters their names, destinations and currently selected service.",
+                                      CommandSSFS
+                                  },
+                                  {
+                                      "setssf",
+                                      FALSE, 1, 1,
+                                      "Select a service to stream to a secondary service output",
+                                      "setssf <output name> <service name>\n"
+                                      "Stream the specified service to the secondary service output.",
+                                      CommandSetSSF
+                                  },
+                                  {
                                       "help",
-                                      1, 0, 1,
+                                      TRUE, 0, 1,
                                       "Display the list of commands or help on a specific command",
                                       "help <command>\n"
                                       "Displays help for the specified command.",
                                       CommandHelp
                                   },
-                                  {NULL, 0, 0, 0, NULL,NULL}
+                                  {NULL, FALSE, 0, 0, NULL,NULL}
                               };
-
-static Output_t outputs[MAX_OUTPUTS];
 static char *args[MAX_ARGS];
-static int quit = 0;
+static bool quit = FALSE;
 
 int CommandInit(void)
 {
-    /* Clear all outputs */
-    memset(&outputs, 0, sizeof(outputs));
-    
+
     rl_readline_name = "DVBStreamer";
     rl_attempted_completion_function = AttemptComplete;
     return 0;
@@ -232,15 +251,7 @@ int CommandInit(void)
 
 void CommandDeInit(void)
 {
-    int i;
-    for (i = 0; i < MAX_OUTPUTS; i ++)
-    {
-        if (!outputs[i].name)
-        {
-            continue;
-        }
-        OutputFree(&outputs[i]);
-    }
+    /* Nothing to do for now */
 }
 
 /**************** Command Loop/Startup file functions ************************/
@@ -248,7 +259,7 @@ void CommandLoop(void)
 {
     char *command;
     char *argument;
-    quit = 0;
+    quit = FALSE;
     /* Start Command loop */
     while(!quit && !ExitProgram)
     {
@@ -284,7 +295,7 @@ int CommandProcessFile(char *file)
         return 1;
     }
 
-    quit = 0;
+    quit = FALSE;
     while(!feof(fp) && !quit)
     {
         fgets(line, sizeof(line), fp);
@@ -347,7 +358,7 @@ static char **AttemptComplete (const char *text, int start, int end)
     {
         matches = rl_completion_matches (text, CompleteCommand);
     }
-    else 
+    else
     {
         rl_attempted_completion_over = 1;
     }
@@ -358,13 +369,13 @@ static char *CompleteCommand(const char *text, int state)
 {
     static int lastIndex = -1, textlen;
     int i;
-    
+
     if (state == 0)
     {
         lastIndex = -1;
         textlen = strlen(text);
     }
-    
+
     for ( i = lastIndex + 1; commands[i].command; i ++)
     {
         if (strncasecmp(text, commands[i].command, textlen) == 0)
@@ -377,18 +388,18 @@ static char *CompleteCommand(const char *text, int state)
 }
 
 
-static int ProcessCommand(char *command, char *argument)
+static bool ProcessCommand(char *command, char *argument)
 {
     char **argv = NULL;
     int argc = 0;
     int i;
-    int commandFound = 0;
-    
+    bool commandFound = FALSE;
+
     for (i = 0; commands[i].command; i ++)
     {
         if (strcasecmp(command,commands[i].command) == 0)
         {
-            
+
             if (argument)
             {
                 if (commands[i].tokenise)
@@ -408,7 +419,7 @@ static int ProcessCommand(char *command, char *argument)
                 argv = args;
                 args[0] = NULL;
             }
-            
+
             if ((argc >= commands[i].minargs) && (argc <= commands[i].maxargs))
             {
                 commands[i].commandfunc(argc, argv );
@@ -417,7 +428,7 @@ static int ProcessCommand(char *command, char *argument)
             {
                 fprintf(rl_outstream, "Incorrect number of arguments see help for more information!\n\n%s\n\n",commands[i].longhelp);
             }
-            
+
             if (commands[i].tokenise)
             {
                 int a;
@@ -428,8 +439,8 @@ static int ProcessCommand(char *command, char *argument)
                     free(argv[a]);
                 }
             }
-           
-            commandFound = 1;
+
+            commandFound = TRUE;
             break;
         }
     }
@@ -481,12 +492,12 @@ static char **Tokenise(char *arguments, int *argc)
     char *start = arguments;
     char *end;
     char t;
-    
+
     while (*start)
     {
         /* Trim spaces from the start */
         for (; *start && isspace(*start); start ++);
-        
+
         /* Work out the end of the argument (Very simplistic for the moment no quotes allowed) */
         for (end = start; *end && !isspace(*end); end ++);
         t = end[0];
@@ -495,7 +506,7 @@ static char **Tokenise(char *arguments, int *argc)
         end[0] = t;
         start = end;
         currentarg ++;
-        
+
         if (currentarg >= MAX_ARGS)
         {
             int i;
@@ -528,7 +539,7 @@ static char *Trim(char *str)
 /************************** Command Functions ********************************/
 static void CommandQuit(int argc, char **argv)
 {
-    quit = 1;
+    quit = TRUE;
 }
 
 static void CommandServices(int argc, char **argv)
@@ -545,6 +556,7 @@ static void CommandServices(int argc, char **argv)
         }
     }
     while(service && !ExitProgram);
+    ServiceEnumeratorDestroy(enumerator);
 }
 
 static void CommandMultiplex(int argc, char **argv)
@@ -567,6 +579,7 @@ static void CommandMultiplex(int argc, char **argv)
             }
         }
         while(service && !ExitProgram);
+        ServiceEnumeratorDestroy(enumerator);
     }
 }
 
@@ -590,7 +603,7 @@ static void CommandCurrent(int argc, char **argv)
 {
 	if ( CurrentService)
 	{
-		fprintf(rl_outstream, "Current Service : \"%s\" (0x%04x) Multiplex: %f MHz\n", 
+		fprintf(rl_outstream, "Current Service : \"%s\" (0x%04x) Multiplex: %f MHz\n",
 			CurrentService->name, CurrentService->id, (double)CurrentMultiplex->freq / 1000000.0);
 	}
 	else
@@ -606,7 +619,7 @@ static void CommandPids(int argc, char **argv)
     service = ServiceFindName(argv[0]);
     if (service)
     {
-        int cached = 1;
+        bool cached = TRUE;
         int i;
         int count;
         PID_t *pids;
@@ -614,7 +627,7 @@ static void CommandPids(int argc, char **argv)
         if (pids == NULL)
         {
             count = ServicePIDCount(service);
-            cached = 0;
+            cached = FALSE;
         }
         fprintf(rl_outstream, "%d PIDs for \"%s\" %s\n", count, argv[0], cached ? "(Cached)":"");
         if (count > 0)
@@ -631,12 +644,12 @@ static void CommandPids(int argc, char **argv)
                     fprintf(rl_outstream, "No memory to retrieve PIDs\n");
                 }
             }
-            
+
             for (i = 0; i < count; i ++)
             {
                 fprintf(rl_outstream, "%2d: %d %d %d\n", i, pids[i].pid, pids[i].type, pids[i].subtype);
             }
-            
+
             if (!cached)
             {
                 free(pids);
@@ -666,17 +679,29 @@ static void CommandStats(int argc, char **argv)
     fprintf(rl_outstream, "\n");
 
     fprintf(rl_outstream, "Manual Output Statistics\n"
-           "------------------------\n");
+                          "------------------------\n");
     for (i = 0; i < MAX_OUTPUTS; i ++)
     {
-        if (!outputs[i].name)
+        if ((!Outputs[i].name) || (Outputs[i].type != OutputType_Manual))
         {
             continue;
         }
-        fprintf(rl_outstream, "%s Filter :\n", outputs[i].name);
-        fprintf(rl_outstream, "\tFiltered  : %d\n", outputs[i].filter->packetsfiltered);
-        fprintf(rl_outstream, "\tOutput    : %d\n", outputs[i].filter->packetsoutput);
+        fprintf(rl_outstream, "\t%-15s : %d\n", Outputs[i].name, Outputs[i].filter->packetsoutput);
     }
+
+    fprintf(rl_outstream, "\n");
+
+    fprintf(rl_outstream, "Secondary Service Statistics\n"
+                          "----------------------------\n");
+    for (i = 0; i < MAX_OUTPUTS; i ++)
+    {
+        if ((!Outputs[i].name) || (Outputs[i].type != OutputType_Service))
+        {
+            continue;
+        }
+        fprintf(rl_outstream, "\t%-15s : %d\n", Outputs[i].name, Outputs[i].filter->packetsoutput);
+    }
+    fprintf(rl_outstream, "\n");
 
     fprintf(rl_outstream, "Total packets processed: %d\n", TSFilter->totalpackets);
     fprintf(rl_outstream, "Approximate TS bitrate : %gMbs\n", ((double)TSFilter->bitrate / (1024.0 * 1024.0)));
@@ -687,15 +712,19 @@ static void CommandAddOutput(int argc, char **argv)
     Output_t *output = NULL;
 
     printlog(LOG_DEBUGV,"Name = \"%s\" Destination = \"%s\"\n", argv[0], argv[1]);
-    
-    output = OutputAllocate(argv[0], argv[1]);
+
+    output = OutputAllocate(argv[0], OutputType_Manual, argv[1]);
+    if (!output)
+    {
+        fprintf(rl_outstream, "Failed to add output, reason \"%s\"\n", OutputErrorStr);
+    }
 }
 
 static void CommandRmOutput(int argc, char **argv)
 {
     Output_t *output = NULL;
 
-    output = OutputFind(argv[0]);
+    output = OutputFind(argv[0], OutputType_Manual);
     if (output == NULL)
     {
         return;
@@ -708,59 +737,41 @@ static void CommandOutputs(int argc, char **argv)
     int i;
     for (i = 0; i < MAX_OUTPUTS; i ++)
     {
-        if (outputs[i].name)
+        if (Outputs[i].name && (Outputs[i].type == OutputType_Manual))
         {
-            fprintf(rl_outstream, "%10s : %s\n",outputs[i].name,
-                   UDPOutputDestination((void*)outputs[i].filter->oparg));
+            fprintf(rl_outstream, "%10s : %s\n",Outputs[i].name,
+                   UDPOutputDestination((void*)Outputs[i].filter->oparg));
         }
     }
 }
 
 static void CommandAddPID(int argc, char **argv)
 {
-    uint16_t pid;
-    Output_t *output = OutputFind(argv[0]);    
+    Output_t *output = OutputFind(argv[0], OutputType_Manual);
     if (output)
     {
         int i;
         i = ParsePID(argv[1]);
-        if (1 < 0)
+        if (i < 0)
         {
             return;
         }
-        pid = (uint16_t)i;
-        
-        output->filter->enabled = 0;
-        output->pids.pids[output->pids.pidcount] = pid;
-        output->pids.pidcount ++;
-        output->filter->enabled = 1;
+        OutputAddPID(output, (uint16_t)i);
     }
 }
 
 static void CommandRmPID(int argc, char **argv)
 {
-    uint16_t pid;
-    Output_t *output = OutputFind(argv[0]);    
+    Output_t *output = OutputFind(argv[0], OutputType_Manual);
     if (output)
     {
         int i;
         i = ParsePID(argv[1]);
-        if (1 < 0)
+        if (i < 0)
         {
             return;
         }
-        pid = (uint16_t)i;
-        
-        for ( i = 0; i < output->pids.pidcount; i ++)
-        {
-            if (output->pids.pids[i] == pid)
-            {
-                memcpy(&output->pids.pids[i], &output->pids.pids[i + 1],
-                       (output->pids.pidcount - (i + 1)) * sizeof(uint16_t));
-                output->pids.pidcount --;
-                break;
-            }
-        }
+        OutputRemovePID(output, (uint16_t)i);
     }
 }
 
@@ -768,25 +779,114 @@ static void CommandOutputPIDs(int argc, char **argv)
 {
     int i;
     Output_t *output = NULL;
+    int pidcount;
+    uint16_t *pids;
     char *name;
 
     name = Trim(argv[0]);
 
-    output = OutputFind(name);
+    output = OutputFind(name, OutputType_Manual);
 
     if (!output)
     {
         return;
     }
+    OutputGetPIDs(output, &pidcount, &pids);
 
-    fprintf(rl_outstream, "PIDs for \'%s\' (%d):\n", name, output->pids.pidcount);
+    fprintf(rl_outstream, "PIDs for \'%s\' (%d):\n", name, pidcount);
 
-    for (i = 0; i < output->pids.pidcount; i ++)
+    for (i = 0; i <pidcount; i ++)
     {
-        fprintf(rl_outstream, "0x%x\n", output->pids.pids[i]);
+        fprintf(rl_outstream, "0x%x\n", pids[i]);
     }
 
 }
+
+static void CommandAddSSF(int argc, char **argv)
+{
+    Output_t *output = NULL;
+
+    printlog(LOG_DEBUGV,"Name = \"%s\" Destination = \"%s\"\n", argv[0], argv[1]);
+
+    output = OutputAllocate(argv[0], OutputType_Service, argv[1]);
+    if (!output)
+    {
+        fprintf(rl_outstream, "Failed to add output, reason \"%s\"\n", OutputErrorStr);
+    }
+}
+
+static void CommandRemoveSSF(int argc, char **argv)
+{
+    Output_t *output = NULL;
+
+    output = OutputFind(argv[0], OutputType_Service);
+    if (output == NULL)
+    {
+        return;
+    }
+    OutputFree(output);
+}
+
+static void CommandSSFS(int argc, char **argv)
+{
+    int i;
+    for (i = 0; i < MAX_OUTPUTS; i ++)
+    {
+        if (Outputs[i].name && (Outputs[i].type == OutputType_Service))
+        {
+            Service_t *service;
+            OutputGetService(&Outputs[i], &service);
+            fprintf(rl_outstream, "%10s : %s (%s)\n",Outputs[i].name,
+                   UDPOutputDestination((void*)Outputs[i].filter->oparg),
+                   service ? service->name:"<NONE>");
+        }
+    }
+}
+
+static void CommandSetSSF(int argc, char **argv)
+{
+    Output_t *output = NULL;
+    char *outputName = argv[0];
+    char *serviceName;
+    Service_t *service, *oldService = NULL;
+
+    serviceName = strchr(outputName, ' ');
+    if (!serviceName)
+    {
+        fprintf(rl_outstream, "No service specified!");
+        return;
+    }
+
+    serviceName[0] = 0;
+
+    for (serviceName ++;*serviceName && isspace(*serviceName); serviceName ++);
+
+    output = OutputFind(outputName, OutputType_Service);
+    if (output == NULL)
+    {
+        fprintf(rl_outstream, "Failed to find output %s\n", outputName);
+        return;
+    }
+
+    service = ServiceFindName(serviceName);
+    if (service == NULL)
+    {
+        fprintf(rl_outstream, "Failed to find service %s\n", serviceName);
+        return;
+    }
+    OutputGetService(output, &oldService);
+
+    if (OutputSetService(output, service))
+    {
+        fprintf(rl_outstream, "Failed to set service, reason %s\n", OutputErrorStr);
+    }
+
+    if (oldService)
+    {
+        ServiceFree(oldService);
+    }
+}
+
 
 static void CommandHelp(int argc, char **argv)
 {
@@ -815,81 +915,6 @@ static void CommandHelp(int argc, char **argv)
             fprintf(rl_outstream, "%10s - %s\n", commands[i].command, commands[i].shorthelp);
         }
     }
-}
-/* Output Management functions */
-static Output_t *OutputAllocate(char *name, char *destination)
-{
-    Output_t *output = NULL;
-    int i;
-    
-    for (i = 0; i < MAX_OUTPUTS; i ++)
-    {
-        if (outputs[i].name && (strcmp(name, outputs[i].name) == 0))
-        {
-            fprintf(rl_outstream, "Output already exists!\n");
-            return NULL;
-        }
-        if ((output == NULL ) && (outputs[i].name == NULL))
-        {
-            output = &outputs[i];
-        }
-    }
-    if (!output)
-    {
-        fprintf(rl_outstream, "No free output slots!\n");
-        return NULL;
-    }
-
-    output->filter = PIDFilterAllocate(TSFilter);
-    if (!output->filter)
-    {
-        fprintf(rl_outstream, "Failed to allocate PID filter!\n");
-        return NULL;
-    }
-    output->pids.pidcount = 0;
-    output->filter->filterpacket = PIDFilterSimpleFilter;
-    output->filter->fparg = &output->pids;
-    output->filter->outputpacket = UDPOutputPacketOutput;
-    output->filter->oparg = UDPOutputCreate(destination);
-    if (!output->filter->oparg)
-    {
-        fprintf(rl_outstream, "Failed to parse ip and udp port!\n");
-        PIDFilterFree(output->filter);
-        return NULL;
-    }
-    output->filter->enabled = 1;
-    output->name = strdup(name);
-
-    return output;
-}
-
-static void OutputFree(Output_t *output)
-{
-    output->filter->enabled = 0;
-    PIDFilterFree(output->filter);
-    free(output->name);
-    UDPOutputClose(output->filter->oparg);
-    memset(output, 0, sizeof(Output_t));
-}
-
-static Output_t *OutputFind(char *name)
-{
-    Output_t *output = NULL;
-    int i;
-    for (i = 0; i < MAX_OUTPUTS; i ++)
-    {
-        if (outputs[i].name && (strcmp(outputs[i].name,name) == 0))
-        {
-            output = &outputs[i];
-            break;
-        }
-    }
-
-    if (output == NULL)
-    {
-        fprintf(rl_outstream, "Failed to find output \"%s\"\n", name);
-    }
-    return output;
 }
 
 static int ParsePID(char *argument)

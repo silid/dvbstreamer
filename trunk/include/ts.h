@@ -1,30 +1,32 @@
 /*
 Copyright (C) 2006  Adam Charrett
- 
+
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
- 
+
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
- 
+
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
- 
+
 ts.h
- 
+
 Transport stream processing and filter management.
- 
+
 */
 #ifndef _TS_H
 #define _TS_H
+
 #include <stdint.h>
 #include <pthread.h>
 
+#include "types.h"
 #include "dvb.h"
 #include "services.h"
 #include "multiplexes.h"
@@ -67,11 +69,11 @@ typedef void (*PacketOutput)(PIDFilter_t *pidfilter, void *userarg, TSPacket_t* 
 struct PIDFilter_t
 {
     struct TSFilter_t *tsfilter;
-    volatile int enabled;
-    
+    volatile bool enabled;
+
     TSStructureChanged tsstructurechanged;
     void *tscarg;
-    
+
     PacketFilter filterpacket;
     void *fparg;
 
@@ -102,17 +104,17 @@ PIDFilterSimpleFilter_t;
 
 typedef struct TSFilter_t
 {
-    int quit;
+    bool quit;
     TSPacket_t readbuffer[MAX_PACKETS];
     DVBAdapter_t *adapter;
     pthread_t thread;
-    int enabled;
+    bool enabled;
     pthread_mutex_t mutex;
-    int tsstructurechanged;
-    
+    bool tsstructurechanged;
+
     volatile int totalpackets;
 	volatile int bitrate;
-	
+
     struct
     {
         int allocated;
@@ -124,7 +126,7 @@ TSFilter_t;
 
 TSFilter_t* TSFilterCreate(DVBAdapter_t *adapter);
 void TSFilterDestroy(TSFilter_t * tsfilter);
-void TSFilterEnable(TSFilter_t * tsfilter, int enable);
+void TSFilterEnable(TSFilter_t * tsfilter, bool enable);
 void TSFilterZeroStats(TSFilter_t *tsfilter);
 #define TSFilterLock(tsfilter)   pthread_mutex_lock(&(tsfilter)->mutex)
 #define TSFilterUnLock(tsfilter) pthread_mutex_unlock(&(tsfilter)->mutex)
@@ -135,7 +137,7 @@ PIDFilter_t *PIDFilterSetup(TSFilter_t *tsfilter,
                             PacketFilter filterpacket,  void *fparg,
                             PacketProcessor processpacket, void *pparg,
                             PacketOutput outputpacket,  void *oparg);
-                            
+
 #define PIDFilterFilterPacketSet(_pidfilter, _callback, _arg) \
     do{ (_pidfilter)->fparg = _arg; (_pidfilter)->filterpacket = _callback; } while(0)
 
@@ -144,7 +146,7 @@ PIDFilter_t *PIDFilterSetup(TSFilter_t *tsfilter,
 
 #define PIDFilterOutputPacketSet(_pidfilter, _callback, _arg) \
     do{ (_pidfilter)->oparg = _arg; (_pidfilter)->outputpacket = _callback; } while(0)
-    
+
 #define PIDFilterTSStructureChangeSet(_pidfilter, _callback, _arg) \
     do{ (_pidfilter)->tscarg = _arg; (_pidfilter)->tsstructurechanged = _callback; } while(0)
 

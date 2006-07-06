@@ -1,24 +1,24 @@
 /*
 Copyright (C) 2006  Adam Charrett
- 
+
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
- 
+
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
- 
+
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
- 
+
 patprocessor.c
- 
+
 Process Program Association Tables and update the services information.
- 
+
 */
 #include <stdlib.h>
 #include <stdio.h>
@@ -54,7 +54,7 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat);
 
 PIDFilter_t *PATProcessorCreate(TSFilter_t *tsfilter)
 {
-    PIDFilter_t *result = NULL; 
+    PIDFilter_t *result = NULL;
     PATProcessor_t *state = calloc(1, sizeof(PATProcessor_t));
     if (state)
     {
@@ -134,7 +134,7 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
                 printlog(LOG_DEBUG, "Service not found in cache while processing PAT, adding 0x%04x\n", patentry->i_number);
                 service = CacheServiceAdd(patentry->i_number);
                 /* Cause a TS Structure change call back*/
-                state->tsfilter->tsstructurechanged = 1;
+                state->tsfilter->tsstructurechanged = TRUE;
             }
 
             if (service && (service->pmtpid != patentry->i_pid))
@@ -150,7 +150,7 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
         for (i = 0; i < count; i ++)
         {
             int found = 0;
-            
+
             for (patentry = newpat->p_first_program; patentry; patentry = patentry->p_next)
             {
                 if (services[i]->id == patentry->i_number)
@@ -161,12 +161,12 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
             }
             if (!found)
             {
-                printlog(LOG_DEBUG, "Service not found in PAT while checking cache, deleting 0x%04x (%s)\n", 
+                printlog(LOG_DEBUG, "Service not found in PAT while checking cache, deleting 0x%04x (%s)\n",
                     services[i]->id, services[i]->name);
                 CacheServiceDelete(services[i]);
                 services = CacheServicesGet(&count);
                 /* Cause a TS Structure change call back*/
-                state->tsfilter->tsstructurechanged = 1;
+                state->tsfilter->tsstructurechanged = TRUE;
             }
         }
 

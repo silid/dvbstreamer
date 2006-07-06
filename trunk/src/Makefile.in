@@ -56,7 +56,8 @@ am_dvbstreamer_OBJECTS = main.$(OBJEXT) dvb.$(OBJEXT) \
 	udp.$(OBJEXT) ts.$(OBJEXT) udpoutput.$(OBJEXT) \
 	patprocessor.$(OBJEXT) pmtprocessor.$(OBJEXT) \
 	sdtprocessor.$(OBJEXT) servicefilter.$(OBJEXT) dbase.$(OBJEXT) \
-	cache.$(OBJEXT) logging.$(OBJEXT) commands.$(OBJEXT)
+	cache.$(OBJEXT) logging.$(OBJEXT) commands.$(OBJEXT) \
+	binarycomms.$(OBJEXT) messages.$(OBJEXT) outputs.$(OBJEXT)
 dvbstreamer_OBJECTS = $(am_dvbstreamer_OBJECTS)
 dvbstreamer_DEPENDENCIES =
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
@@ -206,7 +207,10 @@ dvbstreamer_SOURCES = \
 	dbase.c\
 	cache.c\
 	logging.c\
-    commands.c
+    commands.c \
+    binarycomms.c \
+    messages.c \
+    outputs.c
 
 dvbstreamer_LDFLAGS = 
 dvbstreamer_LDADD = \
@@ -283,13 +287,16 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/binarycomms.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/commands.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dbase.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dvb.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/logging.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/messages.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/multiplexes.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/outputs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/parsezap.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/patprocessor.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pmtprocessor.Po@am__quote@
