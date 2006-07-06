@@ -1,24 +1,24 @@
 /*
 Copyright (C) 2006  Adam Charrett
- 
+
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
- 
+
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
- 
+
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
- 
+
 main.c
- 
+
 Entry point to the application.
- 
+
 */
 #include "config.h"
 
@@ -47,6 +47,8 @@ Entry point to the application.
 #include "cache.h"
 #include "logging.h"
 #include "commands.h"
+#include "outputs.h"
+#include "binarycomms.h"
 
 
 static void usage(char *appname);
@@ -60,7 +62,7 @@ PIDFilter_t *PIDFilters[PIDFilterIndex_Count];
 TSFilter_t *TSFilter;
 DVBAdapter_t *DVBAdapter;
 
-int ExitProgram = 0;
+bool ExitProgram = FALSE;
 
 int main(int argc, char *argv[])
 {
@@ -70,14 +72,18 @@ int main(int argc, char *argv[])
     void *outputArg = NULL;
     int i;
     int adapterNumber = 0;
+    bool daemonMode = FALSE;
+    char *username = "dvbstreamer";
+    char *password = "control";
+    char *serverName = NULL;
 
     channelsFile[0] = 0;
     installsighandler();
-    
+
     while (!ExitProgram)
     {
         char c;
-        c = getopt(argc, argv, "vVo:a:t:s:c:f:");
+        c = getopt(argc, argv, "vVdo:a:t:s:c:f:u:p:n:");
         if (c == -1)
         {
             break;
@@ -121,17 +127,26 @@ int main(int argc, char *argv[])
                 channelsFileType = FE_QAM;
                 printlog(LOG_INFOV, "Using DVB-C channels file %s\n", channelsFile);
                 break;
+                /* Daemon options */
+                case 'd': daemonMode = TRUE;
+                break;
+                case 'u': username = optarg;
+                break;
+                case 'p': password = optarg;
+                break;
+                case 'n': serverName = optarg;
+                break;
                 default:
                 usage(argv[0]);
                 exit(1);
         }
     }
-    
+
     if (ExitProgram)
     {
         exit(1);
     }
-    
+
     if (outputArg == NULL)
     {
         printlog(LOG_ERROR, "No output set!\n");
@@ -197,14 +212,34 @@ int main(int argc, char *argv[])
     /* Enable all the filters */
     for (i = 0; i < PIDFilterIndex_Count; i ++)
     {
-        PIDFilters[i]->enabled = 1;
+        PIDFilters[i]->enabled = TRUE;
     }
     printlog(LOG_DEBUGV, "PID filters started\n");
+
+    if (OutputsInit())
+    {
+        printlog(LOG_ERROR, "OutputsInit failed!\n");
+    }
 
     if (CommandInit())
     {
         printlog(LOG_ERROR, "CommandInit failed!\n");
         exit(1);
+    }
+
+    if (daemonMode)
+    {
+        char serverNameBuffer[40];
+        if (!serverName)
+        {
+            sprintf(serverNameBuffer, "DVBStreamer Adapter %d", adapterNumber);
+            serverName = serverNameBuffer;
+        }
+        if (BinaryCommsInit(adapterNumber, serverName, username, password))
+        {
+            printlog(LOG_ERROR, "BinaryCommsInit failed!\n");
+            exit(1);
+        }
     }
 
     if (startupFile)
@@ -217,15 +252,28 @@ int main(int argc, char *argv[])
     }
     printlog(LOG_DEBUGV, "Startup file processed\n");
 
-    CommandLoop();
-    printlog(LOG_DEBUGV, "Command loop finished, shutting down\n");
+    if (daemonMode)
+    {
+        BinaryCommsAcceptConnections();
+        printlog(LOG_DEBUGV, "Binary comms finished, shutting down\n");
+    }
+    else
+    {
+        CommandLoop();
+        printlog(LOG_DEBUGV, "Command loop finished, shutting down\n");
+    }
+
+    BinaryCommsDeInit();
 
     CommandDeInit();
-    
+
+    OutputsDeInit();
+    printlog(LOG_DEBUGV, "Outputs deinitialised\n");
+
     /* Disable all the filters */
     for (i = 0; i < PIDFilterIndex_Count; i ++)
     {
-        PIDFilters[i]->enabled = 0;
+        PIDFilters[i]->enabled = FALSE;
     }
     printlog(LOG_DEBUGV, "PID filters stopped\n");
 
@@ -233,7 +281,7 @@ int main(int argc, char *argv[])
     PMTProcessorDestroy( PIDFilters[PIDFilterIndex_PMT]);
     SDTProcessorDestroy( PIDFilters[PIDFilterIndex_SDT]);
     ServiceFilterDestroy( PIDFilters[PIDFilterIndex_Service]);
-    
+
     printlog(LOG_DEBUGV, "Processors destroyed\n");
     /* Close the adapter and shutdown the filter etc*/
     DVBDispose(DVBAdapter);
@@ -247,7 +295,7 @@ int main(int argc, char *argv[])
 
     CacheDeInit();
     printlog(LOG_DEBUGV, "Cache deinitalised\n");
-    
+
     DBaseDeInit();
     printlog(LOG_DEBUGV, "Database deinitalised\n");
     return 0;
@@ -277,7 +325,7 @@ Service_t *SetCurrentService(char *name)
     if ((CurrentService == NULL) || (!ServiceAreEqual(service,CurrentService)))
     {
         printlog(LOG_DEBUGV,"Disabling filters\n");
-        TSFilterEnable(TSFilter, 0);
+        TSFilterEnable(TSFilter, FALSE);
 
         if (CurrentMultiplex)
         {
@@ -325,11 +373,11 @@ Service_t *SetCurrentService(char *name)
         }
 
         TSFilterZeroStats(TSFilter);
-        
+
         ServiceFilterServiceSet(PIDFilters[PIDFilterIndex_Service], CurrentService);
-        
+
         printlog(LOG_DEBUGV,"Enabling filters\n");
-        TSFilterEnable(TSFilter, 1);
+        TSFilterEnable(TSFilter, TRUE);
     }
 
     return (Service_t*)CurrentService;
@@ -390,7 +438,7 @@ static void sighandler(int signum)
         case SIGQUIT:
             rl_cleanup_after_signal();
             fclose(rl_instream);
-            ExitProgram = 1;
+            ExitProgram = TRUE;
             break;
     }
 }
