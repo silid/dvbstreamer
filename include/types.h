@@ -15,38 +15,18 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 
-main.h
+types.h
 
-Entry point to the application.
+Generic type definitions.
 
 */
-#ifndef _MAIN_H
-#define _MAIN_H
 
-#include "types.h"
-#include "dvb.h"
-#include "ts.h"
-#include "services.h"
-#include "multiplexes.h"
+#ifndef _DVBSTREAMER_TYPES_H
+#define _DVBSTREAMER_TYPES_H
 
-enum PIDFilterIndex
-{
-    PIDFilterIndex_PAT = 0,
-    PIDFilterIndex_PMT,
-    PIDFilterIndex_SDT,
-    PIDFilterIndex_Service ,
+#define TRUE  1
+#define FALSE 0
 
-    PIDFilterIndex_Count
-};
-
-extern volatile Multiplex_t *CurrentMultiplex;
-extern volatile Service_t *CurrentService;
-
-extern PIDFilter_t  *PIDFilters[];
-extern TSFilter_t   *TSFilter;
-extern DVBAdapter_t *DVBAdapter;
-extern Service_t *SetCurrentService(char *name);
-
-extern bool ExitProgram;
+typedef int bool;
 
 #endif

@@ -1,25 +1,25 @@
 /*
 Copyright (C) 2006  Adam Charrett
- 
+
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
- 
+
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
- 
+
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
- 
+
 servicefilter.c
- 
+
 Filter all packets for a service include the PMT, rewriting the PAT sent out in
 the output to only include this service.
- 
+
 */
 #include <stdlib.h>
 #include <stdio.h>
@@ -43,7 +43,7 @@ typedef struct ServiceFilter_t
     Multiplex_t  *multiplex;
     Service_t    *nextservice;
     Service_t    *service;
-    int           rewritepat;
+    bool          rewritepat;
     unsigned int  version;
     unsigned char packetcounter;
     TSPacket_t    patpacket;
@@ -97,25 +97,25 @@ static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t
 {
     int i;
     ServiceFilter_t *state = (ServiceFilter_t *)arg;
-    
+
     if (state->service != state->nextservice)
     {
         state->service = state->nextservice;
         state->multiplex = CurrentMultiplex;
-        state->rewritepat = 1;
+        state->rewritepat = TRUE;
     }
-    
+
     if (state->service)
     {
         int count;
         PID_t *pids;
-        
+
         /* Handle PAT and PMT pids */
         if ((pid == 0) || (pid == state->service->pmtpid))
         {
             return 1;
         }
-        
+
         pids = CachePIDsGet(state->service, &count);
         for (i = 0; i < count; i ++)
         {
@@ -139,7 +139,7 @@ static TSPacket_t *ServiceFilterProcessPacket(PIDFilter_t *pidfilter, void *arg,
         {
             state->version ++;
             ServiceFilterPATRewrite(&state->patpacket, state->multiplex->tsid, state->version, state->service->id, state->service->pmtpid);
-            state->rewritepat = 0;
+            state->rewritepat = FALSE;
         }
 
         TSPACKET_SETCOUNT(state->patpacket, state->packetcounter ++);

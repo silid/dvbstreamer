@@ -1,24 +1,24 @@
 /*
 Copyright (C) 2006  Adam Charrett
- 
+
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
- 
+
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
- 
+
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
- 
+
 ts.c
- 
+
 Transport stream processing and filter management.
- 
+
 */
 #include <stdlib.h>
 #include <stdio.h>
@@ -54,12 +54,12 @@ TSFilter_t* TSFilterCreate(DVBAdapter_t *adapter)
 
 void TSFilterDestroy(TSFilter_t* tsfilter)
 {
-    tsfilter->quit = 1;
+    tsfilter->quit = TRUE;
     pthread_join(tsfilter->thread, NULL);
     pthread_mutex_destroy(&tsfilter->mutex);
 }
 
-void TSFilterEnable(TSFilter_t* tsfilter, int enable)
+void TSFilterEnable(TSFilter_t* tsfilter, bool enable)
 {
     pthread_mutex_lock(&tsfilter->mutex);
     tsfilter->enabled = enable;
@@ -69,11 +69,11 @@ void TSFilterEnable(TSFilter_t* tsfilter, int enable)
 void TSFilterZeroStats(TSFilter_t* tsfilter)
 {
     int i;
-    
+
     /* Clear all filter stats */
     tsfilter->totalpackets = 0;
     tsfilter->bitrate = 0;
-    
+
     for (i = 0; i < MAX_FILTERS; i ++)
     {
         if (tsfilter->pidfilters[i].allocated)
@@ -147,7 +147,7 @@ int PIDFilterSimpleFilter(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPac
     int i;
     for (i = 0; i < filter->pidcount; i ++)
     {
-        if ((pid == filter->pids[i]) || 
+        if ((pid == filter->pids[i]) ||
             (filter->pids[i] == 8192)) /* Special case match all PIDs */
         {
             return 1;
@@ -163,13 +163,13 @@ static void *FilterTS(void *arg)
 	struct timeval now, last;
 	int diff;
 	int prevpackets = 0;
-	
+
     TSFilter_t *state = (TSFilter_t*)arg;
     DVBAdapter_t *adapter = state->adapter;
     int count = 0;
-	
+
 	gettimeofday(&last, 0);
-	
+
     while (!state->quit)
     {
         int p;
@@ -180,20 +180,20 @@ static void *FilterTS(void *arg)
         {
             ProcessPacket(state, &state->readbuffer[p]);
             state->totalpackets ++;
-            /* The structure of the transport stream has changed in a major way, 
-                (ie new services, services removed) so inform all of the filters 
+            /* The structure of the transport stream has changed in a major way,
+                (ie new services, services removed) so inform all of the filters
                 that are interested.
               */
             if (state->tsstructurechanged)
             {
                 InformTSStructureChanged(state);
-                state->tsstructurechanged = 0;
+                state->tsstructurechanged = FALSE;
             }
         }
-		
+
 		gettimeofday(&now, 0);
 		diff =(now.tv_sec - last.tv_sec) * 1000 + (now.tv_usec - last.tv_usec) / 1000;
-		if (diff > 1000) 
+		if (diff > 1000)
 		{
 			// Work out bit rates
 			state->bitrate = ((state->totalpackets - prevpackets) * (188 * 8));
@@ -217,7 +217,7 @@ static void ProcessPacket(TSFilter_t *state, TSPacket_t *packet)
             PIDFilter_t *filter = &state->pidfilters[i].filter;
             if (filter->filterpacket && filter->filterpacket(filter, filter->fparg, pid, packet))
             {
-                int output = 1;
+                bool output = TRUE;
                 TSPacket_t *outputPacket = packet;
 
                 filter->packetsfiltered ++;
@@ -225,7 +225,7 @@ static void ProcessPacket(TSFilter_t *state, TSPacket_t *packet)
                 if (filter->processpacket)
                 {
                     outputPacket = filter->processpacket(filter, filter->pparg, packet);
-                    output = (outputPacket) ? 1:0;
+                    output = (outputPacket) ? TRUE:FALSE;
                     filter->packetsprocessed ++;
                 }
 
@@ -245,7 +245,7 @@ static void InformTSStructureChanged(TSFilter_t *state)
 
     for (i = 0; i < MAX_FILTERS; i ++)
     {
-        if (state->pidfilters[i].allocated && 
+        if (state->pidfilters[i].allocated &&
             state->pidfilters[i].filter.enabled &&
             state->pidfilters[i].filter.tsstructurechanged)
         {
