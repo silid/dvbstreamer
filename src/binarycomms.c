@@ -58,7 +58,7 @@ Binary Communications protocol for control DVBStreamer.
         }\
         else \
         { \
-          MessageRERR(RERR_NOTAUTHORISED, "Not authorised!"); \
+          MessageRERR(_message, RERR_NOTAUTHORISED, "Not authorised!"); \
         }\
     }while(0)
 
@@ -78,6 +78,14 @@ static void HandleConnection(Connection_t *connection);
 static void ProcessMessage(Connection_t *connection, Message_t *message);
 static void ProcessInfo(Connection_t *connection, Message_t *message);
 static void ProcessAuth(Connection_t *connection, Message_t *message);
+static void ProcessPrimaryServiceSelect(Connection_t *connection, Message_t *message);
+static void ProcessSecondaryServiceAdd(Connection_t *connection, Message_t *message);
+static void ProcessSecondaryServiceSet(Connection_t *connection, Message_t *message);
+static void ProcessSecondaryServiceRemove(Connection_t *connection, Message_t *message);
+static void ProcessOutputAdd(Connection_t *connection, Message_t *message);
+static void ProcessOutputRemove(Connection_t *connection, Message_t *message);
+static void ProcessOutputPIDAdd(Connection_t *connection, Message_t *message);
+static void ProcessOutputPIDRemove(Connection_t *connection, Message_t *message);
 static void ProcessPrimaryServiceCurrent(Connection_t *connection, Message_t *message);
 static void ProcessSecondaryServiceList(Connection_t *connection, Message_t *message);
 static void ProcessOutputsList(Connection_t *connection, Message_t *message);
@@ -268,14 +276,28 @@ static void ProcessMessage(Connection_t *connection, Message_t *message)
             break;
             /* Control Messages */
         case MSGCODE_CSPS:
+            IFAUTHENTICATED(ProcessPrimaryServiceSelect, connection, message);
+            break;
         case MSGCODE_CSSA:
+            IFAUTHENTICATED(ProcessSecondaryServiceAdd, connection, message);
+            break;
         case MSGCODE_CSSS:
+            IFAUTHENTICATED(ProcessSecondaryServiceSet, connection, message);
+            break;
         case MSGCODE_CSSR:
+            IFAUTHENTICATED(ProcessSecondaryServiceRemove, connection, message);
+            break;
         case MSGCODE_COAO:
+            IFAUTHENTICATED(ProcessOutputAdd, connection, message);
+            break;
         case MSGCODE_CORO:
+            IFAUTHENTICATED(ProcessOutputRemove, connection, message);
+            break;
         case MSGCODE_COAP:
+            IFAUTHENTICATED(ProcessOutputPIDAdd, connection, message);
+            break;
         case MSGCODE_CORP:
-            MessageRERR(message, RERR_UNDEFINED, "Not Implemented!");
+            IFAUTHENTICATED(ProcessOutputPIDRemove, connection, message);
             break;
             /* Status Messages */
         case MSGCODE_SSPC:
@@ -399,6 +421,47 @@ static void ProcessAuth(Connection_t *connection, Message_t *message)
     free(msgPassword);
 }
 
+static void ProcessPrimaryServiceSelect(Connection_t *connection, Message_t *message)
+{
+    MessageRERR(message, RERR_UNDEFINED, "Not Implemented!");
+}
+
+static void ProcessSecondaryServiceAdd(Connection_t *connection, Message_t *message)
+{
+    MessageRERR(message, RERR_UNDEFINED, "Not Implemented!");
+}
+
+static void ProcessSecondaryServiceSet(Connection_t *connection, Message_t *message)
+{
+    MessageRERR(message, RERR_UNDEFINED, "Not Implemented!");
+}
+
+static void ProcessSecondaryServiceRemove(Connection_t *connection, Message_t *message)
+{
+    MessageRERR(message, RERR_UNDEFINED, "Not Implemented!");
+}
+
+static void ProcessOutputAdd(Connection_t *connection, Message_t *message)
+{
+    MessageRERR(message, RERR_UNDEFINED, "Not Implemented!");
+}
+
+static void ProcessOutputRemove(Connection_t *connection, Message_t *message)
+{
+    MessageRERR(message, RERR_UNDEFINED, "Not Implemented!");
+}
+
+static void ProcessOutputPIDAdd(Connection_t *connection, Message_t *message)
+{
+    MessageRERR(message, RERR_UNDEFINED, "Not Implemented!");
+}
+
+static void ProcessOutputPIDRemove(Connection_t *connection, Message_t *message)
+{
+    MessageRERR(message, RERR_UNDEFINED, "Not Implemented!");
+}
+
+
 static void ProcessPrimaryServiceCurrent(Connection_t *connection, Message_t *message)
 {
     if (CurrentService)
@@ -488,6 +551,7 @@ static void ProcessOutputListPids(Connection_t *connection, Message_t *message)
     {
         MessageRERR(message, RERR_NOTFOUND, outputName);
     }
+    free(outputName);
 }
 
 static void ProcessOutputPacketCount(Connection_t *connection, Message_t *message)
@@ -512,6 +576,7 @@ static void ProcessOutputPacketCount(Connection_t *connection, Message_t *messag
     {
         MessageRERR(message, RERR_NOTFOUND, outputName);
     }
+    free(outputName);
 }
 
 static void ProcessTSStats(Connection_t *connection, Message_t *message)
@@ -631,4 +696,5 @@ static void ProcessServicePids(Connection_t *connection, Message_t *message)
     {
         MessageRERR(message, RERR_NOTFOUND, serviceName);
     }
+    free(serviceName);
 }
