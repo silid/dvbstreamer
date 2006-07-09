@@ -210,7 +210,7 @@ char *UDPOutputDestination(void *arg)
 
     if (getnameinfo((struct sockaddr *)&state->address, state->address_len,
                     destinationBuffer+1, sizeof(destinationBuffer)-3-sizeof(portBuffer),
-                    portBuffer, sizeof(portBuffer), NI_NUMERICHOST) != 0)
+                    portBuffer, sizeof(portBuffer), NI_NUMERICHOST|NI_NUMERICSERV) != 0)
     {
         return NULL;
     }
