@@ -81,6 +81,7 @@ static void CommandAddSSF(int argc, char **argv);
 static void CommandRemoveSSF(int argc, char **argv);
 static void CommandSSFS(int argc, char **argv);
 static void CommandSetSSF(int argc, char **argv);
+static void CommandFEStatus(int argc, char **argv);
 static void CommandHelp(int argc, char **argv);
 
 static int ParsePID(char *argument);
@@ -227,6 +228,14 @@ static Command_t commands[] = {
                                       "setssf <output name> <service name>\n"
                                       "Stream the specified service to the secondary service output.",
                                       CommandSetSSF
+                                  },
+{
+                                      "festatus",
+                                      0, 0, 0,
+                                      "Displays the status of the tuner.",
+                                      "Displays whether the front end is locked, the bit error rate and signal to noise"
+                                      "ratio and the signal strength",
+                                      CommandFEStatus
                                   },
                                   {
                                       "help",
@@ -887,6 +896,21 @@ static void CommandSetSSF(int argc, char **argv)
     }
 }
 
+static void CommandFEStatus(int argc, char **argv)
+{
+    fe_status_t status;
+    unsigned int ber, strength, snr;
+    DVBFrontEndStatus(DVBAdapter, &status, &ber, &strength, &snr);
+
+    fprintf(rl_outstream,"Tuner status:  %s%s%s%s%s%s\n",
+             (status & FE_HAS_SIGNAL)?"Signal, ":"",
+             (status & FE_TIMEDOUT)?"Timed out, ":"",
+             (status & FE_HAS_LOCK)?"Lock, ":"",
+             (status & FE_HAS_CARRIER)?"Carrier, ":"",
+             (status & FE_HAS_VITERBI)?"VITERBI, ":"",
+             (status & FE_HAS_SYNC)?"Sync, ":"");
+    fprintf(rl_outstream, "BER = %d Signal Strength = %d SNR = %d\n", ber, strength, snr);
+}
 
 static void CommandHelp(int argc, char **argv)
 {
