@@ -134,9 +134,9 @@ int BinaryCommsInit(int adapter, char *streamername, char *username, char *passw
 
     time(&serverStartTime);
     printlog(LOG_INFO, "Server created %s", ctime(&serverStartTime));
-    printlog(LOG_DEBUG, "Username    : %s\n"
-             "Password    : %s\n"
-             "Server Name : %s\n", authUsername, authPassword, infoStreamerName);
+    printlog(LOG_DEBUG, "Username    : %s\n", authUsername);
+    printlog(LOG_DEBUG, "Password    : %s\n", authPassword);
+    printlog(LOG_DEBUG, "Server Name : %s\n", infoStreamerName);
     return 0;
 }
 
