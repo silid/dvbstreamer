@@ -56,6 +56,10 @@ void printlog(int level, char *format, ...)
             fputs(buffer, stderr);
         }
         fputs(logline, stderr);
+        if (DaemonMode)
+        {
+            fflush(stderr);
+        }
         va_end(valist);
         free(logline);
     }

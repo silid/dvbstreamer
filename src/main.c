@@ -490,9 +490,11 @@ static void makedaemon(int adapter)
 
     /* Close out the standard file descriptors */
     fclose(stdin);
+    fclose(stdout);
+    fclose(stderr);
     sprintf(logfile, "/var/log/dvbstreamer%d.err.log", adapter);
-    freopen(logfile, "wt+", stderr);
+    stderr = fopen(logfile, "wt+");
     sprintf(logfile, "/var/log/dvbstreamer%d.out.log", adapter);
-    freopen(logfile, "wt+", stdout);
+    stdout = fopen(logfile, "wt+");
     DaemonMode = TRUE;
 }
