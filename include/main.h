@@ -48,5 +48,6 @@ extern DVBAdapter_t *DVBAdapter;
 extern Service_t *SetCurrentService(char *name);
 
 extern bool ExitProgram;
+extern bool DaemonMode;
 
 #endif

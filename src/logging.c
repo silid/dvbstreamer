@@ -20,10 +20,13 @@ logging.h
 Logging functions.
  
 */
+#define _GNU_SOURCE
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <time.h>
 
+#include "main.h"
 #include "logging.h"
 
 int verbosity = 0;
@@ -39,7 +42,20 @@ void printlog(int level, char *format, ...)
         char *logline;
         va_start(valist, format);
         vasprintf(&logline, format, valist);
-        fprintf(stderr, logline);
+        if (DaemonMode)
+        {
+            char buffer[24]; /* "YYYY-MM-DD HH:MM:SS" */
+            time_t curtime;
+            struct tm *loctime;
+            /* Get the current time. */
+            curtime = time (NULL);
+            /* Convert it to local time representation. */
+            loctime = localtime (&curtime);
+            /* Print it out in a nice format. */
+            strftime (buffer, sizeof(buffer), "%F %T : ", loctime);
+            fputs(buffer, stderr);
+        }
+        fputs(logline, stderr);
         va_end(valist);
         free(logline);
     }

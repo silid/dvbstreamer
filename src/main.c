@@ -29,6 +29,8 @@ Entry point to the application.
 #include <pthread.h>
 #include <getopt.h>
 #include <ctype.h>
+#include <signal.h>
+#include <sys/unistd.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -55,6 +57,7 @@ static void usage(char *appname);
 static void version(void);
 static void sighandler(int signum);
 static void installsighandler(void);
+static void makedaemon(int adapter);
 
 volatile Multiplex_t *CurrentMultiplex = NULL;
 volatile Service_t *CurrentService = NULL;
@@ -63,6 +66,7 @@ TSFilter_t *TSFilter;
 DVBAdapter_t *DVBAdapter;
 
 bool ExitProgram = FALSE;
+bool DaemonMode = FALSE;
 
 int main(int argc, char *argv[])
 {
@@ -72,10 +76,11 @@ int main(int argc, char *argv[])
     void *outputArg = NULL;
     int i;
     int adapterNumber = 0;
-    bool daemonMode = FALSE;
+    
     char *username = "dvbstreamer";
     char *password = "control";
     char *serverName = NULL;
+    char *primaryOutput = NULL;
 
     channelsFile[0] = 0;
     installsighandler();
@@ -97,13 +102,7 @@ int main(int argc, char *argv[])
                 exit(0);
                 break;
                 case 'o':
-                outputArg = UDPOutputCreate(optarg);
-                if (outputArg == NULL)
-                {
-                    printlog(LOG_ERROR, "Error creating UDP output!\n");
-                    exit(1);
-                }
-                printlog(LOG_INFOV, "Output will be via UDP to %s\n", UDPOutputDestination(outputArg));
+                primaryOutput = optarg;
                 break;
                 case 'a': adapterNumber = atoi(optarg);
                 printlog(LOG_INFOV, "Using adapter %d\n", adapterNumber);
@@ -128,7 +127,7 @@ int main(int argc, char *argv[])
                 printlog(LOG_INFOV, "Using DVB-C channels file %s\n", channelsFile);
                 break;
                 /* Daemon options */
-                case 'd': daemonMode = TRUE;
+                case 'd': DaemonMode = TRUE;
                 break;
                 case 'u': username = optarg;
                 break;
@@ -147,7 +146,12 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    if (outputArg == NULL)
+    if (DaemonMode)
+    {
+        makedaemon( adapterNumber);
+    }
+
+    if (primaryOutput == NULL)
     {
         printlog(LOG_ERROR, "No output set!\n");
         usage(argv[0]);
@@ -206,6 +210,13 @@ int main(int argc, char *argv[])
     PIDFilters[PIDFilterIndex_PMT] = PMTProcessorCreate(TSFilter);
     PIDFilters[PIDFilterIndex_SDT] = SDTProcessorCreate(TSFilter);
 
+    outputArg = UDPOutputCreate(primaryOutput);
+    if (outputArg == NULL)
+    {
+        printlog(LOG_ERROR, "Error creating UDP output!\n");
+        exit(1);
+    }
+    printlog(LOG_INFOV, "Output will be via UDP to %s\n", UDPOutputDestination(outputArg));
     /* Create Service filter */
     PIDFilters[PIDFilterIndex_Service] = ServiceFilterCreate(TSFilter,
                                         UDPOutputPacketOutput,outputArg);
@@ -227,7 +238,7 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    if (daemonMode)
+    if (DaemonMode)
     {
         char serverNameBuffer[40];
         if (!serverName)
@@ -252,7 +263,7 @@ int main(int argc, char *argv[])
     }
     printlog(LOG_DEBUGV, "Startup file processed\n");
 
-    if (daemonMode)
+    if (DaemonMode)
     {
         BinaryCommsAcceptConnections();
         printlog(LOG_DEBUGV, "Binary comms finished, shutting down\n");
@@ -441,4 +452,47 @@ static void sighandler(int signum)
             ExitProgram = TRUE;
             break;
     }
+}
+
+static void makedaemon(int adapter)
+{
+    /* Our process ID and Session ID */
+    pid_t pid, sid;
+    char logfile[PATH_MAX];
+
+    /* Fork off the parent process */
+    pid = fork();
+    if (pid < 0)
+    {
+        exit(1);
+    }
+    /* If we got a good PID, then
+       we can exit the parent process. */
+    if (pid > 0)
+    {
+        exit(0);
+    }
+
+    /* Create a new SID for the child process */
+    sid = setsid();
+    if (sid < 0)
+    {
+        /* Log the failure */
+        exit(1);
+    }
+
+    /* Change the current working directory */
+    if ((chdir("/")) < 0)
+    {
+        /* Log the failure */
+        exit(1);
+    }
+
+    /* Close out the standard file descriptors */
+    fclose(stdin);
+    sprintf(logfile, "/var/log/dvbstreamer%d.err.log", adapter);
+    freopen(logfile, "wt+", stderr);
+    sprintf(logfile, "/var/log/dvbstreamer%d.out.log", adapter);
+    freopen(logfile, "wt+", stdout);
+    DaemonMode = TRUE;
 }
