@@ -22,7 +22,7 @@ Additional output management functions.
 */
 
 #include <stdlib.h>
-#include <strings.h>
+#include <string.h>
 
 #include "ts.h"
 #include "services.h"
