@@ -23,6 +23,7 @@ Binary Communications protocol message manipulation functions.
 
 #ifndef _MESSAGES_H
 #define _MESSAGES_H
+#include <stdint.h>
 
 #define MESSAGE_MAX_LENGTH 0xffff
 
