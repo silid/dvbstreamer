@@ -125,7 +125,7 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
             }
         }
     }
-
+#if 0
     do
     {
         status = 0;
@@ -175,6 +175,36 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
     else
     {
         printlog(LOG_DEBUGV,"Unable to achieve lock at %lu Hz\n",(unsigned long)frontend->frequency);
+        return 0;
+    }
+#endif
+    return 1;
+}
+
+int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status, unsigned int *ber, unsigned int *strength, unsigned int *snr)
+{
+    if (ioctl(adapter->frontendfd, FE_READ_STATUS, status) < 0)
+    {
+        printlog(LOG_ERROR,"FE_READ_STATUS: %s\n", strerror(errno));
+        return 0;
+    }
+
+    if(ioctl(adapter->frontendfd,FE_READ_BER, ber) < 0)
+    {
+        printlog(LOG_ERROR,"FE_READ_BER: %s\n", strerror(errno));
+        return 0;
+    }
+
+    if(ioctl(adapter->frontendfd,FE_READ_SIGNAL_STRENGTH,strength) < 0)
+    {
+        printlog(LOG_ERROR,"FE_READ_SIGNAL_STRENGTH: %s\n", strerror(errno));
+        return 0;
+    }
+
+
+    if(ioctl(adapter->frontendfd,FE_READ_SNR,snr) < 0)
+    {
+        printlog(LOG_ERROR,"FE_READ_SNR: %s\n", strerror(errno));
         return 0;
     }
     return 1;

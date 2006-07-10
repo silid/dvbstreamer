@@ -44,6 +44,7 @@ DVBAdapter_t;
 DVBAdapter_t *DVBInit(int adapter);
 void DVBDispose(DVBAdapter_t *adapter);
 int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *frontend);
+int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status, unsigned int *ber, unsigned int *strength, unsigned int *snr);
 int DVBDemuxStreamEntireTSToDVR(DVBAdapter_t *adapter);
 int DVBDemuxSetPESFilter(DVBAdapter_t *adapter, ushort pid, int pidtype, int taptype);
 int DVBDVRRead(DVBAdapter_t *adapter, char *data, int max, int timeout);
