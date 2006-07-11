@@ -37,7 +37,7 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 LIBOBJDIR =
-bin_PROGRAMS = dvbstreamer$(EXEEXT)
+bin_PROGRAMS = dvbstreamer$(EXEEXT) dvbctrl$(EXEEXT)
 subdir = src
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -51,6 +51,10 @@ CONFIG_CLEAN_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS)
+am_dvbctrl_OBJECTS = dvbctrl.$(OBJEXT) messages.$(OBJEXT) \
+	logging.$(OBJEXT)
+dvbctrl_OBJECTS = $(am_dvbctrl_OBJECTS)
+dvbctrl_DEPENDENCIES =
 am_dvbstreamer_OBJECTS = main.$(OBJEXT) dvb.$(OBJEXT) \
 	parsezap.$(OBJEXT) multiplexes.$(OBJEXT) services.$(OBJEXT) \
 	udp.$(OBJEXT) ts.$(OBJEXT) udpoutput.$(OBJEXT) \
@@ -71,8 +75,8 @@ LTCOMPILE = $(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) \
 CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = $(dvbstreamer_SOURCES)
-DIST_SOURCES = $(dvbstreamer_SOURCES)
+SOURCES = $(dvbctrl_SOURCES) $(dvbstreamer_SOURCES)
+DIST_SOURCES = $(dvbctrl_SOURCES) $(dvbstreamer_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -216,6 +220,13 @@ dvbstreamer_LDFLAGS =
 dvbstreamer_LDADD = \
 	 -ldvbpsi -lpthread -lsqlite3 -lreadline -ltermcap
 
+dvbctrl_SOURCES = \
+    dvbctrl.c\
+    messages.c\
+    logging.c
+
+dvbctrl_LDFLAGS = 
+dvbctrl_LDADD = 
 all: all-am
 
 .SUFFIXES:
@@ -277,6 +288,9 @@ clean-binPROGRAMS:
 	  echo " rm -f $$p $$f"; \
 	  rm -f $$p $$f ; \
 	done
+dvbctrl$(EXEEXT): $(dvbctrl_OBJECTS) $(dvbctrl_DEPENDENCIES) 
+	@rm -f dvbctrl$(EXEEXT)
+	$(LINK) $(dvbctrl_LDFLAGS) $(dvbctrl_OBJECTS) $(dvbctrl_LDADD) $(LIBS)
 dvbstreamer$(EXEEXT): $(dvbstreamer_OBJECTS) $(dvbstreamer_DEPENDENCIES) 
 	@rm -f dvbstreamer$(EXEEXT)
 	$(LINK) $(dvbstreamer_LDFLAGS) $(dvbstreamer_OBJECTS) $(dvbstreamer_LDADD) $(LIBS)
@@ -292,6 +306,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/commands.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dbase.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dvb.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dvbctrl.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/logging.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/messages.Po@am__quote@

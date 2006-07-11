@@ -11,7 +11,7 @@ AM_CFLAGS =\
 	 -Wall\
 	 -g
 
-bin_PROGRAMS = dvbstreamer
+bin_PROGRAMS = dvbstreamer dvbctrl
 
 dvbstreamer_SOURCES = \
 	main.c\
@@ -34,8 +34,16 @@ dvbstreamer_SOURCES = \
     messages.c \
     outputs.c
 
-dvbstreamer_LDFLAGS = 
+dvbstreamer_LDFLAGS =
 
 dvbstreamer_LDADD = \
 	 -ldvbpsi -lpthread -lsqlite3 -lreadline -ltermcap
 
+dvbctrl_SOURCES = \
+    dvbctrl.c\
+    messages.c\
+    logging.c
+
+dvbctrl_LDFLAGS =
+
+dvbctrl_LDADD =
