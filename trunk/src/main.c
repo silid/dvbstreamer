@@ -57,7 +57,8 @@ static void usage(char *appname);
 static void version(void);
 static void sighandler(int signum);
 static void installsighandler(void);
-static void makedaemon(int adapter);
+static void InitDaemon(int adapter);
+static void DeinitDaemon(void);
 
 volatile Multiplex_t *CurrentMultiplex = NULL;
 volatile Service_t *CurrentService = NULL;
@@ -68,6 +69,8 @@ DVBAdapter_t *DVBAdapter;
 bool ExitProgram = FALSE;
 bool DaemonMode = FALSE;
 
+static char PidFile[PATH_MAX];
+
 int main(int argc, char *argv[])
 {
     char *startupFile = NULL;
@@ -76,7 +79,7 @@ int main(int argc, char *argv[])
     void *outputArg = NULL;
     int i;
     int adapterNumber = 0;
-    
+
     char *username = "dvbstreamer";
     char *password = "control";
     char *serverName = NULL;
@@ -148,7 +151,7 @@ int main(int argc, char *argv[])
 
     if (DaemonMode)
     {
-        makedaemon( adapterNumber);
+        InitDaemon( adapterNumber);
     }
 
     if (primaryOutput == NULL)
@@ -309,6 +312,11 @@ int main(int argc, char *argv[])
 
     DBaseDeInit();
     printlog(LOG_DEBUGV, "Database deinitalised\n");
+
+    if (DaemonMode)
+    {
+        DeinitDaemon();
+    }
     return 0;
 }
 
@@ -441,24 +449,27 @@ static void installsighandler(void)
 
 static void sighandler(int signum)
 {
-    switch (signum)
+    if (!DaemonMode)
     {
-        case SIGINT:
-            rl_free_line_state ();
-        case SIGTERM:
-        case SIGQUIT:
-            rl_cleanup_after_signal();
-            fclose(rl_instream);
-            ExitProgram = TRUE;
-            break;
+        switch (signum)
+        {
+            case SIGINT:
+            case SIGQUIT:
+                rl_free_line_state ();
+            case SIGTERM:
+                rl_cleanup_after_signal();
+                fclose(rl_instream);
+                break;
+        }
     }
+    ExitProgram = TRUE;
 }
 
-static void makedaemon(int adapter)
+static void InitDaemon(int adapter)
 {
+    char logfile[PATH_MAX];
     /* Our process ID and Session ID */
     pid_t pid, sid;
-    char logfile[PATH_MAX];
 
     /* Fork off the parent process */
     pid = fork();
@@ -466,10 +477,19 @@ static void makedaemon(int adapter)
     {
         exit(1);
     }
+
     /* If we got a good PID, then
        we can exit the parent process. */
     if (pid > 0)
     {
+        FILE *fp;
+        sprintf(PidFile, "/var/run/dvbstreamer-%d.pid", adapter);
+        fp = fopen(PidFile, "wt");
+        if (fp)
+        {
+            fprintf(fp, "%d", pid);
+            fclose(fp);
+        }
         exit(0);
     }
 
@@ -492,9 +512,16 @@ static void makedaemon(int adapter)
     fclose(stdin);
     fclose(stdout);
     fclose(stderr);
-    sprintf(logfile, "/var/log/dvbstreamer%d.err.log", adapter);
-    stderr = fopen(logfile, "wt+");
-    sprintf(logfile, "/var/log/dvbstreamer%d.out.log", adapter);
-    stdout = fopen(logfile, "wt+");
+    sprintf(logfile, "/var/log/dvbstreamer-%d.err.log", adapter);
+    stderr = freopen(logfile, "wt+", stderr);
+    sprintf(logfile, "/var/log/dvbstreamer-%d.out.log", adapter);
+    stdout = freopen(logfile, "wt+", stdout);
     DaemonMode = TRUE;
+}
+
+static void DeinitDaemon(void)
+{
+    /* Remove pid file */
+    unlink(PidFile);
+    exit(0);
 }
