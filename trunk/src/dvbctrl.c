@@ -57,6 +57,7 @@ Command_t;
 static void usage(char *appname);
 static void version(void);
 static void CommandInfo(char *argv[]);
+static void CommandServices(char *argv[]);
 
 /* Used by logging to determine whether to include date/time info */
 int DaemonMode = FALSE;
@@ -77,6 +78,16 @@ static Command_t commands[] =
             "upsecs for the number of seconds the server has been running, uptime "
             "for a nice time string on how long the host has been running.",
             CommandInfo
+        },
+        {
+            "services", 0,
+            "List all available services.",
+            CommandServices
+        },
+        {
+            "multiplex", 0,
+            "List all the services on the current multiplex.",
+            CommandServices
         },
         {
             NULL, 0, NULL, NULL
@@ -287,6 +298,64 @@ static void CommandInfo(char *argv[])
             printf("ERROR (%d) %s\n", code, text);
         }
 
+    }
+    else
+    {
+        printlog(LOG_ERROR, "Unexpected response message! (type 0x%02x)",
+                 MessageGetCode(&message) );
+    }
+}
+
+static void CommandServices(char *argv[])
+{
+    MessageReset(&message);
+    if (strcmp("services", argv[0]) == 0)
+    {
+        MessageSetCode(&message, MSGCODE_SSLA);
+    }
+    if (strcmp("multiplex", argv[0]) == 0)
+    {
+        MessageSetCode(&message, MSGCODE_SSLM);
+    }
+    if (MessageSend(&message, socketfd))
+    {
+        printlog(LOG_ERROR, "Sending message failed!\n");
+        exit(1);
+    }
+    if (MessageRecv(&message, socketfd))
+    {
+        printlog(LOG_ERROR, "Failed to receive message!\n");
+        exit(1);
+    }
+    if (MessageGetCode(&message) == MSGCODE_RSL)
+    {
+        uint16_t servicecount = 0;
+        int i;
+        MessageReadUint16( &message, &servicecount);
+        
+        for (i = 0; i < servicecount; i ++)
+        {
+            char *name = NULL;
+            MessageReadString( &message, &name);
+            if (name)
+            {
+                printf("%s\n", name);
+                free(name);
+            }
+        }
+    }
+    else if (MessageGetCode(&message) == MSGCODE_RERR)
+    {
+        uint8_t code;
+        char *reason = NULL;
+        MessageReadUint8( &message, &code);
+        MessageReadString( &message, &reason);
+        printlog(LOG_ERROR, "Failed to retrieve service list, code 0x%02x reason \"%s\"\n", 
+            code, reason);
+        if (reason)
+        {
+            free(reason);
+        }
     }
     else
     {
