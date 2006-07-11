@@ -41,8 +41,8 @@ Binary Communications protocol for control DVBStreamer.
 #include "cache.h"
 #include "messages.h"
 #include "main.h"
+#include "binarycomms.h"
 
-#define PORT 54197 // 0xd3b5 ~= DVBS
 
 #define MAX_CONNECTIONS 2 /* 1 for monitoring by web and another for control */
 
@@ -119,10 +119,10 @@ int BinaryCommsInit(int adapter, char *streamername, char *username, char *passw
     bzero((char *) &serverAddress, sizeof(serverAddress));
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_addr.s_addr = INADDR_ANY;
-    serverAddress.sin_port = htons(PORT + adapter);
+    serverAddress.sin_port = htons(BINARYCOMMS_PORT + adapter);
     if (bind(serverSocket, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0)
     {
-        printlog(LOG_ERROR, "Failed to bind server to port %d", PORT + adapter);
+        printlog(LOG_ERROR, "Failed to bind server to port %d", BINARYCOMMS_PORT + adapter);
         close(serverSocket);
         return 1;
     }
