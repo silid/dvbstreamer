@@ -36,6 +36,43 @@ Application to control dvbstreamer in daemon mode.
 #include "binarycomms.h"
 #include "messages.h"
 
+#define MESSAGE_SENDRECV() \
+    do{\
+        if (MessageSend(&message, socketfd))\
+        {\
+            printlog(LOG_ERROR, "Sending message failed!\n");\
+            exit(1);\
+        }\
+        if (MessageRecv(&message, socketfd))\
+        {\
+            printlog(LOG_ERROR, "Failed to receive message!\n");\
+            exit(1);\
+        }\
+    }while(0)
+
+#define CHECK_RERR_OK() \
+    do{\
+    if (MessageGetCode(&message) == MSGCODE_RERR) \
+    {\
+        uint8_t code = 0;\
+        char *text = NULL;\
+        MessageReadUint8(&message, &code);\
+        if (code != 0)\
+        {\
+            MessageReadString(&message, &text);\
+            printf("ERROR (%d) %s\n", code, text);\
+            free(text);\
+            return;\
+        }\
+    }\
+    else\
+    {\
+        printlog(LOG_ERROR, "Unexpected response message! (type 0x%02x)",\
+                 MessageGetCode(&message) );\
+        return;\
+    }\
+    }while(0)
+
 typedef struct InfoParam_t
 {
     char *name;
@@ -58,6 +95,8 @@ static void usage(char *appname);
 static void version(void);
 static void CommandInfo(char *argv[]);
 static void CommandServices(char *argv[]);
+static void CommandSelect(char *argv[]);
+static void CommandCurrent(char *argv[]);
 
 /* Used by logging to determine whether to include date/time info */
 int DaemonMode = FALSE;
@@ -88,6 +127,16 @@ static Command_t commands[] =
             "multiplex", 0,
             "List all the services on the current multiplex.",
             CommandServices
+        },
+        {
+            "select", 1,
+            "Select the service to stream to the primary output.",
+            CommandSelect
+        },
+        {
+            "current", 0,
+            "Print out the service currently being streamed.",
+            CommandCurrent
         },
         {
             NULL, 0, NULL, NULL
@@ -270,25 +319,16 @@ static void CommandInfo(char *argv[])
         return;
     }
     printlog(LOG_DEBUG, "Querying host for \"%s\"\n", infoParams[found].name);
-    MessageReset(&message);
-    MessageSetCode(&message, MSGCODE_INFO);
-    MessageWriteUint8(&message, infoParams[found].value);
-    if (MessageSend(&message, socketfd))
-    {
-        printlog(LOG_ERROR, "Sending message failed!\n");
-        exit(1);
-    }
-    if (MessageRecv(&message, socketfd))
-    {
-        printlog(LOG_ERROR, "Failed to receive message!\n");
-        exit(1);
-    }
+
+    MessageEncode(&message, MSGCODE_INFO, "b", infoParams[found].value);
+
+    MESSAGE_SENDRECV();
+
     if (MessageGetCode(&message) == MSGCODE_RERR)
     {
-        uint8_t code = 0;
+        uint8_t code;
         char *text = NULL;
-        MessageReadUint8(&message, &code);
-        MessageReadString(&message, &text);
+        MessageDecode(&message, "bs", &code, &text);
         if (code == 0)
         {
             printf("%s\n", text);
@@ -297,7 +337,6 @@ static void CommandInfo(char *argv[])
         {
             printf("ERROR (%d) %s\n", code, text);
         }
-
     }
     else
     {
@@ -317,22 +356,15 @@ static void CommandServices(char *argv[])
     {
         MessageSetCode(&message, MSGCODE_SSLM);
     }
-    if (MessageSend(&message, socketfd))
-    {
-        printlog(LOG_ERROR, "Sending message failed!\n");
-        exit(1);
-    }
-    if (MessageRecv(&message, socketfd))
-    {
-        printlog(LOG_ERROR, "Failed to receive message!\n");
-        exit(1);
-    }
+
+    MESSAGE_SENDRECV();
+
     if (MessageGetCode(&message) == MSGCODE_RSL)
     {
         uint16_t servicecount = 0;
         int i;
         MessageReadUint16( &message, &servicecount);
-        
+
         for (i = 0; i < servicecount; i ++)
         {
             char *name = NULL;
@@ -348,9 +380,8 @@ static void CommandServices(char *argv[])
     {
         uint8_t code;
         char *reason = NULL;
-        MessageReadUint8( &message, &code);
-        MessageReadString( &message, &reason);
-        printlog(LOG_ERROR, "Failed to retrieve service list, code 0x%02x reason \"%s\"\n", 
+        MessageDecode(&message, "bs", &code, &reason);
+        printlog(LOG_ERROR, "Failed to retrieve service list, code 0x%02x reason \"%s\"\n",
             code, reason);
         if (reason)
         {
@@ -363,3 +394,57 @@ static void CommandServices(char *argv[])
                  MessageGetCode(&message) );
     }
 }
+
+static void CommandSelect(char *argv[])
+{
+    if (!username)
+    {
+        printlog(LOG_ERROR, "No username supplied!\n");
+        return;
+    }
+    if (!password)
+    {
+        printlog(LOG_ERROR, "No password supplied!\n");
+        return;
+    }
+    MessageEncode(&message, MSGCODE_AUTH, "ss", username, password );
+
+    MESSAGE_SENDRECV();
+
+    CHECK_RERR_OK();
+
+    MessageEncode(&message, MSGCODE_CSPS, "s", argv[1]);
+
+    MESSAGE_SENDRECV();
+
+    CHECK_RERR_OK();
+}
+
+static void CommandCurrent(char *argv[])
+{
+    MessageReset(&message);
+    MessageSetCode(&message, MSGCODE_SSPC);
+
+    MESSAGE_SENDRECV();
+
+    if (MessageGetCode(&message) == MSGCODE_RERR)
+    {
+        uint8_t code;
+        char *text = NULL;
+        MessageDecode(&message, "bs", &code, &text);
+        if (code == 0)
+        {
+            printf("%s\n", text);
+        }
+        else
+        {
+            printf("ERROR (%d) %s\n", code, text);
+        }
+    }
+    else
+    {
+        printlog(LOG_ERROR, "Unexpected response message! (type 0x%02x)",
+                 MessageGetCode(&message) );
+    }
+}
+
