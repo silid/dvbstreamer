@@ -168,7 +168,7 @@ static Command_t commands[] = {
                                       CommandRmOutput
                                   },
                                   {
-                                      "outputs",
+                                      "lsoutputs",
                                       FALSE, 0, 0,
                                       "List current outputs",
                                       "List all active additonal output names and destinations.",
@@ -191,15 +191,15 @@ static Command_t commands[] = {
                                       CommandRmPID
                                   },
                                   {
-                                      "outputpids",
+                                      "lspids",
                                       TRUE, 1, 1,
                                       "List PIDs for output",
-                                      "outputpids <output name>\n"
+                                      "lspids <output name>\n"
                                       "List the PIDs being filtered for a specific output",
                                       CommandOutputPIDs
                                   },
                                   {
-                                      "addssf",
+                                      "addsf",
                                       TRUE, 2, 2,
                                       "Add a service filter for secondary services",
                                       "addsf <output name> <ipaddress>:<udp port>\n"
@@ -207,7 +207,7 @@ static Command_t commands[] = {
                                       CommandAddSSF
                                   },
                                   {
-                                      "rmssf",
+                                      "rmsf",
                                       TRUE, 1, 1,
                                       "Remove a service filter for secondary services",
                                       "rmsf <output name>\n"
@@ -215,21 +215,21 @@ static Command_t commands[] = {
                                       CommandRemoveSSF
                                   },
                                   {
-                                      "ssfs",
+                                      "lssfs",
                                       FALSE,0,0,
                                       "List all secondary service filters",
                                       "List all secondary service filters their names, destinations and currently selected service.",
                                       CommandSSFS
                                   },
                                   {
-                                      "setssf",
+                                      "setsf",
                                       FALSE, 1, 1,
                                       "Select a service to stream to a secondary service output",
-                                      "setssf <output name> <service name>\n"
+                                      "setsf <output name> <service name>\n"
                                       "Stream the specified service to the secondary service output.",
                                       CommandSetSSF
                                   },
-{
+                                  {
                                       "festatus",
                                       0, 0, 0,
                                       "Displays the status of the tuner.",
@@ -675,15 +675,24 @@ static void CommandPids(int argc, char **argv)
 static void CommandStats(int argc, char **argv)
 {
     int i;
-    fprintf(rl_outstream, "Packet Statistics\n"
-           "-----------------\n");
+    fprintf(rl_outstream, "PSI/SI Processor Statistics\n"
+                          "---------------------------\n");
 
     for (i = 0; i < PIDFilterIndex_Count; i ++)
     {
-        fprintf(rl_outstream, "%s Filter :\n", PIDFilterNames[i]);
-        fprintf(rl_outstream, "\tFiltered  : %d\n", PIDFilters[i]->packetsfiltered);
-        fprintf(rl_outstream, "\tProcessed : %d\n", PIDFilters[i]->packetsprocessed);
-        fprintf(rl_outstream, "\tOutput    : %d\n", PIDFilters[i]->packetsoutput);
+        fprintf(rl_outstream, "\t%-15s : %d\n", PIDFilterNames[i], PIDFilters[i]->packetsprocessed);
+    }
+    fprintf(rl_outstream, "\n");
+
+    fprintf(rl_outstream, "Service Filter Statistics\n"
+                          "-------------------------\n");
+    for (i = 0; i < MAX_OUTPUTS; i ++)
+    {
+        if ((!Outputs[i].name) || (Outputs[i].type != OutputType_Service))
+        {
+            continue;
+        }
+        fprintf(rl_outstream, "\t%-15s : %d\n", Outputs[i].name, Outputs[i].filter->packetsoutput);
     }
     fprintf(rl_outstream, "\n");
 
@@ -697,20 +706,9 @@ static void CommandStats(int argc, char **argv)
         }
         fprintf(rl_outstream, "\t%-15s : %d\n", Outputs[i].name, Outputs[i].filter->packetsoutput);
     }
-
     fprintf(rl_outstream, "\n");
 
-    fprintf(rl_outstream, "Secondary Service Statistics\n"
-                          "----------------------------\n");
-    for (i = 0; i < MAX_OUTPUTS; i ++)
-    {
-        if ((!Outputs[i].name) || (Outputs[i].type != OutputType_Service))
-        {
-            continue;
-        }
-        fprintf(rl_outstream, "\t%-15s : %d\n", Outputs[i].name, Outputs[i].filter->packetsoutput);
-    }
-    fprintf(rl_outstream, "\n");
+
 
     fprintf(rl_outstream, "Total packets processed: %d\n", TSFilter->totalpackets);
     fprintf(rl_outstream, "Approximate TS bitrate : %gMbs\n", ((double)TSFilter->bitrate / (1024.0 * 1024.0)));
@@ -732,6 +730,12 @@ static void CommandAddOutput(int argc, char **argv)
 static void CommandRmOutput(int argc, char **argv)
 {
     Output_t *output = NULL;
+
+    if (strcmp(argv[0], PrimaryService) == 0)
+    {
+        fprintf(rl_outstream, "Cannot remove the primary output!\n");
+        return;
+    }
 
     output = OutputFind(argv[0], OutputType_Manual);
     if (output == NULL)
@@ -869,6 +873,12 @@ static void CommandSetSSF(int argc, char **argv)
     serviceName[0] = 0;
 
     for (serviceName ++;*serviceName && isspace(*serviceName); serviceName ++);
+
+    if (strcmp(outputName, PrimaryService) == 0)
+    {
+        fprintf(rl_outstream, "Use \'select\' to change the primary service!\n");
+        return;
+    }
 
     output = OutputFind(outputName, OutputType_Service);
     if (output == NULL)
