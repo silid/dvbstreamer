@@ -68,6 +68,8 @@ DVBAdapter_t *DVBAdapter;
 
 bool ExitProgram = FALSE;
 bool DaemonMode = FALSE;
+char PrimaryService[] = "<Primary>";
+Output_t *PrimaryServiceOutput = NULL;
 
 static char PidFile[PATH_MAX];
 
@@ -213,16 +215,6 @@ int main(int argc, char *argv[])
     PIDFilters[PIDFilterIndex_PMT] = PMTProcessorCreate(TSFilter);
     PIDFilters[PIDFilterIndex_SDT] = SDTProcessorCreate(TSFilter);
 
-    outputArg = UDPOutputCreate(primaryOutput);
-    if (outputArg == NULL)
-    {
-        printlog(LOG_ERROR, "Error creating UDP output!\n");
-        exit(1);
-    }
-    printlog(LOG_INFOV, "Output will be via UDP to %s\n", UDPOutputDestination(outputArg));
-    /* Create Service filter */
-    PIDFilters[PIDFilterIndex_Service] = ServiceFilterCreate(TSFilter,
-                                        UDPOutputPacketOutput,outputArg);
     /* Enable all the filters */
     for (i = 0; i < PIDFilterIndex_Count; i ++)
     {
@@ -234,6 +226,15 @@ int main(int argc, char *argv[])
     {
         printlog(LOG_ERROR, "OutputsInit failed!\n");
     }
+
+    /* Create Service filter */
+    PrimaryServiceOutput = OutputAllocate(PrimaryService, OutputType_Service, primaryOutput);
+    if (!PrimaryServiceOutput)
+    {
+        printlog(LOG_ERROR, "Failed to create primary service output, reason %s\n", OutputErrorStr);
+        exit(1);
+    }
+    printlog(LOG_DEBUG, "PrimaryServiceOutput=%p\n", PrimaryServiceOutput);
 
     if (CommandInit())
     {
@@ -294,7 +295,6 @@ int main(int argc, char *argv[])
     PATProcessorDestroy( PIDFilters[PIDFilterIndex_PAT]);
     PMTProcessorDestroy( PIDFilters[PIDFilterIndex_PMT]);
     SDTProcessorDestroy( PIDFilters[PIDFilterIndex_SDT]);
-    ServiceFilterDestroy( PIDFilters[PIDFilterIndex_Service]);
 
     printlog(LOG_DEBUGV, "Processors destroyed\n");
     /* Close the adapter and shutdown the filter etc*/
@@ -392,8 +392,7 @@ Service_t *SetCurrentService(char *name)
         }
 
         TSFilterZeroStats(TSFilter);
-
-        ServiceFilterServiceSet(PIDFilters[PIDFilterIndex_Service], CurrentService);
+        OutputSetService(PrimaryServiceOutput, CurrentService);
 
         printlog(LOG_DEBUGV,"Enabling filters\n");
         TSFilterEnable(TSFilter, TRUE);
@@ -513,9 +512,9 @@ static void InitDaemon(int adapter)
     fclose(stdout);
     fclose(stderr);
     sprintf(logfile, "/var/log/dvbstreamer-%d.err.log", adapter);
-    stderr = freopen(logfile, "wt+", stderr);
+    stderr = freopen(logfile, "at", stderr);
     sprintf(logfile, "/var/log/dvbstreamer-%d.out.log", adapter);
-    stdout = freopen(logfile, "wt+", stdout);
+    stdout = freopen(logfile, "at", stdout);
     DaemonMode = TRUE;
 }
 

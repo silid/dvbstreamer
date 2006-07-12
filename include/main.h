@@ -34,7 +34,6 @@ enum PIDFilterIndex
     PIDFilterIndex_PAT = 0,
     PIDFilterIndex_PMT,
     PIDFilterIndex_SDT,
-    PIDFilterIndex_Service ,
 
     PIDFilterIndex_Count
 };
@@ -49,5 +48,6 @@ extern Service_t *SetCurrentService(char *name);
 
 extern bool ExitProgram;
 extern bool DaemonMode;
+extern char PrimaryService[];
 
 #endif
