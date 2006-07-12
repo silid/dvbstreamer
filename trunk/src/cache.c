@@ -1,24 +1,24 @@
 /*
 Copyright (C) 2006  Adam Charrett
- 
+
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
- 
+
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
- 
+
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
- 
+
 cache.c
- 
+
 Caches service and PID information from the database for the current multiplex.
- 
+
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -123,7 +123,7 @@ Service_t *CacheServiceFindName(char *name, Multiplex_t **multiplex)
     int i;
     if (cachedServices)
     {
-        printlog(LOG_DEBUGV,"Checking cached services..");
+        printlog(LOG_DEBUGV,"Checking cached services\n");
         for (i = 0; i < cachedServicesCount; i ++)
         {
             if (strcmp(cachedServices[i]->name, name) == 0)
@@ -280,7 +280,7 @@ void CacheServiceDelete(Service_t *service)
             break;
         }
     }
-    
+
     if (deletedIndex != -1)
     {
         /* Get rid of the pids as we don't need them any more! */
@@ -293,7 +293,7 @@ void CacheServiceDelete(Service_t *service)
             cacheFlags[i] = cacheFlags [i + 1];
         }
         cachedServicesCount --;
-        /* Add the deleted service to the list of deleted services for removal 
+        /* Add the deleted service to the list of deleted services for removal
             when we writeback the cache.
          */
         cachedDeletedServices[cachedDeletedServicesCount] = service;
@@ -356,7 +356,7 @@ void CacheWriteback()
             ServiceNameSet(cachedServices[i], cachedServices[i]->name);
         }
     }
-    
+
     /* Delete deleted services from the database along with their PIDs*/
     for (i = 0; i < cachedDeletedServicesCount; i ++)
     {
