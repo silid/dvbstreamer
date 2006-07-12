@@ -62,6 +62,9 @@ Binary Communications protocol for control DVBStreamer.
         }\
     }while(0)
 
+
+#define MessageRERR(_msg, _errcode, _str) MessageEncode(_msg, MSGCODE_RERR, "bs", _errcode, _str)
+
 typedef struct Connection_t
 {
     int socketfd;
@@ -112,7 +115,7 @@ int BinaryCommsInit(int adapter, char *streamername, char *username, char *passw
     serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (serverSocket < 0)
     {
-        printlog(LOG_ERROR, "Failed to create server socket!");
+        printlog(LOG_ERROR, "Failed to create server socket!\n");
         return 1;
     }
 
@@ -423,7 +426,23 @@ static void ProcessAuth(Connection_t *connection, Message_t *message)
 
 static void ProcessPrimaryServiceSelect(Connection_t *connection, Message_t *message)
 {
-    MessageRERR(message, RERR_UNDEFINED, "Not Implemented!");
+    char *serviceName;
+    if (MessageReadString(message, &serviceName))
+    {
+        LOG_MALFORMED(connection, "service name");
+        connection->connected = FALSE;
+        return ;
+    }
+    Service_t *newservice = SetCurrentService(serviceName);
+    if (newservice)
+    {
+        MessageRERR(message, RERR_OK, "");
+    }
+    else
+    {
+        MessageRERR(message, RERR_NOTFOUND, serviceName);
+    }
+    free(serviceName);
 }
 
 static void ProcessSecondaryServiceAdd(Connection_t *connection, Message_t *message)
