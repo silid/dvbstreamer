@@ -97,6 +97,19 @@ static void CommandInfo(char *argv[]);
 static void CommandServices(char *argv[]);
 static void CommandSelect(char *argv[]);
 static void CommandCurrent(char *argv[]);
+static void CommandPids(char *argv[]);
+static void CommandStats(char *argv[]);
+static void CommandAddOutput(char *argv[]);
+static void CommandRmOutput(char *argv[]);
+static void CommandOutputs(char *argv[]);
+static void CommandAddPID(char *argv[]);
+static void CommandRmPID(char *argv[]);
+static void CommandOutputPIDs(char *argv[]);
+static void CommandAddSF(char *argv[]);
+static void CommandRemoveSF(char *argv[]);
+static void CommandListSFS(char *argv[]);
+static void CommandSetSF(char *argv[]);
+static void CommandFEStatus(char *argv[]);
 
 /* Used by logging to determine whether to include date/time info */
 int DaemonMode = FALSE;
@@ -139,23 +152,94 @@ static Command_t commands[] =
             CommandCurrent
         },
         {
+            "pids", 1,
+            "List the PIDs for a specified service",
+            CommandPids
+        },
+        {
+            "stats", 0,
+            "Display the stats for the PAT,PMT and service PID filters",
+            CommandStats
+        },
+        {
+            "addoutput", 2,
+            "Takes <output name> <ipaddress>:<udp port>\n"
+            "Adds a new destination for sending packets to. This is only used for "
+            "manually filtered packets. "
+            "To send packets to this destination you'll need to also call \'filterpid\' "
+            "with this output as an argument.",
+            CommandAddOutput
+        },
+        {
+            "rmoutput", 1,
+            "Takes <output name>\n"
+            "Removes the destination and stops all filters associated with this output.",
+            CommandRmOutput
+        },
+        {
+            "lsoutputs", 0,
+            "List all active additonal output names and destinations.",
+            CommandOutputs
+        },
+        {
+            "addpid", 2,
+            "Takes <output name> <pid>\n"
+            "Adds a PID to the filter to be sent to the specified output.",
+            CommandAddPID
+        },
+        {
+            "rmpid", 2,
+            "Takes <output name> <pid>\n"
+            "Removes the PID from the filter that is sending packets to the specified output.",
+            CommandRmPID
+        },
+        {
+            "lspids", 1,
+            "Takes <output name>\n"
+            "List the PIDs being filtered for a specific output",
+            CommandOutputPIDs
+        },
+        {
+            "addsf", 2,
+            "Takes <output name> <ipaddress>:<udp port>\n"
+            "Adds a new destination for sending a secondary service to.",
+            CommandAddSF
+        },
+        {
+            "rmsf", 1,
+            "Takes <output name>\n"
+            "Remove a destination for sending secondary services to.",
+            CommandRemoveSF
+        },
+        {
+            "lssfs", 0,
+            "List all secondary service filters their names, destinations and currently selected service.",
+            CommandListSFS
+        },
+        {
+            "setsf", 1,
+            "Takes <output name> <service name>\n"
+            "Stream the specified service to the secondary service output.",
+            CommandSetSF
+        },
+        {
+            "festatus", 0,
+            "Displays whether the front end is locked, the bit error rate and signal to noise"
+            "ratio and the signal strength",
+            CommandFEStatus
+        },
+        {
             NULL, 0, NULL, NULL
         }
     };
 
 static InfoParam_t infoParams[] =
     {
-        { "name", 0
-        },
-        { "fetype", 1
-        },
-        { "upsecs", 0xfe
-        },
-        { "uptime", 0xff
-        },
-        {
-            NULL, 0
-        },
+        { "name",   0x00 },
+        { "fetype", 0x01 },
+        { "upsecs", 0xfe },
+        { "uptime", 0xff },
+        { NULL,     0x00 },
     };
 
 int main(int argc, char *argv[])
@@ -277,10 +361,10 @@ static void usage(char *appname)
             "      -a <adapter>  : DVB Adapter number to control on the host\n",
             appname
            );
-    fprintf(stderr, "Commands include:\n");
+    fprintf(stderr, "\nCommands include:\n");
     for (c = 0; commands[c].name; c ++)
     {
-        fprintf(stderr, "%10s : %s\n", commands[c].name, commands[c].help);
+        fprintf(stderr, "%10s:\n%s\n\n", commands[c].name, commands[c].help);
     }
 }
 
@@ -316,7 +400,7 @@ static void CommandInfo(char *argv[])
     if (found < 0)
     {
         printlog(LOG_ERROR, "Unknown info \"%s\"\n", argv[1]);
-        return;
+        return ;
     }
     printlog(LOG_DEBUG, "Querying host for \"%s\"\n", infoParams[found].name);
 
@@ -382,7 +466,7 @@ static void CommandServices(char *argv[])
         char *reason = NULL;
         MessageDecode(&message, "bs", &code, &reason);
         printlog(LOG_ERROR, "Failed to retrieve service list, code 0x%02x reason \"%s\"\n",
-            code, reason);
+                 code, reason);
         if (reason)
         {
             free(reason);
@@ -400,12 +484,12 @@ static void CommandSelect(char *argv[])
     if (!username)
     {
         printlog(LOG_ERROR, "No username supplied!\n");
-        return;
+        return ;
     }
     if (!password)
     {
         printlog(LOG_ERROR, "No password supplied!\n");
-        return;
+        return ;
     }
     MessageEncode(&message, MSGCODE_AUTH, "ss", username, password );
 
@@ -448,3 +532,41 @@ static void CommandCurrent(char *argv[])
     }
 }
 
+static void CommandPids(char *argv[])
+{}
+
+static void CommandStats(char *argv[])
+{}
+
+static void CommandAddOutput(char *argv[])
+{}
+
+static void CommandRmOutput(char *argv[])
+{}
+
+static void CommandOutputs(char *argv[])
+{}
+
+static void CommandAddPID(char *argv[])
+{}
+
+static void CommandRmPID(char *argv[])
+{}
+
+static void CommandOutputPIDs(char *argv[])
+{}
+
+static void CommandAddSF(char *argv[])
+{}
+
+static void CommandRemoveSF(char *argv[])
+{}
+
+static void CommandListSFS(char *argv[])
+{}
+
+static void CommandSetSF(char *argv[])
+{}
+
+static void CommandFEStatus(char *argv[])
+{}
