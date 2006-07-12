@@ -3,9 +3,12 @@ Binary Protocol for DVBStreamer
 
 All integers will be in network byte order (ie big endian)
 
-Authentication will be used for changing channel adding pids/services etc, once a 
-connection has successfully sent an AUTH message that connection will be allowed 
+Authentication will be used for changing channel adding pids/services etc, once a
+connection has successfully sent an AUTH message that connection will be allowed
 to change channels/add outputs etc.
+
+The primary service is identifyable in the service filters list by the name
+"<Primary>".
 
 Common Types
 ------------
@@ -37,7 +40,7 @@ Message Header
 
 Rxxx Standard Response Messages
 -------------------------------
-RERR = Response Error 
+RERR = Response Error
 
 	DATA
 	-----------------------------------------
@@ -51,7 +54,7 @@ RERR = Response Error
 	0x03 = Not found
 	0x04 = Already streaming to requested ip:port
 	0xFF = Generic Error (see message)
-	
+
 
 AUTH Authentication Message
 ---------------------------
@@ -74,7 +77,7 @@ INFO = Information message
 	----------------------------
 	|Field to Retrieve (uint8) |
     ----------------------------
-	
+
 	Responses: RERR (OK, with message string containing the data)
 
 	Field IDs
@@ -162,7 +165,7 @@ SSPC = Status Service Primary Current - Return current service name for primary 
 	Responses: RERR (No Service Selected),  RERR (OK, with message string containing the data)
 
 SSSL = Status Service Secondary List - List secondary outputs.
-	
+
 	No Data section
 
 	Responses: RSSL
@@ -174,12 +177,12 @@ SOLO = Status Outputs List outputs
 	Responses: ROLO
 
 SOLP = Status Output List pids
-	
+
 	DATA
 	-----------------------
 	| Output Name (STRING)|
 	-----------------------
-	
+
 	Responses: RPL, RERR (Output Not found)
 
 
@@ -229,13 +232,13 @@ SSPL = Status Services List PIDs
 Rxxx Response Messages
 ----------------------
 RSSL = Response Service Secondary List
-	
+
 	DATA (header)
 
 	----------------------------------
 	| # of Secondary Services (uint8)|
 	----------------------------------
-	
+
 	(repeated)
 	-------------------------------------------------------------------------------
 	| Service Output Name (STRING) |Output Address (IPPORT)| Service Name (STRING)|
@@ -249,7 +252,7 @@ ROLO = Response  Outputs List outputs
 	---------------------------------
 	| # of Secondary Outputs (uint8)|
 	---------------------------------
-	
+
 	(repeated)
 	----------------------------------------------      -
 	|Output Name (STRING)|Output Address (IPPORT)| .....|
@@ -272,11 +275,11 @@ ROPC = Response Output Packet Count
 	-------------------------
  	| Packet Count (uint32) |
 	-------------------------
- 
+
 
 
 RTSS = Response TS Stats
-	
+
 	DATA (PC = Packet count (uint32))
 	----------------------------------------------------------
 	| bitrate (uint32) | Total PC | PAT PC | PMT PC | SDT PC |
@@ -305,7 +308,7 @@ RSL  = Response Services List
 
 Message Codes/Names to Values
 -----------------------------
-0xFF = RERR = Response Error 
+0xFF = RERR = Response Error
 0x00 = INFO = Information message
 0x01 = AUTH = Authenticate
 0x11 = CSPS = Control Service Primary Select - Select Primary Service
