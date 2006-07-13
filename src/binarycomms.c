@@ -63,7 +63,71 @@ Binary Communications protocol for control DVBStreamer.
     }while(0)
 
 
-#define MessageRERR(_msg, _errcode, _str) MessageEncode(_msg, MSGCODE_RERR, "bs", _errcode, _str)
+#define MessageRERR(_msg, _errcode, _str) \
+    do{\
+        MessageInit(_msg, MSGCODE_RERR);\
+        MessageEncode(_msg, "bs", _errcode, _str);\
+    }while(0)
+
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
+#define READSTRING(_var)\
+    do { \
+        if (MessageReadString(message, &_var))\
+        {\
+            LOG_MALFORMED(connection, TOSTRING(_var));\
+            connection->connected = FALSE;\
+            return ;\
+        }\
+    }while(0)
+
+#define READ2STRINGS(_var1, _var2)\
+    do { \
+        if (MessageReadString(message, &_var1))\
+        {\
+            LOG_MALFORMED(connection, TOSTRING(_var1));\
+            connection->connected = FALSE;\
+            return ;\
+        }\
+        if (MessageReadString(message, &_var2))\
+        {\
+            LOG_MALFORMED(connection, TOSTRING(_var2));\
+            connection->connected = FALSE;\
+            free(_var1);\
+            return ;\
+        }\
+    }while(0)
+
+#define READUINT8(_var)\
+    do { \
+        if (MessageReadUint8(message, &_var))\
+        {\
+            LOG_MALFORMED(connection, TOSTRING(_var));\
+            connection->connected = FALSE;\
+            return ;\
+        }\
+    }while(0)
+
+#define READUINT16(_var)\
+    do { \
+        if (MessageReadUint16(message, &_var))\
+        {\
+            LOG_MALFORMED(connection, TOSTRING(_var));\
+            connection->connected = FALSE;\
+            return ;\
+        }\
+    }while(0)
+
+#define READUINT32(_var)\
+    do { \
+        if (MessageReadUint32(message, &_var))\
+        {\
+            LOG_MALFORMED(connection, TOSTRING(_var));\
+            connection->connected = FALSE;\
+            return ;\
+        }\
+    }while(0)
 
 typedef struct Connection_t
 {
@@ -341,14 +405,10 @@ static void ProcessMessage(Connection_t *connection, Message_t *message)
 
 static void ProcessInfo(Connection_t *connection, Message_t *message)
 {
-    uint8_t field;
-    if (MessageReadUint8(message, &field))
-    {
-        LOG_MALFORMED(connection, "info");
-        connection->connected = FALSE;
-    }
+    uint8_t info;
+    READUINT8(info);
 
-    switch (field)
+    switch (info)
     {
         case INFO_NAME:
             MessageRERR(message, RERR_OK, infoStreamerName);
@@ -401,24 +461,11 @@ static void ProcessAuth(Connection_t *connection, Message_t *message)
     char *msgUsername = NULL;
     char *msgPassword = NULL;
 
-    if (MessageReadString(message, &msgUsername))
-    {
-        LOG_MALFORMED(connection, "username");
-        connection->connected = FALSE;
-        return ;
-    }
+    READ2STRINGS(msgUsername, msgPassword);
 
-    if (MessageReadString(message, &msgPassword))
-    {
-        LOG_MALFORMED(connection, "password");
-        connection->connected = FALSE;
-        free(msgUsername);
-        return ;
-    }
     connection->authenticated = (strcmp(msgUsername, authUsername) == 0) &&
                                 (strcmp(msgPassword, authPassword) == 0);
 
-    MessageReset(message);
     MessageRERR(message, connection->authenticated ? RERR_OK : RERR_NOTAUTHORISED, NULL);
     free(msgUsername);
     free(msgPassword);
@@ -427,12 +474,7 @@ static void ProcessAuth(Connection_t *connection, Message_t *message)
 static void ProcessPrimaryServiceSelect(Connection_t *connection, Message_t *message)
 {
     char *serviceName;
-    if (MessageReadString(message, &serviceName))
-    {
-        LOG_MALFORMED(connection, "service name");
-        connection->connected = FALSE;
-        return ;
-    }
+    READSTRING(serviceName);
     Service_t *newservice = SetCurrentService(serviceName);
     if (newservice)
     {
@@ -447,37 +489,204 @@ static void ProcessPrimaryServiceSelect(Connection_t *connection, Message_t *mes
 
 static void ProcessSecondaryServiceAdd(Connection_t *connection, Message_t *message)
 {
-    MessageRERR(message, RERR_UNDEFINED, "Not Implemented!");
+    Output_t *output = NULL;
+    char *serviceOutputName = NULL;
+    char *destination = NULL;
+    READ2STRINGS(serviceOutputName, destination);
+
+    printlog(LOG_DEBUGV,"Add Service Output Name = \"%s\" Destination = \"%s\"\n",
+        serviceOutputName, destination);
+
+    output = OutputAllocate(serviceOutputName, OutputType_Service, destination);
+    if (output)
+    {
+        MessageRERR(message, RERR_OK, "");
+    }
+    else
+    {
+        output = OutputFind(serviceOutputName, OutputType_Service);
+        MessageRERR(message, output ? RERR_ALREADYEXISTS:RERR_UNDEFINED, OutputErrorStr);
+    }
+    free(serviceOutputName);
+    free(destination);
 }
 
 static void ProcessSecondaryServiceSet(Connection_t *connection, Message_t *message)
 {
-    MessageRERR(message, RERR_UNDEFINED, "Not Implemented!");
+    Output_t *output = NULL;
+    Service_t *newService = NULL;
+    Service_t *oldService = NULL;
+    char *serviceOutputName = NULL;
+    char *serviceName = NULL;
+    READ2STRINGS(serviceOutputName, serviceName);
+
+    printlog(LOG_DEBUGV,"Set Service Output Name = \"%s\" Service = \"%s\"\n",
+        serviceOutputName, serviceName);
+
+    output = OutputFind(serviceOutputName, OutputType_Service);
+    if (!output)
+    {
+        MessageRERR(message, RERR_NOTFOUND, serviceOutputName);
+    }
+    else
+    {
+        newService = ServiceFindName(serviceName);
+        if (!newService)
+        {
+            MessageRERR(message, RERR_NOTFOUND, serviceName);
+        }
+        else
+        {
+            OutputGetService(output, &oldService);
+            OutputSetService(output, newService);
+            if (oldService)
+            {
+                ServiceFree(oldService);
+            }
+            MessageRERR(message, RERR_OK, "");
+        }
+    }
+    free(serviceOutputName);
+    free(serviceName);
 }
 
 static void ProcessSecondaryServiceRemove(Connection_t *connection, Message_t *message)
 {
-    MessageRERR(message, RERR_UNDEFINED, "Not Implemented!");
+    Output_t *output = NULL;
+    Service_t *oldService = NULL;
+    char *serviceOutputName = NULL;
+    READSTRING(serviceOutputName);
+
+    if (strcmp(serviceOutputName, PrimaryService) == 0)
+    {
+        MessageRERR(message, RERR_UNDEFINED, "You cannot remove the primary service!");
+        free(serviceOutputName);
+        return;
+    }
+
+    printlog(LOG_DEBUGV,"Remove Service Output Name = \"%s\"\n",
+        serviceOutputName);
+
+    output = OutputFind(serviceOutputName, OutputType_Service);
+    if (!output)
+    {
+        MessageRERR(message, RERR_NOTFOUND, serviceOutputName);
+    }
+    else
+    {
+        OutputGetService(output, &oldService);
+        OutputFree(output);
+        if (oldService)
+        {
+            ServiceFree(oldService);
+        }
+        MessageRERR(message, RERR_OK, "");
+    }
+    free(serviceOutputName);
 }
 
 static void ProcessOutputAdd(Connection_t *connection, Message_t *message)
 {
-    MessageRERR(message, RERR_UNDEFINED, "Not Implemented!");
+    Output_t *output = NULL;
+    char *manualOutputName = NULL;
+    char *destination = NULL;
+    READ2STRINGS(manualOutputName, destination);
+
+    printlog(LOG_DEBUGV,"Add Manual Output Name = \"%s\" Destination = \"%s\"\n",
+        manualOutputName, destination);
+
+    output = OutputAllocate(manualOutputName, OutputType_Manual, destination);
+    if (output)
+    {
+        MessageRERR(message, RERR_OK, "");
+    }
+    else
+    {
+        output = OutputFind(manualOutputName, OutputType_Manual);
+        MessageRERR(message, output ? RERR_ALREADYEXISTS:RERR_UNDEFINED, OutputErrorStr);
+    }
+    free(manualOutputName);
+    free(destination);
 }
 
 static void ProcessOutputRemove(Connection_t *connection, Message_t *message)
 {
-    MessageRERR(message, RERR_UNDEFINED, "Not Implemented!");
+    Output_t *output = NULL;
+    char *manualOutputName = NULL;
+    READSTRING(manualOutputName);
+
+    printlog(LOG_DEBUGV,"Remove Manual Output Name = \"%s\"\n",
+        manualOutputName);
+
+    output = OutputFind(manualOutputName, OutputType_Manual);
+    if (!output)
+    {
+        MessageRERR(message, RERR_NOTFOUND, manualOutputName);
+    }
+    else
+    {
+        OutputFree(output);
+        MessageRERR(message, RERR_OK, "");
+    }
+    free(manualOutputName);
 }
 
 static void ProcessOutputPIDAdd(Connection_t *connection, Message_t *message)
 {
-    MessageRERR(message, RERR_UNDEFINED, "Not Implemented!");
+    Output_t *output = NULL;
+    char *manualOutputName = NULL;
+
+    READSTRING(manualOutputName);
+    output = OutputFind(manualOutputName, OutputType_Manual);
+    if (!output)
+    {
+        MessageRERR(message, RERR_NOTFOUND, manualOutputName);
+        free(manualOutputName);
+    }
+    else
+    {
+        uint16_t i = 0;
+        uint16_t pidCount = 0;
+        uint16_t pid = 0;
+        free(manualOutputName);
+        READUINT16(pidCount);
+
+        for (i = 0; i < pidCount; i ++)
+        {
+            READUINT16(pid);
+            OutputAddPID(output, pid);
+        }
+        MessageRERR(message, RERR_OK, "");
+    }
 }
 
 static void ProcessOutputPIDRemove(Connection_t *connection, Message_t *message)
 {
-    MessageRERR(message, RERR_UNDEFINED, "Not Implemented!");
+    Output_t *output = NULL;
+    char *manualOutputName = NULL;
+
+    READSTRING(manualOutputName);
+    output = OutputFind(manualOutputName, OutputType_Manual);
+    if (!output)
+    {
+        MessageRERR(message, RERR_NOTFOUND, manualOutputName);
+        free(manualOutputName);
+    }
+    else
+    {
+        uint16_t i = 0;
+        uint16_t pidCount = 0;
+        uint16_t pid = 0;
+        free(manualOutputName);
+        READUINT16(pidCount);
+
+        for (i = 0; i < pidCount; i ++)
+        {
+            READUINT16(pid);
+            OutputRemovePID(output, pid);
+        }
+        MessageRERR(message, RERR_OK, "");
+    }
 }
 
 
@@ -497,8 +706,7 @@ static void ProcessSecondaryServiceList(Connection_t *connection, Message_t *mes
 {
     int i;
     uint8_t outputsCount = 0;
-    MessageReset(message);
-    MessageSetCode(message, MSGCODE_RSSL);
+    MessageInit(message, MSGCODE_RSSL);
     MessageWriteUint8(message, outputsCount);
     for (i = 0; i < MAX_OUTPUTS; i ++)
     {
@@ -506,14 +714,16 @@ static void ProcessSecondaryServiceList(Connection_t *connection, Message_t *mes
         {
             Service_t *service = NULL;
             char *name = NULL;
-            MessageWriteString(message, Outputs[i].name);
-            MessageWriteString(message, UDPOutputDestination((void*)Outputs[i].filter->oparg));
+
             OutputGetService(&Outputs[i], &service);
             if (service)
             {
                 name = service->name;
             }
-            MessageWriteString(message, name);
+            MessageEncode(message,"sss",
+                Outputs[i].name,
+                UDPOutputDestination((void*)Outputs[i].filter->oparg),
+                name);
             outputsCount ++;
         }
     }
@@ -525,15 +735,15 @@ static void ProcessOutputsList(Connection_t *connection, Message_t *message)
 {
     int i;
     uint8_t outputsCount = 0;
-    MessageReset(message);
-    MessageSetCode(message, MSGCODE_ROLO);
+    MessageInit(message, MSGCODE_ROLO);
     MessageWriteUint8(message, outputsCount);
     for (i = 0; i < MAX_OUTPUTS; i ++)
     {
         if (Outputs[i].name && (Outputs[i].type == OutputType_Manual))
         {
-            MessageWriteString(message, Outputs[i].name);
-            MessageWriteString(message, UDPOutputDestination((void*)Outputs[i].filter->oparg));
+            MessageEncode(message, "ss",
+                Outputs[i].name,
+                UDPOutputDestination((void*)Outputs[i].filter->oparg));
             outputsCount ++;
         }
     }
@@ -558,8 +768,7 @@ static void ProcessOutputListPids(Connection_t *connection, Message_t *message)
         int pidcount = 0, i;
         uint16_t *pids;
         OutputGetPIDs(output, &pidcount, &pids);
-        MessageReset(message);
-        MessageSetCode(message, MSGCODE_RLP);
+        MessageInit(message, MSGCODE_RLP);
         MessageWriteUint8(message, (uint8_t)pidcount);
         for (i = 0; i < pidcount; i ++)
         {
@@ -587,8 +796,7 @@ static void ProcessOutputPacketCount(Connection_t *connection, Message_t *messag
     output = OutputFind(outputName, OutputType_Manual);
     if (output)
     {
-        MessageReset(message);
-        MessageSetCode(message, MSGCODE_ROPC);
+        MessageInit(message, MSGCODE_ROPC);
         MessageWriteUint32(message, output->filter->packetsfiltered);
     }
     else
@@ -600,8 +808,7 @@ static void ProcessOutputPacketCount(Connection_t *connection, Message_t *messag
 
 static void ProcessTSStats(Connection_t *connection, Message_t *message)
 {
-    MessageReset(message);
-    MessageSetCode(message, MSGCODE_RTSS);
+    MessageInit(message, MSGCODE_RTSS);
     MessageWriteUint32(message, TSFilter->bitrate);
     MessageWriteUint32(message, TSFilter->totalpackets);
     MessageWriteUint32(message, PIDFilters[PIDFilterIndex_PAT]->packetsprocessed);
@@ -611,15 +818,24 @@ static void ProcessTSStats(Connection_t *connection, Message_t *message)
 
 static void ProcessFEStatus(Connection_t *connection, Message_t *message)
 {
-    MessageRERR(message, RERR_UNDEFINED, "Not implemented!");
+    fe_status_t status = 0;
+    unsigned int ber = 0;
+    unsigned int strength = 0;
+    unsigned int snr = 0;
+
+    DVBFrontEndStatus(DVBAdapter, &status, &ber, &strength, &snr);
+    MessageInit(message, MSGCODE_RFES);
+    MessageWriteUint32(message, status);
+    MessageWriteUint32(message, ber);
+    MessageWriteUint32(message, snr);
+    MessageWriteUint32(message, strength);
 }
 
 static void ProcessServiceList(Connection_t *connection, Message_t *message, int all)
 {
     uint16_t count = 0;
     ServiceEnumerator_t enumerator = NULL;
-    MessageReset(message);
-    MessageSetCode(message, MSGCODE_RSL);
+    MessageInit(message, MSGCODE_RSL);
     MessageWriteUint16(message, count);
 
     if (all)
@@ -696,8 +912,7 @@ static void ProcessServicePids(Connection_t *connection, Message_t *message)
                     return ;
                 }
             }
-            MessageReset(message);
-            MessageSetCode(message, MSGCODE_RLP);
+            MessageInit(message, MSGCODE_RLP);
             MessageWriteUint8(message, (uint8_t)count);
             for (i = 0; i < count; i ++)
             {
