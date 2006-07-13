@@ -825,17 +825,14 @@ static void ProcessFEStatus(Connection_t *connection, Message_t *message)
 
     DVBFrontEndStatus(DVBAdapter, &status, &ber, &strength, &snr);
     MessageInit(message, MSGCODE_RFES);
-    MessageWriteUint32(message, status);
-    MessageWriteUint32(message, ber);
-    MessageWriteUint32(message, snr);
-    MessageWriteUint32(message, strength);
+    MessageEncode(message, "bldd", status, ber, snr, strength);
 }
 
 static void ProcessServiceList(Connection_t *connection, Message_t *message, int all)
 {
     uint16_t count = 0;
     ServiceEnumerator_t enumerator = NULL;
-    MessageInit(message, MSGCODE_RSL);
+    MessageInit(message, MSGCODE_RLS);
     MessageWriteUint16(message, count);
 
     if (all)
@@ -897,33 +894,33 @@ static void ProcessServicePids(Connection_t *connection, Message_t *message)
             count = ServicePIDCount(service);
             cached = 0;
         }
-        if (count > 0)
-        {
-            if (!cached)
-            {
-                pids = calloc(count, sizeof(PID_t));
-                if (pids)
-                {
-                    ServicePIDGet(service, pids, &count);
-                }
-                else
-                {
-                    MessageRERR(message, RERR_UNDEFINED, "No memory to retrieve PIDs\n");
-                    return ;
-                }
-            }
-            MessageInit(message, MSGCODE_RLP);
-            MessageWriteUint8(message, (uint8_t)count);
-            for (i = 0; i < count; i ++)
-            {
-                MessageWriteUint16(message, pids[i].pid);
-            }
 
-            if (!cached)
+        if ((count > 0) && (!cached))
+        {
+            pids = calloc(count, sizeof(PID_t));
+            if (pids)
             {
-                free(pids);
+                ServicePIDGet(service, pids, &count);
+            }
+            else
+            {
+                MessageRERR(message, RERR_UNDEFINED, "No memory to retrieve PIDs\n");
+                return ;
             }
         }
+
+        MessageInit(message, MSGCODE_RLP);
+        MessageWriteUint8(message, (uint8_t)count);
+        for (i = 0; i < count; i ++)
+        {
+            MessageWriteUint16(message, pids[i].pid);
+        }
+
+        if ((count > 0) && (!cached))
+        {
+            free(pids);
+        }
+
         ServiceFree(service);
     }
     else

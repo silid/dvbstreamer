@@ -30,6 +30,8 @@ Application to control dvbstreamer in daemon mode.
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <sys/types.h>
+#include <linux/dvb/frontend.h>
 
 #include "types.h"
 #include "logging.h"
@@ -50,6 +52,7 @@ Application to control dvbstreamer in daemon mode.
         }\
     }while(0)
 
+/* For use when only an RERR message is expected */
 #define CHECK_RERR_OK() \
     do{\
     if (MessageGetCode(&message) == MSGCODE_RERR) \
@@ -66,6 +69,27 @@ Application to control dvbstreamer in daemon mode.
         }\
     }\
     else\
+    {\
+        printlog(LOG_ERROR, "Unexpected response message! (type 0x%02x)\n",\
+                 MessageGetCode(&message) );\
+        return;\
+    }\
+    }while(0)
+
+/* For use when a message other than RERR is expected */
+#define CHECK_EXPECTED(_expected) \
+    do{\
+    if (MessageGetCode(&message) == MSGCODE_RERR) \
+    {\
+        uint8_t code = 0;\
+        char *text = NULL;\
+        MessageReadUint8(&message, &code);\
+        MessageReadString(&message, &text);\
+        printf("ERROR (%d) %s\n", code, text);\
+        free(text);\
+        return;\
+    }\
+    else if (MessageGetCode(&message) != (_expected))\
     {\
         printlog(LOG_ERROR, "Unexpected response message! (type 0x%02x)",\
                  MessageGetCode(&message) );\
@@ -404,7 +428,9 @@ static void CommandInfo(char *argv[])
     }
     printlog(LOG_DEBUG, "Querying host for \"%s\"\n", infoParams[found].name);
 
-    MessageEncode(&message, MSGCODE_INFO, "b", infoParams[found].value);
+    MessageInit(&message, MSGCODE_INFO);
+
+    MessageEncode(&message, "b", infoParams[found].value);
 
     MESSAGE_SENDRECV();
 
@@ -431,6 +457,9 @@ static void CommandInfo(char *argv[])
 
 static void CommandServices(char *argv[])
 {
+    uint16_t servicecount = 0;
+    int i;
+
     MessageReset(&message);
     if (strcmp("services", argv[0]) == 0)
     {
@@ -443,39 +472,19 @@ static void CommandServices(char *argv[])
 
     MESSAGE_SENDRECV();
 
-    if (MessageGetCode(&message) == MSGCODE_RSL)
-    {
-        uint16_t servicecount = 0;
-        int i;
-        MessageReadUint16( &message, &servicecount);
+    CHECK_EXPECTED(MSGCODE_RLS);
 
-        for (i = 0; i < servicecount; i ++)
-        {
-            char *name = NULL;
-            MessageReadString( &message, &name);
-            if (name)
-            {
-                printf("%s\n", name);
-                free(name);
-            }
-        }
-    }
-    else if (MessageGetCode(&message) == MSGCODE_RERR)
+    MessageReadUint16( &message, &servicecount);
+
+    for (i = 0; i < servicecount; i ++)
     {
-        uint8_t code;
-        char *reason = NULL;
-        MessageDecode(&message, "bs", &code, &reason);
-        printlog(LOG_ERROR, "Failed to retrieve service list, code 0x%02x reason \"%s\"\n",
-                 code, reason);
-        if (reason)
+        char *name = NULL;
+        MessageReadString( &message, &name);
+        if (name)
         {
-            free(reason);
+            printf("%s\n", name);
+            free(name);
         }
-    }
-    else
-    {
-        printlog(LOG_ERROR, "Unexpected response message! (type 0x%02x)",
-                 MessageGetCode(&message) );
     }
 }
 
@@ -491,13 +500,14 @@ static void CommandSelect(char *argv[])
         printlog(LOG_ERROR, "No password supplied!\n");
         return ;
     }
-    MessageEncode(&message, MSGCODE_AUTH, "ss", username, password );
+    MessageInit(&message, MSGCODE_AUTH);
+    MessageEncode(&message, "ss", username, password );
 
     MESSAGE_SENDRECV();
 
     CHECK_RERR_OK();
-
-    MessageEncode(&message, MSGCODE_CSPS, "s", argv[1]);
+    MessageInit(&message, MSGCODE_CSPS);
+    MessageEncode(&message, "s", argv[1]);
 
     MESSAGE_SENDRECV();
 
@@ -506,8 +516,7 @@ static void CommandSelect(char *argv[])
 
 static void CommandCurrent(char *argv[])
 {
-    MessageReset(&message);
-    MessageSetCode(&message, MSGCODE_SSPC);
+    MessageInit(&message, MSGCODE_SSPC);
 
     MESSAGE_SENDRECV();
 
@@ -533,7 +542,24 @@ static void CommandCurrent(char *argv[])
 }
 
 static void CommandPids(char *argv[])
-{}
+{
+    uint16_t i;
+    uint16_t pidCount = 0;
+    uint16_t pid;
+    MessageInit(&message, MSGCODE_SSPL);
+    MessageEncode(&message, "s", argv[1]);
+
+    MESSAGE_SENDRECV();
+
+    CHECK_EXPECTED(MSGCODE_RLP);
+
+    MessageReadUint16(&message, &pidCount);
+    for ( i = 0; i < pidCount; i ++)
+    {
+        MessageReadUint16(&message, &pid);
+        printf("0x%04x\n", pid);
+    }
+}
 
 static void CommandStats(char *argv[])
 {}
@@ -569,4 +595,25 @@ static void CommandSetSF(char *argv[])
 {}
 
 static void CommandFEStatus(char *argv[])
-{}
+{
+    uint8_t status = 0;
+    uint32_t ber = 0;
+    uint16_t snr = 0;
+    uint16_t strength = 0;
+    MessageInit(&message, MSGCODE_SFES);
+
+    MESSAGE_SENDRECV();
+
+    CHECK_EXPECTED(MSGCODE_RFES);
+
+    //MessageDecode(&message, "bldd", &status,&ber,&snr,&strength);
+
+    printf("Tuner status:  %s%s%s%s%s%s\n",
+           (status & FE_HAS_SIGNAL)?"Signal, ":"",
+           (status & FE_TIMEDOUT)?"Timed out, ":"",
+           (status & FE_HAS_LOCK)?"Lock, ":"",
+           (status & FE_HAS_CARRIER)?"Carrier, ":"",
+           (status & FE_HAS_VITERBI)?"VITERBI, ":"",
+           (status & FE_HAS_SYNC)?"Sync, ":"");
+    printf("BER = %lu Signal Strength = %lu SNR = %lu\n", ber, (uint32_t)strength, (uint32_t)snr);
+}
