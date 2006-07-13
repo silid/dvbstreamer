@@ -769,7 +769,7 @@ static void ProcessOutputListPids(Connection_t *connection, Message_t *message)
         uint16_t *pids;
         OutputGetPIDs(output, &pidcount, &pids);
         MessageInit(message, MSGCODE_RLP);
-        MessageWriteUint8(message, (uint8_t)pidcount);
+        MessageWriteUint16(message, (uint8_t)pidcount);
         for (i = 0; i < pidcount; i ++)
         {
             MessageWriteUint16(message, pids[i]);
@@ -886,7 +886,7 @@ static void ProcessServicePids(Connection_t *connection, Message_t *message)
     {
         int cached = 1;
         int i;
-        int count;
+        int count = 0;
         PID_t *pids;
         pids = CachePIDsGet(service, &count);
         if (pids == NULL)
@@ -910,7 +910,7 @@ static void ProcessServicePids(Connection_t *connection, Message_t *message)
         }
 
         MessageInit(message, MSGCODE_RLP);
-        MessageWriteUint8(message, (uint8_t)count);
+        MessageWriteUint16(message, (uint16_t)count);
         for (i = 0; i < count; i ++)
         {
             MessageWriteUint16(message, pids[i].pid);
