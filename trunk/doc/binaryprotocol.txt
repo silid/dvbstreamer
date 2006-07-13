@@ -260,11 +260,11 @@ ROLO = Response  Outputs List outputs
 
 
 
-RLP = Response Output List pids
+RLP = Response List pids
 
 	DATA
 	---------------------------------------     --
-	| # of PIDs (uint8) | PID 0 (uint16) | ..... |
+	| # of PIDs (uint16) | PID 0 (uint16) | ..... |
     ---------------------------------------     --
 
 
@@ -290,14 +290,14 @@ RFES = Response Front End Status
 
 	DATA
 
-	----------------------------------------------------------------------------
-	| Status (uint32) | BER (uint32) | SNR (uint32) | Signal Strength (uint32) |
-	----------------------------------------------------------------------------
+	---------------------------------------------------------------------------
+	| Status (uint8) | BER (uint32) | SNR (uint16) | Signal Strength (uint16) |
+	---------------------------------------------------------------------------
 
 
 
 
-RSL  = Response Services List
+RLS  = Response Services List
 
 	DATA
 	------------------------------------------------     --
