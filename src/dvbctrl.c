@@ -606,7 +606,7 @@ static void CommandFEStatus(char *argv[])
 
     CHECK_EXPECTED(MSGCODE_RFES);
 
-    //MessageDecode(&message, "bldd", &status,&ber,&snr,&strength);
+    MessageDecode(&message, "bldd", &status,&ber,&snr,&strength);
 
     printf("Tuner status:  %s%s%s%s%s%s\n",
            (status & FE_HAS_SIGNAL)?"Signal, ":"",
@@ -615,5 +615,5 @@ static void CommandFEStatus(char *argv[])
            (status & FE_HAS_CARRIER)?"Carrier, ":"",
            (status & FE_HAS_VITERBI)?"VITERBI, ":"",
            (status & FE_HAS_SYNC)?"Sync, ":"");
-    printf("BER = %lu Signal Strength = %lu SNR = %lu\n", ber, (uint32_t)strength, (uint32_t)snr);
+    printf("BER = %u Signal Strength = %u SNR = %u\n", (unsigned int)ber, (unsigned int)strength, (unsigned int)snr);
 }
