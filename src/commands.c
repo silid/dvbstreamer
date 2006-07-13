@@ -831,13 +831,26 @@ static void CommandAddSSF(int argc, char **argv)
 static void CommandRemoveSSF(int argc, char **argv)
 {
     Output_t *output = NULL;
+    Service_t *oldService;
+
+    if (strcmp(argv[0], PrimaryService) == 0)
+    {
+        fprintf(rl_outstream, "You cannot remove the primary service!\n");
+        return;
+    }
 
     output = OutputFind(argv[0], OutputType_Service);
     if (output == NULL)
     {
         return;
     }
+    OutputGetService(output, &oldService);
     OutputFree(output);
+    if (oldService)
+    {
+        ServiceFree(oldService);
+    }
+
 }
 
 static void CommandSSFS(int argc, char **argv)
