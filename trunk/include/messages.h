@@ -51,11 +51,11 @@ Binary Communications protocol message manipulation functions.
 #define MSGCODE_SSPL 0x2A /* 0x2A = SSPL = Status Services List PIDs */
 #define MSGCODE_RSSL 0x31 /* 0x31 = RSSL = Response Service Secondary List */
 #define MSGCODE_ROLO 0x32 /* 0x32 = ROLO = Response Outputs List outputs */
-#define MSGCODE_RLP  0x33 /* 0x33 = RLP  = Response Output List pids */
+#define MSGCODE_RLP  0x33 /* 0x33 = RLP  = Response List pids */
 #define MSGCODE_ROPC 0x34 /* 0x34 = ROPC = Response Output Packet Count */
 #define MSGCODE_RTSS 0x35 /* 0x35 = RTSS = Response TS Stats */
 #define MSGCODE_RFES 0x36 /* 0x36 = RFES = Response Front End Status */
-#define MSGCODE_RSL  0x37 /* 0x37 = RSL  = Response Services List */
+#define MSGCODE_RLS  0x37 /* 0x37 = RSL  = Response Services List */
 
 #define RERR_OK               0x00
 #define RERR_NOTAUTHORISED    0x01
