@@ -111,13 +111,11 @@ int MessageSend(Message_t *msg, int tofd)
 /* d = uint16                                                                 */
 /* l = uint32                                                                 */
 /******************************************************************************/
-int MessageEncode(Message_t *msg, uint8_t code, char *format, ...)
+int MessageEncode(Message_t *msg, char *format, ...)
 {
     int paramsEncoded = 0;
     int i;
     va_list args;
-    MessageReset(msg);
-    MessageSetCode(msg, code);
 
     va_start(args, format);
     for (i = 0; format[i]; i ++)

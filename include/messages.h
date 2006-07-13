@@ -82,10 +82,18 @@ typedef struct Message_t
 int MessageRecv(Message_t *msg, int fromfd);
 int MessageSend(Message_t *msg, int tofd);
 
+
+
 #define MessageSetCode(_msg, _code) (_msg)->code = (_code)
 #define MessageGetCode(_msg) ((_msg)->code & 0xff)
 
 #define MessageGetLength(_msg) (_msg)->length
+
+#define MessageInit(_msg, _code) \
+    do{\
+        MessageReset(_msg);\
+        MessageSetCode(_msg,_code);\
+    }while(0)
 
 /******************************************************************************/
 /* High level message formating/parsing functions                             */
@@ -96,7 +104,7 @@ int MessageSend(Message_t *msg, int tofd);
 /* s = uint16                                                                 */
 /* d = uint32                                                                 */
 /******************************************************************************/
-int MessageEncode(Message_t *msg, uint8_t code, char *format, ...);
+int MessageEncode(Message_t *msg, char *format, ...);
 int MessageDecode(Message_t *msg, char *format, ...);
 
 /******************************************************************************/
