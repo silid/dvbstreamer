@@ -24,6 +24,7 @@ Application to control dvbstreamer in daemon mode.
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 #include <getopt.h>
 #include <unistd.h>
 #include <sys/socket.h>
@@ -97,6 +98,14 @@ Application to control dvbstreamer in daemon mode.
     }\
     }while(0)
 
+#define AUTHENTICATE() \
+    do{\
+        if (!Authenticate())\
+        {\
+            printf("Failed to Authenticate username/password!\n");\
+        }\
+    }while(0)
+
 typedef struct InfoParam_t
 {
     char *name;
@@ -117,6 +126,9 @@ Command_t;
 
 static void usage(char *appname);
 static void version(void);
+static bool Authenticate();
+static int ParsePID(char *argument);
+
 static void CommandInfo(char *argv[]);
 static void CommandServices(char *argv[]);
 static void CommandSelect(char *argv[]);
@@ -126,11 +138,7 @@ static void CommandStats(char *argv[]);
 static void CommandAddOutput(char *argv[]);
 static void CommandRmOutput(char *argv[]);
 static void CommandOutputs(char *argv[]);
-static void CommandAddPID(char *argv[]);
-static void CommandRmPID(char *argv[]);
-static void CommandOutputPIDs(char *argv[]);
-static void CommandAddSF(char *argv[]);
-static void CommandRemoveSF(char *argv[]);
+static void CommandAddRmPID(char *argv[]);
 static void CommandListSFS(char *argv[]);
 static void CommandSetSF(char *argv[]);
 static void CommandFEStatus(char *argv[]);
@@ -145,6 +153,17 @@ static int adapterNumber = 0;
 static char *username = NULL;
 static char *password = NULL;
 
+static char pidsCmd[] = "pids";
+static char lspidsCmd[] ="lspids";
+static char servicesCmd[] = "services";
+static char multiplexCmd[]= "multiplex";
+static char addpidCmd[] = "addpid";
+static char rmpidCmd[]  = "rmpid";
+static char addoutputCmd[] = "addoutput";
+static char addsfCmd[] = "addsf";
+static char rmoutputCmd[] = "rmoutput";
+static char rmsfCmd[] = "rmsf";
+
 static Command_t commands[] =
     {
         {
@@ -156,12 +175,12 @@ static Command_t commands[] =
             CommandInfo
         },
         {
-            "services", 0,
+            servicesCmd, 0,
             "List all available services.",
             CommandServices
         },
         {
-            "multiplex", 0,
+            multiplexCmd, 0,
             "List all the services on the current multiplex.",
             CommandServices
         },
@@ -176,7 +195,7 @@ static Command_t commands[] =
             CommandCurrent
         },
         {
-            "pids", 1,
+            pidsCmd, 1,
             "List the PIDs for a specified service",
             CommandPids
         },
@@ -186,7 +205,7 @@ static Command_t commands[] =
             CommandStats
         },
         {
-            "addoutput", 2,
+            addoutputCmd, 2,
             "Takes <output name> <ipaddress>:<udp port>\n"
             "Adds a new destination for sending packets to. This is only used for "
             "manually filtered packets. "
@@ -195,7 +214,7 @@ static Command_t commands[] =
             CommandAddOutput
         },
         {
-            "rmoutput", 1,
+            rmoutputCmd, 1,
             "Takes <output name>\n"
             "Removes the destination and stops all filters associated with this output.",
             CommandRmOutput
@@ -206,34 +225,34 @@ static Command_t commands[] =
             CommandOutputs
         },
         {
-            "addpid", 2,
+            addpidCmd, 2,
             "Takes <output name> <pid>\n"
             "Adds a PID to the filter to be sent to the specified output.",
-            CommandAddPID
+            CommandAddRmPID
         },
         {
-            "rmpid", 2,
+            rmpidCmd, 2,
             "Takes <output name> <pid>\n"
             "Removes the PID from the filter that is sending packets to the specified output.",
-            CommandRmPID
+            CommandAddRmPID
         },
         {
-            "lspids", 1,
+            lspidsCmd, 1,
             "Takes <output name>\n"
             "List the PIDs being filtered for a specific output",
-            CommandOutputPIDs
+            CommandPids
         },
         {
-            "addsf", 2,
+            addsfCmd, 2,
             "Takes <output name> <ipaddress>:<udp port>\n"
             "Adds a new destination for sending a secondary service to.",
-            CommandAddSF
+            CommandAddOutput
         },
         {
-            "rmsf", 1,
+            rmsfCmd, 1,
             "Takes <output name>\n"
             "Remove a destination for sending secondary services to.",
-            CommandRemoveSF
+            CommandRmOutput
         },
         {
             "lssfs", 0,
@@ -241,7 +260,7 @@ static Command_t commands[] =
             CommandListSFS
         },
         {
-            "setsf", 1,
+            "setsf", 2,
             "Takes <output name> <service name>\n"
             "Stream the specified service to the secondary service output.",
             CommandSetSF
@@ -461,11 +480,11 @@ static void CommandServices(char *argv[])
     int i;
 
     MessageReset(&message);
-    if (strcmp("services", argv[0]) == 0)
+    if (strcmp(servicesCmd, argv[0]) == 0)
     {
         MessageSetCode(&message, MSGCODE_SSLA);
     }
-    if (strcmp("multiplex", argv[0]) == 0)
+    if (strcmp(multiplexCmd, argv[0]) == 0)
     {
         MessageSetCode(&message, MSGCODE_SSLM);
     }
@@ -490,22 +509,12 @@ static void CommandServices(char *argv[])
 
 static void CommandSelect(char *argv[])
 {
-    if (!username)
+    if (!Authenticate())
     {
-        printlog(LOG_ERROR, "No username supplied!\n");
-        return ;
+        printf("Failed to authenticate username/password!\n");
+        return;
     }
-    if (!password)
-    {
-        printlog(LOG_ERROR, "No password supplied!\n");
-        return ;
-    }
-    MessageInit(&message, MSGCODE_AUTH);
-    MessageEncode(&message, "ss", username, password );
 
-    MESSAGE_SENDRECV();
-
-    CHECK_RERR_OK();
     MessageInit(&message, MSGCODE_CSPS);
     MessageEncode(&message, "s", argv[1]);
 
@@ -546,7 +555,16 @@ static void CommandPids(char *argv[])
     uint16_t i;
     uint16_t pidCount = 0;
     uint16_t pid;
-    MessageInit(&message, MSGCODE_SSPL);
+
+    if (strcmp(pidsCmd, argv[0]) == 0)
+    {
+        MessageInit(&message, MSGCODE_SSPL);
+    }
+    else
+    {
+        MessageInit(&message, MSGCODE_SOLP);
+    }
+
     MessageEncode(&message, "s", argv[1]);
 
     MESSAGE_SENDRECV();
@@ -565,34 +583,144 @@ static void CommandStats(char *argv[])
 {}
 
 static void CommandAddOutput(char *argv[])
-{}
+{
+    AUTHENTICATE();
+
+    if (strcmp(addoutputCmd, argv[0]) == 0)
+    {
+        MessageInit(&message, MSGCODE_COAO);
+    }
+    else
+    {
+        MessageInit(&message, MSGCODE_CSSA);
+    }
+    MessageEncode(&message, "ss", argv[1], argv[2]);
+
+    MESSAGE_SENDRECV();
+
+    CHECK_RERR_OK();
+}
 
 static void CommandRmOutput(char *argv[])
-{}
+{
+    AUTHENTICATE();
+
+    if (strcmp(rmoutputCmd, argv[0]) == 0)
+    {
+        MessageInit(&message, MSGCODE_CORO);
+    }
+    else
+    {
+        MessageInit(&message, MSGCODE_CSSR);
+    }
+    MessageEncode(&message, "s", argv[1]);
+
+    MESSAGE_SENDRECV();
+
+    CHECK_RERR_OK();
+}
 
 static void CommandOutputs(char *argv[])
-{}
+{
+    uint8_t nrofOutputs = 0;
+    int i;
+    MessageInit(&message, MSGCODE_SOLO);
+    MessageEncode(&message, "s", argv[1]);
 
-static void CommandAddPID(char *argv[])
-{}
+    MESSAGE_SENDRECV();
 
-static void CommandRmPID(char *argv[])
-{}
+    CHECK_EXPECTED(MSGCODE_ROLO);
 
-static void CommandOutputPIDs(char *argv[])
-{}
+    MessageDecode(&message, "b", &nrofOutputs);
+    for (i = 0 ; i < (int)nrofOutputs; i ++)
+    {
+        char *name = NULL;
+        char *destination = NULL;
+        MessageDecode(&message, "ss", &name, &destination);
 
-static void CommandAddSF(char *argv[])
-{}
+        printf("%-15s : %s\n", name, destination);
 
-static void CommandRemoveSF(char *argv[])
-{}
+        if (name)
+        {
+            free(name);
+        }
+        if (destination)
+        {
+            free(destination);
+        }
+    }
+}
+
+static void CommandAddRmPID(char *argv[])
+{
+    int pid = ParsePID(argv[2]);
+    if (pid == -1)
+    {
+        printf("Failed to parse \"%s\" as a PID!\n", argv[2]);
+        return;
+    }
+    AUTHENTICATE();
+    if (strcmp(addpidCmd, argv[0]) == 0)
+    {
+        MessageInit(&message, MSGCODE_COAP);
+    }
+    else
+    {
+        MessageInit(&message, MSGCODE_CORP);
+    }
+    MessageEncode(&message, "sdd", argv[1], 1, pid);
+
+    MESSAGE_SENDRECV();
+
+    CHECK_RERR_OK();
+}
 
 static void CommandListSFS(char *argv[])
-{}
+{
+    uint8_t nrofOutputs = 0;
+    int i;
+    MessageInit(&message, MSGCODE_SSSL);
+
+    MESSAGE_SENDRECV();
+
+    CHECK_EXPECTED(MSGCODE_RSSL);
+
+    MessageDecode(&message, "b", &nrofOutputs);
+    for (i = 0; i < (int)nrofOutputs; i ++)
+    {
+        char *name;
+        char *destination;
+        char *service;
+        MessageDecode(&message, "sss", &name, &destination, &service);
+
+        printf("%-15s : %s (%s)\n", name, destination, service[0] ? service:"<None>");
+        if (name)
+        {
+            free(name);
+        }
+        if (destination)
+        {
+            free(destination);
+        }
+        if (service)
+        {
+            free(service);
+        }
+    }
+
+}
 
 static void CommandSetSF(char *argv[])
-{}
+{
+    AUTHENTICATE();
+
+    MessageInit(&message, MSGCODE_CSSS);
+    MessageEncode(&message, "ss", argv[1], argv[2]);
+
+    MESSAGE_SENDRECV();
+
+    CHECK_RERR_OK();
+}
 
 static void CommandFEStatus(char *argv[])
 {
@@ -616,4 +744,60 @@ static void CommandFEStatus(char *argv[])
            (status & FE_HAS_VITERBI)?"VITERBI, ":"",
            (status & FE_HAS_SYNC)?"Sync, ":"");
     printf("BER = %u Signal Strength = %u SNR = %u\n", (unsigned int)ber, (unsigned int)strength, (unsigned int)snr);
+}
+
+static bool Authenticate()
+{
+    bool authenticated = FALSE;
+    if (!username)
+    {
+        printlog(LOG_ERROR, "No username supplied!\n");
+        return authenticated;
+    }
+    if (!password)
+    {
+        printlog(LOG_ERROR, "No password supplied!\n");
+        return authenticated;
+    }
+    MessageInit(&message, MSGCODE_AUTH);
+    MessageEncode(&message, "ss", username, password );
+
+    MESSAGE_SENDRECV();
+
+    if (MessageGetCode(&message) == MSGCODE_RERR)
+    {
+        uint8_t code = 0;
+        MessageReadUint8(&message, &code);
+        authenticated = (code == 0);
+    }
+    else
+    {
+        printlog(LOG_ERROR, "Unexpected response message! (type 0x%02x)\n",
+                 MessageGetCode(&message) );
+    }
+
+    return authenticated;
+}
+
+static int ParsePID(char *argument)
+{
+    char *formatstr;
+    int pid;
+
+    if ((argument[0] == '0') && (tolower(argument[1])=='x'))
+    {
+        argument[1] = 'x';
+        formatstr = "0x%hx";
+    }
+    else
+    {
+        formatstr = "%hd";
+    }
+
+    if (sscanf(argument, formatstr, &pid) == 0)
+    {
+        return -1;
+    }
+
+    return pid;
 }
