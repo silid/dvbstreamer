@@ -62,15 +62,15 @@ Binary Communications protocol message manipulation functions.
 /******************************************************************************/
 int MessageRecv(Message_t *msg, int fromfd)
 {
-    char header[3];
+    char header[4];
     if (read(fromfd, header, sizeof(header)) != sizeof(header))
     {
         /* Socket must be dead exit this connection! */
         return 1;
     }
 
-    msg->code = header[0];
-    msg->length = (header[1] << 8) | header[2];
+    msg->code = (header[0] << 8) | (header[1] & 0xff);
+    msg->length = (header[2] << 8) | (header[3] & 0xff);
     msg->currentpos = 0;
     if (read(fromfd, msg->buffer, msg->length) != msg->length)
     {
@@ -82,10 +82,11 @@ int MessageRecv(Message_t *msg, int fromfd)
 
 int MessageSend(Message_t *msg, int tofd)
 {
-    char header[3];
-    header[0] = msg->code;
-    header[1] = (msg->length >> 8) & 0xff;
-    header[2] = (msg->length     ) & 0xff;
+    char header[4];
+    header[0] = (msg->code >> 8) & 0xff;
+    header[1] = (msg->code     ) & 0xff;
+    header[2] = (msg->length >> 8) & 0xff;
+    header[3] = (msg->length     ) & 0xff;
 
     if (write(tofd, header, sizeof(header)) != sizeof(header))
     {
