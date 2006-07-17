@@ -580,7 +580,9 @@ static void CommandPids(char *argv[])
 }
 
 static void CommandStats(char *argv[])
-{}
+{
+
+}
 
 static void CommandAddOutput(char *argv[])
 {
@@ -679,7 +681,7 @@ static void CommandListSFS(char *argv[])
 {
     uint8_t nrofOutputs = 0;
     int i;
-    MessageInit(&message, MSGCODE_SSSL);
+    MessageInit(&message, MSGCODE_SSFL);
 
     MESSAGE_SENDRECV();
 
