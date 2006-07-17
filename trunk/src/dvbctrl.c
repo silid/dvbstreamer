@@ -572,6 +572,7 @@ static void CommandPids(char *argv[])
     CHECK_EXPECTED(MSGCODE_RLP);
 
     MessageReadUint16(&message, &pidCount);
+    printlog(LOG_DEBUG, "pidCount=%u\n", (unsigned int)pidCount);
     for ( i = 0; i < pidCount; i ++)
     {
         MessageReadUint16(&message, &pid);
@@ -581,7 +582,38 @@ static void CommandPids(char *argv[])
 
 static void CommandStats(char *argv[])
 {
+    uint32_t bitrate = 0;
+    uint32_t totalPC = 0;
+    uint32_t patPC = 0;
+    uint32_t pmtPC = 0;
+    uint32_t sdtPC = 0;
+    int i;
 
+    MessageInit(&message, MSGCODE_STSS);
+    MESSAGE_SENDRECV();
+    CHECK_EXPECTED(MSGCODE_RTSS);
+
+    MessageDecode(&message, "lllll", &bitrate, &totalPC, &patPC, &pmtPC, &sdtPC);
+
+    printf("PSI/SI Processor Statistics\n"
+           "---------------------------\n");
+
+    printf("\t%-15s : %u\n", "PAT", (unsigned int)patPC);
+    printf("\t%-15s : %u\n", "PMT", (unsigned int)pmtPC);
+    printf("\t%-15s : %u\n", "SDT", (unsigned int)sdtPC);
+
+    printf("\n");
+/*
+    printf("Service Filter Statistics\n"
+           "-------------------------\n");
+    printf("\n");
+
+    printf("Manual Output Statistics\n"
+           "------------------------\n");
+    printf("\n");
+*/
+    printf("Total packets processed: %u\n", (unsigned int)totalPC);
+    printf("Approximate TS bitrate : %gMbs\n", ((double)bitrate / (1024.0 * 1024.0)));
 }
 
 static void CommandAddOutput(char *argv[])
