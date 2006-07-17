@@ -329,7 +329,7 @@ Message Codes/Names to Values
 0x1203 = COAP = Control Output Add PIDs - Add pids to an output.
 0x1204 = CORP = Control Output remove PIDs - Remove pids from an output.
 
-0x2101 = SSPC = Status Service Primary Current - Return current service name for primary service output.
+0x2101 = SSPS = Status Service Primary Service - Return current service name for primary service output.
 0x2102 = SSFL = Status Service Filter List - List service filters outputs.
 0x2103 = SSPC = Status Service Packet Count
 0x2201 = SOLO = Status Outputs List outputs
@@ -354,16 +354,6 @@ Message Codes/Names to Values
 
 Script to produce header file
 -----------------------------
-Copy and paste the message codes above into a new file (binproto.txt).
-
-Create the following awk script (binproto.awk):
-
-BEGIN{ FS="="; }
-
-{
-    printf "#define MSGCODE_%s %s /* %s */\n", $2, $1, $3;
-}
-
-Use the above awk script with the following commands:
-
-sed -e 's/ = /=/g' binproto.txt | awk -f binproto.awk > msgcodes.txt
+Use binaryprotocol_cheader.awk to create the msgcodes.h file,
+or
+Use binaryprotocol_python.awk to create a python file containing all the codes.
