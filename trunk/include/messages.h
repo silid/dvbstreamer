@@ -61,8 +61,8 @@ int MessageSend(Message_t *msg, int tofd);
 /* is no simple/obvious way of interpreting other characters meanings.        */
 /* s = string                                                                 */
 /* b = uint8                                                                  */
-/* s = uint16                                                                 */
-/* d = uint32                                                                 */
+/* d = uint16                                                                 */
+/* l = uint32                                                                 */
 /******************************************************************************/
 int MessageEncode(Message_t *msg, char *format, ...);
 int MessageDecode(Message_t *msg, char *format, ...);

@@ -264,7 +264,8 @@ int MessageReadUint16(Message_t *msg, uint16_t *result)
 {
     MESSAGE_CHECKDATAAVAILABLE(msg, 2);
 
-    *result = (msg->buffer[msg->currentpos] << 8) | msg->buffer[msg->currentpos + 1];
+    *result = ((msg->buffer[msg->currentpos    ] << 8) & 0xff00) |
+              ((msg->buffer[msg->currentpos + 1]     ) & 0x00ff) ;
     msg->currentpos += 2;
     return 0;
 }
@@ -273,10 +274,10 @@ int MessageReadUint32(Message_t *msg, uint32_t *result)
 {
     MESSAGE_CHECKDATAAVAILABLE(msg, 4);
 
-    *result = (msg->buffer[msg->currentpos    ] << 24) |
-              (msg->buffer[msg->currentpos + 1] << 16) |
-              (msg->buffer[msg->currentpos + 2] << 16) |
-              (msg->buffer[msg->currentpos + 3]);
+    *result = ((msg->buffer[msg->currentpos    ] << 24) & 0xff000000) |
+              ((msg->buffer[msg->currentpos + 1] << 16) & 0x00ff0000) |
+              ((msg->buffer[msg->currentpos + 2] << 8 ) & 0x0000ff00) |
+              ((msg->buffer[msg->currentpos + 3]      ) & 0x000000ff);
     msg->currentpos += 4;
     return 0;
 }
