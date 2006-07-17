@@ -32,11 +32,11 @@ Rxxx = Response messages
 Message Header
 --------------
 
-1 byte Message Code
+2 byte Message Code
 2 byte Message Length
-	----------------------------------------------                  -
-	|Message Code (uint8) | Data Length (uint16) | <--- DATA --->   |
-	----------------------------------------------                  -
+	-----------------------------------------------                  -
+	|Message Code (uint16) | Data Length (uint16) | <--- DATA --->   |
+	-----------------------------------------------                  -
 
 Rxxx Standard Response Messages
 -------------------------------
@@ -46,15 +46,18 @@ RERR = Response Error
 	-----------------------------------------
 	| Code (uint8) | Message string (STRING)|
 	-----------------------------------------
-	Code
-	----
-	0x00 = OK
-	0x01 = Not authorised
-	0x02 = Output Already Exists
-	0x03 = Not found
-	0x04 = Already streaming to requested ip:port
-	0xFF = Generic Error (see message)
+Code
+----
+--CODES-START--=RERR
 
+0x00 = OK            = Success
+0x01 = NOTAUTHORISED = Not authorised
+0x02 = EXISTS        = Output Already Exists
+0x03 = NOTFOUND      = Not found
+0x04 = STREAMING     = Already streaming to requested ip:port
+0xFF = GENERIC       = Generic Error (see message)
+
+--CODES-END--
 
 AUTH Authentication Message
 ---------------------------
@@ -80,14 +83,18 @@ INFO = Information message
 
 	Responses: RERR (OK, with message string containing the data)
 
-	Field IDs
-	---------
-	0x00 = Name (user defined) of this server
-	0x01 = Front End Type
-	0x02 = Is connection authenticated = "Authenticated" or "Not authenticated"
+Field IDs
+---------
+--CODES-START--=INFO
 
-	0xFE = Uptime string in seconds ie "61" == 1 Minute 1 Second.
-	0xFF = Uptime string "%d days %d hours %d minutes %d seconds"
+0x00 = NAME          = Name (user defined) of this server
+0x01 = FETYPE        = Front End Type
+0x02 = AUTHENTICATED = Is connection authenticated = "Authenticated" or "Not authenticated"
+
+0xFE = UPSECS        = Uptime string in seconds ie "61" == 1 Minute 1 Second.
+0xFF = UPTIME        = Uptime string "%d days %d hours %d minutes %d seconds"
+
+--CODES-END--
 
 Cxxx Control Messages
 ---------------------
@@ -308,31 +315,55 @@ RLS  = Response Services List
 
 Message Codes/Names to Values
 -----------------------------
-0xFF = RERR = Response Error
-0x00 = INFO = Information message
-0x01 = AUTH = Authenticate
-0x11 = CSPS = Control Service Primary Select - Select Primary Service
-0x12 = CSSA = Control Service Secondary Add - Add secondary service
-0x13 = CSSS = Control Service Secondary Select - Select a secondary service
-0x14 = CSSR = Control Service Secondary Remove - Remove secondary service
-0x15 = COAO = Control Output Add Output - Add a new output destination
-0x16 = CORO = Control Output Remove Output - Remove an output destination
-0x17 = COAP = Control Output Add PIDs - Add pids to an output.
-0x18 = CORP = Control Output remove PIDs - Remove pids from an output.
-0x21 = SSPC = Status Service Primary Current - Return current service name for primary output.
-0x22 = SSSL = Status Service Secondary List - List secondary outputs.
-0x23 = SOLO = Status Outputs List outputs
-0x24 = SOLP = Status Output List pids
-0x25 = SOPC = Status Output Packet Count
-0x26 = STSS = Status TS Stats
-0x27 = SFES = Status Front End Status
-0x28 = SSLA = Status Services List All - List all avaialable services
-0x29 = SSLM = Status Services List Multiplex - List services avaialable of the current multiplex
-0x2A = SSPL = Status Services List PIDs
-0x31 = RSSL = Response Service Secondary List
-0x32 = ROLO = Response Outputs List outputs
-0x33 = RLP  = Response Output List pids
-0x34 = ROPC = Response Output Packet Count
-0x35 = RTSS = Response TS Stats
-0x36 = RFES = Response Front End Status
-0x37 = RSL  = Response Services List
+--CODES-START--=MSGCODE
+
+0x0000 = INFO = Information message
+0x0001 = AUTH = Authenticate
+
+0x1101 = CSPS = Control Service Primary Select - Select Primary Service
+0x1102 = CSSA = Control Service Secondary Add - Add secondary service
+0x1103 = CSSS = Control Service Secondary Select - Select a secondary service
+0x1104 = CSSR = Control Service Secondary Remove - Remove secondary service
+0x1201 = COAO = Control Output Add Output - Add a new output destination
+0x1202 = CORO = Control Output Remove Output - Remove an output destination
+0x1203 = COAP = Control Output Add PIDs - Add pids to an output.
+0x1204 = CORP = Control Output remove PIDs - Remove pids from an output.
+
+0x2101 = SSPC = Status Service Primary Current - Return current service name for primary service output.
+0x2102 = SSFL = Status Service Filter List - List service filters outputs.
+0x2103 = SSPC = Status Service Packet Count
+0x2201 = SOLO = Status Outputs List outputs
+0x2202 = SOLP = Status Output List pids
+0x2203 = SOPC = Status Output Packet Count
+0x2F01 = STSS = Status TS Stats
+0x2F02 = SFES = Status Front End Status
+0x2F03 = SSLA = Status Services List All - List all avaialable services
+0x2F04 = SSLM = Status Services List Multiplex - List services avaialable of the current multiplex
+0x2F05 = SSPL = Status Services List PIDs
+
+0xF001 = RSSL = Response Service Secondary List
+0xF002 = ROLO = Response Outputs List outputs
+0xF003 = RLP  = Response Output List pids
+0xF004 = ROPC = Response Output Packet Count
+0xF005 = RTSS = Response TS Stats
+0xF006 = RFES = Response Front End Status
+0xF007 = RLS  = Response Services List
+0xFFFF = RERR = Response Error
+
+--CODES-END--
+
+Script to produce header file
+-----------------------------
+Copy and paste the message codes above into a new file (binproto.txt).
+
+Create the following awk script (binproto.awk):
+
+BEGIN{ FS="="; }
+
+{
+    printf "#define MSGCODE_%s %s /* %s */\n", $2, $1, $3;
+}
+
+Use the above awk script with the following commands:
+
+sed -e 's/ = /=/g' binproto.txt | awk -f binproto.awk > msgcodes.txt
