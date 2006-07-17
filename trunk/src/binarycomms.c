@@ -306,7 +306,7 @@ static void HandleConnection(Connection_t *connection)
         ProcessMessage(connection, message);
         if (connection->connected)
         {
-            printlog(LOG_DEBUG, "%s:%d : Response 0x%02x length %d\n",
+            printlog(LOG_DEBUG, "%s:%d : Response 0x%04x length %d\n",
                      inet_ntoa(connection->clientAddress.sin_addr), connection->clientAddress.sin_port,
                      MessageGetCode(message), MessageGetLength(message));
             if (MessageSend(message, socketfd))
@@ -330,7 +330,7 @@ static void HandleConnection(Connection_t *connection)
 
 static void ProcessMessage(Connection_t *connection, Message_t *message)
 {
-    printlog(LOG_DEBUG, "%s:%d : Processing message 0x%02x length %d\n",
+    printlog(LOG_DEBUG, "%s:%d : Processing message 0x%04x length %d\n",
              inet_ntoa(connection->clientAddress.sin_addr), connection->clientAddress.sin_port,
              MessageGetCode(message), MessageGetLength(message));
     switch (message->code)
@@ -370,7 +370,7 @@ static void ProcessMessage(Connection_t *connection, Message_t *message)
         case MSGCODE_SSPC:
             ProcessPrimaryServiceCurrent(connection, message);
             break;
-        case MSGCODE_SSSL:
+        case MSGCODE_SSFL:
             ProcessSecondaryServiceList(connection, message);
             break;
         case MSGCODE_SOLO:
@@ -398,7 +398,7 @@ static void ProcessMessage(Connection_t *connection, Message_t *message)
             ProcessServicePids(connection, message);
             break;
         default:
-            MessageRERR(message, RERR_UNDEFINED, "Unknown message type!");
+            MessageRERR(message, RERR_GENERIC, "Unknown message type!");
             break;
     }
 }
@@ -422,7 +422,7 @@ static void ProcessInfo(Connection_t *connection, Message_t *message)
             MessageRERR(message, RERR_OK, connection->authenticated ? "Authenticated" : "Not authenticated");
             break;
 
-        case INFO_UPTIMESEC:
+        case INFO_UPSECS:
             {
                 char buffer[11];
                 time_t now;
@@ -451,7 +451,7 @@ static void ProcessInfo(Connection_t *connection, Message_t *message)
             break;
 
         default:
-            MessageRERR(message, RERR_UNDEFINED, "Unknown field");
+            MessageRERR(message, RERR_GENERIC, "Unknown field");
             break;
     }
 }
@@ -505,7 +505,7 @@ static void ProcessSecondaryServiceAdd(Connection_t *connection, Message_t *mess
     else
     {
         output = OutputFind(serviceOutputName, OutputType_Service);
-        MessageRERR(message, output ? RERR_ALREADYEXISTS:RERR_UNDEFINED, OutputErrorStr);
+        MessageRERR(message, output ? RERR_EXISTS:RERR_GENERIC, OutputErrorStr);
     }
     free(serviceOutputName);
     free(destination);
@@ -559,7 +559,7 @@ static void ProcessSecondaryServiceRemove(Connection_t *connection, Message_t *m
 
     if (strcmp(serviceOutputName, PrimaryService) == 0)
     {
-        MessageRERR(message, RERR_UNDEFINED, "You cannot remove the primary service!");
+        MessageRERR(message, RERR_GENERIC, "You cannot remove the primary service!");
         free(serviceOutputName);
         return;
     }
@@ -603,7 +603,7 @@ static void ProcessOutputAdd(Connection_t *connection, Message_t *message)
     else
     {
         output = OutputFind(manualOutputName, OutputType_Manual);
-        MessageRERR(message, output ? RERR_ALREADYEXISTS:RERR_UNDEFINED, OutputErrorStr);
+        MessageRERR(message, output ? RERR_EXISTS:RERR_GENERIC, OutputErrorStr);
     }
     free(manualOutputName);
     free(destination);
@@ -698,7 +698,7 @@ static void ProcessPrimaryServiceCurrent(Connection_t *connection, Message_t *me
     }
     else
     {
-        MessageRERR(message, RERR_UNDEFINED, "No service selected");
+        MessageRERR(message, RERR_GENERIC, "No service selected");
     }
 }
 
@@ -904,7 +904,7 @@ static void ProcessServicePids(Connection_t *connection, Message_t *message)
             }
             else
             {
-                MessageRERR(message, RERR_UNDEFINED, "No memory to retrieve PIDs\n");
+                MessageRERR(message, RERR_GENERIC, "No memory to retrieve PIDs\n");
                 return ;
             }
         }
