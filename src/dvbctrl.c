@@ -106,6 +106,33 @@ Application to control dvbstreamer in daemon mode.
         }\
     }while(0)
 
+
+
+typedef struct ServiceOutput_t
+{
+    char *name;
+    char *destination;
+    char *service;
+}ServiceOutput_t;
+
+typedef struct ServiceOutputList_t
+{
+    int nrofOutputs;
+    ServiceOutput_t *outputs;
+}ServiceOutputList_t;
+
+typedef struct ManualOutput_t
+{
+    char *name;
+    char *destination;
+}ManualOutput_t;
+
+typedef struct ManualOutputList_t
+{
+    int nrofOutputs;
+    ManualOutput_t *outputs;
+}ManualOutputList_t;
+
 typedef struct InfoParam_t
 {
     char *name;
@@ -128,6 +155,10 @@ static void usage(char *appname);
 static void version(void);
 static bool Authenticate();
 static int ParsePID(char *argument);
+static ServiceOutputList_t* GetServiceOutputs();
+static void FreeServiceOutputs(ServiceOutputList_t *list);
+static ManualOutputList_t* GetManualOutputs();
+static void FreeManualOutputs(ManualOutputList_t *outputs);
 
 static void CommandInfo(char *argv[]);
 static void CommandServices(char *argv[]);
@@ -142,6 +173,7 @@ static void CommandAddRmPID(char *argv[]);
 static void CommandListSFS(char *argv[]);
 static void CommandSetSF(char *argv[]);
 static void CommandFEStatus(char *argv[]);
+
 
 /* Used by logging to determine whether to include date/time info */
 int DaemonMode = FALSE;
@@ -588,7 +620,8 @@ static void CommandStats(char *argv[])
     uint32_t pmtPC = 0;
     uint32_t sdtPC = 0;
     int i;
-
+    ServiceOutputList_t *serviceOutputs = NULL;
+    ManualOutputList_t *manualOutputs = NULL;
     MessageInit(&message, MSGCODE_STSS);
     MESSAGE_SENDRECV();
     CHECK_EXPECTED(MSGCODE_RTSS);
@@ -603,15 +636,38 @@ static void CommandStats(char *argv[])
     printf("\t%-15s : %u\n", "SDT", (unsigned int)sdtPC);
 
     printf("\n");
-/*
+
     printf("Service Filter Statistics\n"
            "-------------------------\n");
+
+    serviceOutputs = GetServiceOutputs();
+    if (serviceOutputs)
+    {
+        for (i = 0; i < serviceOutputs->nrofOutputs; i ++)
+        {
+            uint32_t pc = 0;
+
+            printf("\t%-15s : %u\n", serviceOutputs->outputs[i].name, (unsigned int)pc);
+        }
+        FreeServiceOutputs(serviceOutputs);
+    }
     printf("\n");
 
     printf("Manual Output Statistics\n"
            "------------------------\n");
+    manualOutputs = GetManualOutputs();
+    if (manualOutputs)
+    {
+        for (i = 0; i < manualOutputs->nrofOutputs; i ++)
+        {
+            uint32_t pc = 0;
+
+            printf("\t%-15s : %u\n", manualOutputs->outputs[i].name, (unsigned int)pc);
+        }
+        FreeManualOutputs(manualOutputs);
+    }
     printf("\n");
-*/
+
     printf("Total packets processed: %u\n", (unsigned int)totalPC);
     printf("Approximate TS bitrate : %gMbs\n", ((double)bitrate / (1024.0 * 1024.0)));
 }
@@ -656,32 +712,17 @@ static void CommandRmOutput(char *argv[])
 
 static void CommandOutputs(char *argv[])
 {
-    uint8_t nrofOutputs = 0;
     int i;
-    MessageInit(&message, MSGCODE_SOLO);
-    MessageEncode(&message, "s", argv[1]);
+    ManualOutputList_t *outputs = NULL;
 
-    MESSAGE_SENDRECV();
-
-    CHECK_EXPECTED(MSGCODE_ROLO);
-
-    MessageDecode(&message, "b", &nrofOutputs);
-    for (i = 0 ; i < (int)nrofOutputs; i ++)
+    outputs = GetManualOutputs();
+    if (outputs)
     {
-        char *name = NULL;
-        char *destination = NULL;
-        MessageDecode(&message, "ss", &name, &destination);
-
-        printf("%-15s : %s\n", name, destination);
-
-        if (name)
+        for (i = 0 ; i < outputs->nrofOutputs; i ++)
         {
-            free(name);
+            printf("%-15s : %s\n", outputs->outputs[i].name, outputs->outputs[i].destination);
         }
-        if (destination)
-        {
-            free(destination);
-        }
+        FreeManualOutputs(outputs);
     }
 }
 
@@ -711,37 +752,21 @@ static void CommandAddRmPID(char *argv[])
 
 static void CommandListSFS(char *argv[])
 {
-    uint8_t nrofOutputs = 0;
     int i;
-    MessageInit(&message, MSGCODE_SSFL);
+    ServiceOutputList_t *outputs = NULL;
 
-    MESSAGE_SENDRECV();
-
-    CHECK_EXPECTED(MSGCODE_RSSL);
-
-    MessageDecode(&message, "b", &nrofOutputs);
-    for (i = 0; i < (int)nrofOutputs; i ++)
+    outputs = GetServiceOutputs();
+    if (outputs)
     {
-        char *name;
-        char *destination;
-        char *service;
-        MessageDecode(&message, "sss", &name, &destination, &service);
-
-        printf("%-15s : %s (%s)\n", name, destination, service[0] ? service:"<None>");
-        if (name)
+        for (i = 0; i < outputs->nrofOutputs; i ++)
         {
-            free(name);
+            printf("%-15s : %s (%s)\n",
+                outputs->outputs[i].name,
+                outputs->outputs[i].destination,
+                outputs->outputs[i].service[0] ? outputs->outputs[i].service:"<None>");
         }
-        if (destination)
-        {
-            free(destination);
-        }
-        if (service)
-        {
-            free(service);
-        }
+        FreeServiceOutputs(outputs);
     }
-
 }
 
 static void CommandSetSF(char *argv[])
@@ -835,3 +860,142 @@ static int ParsePID(char *argument)
 
     return pid;
 }
+
+static ServiceOutputList_t* GetServiceOutputs()
+{
+    ServiceOutputList_t *result = NULL;
+    uint8_t nrofOutputs = 0;
+    int i;
+    MessageInit(&message, MSGCODE_SSFL);
+
+    MESSAGE_SENDRECV();
+
+    if (MessageGetCode(&message) == MSGCODE_RERR)
+    {
+        uint8_t code = 0;
+        char *text = NULL;
+        MessageReadUint8(&message, &code);
+        MessageReadString(&message, &text);
+        printf("ERROR (%d) %s\n", code, text);
+        free(text);
+        return NULL;
+    }
+    else if (MessageGetCode(&message) != MSGCODE_RSSL)
+    {
+        printlog(LOG_ERROR, "Unexpected response message! (type 0x%02x)",
+                 MessageGetCode(&message) );
+        return NULL;
+    }
+
+    MessageDecode(&message, "b", &nrofOutputs);
+    result = calloc(1, sizeof(ServiceOutputList_t));
+    if (!result)
+    {
+        return result;
+    }
+    result->nrofOutputs = nrofOutputs & 0xff;
+    result->outputs = calloc(result->nrofOutputs, sizeof(ServiceOutput_t));
+    if (!result->outputs)
+    {
+        free(result);
+        return NULL;
+    }
+    for (i = 0; i < result->nrofOutputs; i ++)
+    {
+        MessageDecode(&message, "sss",
+            &result->outputs[i].name,
+            &result->outputs[i].destination,
+            &result->outputs[i].service);
+    }
+    return result;
+}
+
+static void FreeServiceOutputs(ServiceOutputList_t *list)
+{
+    int i;
+    for (i = 0 ; i < list->nrofOutputs; i ++)
+    {
+        if (list->outputs[i].name)
+        {
+            free(list->outputs[i].name);
+        }
+        if (list->outputs[i].destination)
+        {
+            free(list->outputs[i].destination);
+        }
+        if (list->outputs[i].service)
+        {
+            free(list->outputs[i].service);
+        }
+    }
+    free(list->outputs);
+    free(list);
+}
+
+static ManualOutputList_t* GetManualOutputs()
+{
+    ManualOutputList_t *result = NULL;
+    uint8_t nrofOutputs = 0;
+    int i;
+    MessageInit(&message, MSGCODE_SOLO);
+
+    MESSAGE_SENDRECV();
+
+    if (MessageGetCode(&message) == MSGCODE_RERR)
+    {
+        uint8_t code = 0;
+        char *text = NULL;
+        MessageReadUint8(&message, &code);
+        MessageReadString(&message, &text);
+        printf("ERROR (%d) %s\n", code, text);
+        free(text);
+        return NULL;
+    }
+    else if (MessageGetCode(&message) != MSGCODE_ROLO)
+    {
+        printlog(LOG_ERROR, "Unexpected response message! (type 0x%02x)",
+                 MessageGetCode(&message) );
+        return NULL;
+    }
+
+    MessageDecode(&message, "b", &nrofOutputs);
+
+    result = calloc(1, sizeof(ManualOutputList_t));
+    if (!result)
+    {
+        return result;
+    }
+    result->nrofOutputs = nrofOutputs & 0xff;
+    result->outputs = calloc(result->nrofOutputs, sizeof(ManualOutput_t));
+    if (!result->outputs)
+    {
+        free(result);
+        return NULL;
+    }
+    for (i = 0; i < result->nrofOutputs; i ++)
+    {
+        MessageDecode(&message, "ss",
+            &result->outputs[i].name,
+            &result->outputs[i].destination);
+    }
+    return result;
+}
+
+static void FreeManualOutputs(ManualOutputList_t *list)
+{
+    int i;
+    for (i = 0 ; i < list->nrofOutputs; i ++)
+    {
+        if (list->outputs[i].name)
+        {
+            free(list->outputs[i].name);
+        }
+        if (list->outputs[i].destination)
+        {
+            free(list->outputs[i].destination);
+        }
+    }
+    free(list->outputs);
+    free(list);
+}
+
