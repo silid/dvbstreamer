@@ -157,6 +157,7 @@ static void ProcessPrimaryServiceCurrent(Connection_t *connection, Message_t *me
 static void ProcessSecondaryServiceList(Connection_t *connection, Message_t *message);
 static void ProcessOutputsList(Connection_t *connection, Message_t *message);
 static void ProcessOutputListPids(Connection_t *connection, Message_t *message);
+static void ProcessServiceFilterPacketCount(Connection_t *connection, Message_t *message);
 static void ProcessOutputPacketCount(Connection_t *connection, Message_t *message);
 static void ProcessTSStats(Connection_t *connection, Message_t *message);
 static void ProcessFEStatus(Connection_t *connection, Message_t *message);
@@ -367,11 +368,14 @@ static void ProcessMessage(Connection_t *connection, Message_t *message)
             IFAUTHENTICATED(ProcessOutputPIDRemove, connection, message);
             break;
             /* Status Messages */
-        case MSGCODE_SSPC:
+        case MSGCODE_SSPS:
             ProcessPrimaryServiceCurrent(connection, message);
             break;
         case MSGCODE_SSFL:
             ProcessSecondaryServiceList(connection, message);
+            break;
+        case MSGCODE_SSPC:
+            ProcessServiceFilterPacketCount(connection, message);
             break;
         case MSGCODE_SOLO:
             ProcessOutputsList(connection, message);
@@ -781,6 +785,31 @@ static void ProcessOutputListPids(Connection_t *connection, Message_t *message)
     }
     free(outputName);
 }
+
+static void ProcessServiceFilterPacketCount(Connection_t *connection, Message_t *message)
+{
+    Output_t *output;
+    char *outputName = NULL;
+
+    if (MessageReadString(message, &outputName))
+    {
+        LOG_MALFORMED(connection, "output name");
+        connection->connected = FALSE;
+        return ;
+    }
+    output = OutputFind(outputName, OutputType_Service);
+    if (output)
+    {
+        MessageInit(message, MSGCODE_ROPC);
+        MessageWriteUint32(message, output->filter->packetsfiltered);
+    }
+    else
+    {
+        MessageRERR(message, RERR_NOTFOUND, outputName);
+    }
+    free(outputName);
+}
+
 
 static void ProcessOutputPacketCount(Connection_t *connection, Message_t *message)
 {

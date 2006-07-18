@@ -557,7 +557,7 @@ static void CommandSelect(char *argv[])
 
 static void CommandCurrent(char *argv[])
 {
-    MessageInit(&message, MSGCODE_SSPC);
+    MessageInit(&message, MSGCODE_SSPS);
 
     MESSAGE_SENDRECV();
 
@@ -646,8 +646,16 @@ static void CommandStats(char *argv[])
         for (i = 0; i < serviceOutputs->nrofOutputs; i ++)
         {
             uint32_t pc = 0;
+            MessageInit(&message, MSGCODE_SSPC);
+            MessageEncode(&message, "s", serviceOutputs->outputs[i].name);
 
-            printf("\t%-15s : %u\n", serviceOutputs->outputs[i].name, (unsigned int)pc);
+            MESSAGE_SENDRECV();
+
+            if (MessageGetCode(&message) == MSGCODE_ROPC)
+            {
+                MessageDecode( &message, "l", &pc);
+                printf("\t%-15s : %u\n", serviceOutputs->outputs[i].name, (unsigned int)pc);
+            }
         }
         FreeServiceOutputs(serviceOutputs);
     }
@@ -661,8 +669,16 @@ static void CommandStats(char *argv[])
         for (i = 0; i < manualOutputs->nrofOutputs; i ++)
         {
             uint32_t pc = 0;
+            MessageInit(&message, MSGCODE_SOPC);
+            MessageEncode(&message, "s", manualOutputs->outputs[i].name);
 
-            printf("\t%-15s : %u\n", manualOutputs->outputs[i].name, (unsigned int)pc);
+            MESSAGE_SENDRECV();
+
+            if (MessageGetCode(&message) == MSGCODE_ROPC)
+            {
+                MessageDecode( &message, "l", &pc);
+                printf("\t%-15s : %u\n", manualOutputs->outputs[i].name, (unsigned int)pc);
+            }
         }
         FreeManualOutputs(manualOutputs);
     }
