@@ -1,8 +1,17 @@
-dev
+0.4
 ---
+* Daemon mode, can now run dvbstreamer in the background and use dvbctrl to 
+  control/monitor it.
+* Secondary service filters, allows more than 1 service to be streamed (each 
+  to separate IP Address:Ports).
 * Signal handling (No exit in a nice clean manner, making sure the database is
   updated).
-* IPv6 support added.
+* IPv6 support added. (Thanks again Tero)
+* Minor name changes to commands (mostly commands that list things now start 
+  with ls, mostly :-) )
+* Minor change to behaviour, dvbstreamer now no longer waits for the signal to
+  lock before returning from a command, useful when you have a low siganl 
+  strength/high noise problem!
 
 0.3
 ---
