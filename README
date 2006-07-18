@@ -92,45 +92,25 @@ Once dvbstreamer has started you have the following commands at your disposal:
 
 Command			Description
 -------------------------------------------------------------------------------
-quit			Exit the program, can be used in the startup file to 
-			stop further processing.
-
-services		Lists all the services currently in the database. This 
-			list will be updated as updates to the PAT are detected.
-
-multiplex		List only the services on the same multiplex as the 
-			currently selected service.
-
-select <service name>	Sets <service name> as the current service, this may 
-			mean tuning to a different multiplex.
-
-pids <service name>	List the PIDs for <service name>.
-
-stats			Display the number of packets processed and the number 
-			of packets filtered by each filter.
-
-addoutput <output name> <ipaddress>:<udp port>	
-			Adds a new destination for sending packets to. This is 
-			only used for manually filtered packets. To send 
-			packets to this destination you'll need to also call 
-			'filterpid' with this output as an argument.
-
-rmoutput <output name>	Removes the destination and stops all filters 
-			associated with this output.
-
-outputs			List all active additonal output names and destinations.
-
-addpid <output name> <pid>
-			Adds a PID to the filter to be sent to the specified
-			output.
-
-rmpid <output name> <pid>
-			Removes the PID from the filter that is sending packets
-			to the specified output.
-
-outputpids <output>	List the PIDs being filtered for a specific output.
-help <command>		Displays help for the specified command or with out the
-			command, list all available commands.
+      quit - Exit the program
+  services - List all available services
+ multiplex - List all the services on the current multiplex
+    select - Select a new service to stream
+   current - Print out the service currently being streamed.
+      pids - List the PIDs for a specified service
+     stats - Display the stats for the PAT,PMT and service PID filters
+ addoutput - Add a new destination for manually filtered PIDs.
+  rmoutput - Remove a destination for manually filtered PIDs.
+ lsoutputs - List current outputs
+    addpid - Adds a PID to filter to an output
+     rmpid - Removes a PID to filter from an output
+    lspids - List PIDs for output
+     addsf - Add a service filter for secondary services
+      rmsf - Remove a service filter for secondary services
+     lssfs - List all secondary service filters
+     setsf - Select a service to stream to a secondary service output
+  festatus - Displays the status of the tuner.
+      help - Display the list of commands or help on a specific command
 
 Start up files
 --------------
@@ -155,6 +135,29 @@ addpid eitoutput 0x12
 Its as simple as that, you can use all the commands that you can use on the 
 dvbstreamer prompt.
 
+Daemon mode and DVBCtrl
+-----------------------
+This program allows you to control dvbstreamer when it is running in daemon 
+mode. To start dvbstreamer in daemon mode use the '-d' option. It is also 
+recommend to change the default username and password used to prevent someone
+else changing the channel. To change the default username and password 
+(dvbstreamer, control) use the '-u <username>' and '-p <password>' options.
+For example:
+
+dvbstreamer -d -u adam -p alkhluln
+
+Then to control dvbstreamer you'll need to use dvbctrl. DVBCtrl allows you to
+use all of the commands available on the command line interface. Simple add the
+command after dvbctrl to execute that command. Some commands require a username
+and password to execute.
+For example to set the default service use:
+
+dvbctrl -u adam -p alkhluln select "BBC ONE"
+
+Note the use of quotes to pass BBC ONE as 1 command line parameter!
+
+Use -h for more details on available commands and options.
+
 Bugs
 ----
 Please report all bugs to the sourceforge forums.
@@ -163,10 +166,11 @@ http://sourceforge.net/tracker/?group_id=164687&atid=832723
 Credits
 -------
 Adam Charrett - Author
-Tero Pelander - Submitted several patches and helped to test DVB-C.
+Tero Pelander - IPv6 support along with several patches and tested DVB-C.
 
 History
 -------
+0.4 Daemon mode
 0.3 Service Addition/Removal
 0.2 Add new commands (addoutput etc)
 0.1 First public release

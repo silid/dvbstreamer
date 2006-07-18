@@ -1,5 +1,7 @@
 Some Ideas
 ----------
-Additional outputs for additional PID filters such as for EIT and date tables.
-EIT decoding.
-DVB-S and DVB-C support.
+freevo intergration.
+EIT decoding, simple EPG program.
+fastCGI application to allow multiple dvbstreamer to be control from a web page.
+PVR application, using RTSP to control playback and buffer to disk.
+
