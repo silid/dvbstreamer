@@ -1,0 +1,84 @@
+DVBStreamer - Plugins Ideas
+
+Load all plugins found in a certain directory.
+
+Plugin can add commands.
+Plugin can add Processors/Filters.
+Plugin can add output methods.
+
+struct Plugin_t
+{
+	unsigned int RequiredVersion;
+	char *name;        /* Name of the plugin */
+	char *version;     /* String describing the version of the plugin */
+	char *description; /* Description of the plugin */
+	char *author;      /* Author/Contact address for bugs */
+	Command_t *commands; /* NULL terminated array of commands or NULL for no commands */
+	PluginFeature_t *features; /* A PLUGIN_FEATURE_NONE terminated list of features or NULL for no features. */
+}
+
+struct Command_t
+{
+    char *command;
+    bool  tokenise;
+    int   minargs;
+    int   maxargs;
+    char *shorthelp;
+    char *longhelp;
+    void (*commandfunc)(int argc, char **argv);
+}
+
+
+PLUGIN_FEATURE_TYPE_NONE           0x0
+PLUGIN_FEATURE_TYPE_FILTER         0x1
+PLUGIN_FEATURE_TYPE_DELIVERYMETHOD 0x2
+
+struct PluginFeature_t
+{
+	int type;
+	void *details;
+}
+
+type = PLUGIN_FEATURE_TYPE_FILTER
+details = An instance of the following structure:
+struct FilterHandler_t
+{
+	void (*InitFilter)(PIDFilter_t* filter);
+	void (*DeInitFilter)(PIDFilter_t* filter);
+}
+
+type = PLUGIN_FEATURE_TYPE_DELIVERYMETHOD
+details = An instance of the following structure
+struct DeliveryMethodHandler_t
+{
+	void (*CanHandle)(char *mrl);
+	DeliveryMethodInstance_t* (*CreateInstance)(char *mrl);
+
+}
+
+mrl's will be in the form <delivery method>://<url>[,<options>]
+For example udp could be (ppd == Packets Per Datagram)
+udp://localhost:1234,tos=25,ppd=7
+
+Implementors should consider the following structure as the 'base class' and should extend
+it with the state they require for the output method.
+
+struct DeliveryMethodInstance_t
+{
+	void (*SendPacket)(DeliveryMethodInstance *this, TSPacket_t packet);
+	void (*DestroyInstance)(DeliveryMethodInstance_t *this);
+}
+
+
+For example:
+
+struct UDPOutputMethodInstance_t
+{
+	void (*SendPacket)(DVBStreamerOutputMethodInstance *this, TSPacket_t packet);
+	void (*DestroyInstance)(DVBStreamerOutputMethodInstance_t *this);
+	int tos;
+	int packetsPerDatagram;
+	Socket socketFD;
+	int packetCount;
+	char *buffer;
+}
