@@ -23,10 +23,23 @@ Generic type definitions.
 
 #ifndef _DVBSTREAMER_TYPES_H
 #define _DVBSTREAMER_TYPES_H
-
+/**
+ * @defgroup Types Global types
+ *@{
+ */
+/**
+ * True value.
+ */
 #define TRUE  1
+/**
+ * False value.
+ */
 #define FALSE 0
 
+/**
+ * Boolean type
+ */
 typedef int bool;
 
+/** @} */
 #endif
