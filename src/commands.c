@@ -30,6 +30,7 @@ Command Processing and command functions.
 #include <readline/readline.h>
 #include <readline/history.h>
 
+#include "commands.h"
 #include "multiplexes.h"
 #include "services.h"
 #include "dvb.h"
@@ -43,18 +44,6 @@ Command Processing and command functions.
 #define PROMPT "DVBStream>"
 
 #define MAX_ARGS (10)
-
-typedef struct Command_t
-{
-    char *command;
-    bool  tokenise;
-    int   minargs;
-    int   maxargs;
-    char *shorthelp;
-    char *longhelp;
-    void (*commandfunc)(int argc, char **argv);
-}
-Command_t;
 
 static void GetCommand(char **command, char **argument);
 static char **AttemptComplete (const char *text, int start, int end);
@@ -338,6 +327,25 @@ int CommandProcessFile(char *file)
     fclose(fp);
     return 0;
 }
+
+bool CommandExecute(char *line)
+{
+    bool commandFound = FALSE;
+    char *command;
+    char *argument;
+    ParseLine(line, &command, &argument);
+    if (command && (strlen(command) > 0))
+    {
+        commandFound = ProcessCommand(command, argument);
+        free(command);
+        if (argument)
+        {
+            free(argument);
+        }
+    }
+    return commandFound;
+}
+
 /*************** Command parsing functions ***********************************/
 static void GetCommand(char **command, char **argument)
 {
