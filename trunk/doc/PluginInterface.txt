@@ -29,9 +29,11 @@ struct Command_t
 }
 
 
-PLUGIN_FEATURE_TYPE_NONE           0x0
-PLUGIN_FEATURE_TYPE_FILTER         0x1
-PLUGIN_FEATURE_TYPE_DELIVERYMETHOD 0x2
+PLUGIN_FEATURE_TYPE_NONE           0x00
+PLUGIN_FEATURE_TYPE_FILTER         0x01
+PLUGIN_FEATURE_TYPE_PATPROCESSOR   0x02
+PLUGIN_FEATURE_TYPE_PMTPROCESSOR   0x03
+PLUGIN_FEATURE_TYPE_DELIVERYMETHOD 0x10
 
 struct PluginFeature_t
 {
@@ -47,6 +49,25 @@ struct FilterHandler_t
 	void (*DeInitFilter)(PIDFilter_t* filter);
 }
 
+type = PLUGIN_FEATURE_TYPE_PATPROCESSOR
+details = An instance of the following structure:
+(Implementors should consider the following structure as the 'base class' and
+should extend it with the state they require.)
+
+struct PluginPATProcessor_t
+{
+    void (*ProcessPAT)(PluginPATProcessor_t *this, dvbpsi_pat_t* newpat);
+}
+
+type = PLUGIN_FEATURE_TYPE_PMTPROCESSOR
+details = An instance of the following structure:
+(Implementors should consider the following structure as the 'base class' and
+should extend it with the state they require.)
+struct PluginPMTProcessor_t
+{
+    void (*ProcessPMT)(PluginPMTProcessor_t *this, dvbpsi_pmt_t* newpmt);
+}
+
 type = PLUGIN_FEATURE_TYPE_DELIVERYMETHOD
 details = An instance of the following structure
 struct DeliveryMethodHandler_t
@@ -60,8 +81,8 @@ mrl's will be in the form <delivery method>://<url>[,<options>]
 For example udp could be (ppd == Packets Per Datagram)
 udp://localhost:1234,tos=25,ppd=7
 
-Implementors should consider the following structure as the 'base class' and should extend
-it with the state they require for the output method.
+Implementors should consider the following structure as the 'base class' and
+should extend it with the state they require for the output method.
 
 struct DeliveryMethodInstance_t
 {
@@ -72,10 +93,10 @@ struct DeliveryMethodInstance_t
 
 For example:
 
-struct UDPOutputMethodInstance_t
+struct UDPOutputDeliveryMethodInstance_t
 {
-	void (*SendPacket)(DVBStreamerOutputMethodInstance *this, TSPacket_t packet);
-	void (*DestroyInstance)(DVBStreamerOutputMethodInstance_t *this);
+	void (*SendPacket)(DeliveryMethodInstance_t *this, TSPacket_t packet);
+	void (*DestroyInstance)(DeliveryMethodInstance_t *this);
 	int tos;
 	int packetsPerDatagram;
 	Socket socketFD;
