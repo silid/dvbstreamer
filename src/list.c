@@ -21,6 +21,7 @@ Generic list management functions.
 
 */
 #include <stdlib.h>
+#include "logging.h"
 #include "list.h"
 
 List_t *ListCreate()
@@ -42,19 +43,8 @@ void ListFree(List_t *list)
 
 bool ListAdd(List_t *list, void *data)
 {
-    ListEntry_t *entry = calloc(1, sizeof(ListEntry_t));
-    if (entry == NULL)
-    {
-        return FALSE;
-    }
-    entry->data = data;
-    entry->prev = list->tail;
-    list->tail = entry;
-    if (list->head == NULL)
-    {
-        list->head = entry;
-    }
-    return TRUE;
+    ListIterator_t iterator = {list, list->tail};
+    return ListInsertAfterCurrent(&iterator,data);
 }
 
 bool ListInsertAfterCurrent(ListIterator_t *iterator, void *data)
@@ -74,7 +64,7 @@ bool ListInsertAfterCurrent(ListIterator_t *iterator, void *data)
         iterator->current->next = entry;
     }
 
-    if (iterator->current == iterator->list->head)
+    if (iterator->list->head == NULL)
     {
         iterator->list->head = entry;
     }
@@ -89,7 +79,6 @@ bool ListInsertAfterCurrent(ListIterator_t *iterator, void *data)
 bool ListInsertBeforeCurrent(ListIterator_t *iterator, void *data)
 {
     ListEntry_t *entry;
-
     entry = calloc(1, sizeof(ListEntry_t));
     if (entry == NULL)
     {
@@ -134,7 +123,6 @@ void ListRemoveCurrent(ListIterator_t *iterator)
     List_t *list = iterator->list;
     ListEntry_t *entry = iterator->current;
     iterator->current = entry->next;
-
     if (entry == list->head)
     {
         list->head = entry->next;
@@ -151,4 +139,17 @@ void ListRemoveCurrent(ListIterator_t *iterator)
     {
         entry->next->prev = entry->prev;
     }
+    free(entry);
+}
+
+void ListDump(List_t *list)
+{
+    ListIterator_t iterator;
+    printlog(LOG_DEBUG, "Dumping list %p\n", list);
+    for ( ListIterator_Init(iterator, list); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    {
+        printlog(LOG_DEBUG, "Current = %010p prev = %010p  next = %010p data = %010p\n",
+        iterator.current, iterator.current->prev, iterator.current->next, iterator.current->data);
+    }
+    printlog(LOG_DEBUG, "End of dump\n");
 }

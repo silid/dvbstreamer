@@ -52,6 +52,15 @@ typedef struct sListIterator_t
 
 /**
  * Initialise a ListIterator_t instance to point to the first entry in the list.
+ * Example use of a ListIterator_t
+ * @code
+ * ListIterator_t iterator;
+ * for ( ListIterator_Init(iterator, list); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+ * {
+ *    printf("Data = %p\n", ListIterator_Current(iterator));
+ * }
+ * @endcode
+ *
  * @param _iterator The iterator to initialise (not a pointer),
  * @param _list The list to initialise the iterator to use.
  */
@@ -123,5 +132,12 @@ bool ListInsertAfterCurrent(ListIterator_t *iterator, void *data);
  * @param iterator Iterator pointer to the current entry in the list to remove.
  */
 void ListRemoveCurrent(ListIterator_t *iterator);
+
+/**
+ * Dump the structure of a list.
+ * @param list the list to dump.
+ */
+void ListDump(List_t *list);
+
 /** @} */
 #endif

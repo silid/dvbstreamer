@@ -30,6 +30,7 @@ Transport stream processing and filter management.
 #include "dvb.h"
 #include "services.h"
 #include "multiplexes.h"
+#include "list.h"
 
 /*------ Transport Stream Packet Structures and macros ----*/
 /**
@@ -220,12 +221,15 @@ typedef struct TSFilter_t
     volatile int totalpackets;          /**< Total number of packets processed by this instance. */
 	volatile int bitrate;               /**< Approximate bit rate of the transport stream being processed. */
 
+    List_t *pidfilters;
+#if 0
     struct
     {
         int allocated;
         struct PIDFilter_t filter;
     }
     pidfilters[MAX_FILTERS];             /**< Array of PID filters */
+#endif
 }
 TSFilter_t;
 
