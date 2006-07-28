@@ -25,6 +25,7 @@ Binary Communications protocol for control DVBStreamer.
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
@@ -43,7 +44,7 @@ Binary Communications protocol for control DVBStreamer.
 #include "main.h"
 #include "binarycomms.h"
 #include "deliverymethod.h"
-
+#include "commands.h"
 
 #define MAX_CONNECTIONS 2 /* 1 for monitoring by web and another for control */
 
@@ -146,6 +147,8 @@ static void HandleConnection(Connection_t *connection);
 static void ProcessMessage(Connection_t *connection, Message_t *message);
 static void ProcessInfo(Connection_t *connection, Message_t *message);
 static void ProcessAuth(Connection_t *connection, Message_t *message);
+static void ProcessQuote(Connection_t *connection, Message_t *message);
+static void QuoteMessagePrintf(char *fmt, ...);
 static void ProcessPrimaryServiceSelect(Connection_t *connection, Message_t *message);
 static void ProcessSecondaryServiceAdd(Connection_t *connection, Message_t *message);
 static void ProcessSecondaryServiceSet(Connection_t *connection, Message_t *message);
@@ -172,6 +175,7 @@ static Connection_t connections[MAX_CONNECTIONS];
 static char *infoStreamerName;
 static char *authUsername;
 static char *authPassword;
+static Message_t * QuoteMessage;
 
 static time_t serverStartTime;
 
@@ -343,6 +347,9 @@ static void ProcessMessage(Connection_t *connection, Message_t *message)
         case MSGCODE_AUTH:
             ProcessAuth(connection, message);
             break;
+        case MSGCODE_QUOT:
+            IFAUTHENTICATED(ProcessQuote, connection, message);
+            break;
             /* Control Messages */
         case MSGCODE_CSPS:
             IFAUTHENTICATED(ProcessPrimaryServiceSelect, connection, message);
@@ -474,6 +481,38 @@ static void ProcessAuth(Connection_t *connection, Message_t *message)
     MessageRERR(message, connection->authenticated ? RERR_OK : RERR_NOTAUTHORISED, NULL);
     free(msgUsername);
     free(msgPassword);
+}
+
+static void ProcessQuote(Connection_t *connection, Message_t *message)
+{
+    char *command = NULL;
+
+    READSTRING(command);
+    MessageReset(message);
+    MessageSetCode(message, MSGCODE_RTXT);
+    QuoteMessage = message;
+    CommandPrintf = QuoteMessagePrintf;
+    if (!CommandExecute( command))
+    {
+        MessageRERR(message, RERR_GENERIC, "Unknown command");
+    }
+    free(command);
+
+}
+
+static void QuoteMessagePrintf(char *fmt, ...)
+{
+    int available;
+    int result;
+    char *buffer;
+    va_list valist;
+    va_start(valist, fmt);
+    available = MESSAGE_MAX_LENGTH - QuoteMessage->currentpos;
+    buffer = QuoteMessage->buffer + QuoteMessage->currentpos;
+    result = vsnprintf(buffer,available, fmt, valist);
+    QuoteMessage->currentpos += result;
+    QuoteMessage->length = QuoteMessage->currentpos;
+    va_end(valist);
 }
 
 static void ProcessPrimaryServiceSelect(Connection_t *connection, Message_t *message)
