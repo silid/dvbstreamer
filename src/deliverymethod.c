@@ -20,30 +20,83 @@ deliverymethod.h
 Delivery Method management functions.
 
 */
+#include <stdlib.h>
+#include <string.h>
+
+#include "logging.h"
+#include "list.h"
 #include "deliverymethod.h"
 
+static void DeliveryMethodOutputPacket(PIDFilter_t *pidfilter, void *userarg, TSPacket_t* packet);
+
+static List_t *DeliveryMethodsList;
 int DeliveryMethodManagerInit(void)
 {
-    return 0;
+    DeliveryMethodsList = ListCreate();
+    if (DeliveryMethodsList)
+    {
+        return 0;
+    }
+    return -1;
 }
 
 void DeliveryMethodManagerDeInit(void)
 {
+    ListFree(DeliveryMethodsList);
 }
 
 void DeliveryMethodManagerRegister(DeliveryMethodHandler_t *handler)
 {
+    ListAdd(DeliveryMethodsList, handler);
 }
 
 void DeliveryMethodManagerUnRegister(DeliveryMethodHandler_t *handler)
 {
+    ListRemove(DeliveryMethodsList, handler);
 }
 
 bool DeliveryMethodManagerFind(char *mrl, PIDFilter_t *filter)
 {
+    ListIterator_t iterator;
+    for ( ListIterator_Init(iterator, DeliveryMethodsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    {
+        DeliveryMethodHandler_t *handler = ListIterator_Current(iterator);
+        if (handler->CanHandle(mrl))
+        {
+            DeliveryMethodInstance_t *instance = handler->CreateInstance(mrl);
+            if (instance)
+            {
+                filter->outputpacket = DeliveryMethodOutputPacket;
+                filter->oparg = instance;
+                if (instance->mrl == NULL)
+                {
+                    instance->mrl = strdup(mrl);
+                }
+                return TRUE;
+            }
+        }
+    }
     return FALSE;
 }
 
 void DeliveryMethodManagerFree(PIDFilter_t *filter)
 {
+    DeliveryMethodInstance_t *instance = filter->oparg;
+    instance->DestroyInstance(instance);
+    filter->oparg = NULL;
+}
+
+char* DeliveryMethodGetMRL(PIDFilter_t *filter)
+{
+    DeliveryMethodInstance_t *instance = filter->oparg;
+    return instance->mrl;
+}
+
+static void DeliveryMethodOutputPacket(PIDFilter_t *pidfilter, void *userarg, TSPacket_t* packet)
+{
+    DeliveryMethodInstance_t *instance = userarg;
+    if (instance)
+    {
+        instance->SendPacket(instance, packet);
+    }
 }
