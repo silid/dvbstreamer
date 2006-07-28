@@ -80,7 +80,7 @@ void TSFilterEnable(TSFilter_t* tsfilter, bool enable)
 void TSFilterZeroStats(TSFilter_t* tsfilter)
 {
     ListIterator_t iterator;
-
+    pthread_mutex_lock(&tsfilter->mutex);
     /* Clear all filter stats */
     tsfilter->totalpackets = 0;
     tsfilter->bitrate = 0;
@@ -92,6 +92,7 @@ void TSFilterZeroStats(TSFilter_t* tsfilter)
         filter->packetsprocessed = 0;
         filter->packetsoutput    = 0;
     }
+    pthread_mutex_unlock(&tsfilter->mutex);
 }
 
 PIDFilter_t* PIDFilterAllocate(TSFilter_t* tsfilter)
@@ -172,10 +173,11 @@ static void *FilterTS(void *arg)
         int p;
         //Read in packet
         count = DVBDVRRead(adapter, (char*)state->readbuffer, sizeof(state->readbuffer), 100);
-        if ((state->quit) || (count == -1))
+        if (state->quit)
         {
             break;
         }
+
         pthread_mutex_lock(&state->mutex);
         for (p = 0; (p < (count / TSPACKET_SIZE)) && state->enabled; p ++)
         {
