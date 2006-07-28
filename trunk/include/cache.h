@@ -32,7 +32,16 @@ Caches service and PID information from the database for the current multiplex.
  * @{
  */
 
+/**
+ * @internal
+ * Initialise the cache module.
+ */
 int CacheInit();
+
+/**
+ * @internal
+ * De-initialise the cache module, release all services and pids.
+ */
 void CacheDeInit();
 
 /**
