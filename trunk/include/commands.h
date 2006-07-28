@@ -74,5 +74,13 @@ int CommandProcessFile(char *file);
  */
 bool CommandExecute(char *command);
 
+/**
+ * Printf style output function that should be in command functions to send
+ * data to the user.
+ * @param fmt Printf format.
+ * @return Number of bytes printed.
+ */
+int (*CommandPrintf)(char *fmt, ...);
+
 /** @} */
 #endif
