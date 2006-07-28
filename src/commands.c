@@ -955,7 +955,7 @@ static void CommandFEStatus(int argc, char **argv)
     unsigned int ber, strength, snr;
     DVBFrontEndStatus(DVBAdapter, &status, &ber, &strength, &snr);
 
-    fprintf(rl_outstream,"Tuner status:  %s%s%s%s%s%s\n",
+    CommandPrintf("Tuner status:  %s%s%s%s%s%s\n",
              (status & FE_HAS_SIGNAL)?"Signal, ":"",
              (status & FE_TIMEDOUT)?"Timed out, ":"",
              (status & FE_HAS_LOCK)?"Lock, ":"",
