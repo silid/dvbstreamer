@@ -96,6 +96,18 @@ Field IDs
 
 --CODES-END--
 
+QUOTE Message
+-------------
+
+QUOT = Quote a command to execute (like FTP quote)
+
+    DATA
+	-------------------
+	| Command (STRING)|
+	-------------------
+
+	Response: RERR (If not authenticated) or RTXT for the text output from the command.
+
 Cxxx Control Messages
 ---------------------
 CSxx = Control Service messages
@@ -311,6 +323,15 @@ RLS  = Response Services List
 	|Services Count (uint16)| Service Name (STRING)| ...  |
 	------------------------------------------------     --
 
+RTXT = Response Text
+
+    Entire contents of the packet is printable characters for text output from
+    commands.
+
+	DATA
+	-----    --
+	|Text ... |
+	-----    --
 
 
 Message Codes/Names to Values
@@ -319,6 +340,7 @@ Message Codes/Names to Values
 
 0x0000 = INFO = Information message
 0x0001 = AUTH = Authenticate
+0x0002 = QUOT = Quote command
 
 0x1101 = CSPS = Control Service Primary Select - Select Primary Service
 0x1102 = CSSA = Control Service Secondary Add - Add secondary service
@@ -348,6 +370,7 @@ Message Codes/Names to Values
 0xF005 = RTSS = Response TS Stats
 0xF006 = RFES = Response Front End Status
 0xF007 = RLS  = Response Services List
+0xF008 = RTXT = Response Text
 0xFFFF = RERR = Response Error
 
 --CODES-END--
