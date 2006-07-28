@@ -36,6 +36,7 @@ Delivery Method management functions.
  * @code
  * struct UDPOutputDeliveryMethodInstance_t
  * {
+    char *mrl;
  * 	void (*SendPacket)(DeliveryMethodInstance_t *this, TSPacket_t packet);
  * 	void (*DestroyInstance)(DeliveryMethodInstance_t *this);
  * 	int tos;
@@ -48,7 +49,20 @@ Delivery Method management functions.
  */
 typedef struct DeliveryMethodInstance_t
 {
-	void (*SendPacket)(struct DeliveryMethodInstance_t *this, TSPacket_t packet);
+    /**
+     * The media resource locator used to create the instance.
+     */
+    char *mrl;
+    /**
+     * Send a packet.
+     * @param this The instance of the DeliveryMethodInstance_t to send the packet using.
+     * @param packet The packet to send.
+     */
+	void (*SendPacket)(struct DeliveryMethodInstance_t *this, TSPacket_t *packet);
+	/**
+	 * Destroy an instace of DeliveryMethodInstance_t.
+	 * @param this The instance of the DeliveryMethodInstance_t to free.
+	 */
 	void (*DestroyInstance)(struct DeliveryMethodInstance_t *this);
 }DeliveryMethodInstance_t;
 
@@ -63,7 +77,7 @@ typedef struct DeliveryMethodInstance_t
  */
 typedef struct DeliveryMethodHandler_t
 {
-	void (*CanHandle)(char *mrl); /**< Function callback to test if the handler can handle the specified mrl. */
+	bool (*CanHandle)(char *mrl); /**< Function callback to test if the handler can handle the specified mrl. */
 	DeliveryMethodInstance_t* (*CreateInstance)(char *mrl); /**< Function to create an instance for the specified mrl. */
 }DeliveryMethodHandler_t;
 
@@ -105,6 +119,13 @@ bool DeliveryMethodManagerFind(char *mrl, PIDFilter_t *filter);
  * @param filter The PID filter to release the handler from.
  */
 void DeliveryMethodManagerFree(PIDFilter_t *filter);
+
+/**
+ * Retrieve the mrl used to setup the output on the specified filter.
+ * @param filter The PIDFilter to retrieve the MRL from.
+ * @return The MRL string.
+ */
+char* DeliveryMethodGetMRL(PIDFilter_t *filter);
 
 /** @} */
 #endif
