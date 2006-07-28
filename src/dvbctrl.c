@@ -173,7 +173,7 @@ static void CommandAddRmPID(char *argv[]);
 static void CommandListSFS(char *argv[]);
 static void CommandSetSF(char *argv[]);
 static void CommandFEStatus(char *argv[]);
-
+static void CommandQuote(char *argv[]);
 
 /* Used by logging to determine whether to include date/time info */
 int DaemonMode = FALSE;
@@ -302,6 +302,12 @@ static Command_t commands[] =
             "Displays whether the front end is locked, the bit error rate and signal to noise"
             "ratio and the signal strength",
             CommandFEStatus
+        },
+        {
+            "quote", 1,
+            "Takes \"<command> <parameters>\"\n"
+            "Send the command and parameters to be executed by the server.",
+            CommandQuote
         },
         {
             NULL, 0, NULL, NULL
@@ -819,6 +825,19 @@ static void CommandFEStatus(char *argv[])
            (status & FE_HAS_VITERBI)?"VITERBI, ":"",
            (status & FE_HAS_SYNC)?"Sync, ":"");
     printf("BER = %u Signal Strength = %u SNR = %u\n", (unsigned int)ber, (unsigned int)strength, (unsigned int)snr);
+}
+
+static void CommandQuote(char *argv[])
+{
+    AUTHENTICATE();
+
+    MessageInit(&message, MSGCODE_QUOT);
+    MessageEncode(&message, "s", argv[1]);
+
+    MESSAGE_SENDRECV();
+
+    CHECK_EXPECTED(MSGCODE_RTXT);
+    fwrite(message.buffer, 1, message.length, stdout);
 }
 
 static bool Authenticate()
