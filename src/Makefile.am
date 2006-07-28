@@ -29,10 +29,13 @@ dvbstreamer_SOURCES = \
 	dbase.c\
 	cache.c\
 	logging.c\
-    commands.c \
-    binarycomms.c \
-    messages.c \
-    outputs.c
+    commands.c\
+    binarycomms.c\
+    messages.c\
+    outputs.c\
+    list.c\
+    deliverymethod.c\
+    pluginmgr.c
 
 dvbstreamer_LDFLAGS =
 

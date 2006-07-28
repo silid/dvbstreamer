@@ -51,6 +51,7 @@ Entry point to the application.
 #include "commands.h"
 #include "outputs.h"
 #include "binarycomms.h"
+#include "deliverymethod.h"
 
 
 static void usage(char *appname);
@@ -78,7 +79,6 @@ int main(int argc, char *argv[])
     char *startupFile = NULL;
     fe_type_t channelsFileType = FE_OFDM;
     char channelsFile[PATH_MAX];
-    void *outputArg = NULL;
     int i;
     int adapterNumber = 0;
 
@@ -176,6 +176,15 @@ int main(int argc, char *argv[])
         exit(1);
     }
     printlog(LOG_DEBUGV, "Cache initalised\n");
+
+    if (DeliveryMethodManagerInit())
+    {
+        printlog(LOG_ERROR,"Failed to initialise Delivery Method manager\n");
+        exit(1);
+    }
+    printlog(LOG_DEBUGV, "Delivery Method manager initalised\n");
+
+    UDPOutputRegister();
 
     if (strlen(channelsFile))
     {
@@ -304,8 +313,10 @@ int main(int argc, char *argv[])
     TSFilterDestroy(TSFilter);
     printlog(LOG_DEBUGV, "TSFilter destroyed\n");
 
-    UDPOutputClose(outputArg);
-    printlog(LOG_DEBUGV, "UDPOutput closed\n");
+    UDPOutputUnRegister();
+
+    DeliveryMethodManagerDeInit();
+    printlog(LOG_DEBUGV, "Delivery Method manager deinitalised\n");
 
     CacheDeInit();
     printlog(LOG_DEBUGV, "Cache deinitalised\n");

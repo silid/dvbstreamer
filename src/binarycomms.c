@@ -42,6 +42,7 @@ Binary Communications protocol for control DVBStreamer.
 #include "messages.h"
 #include "main.h"
 #include "binarycomms.h"
+#include "deliverymethod.h"
 
 
 #define MAX_CONNECTIONS 2 /* 1 for monitoring by web and another for control */
@@ -726,7 +727,7 @@ static void ProcessSecondaryServiceList(Connection_t *connection, Message_t *mes
             }
             MessageEncode(message,"sss",
                 Outputs[i].name,
-                UDPOutputDestination((void*)Outputs[i].filter->oparg),
+                DeliveryMethodGetMRL(Outputs[i].filter),
                 name);
             outputsCount ++;
         }
@@ -747,7 +748,7 @@ static void ProcessOutputsList(Connection_t *connection, Message_t *message)
         {
             MessageEncode(message, "ss",
                 Outputs[i].name,
-                UDPOutputDestination((void*)Outputs[i].filter->oparg));
+                DeliveryMethodGetMRL(Outputs[i].filter));
             outputsCount ++;
         }
     }

@@ -1,24 +1,24 @@
 /*
 Copyright (C) 2006  Adam Charrett
- 
+
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
- 
+
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
- 
+
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
- 
+
 Outputs.c
- 
+
 Additional output management functions.
- 
+
 */
 
 #include <stdlib.h>
@@ -30,6 +30,7 @@ Additional output management functions.
 #include "udpoutput.h"
 #include "outputs.h"
 #include "main.h"
+#include "deliverymethod.h"
 
 
 char *OutputErrorStr;
@@ -59,7 +60,7 @@ Output_t *OutputAllocate(char *name, OutputType type, char *destination)
 {
     Output_t *output = NULL;
     int i;
-    
+
     for (i = 0; i < MAX_OUTPUTS; i ++)
     {
         if (Outputs[i].name && (strcmp(name, Outputs[i].name) == 0) &&
@@ -109,11 +110,10 @@ Output_t *OutputAllocate(char *name, OutputType type, char *destination)
             return NULL;
     }
     output->type = type;
-    output->filter->outputpacket = UDPOutputPacketOutput;
-    output->filter->oparg = UDPOutputCreate(destination);
-    if (!output->filter->oparg)
+
+    if (!DeliveryMethodManagerFind(destination, output->filter))
     {
-        OutputErrorStr = "Failed to parse ip and udp port!";
+        OutputErrorStr = "Failed to find a delivery method!";
         free(output->filter->fparg);
         PIDFilterFree(output->filter);
         return NULL;
@@ -140,10 +140,10 @@ void OutputFree(Output_t *output)
             OutputErrorStr = "Unknown output type!";
             return;
     }
-    
+
     free(output->name);
-    
-    UDPOutputClose(output->filter->oparg);
+
+    DeliveryMethodManagerFree(output->filter);
     memset(output, 0, sizeof(Output_t));
 }
 
@@ -153,7 +153,7 @@ Output_t *OutputFind(char *name, OutputType type)
     int i;
     for (i = 0; i < MAX_OUTPUTS; i ++)
     {
-        if (Outputs[i].name && 
+        if (Outputs[i].name &&
             (strcmp(Outputs[i].name,name) == 0) && (Outputs[i].type == type))
         {
             output = &Outputs[i];
@@ -171,7 +171,7 @@ int OutputAddPID(Output_t *output, uint16_t pid)
         OutputErrorStr = "Not a Manual Output!";
         return 1;
     }
-    
+
     pids = (PIDFilterSimpleFilter_t *)output->filter->fparg;
     if (pids->pidcount == MAX_PIDS)
     {
@@ -180,7 +180,7 @@ int OutputAddPID(Output_t *output, uint16_t pid)
     }
     pids->pids[pids->pidcount] = pid;
     pids->pidcount ++;
-    
+
     return 0;
 }
 
@@ -193,7 +193,7 @@ int OutputRemovePID(Output_t *output, uint16_t pid)
         OutputErrorStr = "Not a Manual Output!";
         return 1;
     }
-    
+
     pids = (PIDFilterSimpleFilter_t *)output->filter->fparg;
     for ( i = 0; i < pids->pidcount; i ++)
     {
@@ -217,7 +217,7 @@ int OutputGetPIDs(Output_t *output, int *pidcount, uint16_t **pids)
         OutputErrorStr = "Not a Manual Output!";
         return 1;
     }
-    
+
     pidfilter = (PIDFilterSimpleFilter_t *)output->filter->fparg;
     *pidcount = pidfilter->pidcount;
     *pids = pidfilter->pids;
@@ -231,7 +231,7 @@ int OutputSetService(Output_t *output, Service_t *service)
         OutputErrorStr = "Not a Service Output!";
         return 1;
     }
-    
+
     ServiceFilterServiceSet(output->filter, service);
     return 0;
 }
@@ -243,7 +243,7 @@ int OutputGetService(Output_t *output, Service_t **service)
         OutputErrorStr = "Not a Service Output!";
         return 1;
     }
-    
+
     *service = ServiceFilterServiceGet(output->filter);
     return 0;
 }
