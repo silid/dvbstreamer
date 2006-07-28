@@ -72,6 +72,7 @@ bool DeliveryMethodManagerFind(char *mrl, PIDFilter_t *filter)
                 {
                     instance->mrl = strdup(mrl);
                 }
+                printlog(LOG_DEBUG, "Created DeliveryMethodInstance(%p) for %s\n",instance, instance->mrl);
                 return TRUE;
             }
         }
@@ -82,8 +83,11 @@ bool DeliveryMethodManagerFind(char *mrl, PIDFilter_t *filter)
 void DeliveryMethodManagerFree(PIDFilter_t *filter)
 {
     DeliveryMethodInstance_t *instance = filter->oparg;
-    instance->DestroyInstance(instance);
-    filter->oparg = NULL;
+    if (instance)
+    {
+        instance->DestroyInstance(instance);
+        filter->oparg = NULL;
+    }
 }
 
 char* DeliveryMethodGetMRL(PIDFilter_t *filter)

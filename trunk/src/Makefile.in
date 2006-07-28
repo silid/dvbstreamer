@@ -61,7 +61,8 @@ am_dvbstreamer_OBJECTS = main.$(OBJEXT) dvb.$(OBJEXT) \
 	patprocessor.$(OBJEXT) pmtprocessor.$(OBJEXT) \
 	sdtprocessor.$(OBJEXT) servicefilter.$(OBJEXT) dbase.$(OBJEXT) \
 	cache.$(OBJEXT) logging.$(OBJEXT) commands.$(OBJEXT) \
-	binarycomms.$(OBJEXT) messages.$(OBJEXT) outputs.$(OBJEXT)
+	binarycomms.$(OBJEXT) messages.$(OBJEXT) outputs.$(OBJEXT) \
+	list.$(OBJEXT) deliverymethod.$(OBJEXT) pluginmgr.$(OBJEXT)
 dvbstreamer_OBJECTS = $(am_dvbstreamer_OBJECTS)
 dvbstreamer_DEPENDENCIES =
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
@@ -211,10 +212,13 @@ dvbstreamer_SOURCES = \
 	dbase.c\
 	cache.c\
 	logging.c\
-    commands.c \
-    binarycomms.c \
-    messages.c \
-    outputs.c
+    commands.c\
+    binarycomms.c\
+    messages.c\
+    outputs.c\
+    list.c\
+    deliverymethod.c\
+    pluginmgr.c
 
 dvbstreamer_LDFLAGS = 
 dvbstreamer_LDADD = \
@@ -305,8 +309,10 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/commands.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dbase.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/deliverymethod.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dvb.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dvbctrl.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/list.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/logging.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/messages.Po@am__quote@
@@ -314,6 +320,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/outputs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/parsezap.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/patprocessor.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pluginmgr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pmtprocessor.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sdtprocessor.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/servicefilter.Po@am__quote@

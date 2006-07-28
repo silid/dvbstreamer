@@ -17,17 +17,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 
 udpoutput.h
 
-UDP Output functions
+UDP Output Delivery Method handler.
 
 */
 #ifndef _UDPOUTPUT_H
 #define _UDPOUTPUT_H
-#include "ts.h"
-
-void *UDPOutputCreate(char *arg);
-void UDPOutputClose(void *udpoutput);
-void UDPOutputDatagramFullCountSet(void *udpoutput, int fullcount);
-int UDPOutputDatagramFullCountGet(void *udpoutput);
-void UDPOutputPacketOutput(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
-char *UDPOutputDestination(void *arg);
+void UDPOutputRegister(void);
+void UDPOutputUnRegister(void);
 #endif
