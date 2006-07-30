@@ -39,6 +39,7 @@ typedef struct ListEntry_t
 
 typedef struct List_t
 {
+    int count;
     ListEntry_t *head;
     ListEntry_t *tail;
 }List_t;
@@ -132,6 +133,13 @@ bool ListInsertAfterCurrent(ListIterator_t *iterator, void *data);
  * @param iterator Iterator pointer to the current entry in the list to remove.
  */
 void ListRemoveCurrent(ListIterator_t *iterator);
+
+/**
+ * Returns the number of entries in the specified list.
+ * @param _list The list to retrieve the number of entries from.
+ * @return The number of entries in the list.
+ */
+#define ListCount(_list) (_list)->count
 
 /**
  * Dump the structure of a list.

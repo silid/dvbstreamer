@@ -748,28 +748,27 @@ static void ProcessPrimaryServiceCurrent(Connection_t *connection, Message_t *me
 
 static void ProcessSecondaryServiceList(Connection_t *connection, Message_t *message)
 {
-    int i;
+    ListIterator_t iterator;
     uint8_t outputsCount = 0;
     MessageInit(message, MSGCODE_RSSL);
     MessageWriteUint8(message, outputsCount);
-    for (i = 0; i < MAX_OUTPUTS; i ++)
-    {
-        if (Outputs[i].name && (Outputs[i].type == OutputType_Service))
-        {
-            Service_t *service = NULL;
-            char *name = NULL;
 
-            OutputGetService(&Outputs[i], &service);
-            if (service)
-            {
-                name = service->name;
-            }
-            MessageEncode(message,"sss",
-                Outputs[i].name,
-                DeliveryMethodGetMRL(Outputs[i].filter),
-                name);
-            outputsCount ++;
+    for ( ListIterator_Init(iterator, ServiceOutputsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    {
+        Output_t *output = ListIterator_Current(iterator);
+        Service_t *service = NULL;
+        char *name = NULL;
+
+        OutputGetService(output, &service);
+        if (service)
+        {
+            name = service->name;
         }
+        MessageEncode(message,"sss",
+            output->name,
+            DeliveryMethodGetMRL(output->filter),
+            name);
+        outputsCount ++;
     }
     MessageSeek(message, 0);
     MessageWriteUint8(message, outputsCount);
@@ -777,19 +776,19 @@ static void ProcessSecondaryServiceList(Connection_t *connection, Message_t *mes
 
 static void ProcessOutputsList(Connection_t *connection, Message_t *message)
 {
-    int i;
+    ListIterator_t iterator;
     uint8_t outputsCount = 0;
+
     MessageInit(message, MSGCODE_ROLO);
     MessageWriteUint8(message, outputsCount);
-    for (i = 0; i < MAX_OUTPUTS; i ++)
+
+    for ( ListIterator_Init(iterator, ManualOutputsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
-        if (Outputs[i].name && (Outputs[i].type == OutputType_Manual))
-        {
-            MessageEncode(message, "ss",
-                Outputs[i].name,
-                DeliveryMethodGetMRL(Outputs[i].filter));
-            outputsCount ++;
-        }
+        Output_t *output = ListIterator_Current(iterator);
+        MessageEncode(message, "ss",
+            output->name,
+            DeliveryMethodGetMRL(output->filter));
+        outputsCount ++;
     }
     MessageSeek(message, 0);
     MessageWriteUint8(message, outputsCount);
