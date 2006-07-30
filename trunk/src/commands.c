@@ -705,6 +705,7 @@ static void CommandPids(int argc, char **argv)
 static void CommandStats(int argc, char **argv)
 {
     int i;
+    ListIterator_t iterator;
     CommandPrintf("PSI/SI Processor Statistics\n"
                           "---------------------------\n");
 
@@ -716,25 +717,19 @@ static void CommandStats(int argc, char **argv)
 
     CommandPrintf("Service Filter Statistics\n"
                           "-------------------------\n");
-    for (i = 0; i < MAX_OUTPUTS; i ++)
+    for ( ListIterator_Init(iterator, ServiceOutputsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
-        if ((!Outputs[i].name) || (Outputs[i].type != OutputType_Service))
-        {
-            continue;
-        }
-        CommandPrintf("\t%-15s : %d\n", Outputs[i].name, Outputs[i].filter->packetsoutput);
+        Output_t *output = ListIterator_Current(iterator);
+        CommandPrintf("\t%-15s : %d\n", output->name, output->filter->packetsoutput);
     }
     CommandPrintf("\n");
 
     CommandPrintf("Manual Output Statistics\n"
                           "------------------------\n");
-    for (i = 0; i < MAX_OUTPUTS; i ++)
+     for ( ListIterator_Init(iterator, ManualOutputsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
-        if ((!Outputs[i].name) || (Outputs[i].type != OutputType_Manual))
-        {
-            continue;
-        }
-        CommandPrintf("\t%-15s : %d\n", Outputs[i].name, Outputs[i].filter->packetsoutput);
+        Output_t *output = ListIterator_Current(iterator);
+        CommandPrintf("\t%-15s : %d\n", output->name, output->filter->packetsoutput);
     }
     CommandPrintf("\n");
 
@@ -777,14 +772,12 @@ static void CommandRmOutput(int argc, char **argv)
 
 static void CommandOutputs(int argc, char **argv)
 {
-    int i;
-    for (i = 0; i < MAX_OUTPUTS; i ++)
+    ListIterator_t iterator;
+    for ( ListIterator_Init(iterator, ManualOutputsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
-        if (Outputs[i].name && (Outputs[i].type == OutputType_Manual))
-        {
-            CommandPrintf("%10s : %s\n",Outputs[i].name,
-                   DeliveryMethodGetMRL(Outputs[i].filter));
-        }
+        Output_t *output = ListIterator_Current(iterator);
+        CommandPrintf("%10s : %s\n",output->name,
+                DeliveryMethodGetMRL(output->filter));
     }
 }
 
@@ -885,17 +878,15 @@ static void CommandRemoveSSF(int argc, char **argv)
 
 static void CommandSSFS(int argc, char **argv)
 {
-    int i;
-    for (i = 0; i < MAX_OUTPUTS; i ++)
+    ListIterator_t iterator;
+    for ( ListIterator_Init(iterator, ServiceOutputsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
-        if (Outputs[i].name && (Outputs[i].type == OutputType_Service))
-        {
-            Service_t *service;
-            OutputGetService(&Outputs[i], &service);
-            CommandPrintf("%10s : %s (%s)\n",Outputs[i].name,
-                   DeliveryMethodGetMRL(Outputs[i].filter),
-                   service ? service->name:"<NONE>");
-        }
+        Output_t *output = ListIterator_Current(iterator);
+        Service_t *service;
+        OutputGetService(output, &service);
+        CommandPrintf("%10s : %s (%s)\n",output->name,
+                DeliveryMethodGetMRL(output->filter),
+                service ? service->name:"<NONE>");
     }
 }
 

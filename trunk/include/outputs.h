@@ -58,10 +58,14 @@ Output_t;
 extern char *OutputErrorStr;
 
 /**
- * Array containing all the outputs.
- * Only outputs with non NULL names are active.
+ * List of manual outputs.
  */
-extern Output_t Outputs[];
+extern List_t *ManualOutputsList;
+
+/**
+ * List of service filter outputs.
+ */
+extern List_t *ServiceOutputsList;
 
 /**
  * Initialises the Outputs module.

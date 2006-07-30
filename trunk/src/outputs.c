@@ -31,52 +31,59 @@ Additional output management functions.
 #include "outputs.h"
 #include "main.h"
 #include "deliverymethod.h"
-
+#include "list.h"
 
 char *OutputErrorStr;
-Output_t Outputs[MAX_OUTPUTS];
+
+List_t *ManualOutputsList;
+List_t *ServiceOutputsList;
 
 int OutputsInit()
 {
-    /* Clear all outputs */
-    memset(&Outputs, 0, sizeof(Outputs));
+    ManualOutputsList = ListCreate();
+    ServiceOutputsList = ListCreate();
     return 0;
 }
 
 void OutputsDeInit()
 {
-    int i;
-    for (i = 0; i < MAX_OUTPUTS; i ++)
+    ListIterator_t iterator;
+    for ( ListIterator_Init(iterator, ManualOutputsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
-        if (!Outputs[i].name)
-        {
-            continue;
-        }
-        OutputFree(&Outputs[i]);
+        OutputFree((Output_t*)ListIterator_Current(iterator));
     }
+    for ( ListIterator_Init(iterator, ServiceOutputsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    {
+        OutputFree((Output_t*)ListIterator_Current(iterator));
+    }
+    ListFree(ManualOutputsList);
+    ListFree( ServiceOutputsList);
 }
 
 Output_t *OutputAllocate(char *name, OutputType type, char *destination)
 {
     Output_t *output = NULL;
-    int i;
-
-    for (i = 0; i < MAX_OUTPUTS; i ++)
+    ListIterator_t iterator;
+    List_t *list = (type == OutputType_Manual) ? ManualOutputsList:ServiceOutputsList;
+    for ( ListIterator_Init(iterator, list); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
-        if (Outputs[i].name && (strcmp(name, Outputs[i].name) == 0) &&
-            (type == Outputs[i].type))
+        output = ListIterator_Current(iterator);
+        if (strcmp(name, output->name) == 0)
         {
             OutputErrorStr = "Output already exists!";
             return NULL;
         }
-        if ((output == NULL ) && (Outputs[i].name == NULL))
-        {
-            output = &Outputs[i];
-        }
     }
+    output = calloc(1, sizeof(Output_t));
     if (!output)
     {
-        OutputErrorStr = "No free output slots!";
+        OutputErrorStr = "Not enough memory!";
+        return NULL;
+    }
+    if (!ListAdd( list, output))
+    {
+        free(output);
+        OutputErrorStr = "Failed to add to list!";
         return NULL;
     }
     switch (type)
@@ -86,6 +93,8 @@ Output_t *OutputAllocate(char *name, OutputType type, char *destination)
             if (!output->filter)
             {
                 OutputErrorStr = "Failed to allocate PID filter!";
+                ListRemove( list, output);
+                free(output);
                 return NULL;
             }
             output->filter->filterpacket = PIDFilterSimpleFilter;
@@ -94,6 +103,8 @@ Output_t *OutputAllocate(char *name, OutputType type, char *destination)
             {
                 OutputErrorStr = "Failed to allocated PIDFilterSimpleFilter_t structure!";
                 PIDFilterFree(output->filter);
+                ListRemove( list, output);
+                free(output);
                 return NULL;
             }
             break;
@@ -102,6 +113,8 @@ Output_t *OutputAllocate(char *name, OutputType type, char *destination)
             if (!output->filter)
             {
                 OutputErrorStr = "Failed to allocate Service filter!";
+                ListRemove( list, output);
+                free(output);
                 return NULL;
             }
             break;
@@ -114,8 +127,18 @@ Output_t *OutputAllocate(char *name, OutputType type, char *destination)
     if (!DeliveryMethodManagerFind(destination, output->filter))
     {
         OutputErrorStr = "Failed to find a delivery method!";
-        free(output->filter->fparg);
-        PIDFilterFree(output->filter);
+        switch (type)
+        {
+            case OutputType_Manual:
+                free(output->filter->fparg);
+                PIDFilterFree(output->filter);
+                break;
+            case OutputType_Service:
+                ServiceFilterDestroy( output->filter);
+                break;
+        }
+        ListRemove( list, output);
+        free(output);
         return NULL;
     }
     output->filter->enabled = 1;
@@ -126,14 +149,17 @@ Output_t *OutputAllocate(char *name, OutputType type, char *destination)
 
 void OutputFree(Output_t *output)
 {
+    List_t *list;
     output->filter->enabled = 0;
     switch (output->type)
     {
         case OutputType_Manual:
+            list = ManualOutputsList;
             free(output->filter->fparg);
             PIDFilterFree(output->filter);
             break;
         case OutputType_Service:
+            list = ServiceOutputsList;
             ServiceFilterDestroy(output->filter);
             break;
         default:
@@ -144,23 +170,26 @@ void OutputFree(Output_t *output)
     free(output->name);
 
     DeliveryMethodManagerFree(output->filter);
-    memset(output, 0, sizeof(Output_t));
+    
+    ListRemove( list, output);
+    free(output);
 }
 
 Output_t *OutputFind(char *name, OutputType type)
 {
-    Output_t *output = NULL;
-    int i;
-    for (i = 0; i < MAX_OUTPUTS; i ++)
+    Output_t *result = NULL;
+    ListIterator_t iterator;
+    List_t *list = (type == OutputType_Manual) ? ManualOutputsList:ServiceOutputsList;
+    for ( ListIterator_Init(iterator, list); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
-        if (Outputs[i].name &&
-            (strcmp(Outputs[i].name,name) == 0) && (Outputs[i].type == type))
+        Output_t *output = ListIterator_Current(iterator);
+        if (strcmp(output->name,name) == 0)
         {
-            output = &Outputs[i];
+            result = output;
             break;
         }
     }
-    return output;
+    return result;;
 }
 
 int OutputAddPID(Output_t *output, uint16_t pid)

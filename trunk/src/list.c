@@ -73,6 +73,7 @@ bool ListInsertAfterCurrent(ListIterator_t *iterator, void *data)
     {
         iterator->list->tail = entry;
     }
+    iterator->list->count ++;
     return TRUE;
 }
 
@@ -101,6 +102,7 @@ bool ListInsertBeforeCurrent(ListIterator_t *iterator, void *data)
     {
         iterator->list->tail = entry;
     }
+    iterator->list->count ++;
     return TRUE;
 }
 
@@ -140,12 +142,13 @@ void ListRemoveCurrent(ListIterator_t *iterator)
         entry->next->prev = entry->prev;
     }
     free(entry);
+    iterator->list->count --;
 }
 
 void ListDump(List_t *list)
 {
     ListIterator_t iterator;
-    printlog(LOG_DEBUG, "Dumping list %p\n", list);
+    printlog(LOG_DEBUG, "Dumping list %p (%d entries)\n", list, list->count);
     for ( ListIterator_Init(iterator, list); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         printlog(LOG_DEBUG, "Current = %010p prev = %010p  next = %010p data = %010p\n",
