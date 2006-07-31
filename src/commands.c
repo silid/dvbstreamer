@@ -88,7 +88,7 @@ static char *PIDFilterNames[] = {
                                     "Service",
                                 };
 
-static Command_t commands[] = {
+static Command_t coreCommands[] = {
                                   {
                                       "quit",
                                       FALSE, 0, 0,
@@ -244,20 +244,36 @@ static Command_t commands[] = {
                               };
 static char *args[MAX_ARGS];
 static bool quit = FALSE;
+static List_t *commandsList;
 
 int CommandInit(void)
 {
-
     rl_readline_name = "DVBStreamer";
     rl_attempted_completion_function = AttemptComplete;
+    commandsList = ListCreate();
+    if (!commandsList)
+    {
+        printlog(LOG_ERROR, "Failed to allocate commandsList!\n");
+        return -1;
+    }
+    ListAdd( commandsList, coreCommands);
     return 0;
 }
 
 void CommandDeInit(void)
 {
-    /* Nothing to do for now */
+    ListFree( commandsList);
 }
 
+void CommandRegisterCommands(Command_t *commands)
+{
+    ListAdd( commandsList, commands);
+}
+
+void CommandUnRegisterCommands(Command_t *commands)
+{
+    ListRemove( commandsList, commands);
+}
 /**************** Command Loop/Startup file functions ************************/
 void CommandLoop(void)
 {
@@ -393,22 +409,30 @@ static char **AttemptComplete (const char *text, int start, int end)
 static char *CompleteCommand(const char *text, int state)
 {
     static int lastIndex = -1, textlen;
+    static ListIterator_t iterator;
     int i;
 
     if (state == 0)
     {
         lastIndex = -1;
         textlen = strlen(text);
+        ListIterator_Init(iterator, commandsList);
     }
 
-    for ( i = lastIndex + 1; commands[i].command; i ++)
+    do
     {
-        if (strncasecmp(text, commands[i].command, textlen) == 0)
+        Command_t *commands = ListIterator_Current(iterator);
+        for ( i = lastIndex + 1; commands[i].command; i ++)
         {
-            lastIndex = i;
-            return strdup(commands[i].command);
+            if (strncasecmp(text, commands[i].command, textlen) == 0)
+            {
+                lastIndex = i;
+                return strdup(commands[i].command);
+            }
         }
-    }
+        ListIterator_Next(iterator);
+    }while(ListIterator_MoreEntries(iterator));
+
     return NULL;
 }
 
@@ -419,54 +443,59 @@ static bool ProcessCommand(char *command, char *argument)
     int argc = 0;
     int i;
     bool commandFound = FALSE;
+    ListIterator_t iterator;
 
-    for (i = 0; commands[i].command; i ++)
+    for ( ListIterator_Init(iterator, commandsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
-        if (strcasecmp(command,commands[i].command) == 0)
+        Command_t *commands = ListIterator_Current(iterator);
+        for (i = 0; commands[i].command; i ++)
         {
-
-            if (argument)
+            if (strcasecmp(command,commands[i].command) == 0)
             {
-                if (commands[i].tokenise)
+
+                if (argument)
                 {
-                    argv = Tokenise(argument, &argc);
+                    if (commands[i].tokenise)
+                    {
+                        argv = Tokenise(argument, &argc);
+                    }
+                    else
+                    {
+                        argc = 1;
+                        argv = args;
+                        args[0] = argument;
+                    }
                 }
                 else
                 {
-                    argc = 1;
+                    argc = 0;
                     argv = args;
-                    args[0] = argument;
+                    args[0] = NULL;
                 }
-            }
-            else
-            {
-                argc = 0;
-                argv = args;
-                args[0] = NULL;
-            }
 
-            if ((argc >= commands[i].minargs) && (argc <= commands[i].maxargs))
-            {
-                commands[i].commandfunc(argc, argv );
-            }
-            else
-            {
-                CommandPrintf("Incorrect number of arguments see help for more information!\n\n%s\n\n",commands[i].longhelp);
-            }
-
-            if (commands[i].tokenise)
-            {
-                int a;
-
-                /* Free the arguments but not the array as that is a static array */
-                for (a = 0; a < argc; a ++)
+                if ((argc >= commands[i].minargs) && (argc <= commands[i].maxargs))
                 {
-                    free(argv[a]);
+                    commands[i].commandfunc(argc, argv );
                 }
-            }
+                else
+                {
+                    CommandPrintf("Incorrect number of arguments see help for more information!\n\n%s\n\n",commands[i].longhelp);
+                }
 
-            commandFound = TRUE;
-            break;
+                if (commands[i].tokenise)
+                {
+                    int a;
+
+                    /* Free the arguments but not the array as that is a static array */
+                    for (a = 0; a < argc; a ++)
+                    {
+                        free(argv[a]);
+                    }
+                }
+
+                commandFound = TRUE;
+                break;
+            }
         }
     }
     return commandFound;
@@ -959,28 +988,39 @@ static void CommandFEStatus(int argc, char **argv)
 static void CommandHelp(int argc, char **argv)
 {
     int i;
+    ListIterator_t iterator;
+
     if (argc)
     {
         int commandFound = 0;
-        for (i = 0; commands[i].command; i ++)
+
+        for ( ListIterator_Init(iterator, commandsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
         {
-            if (strcasecmp(commands[i].command,argv[0]) == 0)
+            Command_t *commands = ListIterator_Current(iterator);
+            for (i = 0; commands[i].command; i ++)
             {
-                CommandPrintf("%s\n\n", commands[i].longhelp);
-                commandFound = 1;
-                break;
+                if (strcasecmp(commands[i].command,argv[0]) == 0)
+                {
+                    CommandPrintf("%s\n\n", commands[i].longhelp);
+                    commandFound = 1;
+                    break;
+                }
             }
-        }
-        if (!commandFound)
-        {
-            CommandPrintf("No help for unknown command \"%s\"\n", argv[0]);
+            if (!commandFound)
+            {
+                CommandPrintf("No help for unknown command \"%s\"\n", argv[0]);
+            }
         }
     }
     else
     {
-        for (i = 0; commands[i].command; i ++)
+        for ( ListIterator_Init(iterator, commandsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
         {
-            CommandPrintf("%10s - %s\n", commands[i].command, commands[i].shorthelp);
+            Command_t *commands = ListIterator_Current(iterator);
+            for (i = 0; commands[i].command; i ++)
+            {
+                CommandPrintf("%10s - %s\n", commands[i].command, commands[i].shorthelp);
+            }
         }
     }
 }

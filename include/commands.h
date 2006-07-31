@@ -55,6 +55,19 @@ int CommandInit(void);
 void CommandDeInit(void);
 
 /**
+ * Register an array of commands to be used by the command processor.
+ * @param commands The command=NULL terminated array of commands to add,
+ */
+void CommandRegisterCommands(Command_t *commands);
+
+/**
+ * Unregister an array of commands previously registered by a call to 
+ * CommandRegisterCommands.
+ * @param commands The array of commands to remove.
+ */
+void CommandUnRegisterCommands(Command_t *commands);
+
+/**
  * Start interactive command loop.
  * This function returns when the user exits the command loop, or the ExitProgram variable is TRUE.
  */
