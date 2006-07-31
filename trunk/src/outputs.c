@@ -48,15 +48,15 @@ int OutputsInit()
 void OutputsDeInit()
 {
     ListIterator_t iterator;
-    for ( ListIterator_Init(iterator, ManualOutputsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    while(ManualOutputsList->head)
     {
-        OutputFree((Output_t*)ListIterator_Current(iterator));
+        OutputFree((Output_t*)ManualOutputsList->head->data);
     }
-    for ( ListIterator_Init(iterator, ServiceOutputsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    while(ServiceOutputsList->head)
     {
-        OutputFree((Output_t*)ListIterator_Current(iterator));
+        OutputFree((Output_t*)ServiceOutputsList->head->data);
     }
-    ListFree(ManualOutputsList);
+    ListFree( ManualOutputsList);
     ListFree( ServiceOutputsList);
 }
 
@@ -189,7 +189,7 @@ Output_t *OutputFind(char *name, OutputType type)
             break;
         }
     }
-    return result;;
+    return result;
 }
 
 int OutputAddPID(Output_t *output, uint16_t pid)
