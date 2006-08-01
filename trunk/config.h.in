@@ -1,18 +1,10 @@
 /* config.h.in.  Generated from configure.in by autoheader.  */
-#undef ENABLE_NLS
-#undef HAVE_CATGETS
-#undef HAVE_GETTEXT
-#undef HAVE_LC_MESSAGES
-#undef HAVE_STPCPY
-#undef HAVE_LIBSM
-#undef PACKAGE_LOCALE_DIR
-#undef PACKAGE_DOC_DIR
-#undef PACKAGE_DATA_DIR
-#undef PACKAGE_PIXMAPS_DIR
-#undef PACKAGE_HELP_DIR
-#undef PACKAGE_MENU_DIR
-#undef PACKAGE_SOURCE_DIR
-#undef GETTEXT_PACKAGE
+
+/* Define this to plugins directory location */
+#undef DVBSTREAMER_PLUGINDIR
+
+/* Define this to plugin directory relative to execution prefix */
+#undef DVBSTREAMER_REL_PLUGINDIR
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
@@ -50,8 +42,17 @@
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT
 
+/* Define this to data directory location */
+#undef PACKAGE_DATA_DIR
+
+/* Define this to Docs directory location */
+#undef PACKAGE_DOC_DIR
+
 /* Define to the full name of this package. */
 #undef PACKAGE_NAME
+
+/* Define this to source directory location */
+#undef PACKAGE_SOURCE_DIR
 
 /* Define to the full name and version of this package. */
 #undef PACKAGE_STRING
