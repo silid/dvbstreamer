@@ -40,7 +40,6 @@ Entry point to the application.
 #include "services.h"
 #include "dvb.h"
 #include "ts.h"
-#include "udpoutput.h"
 #include "main.h"
 #include "patprocessor.h"
 #include "pmtprocessor.h"
@@ -52,7 +51,7 @@ Entry point to the application.
 #include "outputs.h"
 #include "binarycomms.h"
 #include "deliverymethod.h"
-
+#include "pluginmgr.h"
 
 static void usage(char *appname);
 static void version(void);
@@ -184,8 +183,6 @@ int main(int argc, char *argv[])
     }
     printlog(LOG_DEBUGV, "Delivery Method manager initalised\n");
 
-    UDPOutputRegister();
-
     if (strlen(channelsFile))
     {
         printlog(LOG_INFO,"Importing services from %s\n", channelsFile);
@@ -234,6 +231,18 @@ int main(int argc, char *argv[])
     if (OutputsInit())
     {
         printlog(LOG_ERROR, "OutputsInit failed!\n");
+        exit(1);
+    }
+
+    /*
+     * Start plugins after outputs but before creating the primary output to
+     * allow pugins to create outputs and allow new delivery methods to be
+     *  registered.
+     */
+    if (PluginManagerInit())
+    {
+        printlog(LOG_ERROR, "PluginManagerInit failed!\n");
+        exit(1);
     }
 
     /* Create Service filter */
@@ -294,6 +303,13 @@ int main(int argc, char *argv[])
     OutputsDeInit();
     printlog(LOG_DEBUGV, "Outputs deinitialised\n");
 
+    /*
+     * Deinit Plugins after outputs so all delivery methods are properly torn
+     * down.
+     */
+    PluginManagerDeInit();
+    printlog(LOG_DEBUGV, "Plugins deinitialised\n");
+
     /* Disable all the filters */
     for (i = 0; i < PIDFilterIndex_Count; i ++)
     {
@@ -312,8 +328,6 @@ int main(int argc, char *argv[])
 
     TSFilterDestroy(TSFilter);
     printlog(LOG_DEBUGV, "TSFilter destroyed\n");
-
-    UDPOutputUnRegister();
 
     DeliveryMethodManagerDeInit();
     printlog(LOG_DEBUGV, "Delivery Method manager deinitalised\n");
