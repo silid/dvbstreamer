@@ -166,8 +166,21 @@ sharedstatedir = @sharedstatedir@
 subdirs = @subdirs@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
-dvbstreamer_includedir = $(pkgincludedir)
-dvbstreamer_include_DATA = 
+dvbstreamer_includedir = $(pkgincludedir)/dvbstreamer
+dvbstreamer_include_DATA = \
+    cache.h \
+    services.h \
+    multiplexes.h \
+    dvb.h \
+    main.h \
+    plugin.h \
+    types.h \
+    ts.h \
+    logging.h \
+    list.h \
+    commands.h \
+    deliverymethod.h
+
 EXTRA_DIST = $(dvbstreamer_include_DATA)
 all: all-am
 
