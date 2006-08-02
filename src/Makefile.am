@@ -4,24 +4,25 @@
 ## If you don't want it to overwrite it,
 ## 	Please disable it in the Anjuta project configuration
 
-INCLUDES =
+INCLUDES = @INCLTDL@
 
 AM_CFLAGS =\
-	-I$(srcdir)/../include\
+     -I$(srcdir)/../include \
 	 -Wall\
 	 -g
 
 bin_PROGRAMS = dvbstreamer dvbctrl
 
+#
+# DVBStreamer
+#
 dvbstreamer_SOURCES = \
 	main.c\
 	dvb.c\
 	parsezap.c\
 	multiplexes.c\
 	services.c\
-	udp.c\
 	ts.c\
-	udpoutput.c\
 	patprocessor.c\
 	pmtprocessor.c\
 	sdtprocessor.c\
@@ -40,8 +41,11 @@ dvbstreamer_SOURCES = \
 dvbstreamer_LDFLAGS =
 
 dvbstreamer_LDADD = \
-	 -ldvbpsi -lpthread -lsqlite3 -lreadline -ltermcap
+	 -ldvbpsi -lpthread -lsqlite3 -lreadline -ltermcap @LIBLTDL@
 
+#
+# dvbctrl
+#
 dvbctrl_SOURCES = \
     dvbctrl.c\
     messages.c\
@@ -50,3 +54,16 @@ dvbctrl_SOURCES = \
 dvbctrl_LDFLAGS =
 
 dvbctrl_LDADD =
+
+#
+# Plugins
+#
+pluginsdir = @DVBSTREAMER_PLUGINDIR@
+
+plugins_LTLIBRARIES = udpoutput.la
+
+udpoutput_la_SOURCES = \
+    udp.c \
+    udpoutput.c
+
+udpoutput_la_LDFLAGS = -module -avoid-version
