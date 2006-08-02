@@ -40,8 +40,8 @@ LIBOBJDIR =
 DIST_COMMON = README $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
 	$(top_srcdir)/configure AUTHORS COPYING ChangeLog INSTALL NEWS \
-	TODO acconfig.h config.guess config.sub depcomp install-sh \
-	ltmain.sh missing
+	TODO config.guess config.sub depcomp install-sh ltmain.sh \
+	missing
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/acinclude.m4 \
@@ -105,6 +105,7 @@ CXXFLAGS = @CXXFLAGS@
 CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
+DVBSTREAMER_PLUGINDIR = @DVBSTREAMER_PLUGINDIR@
 ECHO = @ECHO@
 ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
@@ -113,11 +114,13 @@ EGREP = @EGREP@
 EXEEXT = @EXEEXT@
 F77 = @F77@
 FFLAGS = @FFLAGS@
+INCLTDL = @INCLTDL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LDFLAGS = @LDFLAGS@
+LIBLTDL = @LIBLTDL@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
@@ -129,18 +132,12 @@ MAINTAINER_MODE_TRUE = @MAINTAINER_MODE_TRUE@
 MAKEINFO = @MAKEINFO@
 NO_PREFIX_PACKAGE_DATA_DIR = @NO_PREFIX_PACKAGE_DATA_DIR@
 NO_PREFIX_PACKAGE_DOC_DIR = @NO_PREFIX_PACKAGE_DOC_DIR@
-NO_PREFIX_PACKAGE_HELP_DIR = @NO_PREFIX_PACKAGE_HELP_DIR@
-NO_PREFIX_PACKAGE_MENU_DIR = @NO_PREFIX_PACKAGE_MENU_DIR@
-NO_PREFIX_PACKAGE_PIXMAPS_DIR = @NO_PREFIX_PACKAGE_PIXMAPS_DIR@
 OBJEXT = @OBJEXT@
 PACKAGE = @PACKAGE@
 PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
 PACKAGE_DATA_DIR = @PACKAGE_DATA_DIR@
 PACKAGE_DOC_DIR = @PACKAGE_DOC_DIR@
-PACKAGE_HELP_DIR = @PACKAGE_HELP_DIR@
-PACKAGE_MENU_DIR = @PACKAGE_MENU_DIR@
 PACKAGE_NAME = @PACKAGE_NAME@
-PACKAGE_PIXMAPS_DIR = @PACKAGE_PIXMAPS_DIR@
 PACKAGE_STRING = @PACKAGE_STRING@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_VERSION = @PACKAGE_VERSION@
@@ -191,9 +188,10 @@ prefix = @prefix@
 program_transform_name = @program_transform_name@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
+subdirs = @subdirs@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
-SUBDIRS = include src
+SUBDIRS = libltdl include src
 dvbstreamerdocdir = ${prefix}/doc/DVBStreamer
 dvbstreamerdoc_DATA = \
 	README\
@@ -252,7 +250,7 @@ config.h: stamp-h1
 stamp-h1: $(srcdir)/config.h.in $(top_builddir)/config.status
 	@rm -f stamp-h1
 	cd $(top_builddir) && $(SHELL) ./config.status config.h
-$(srcdir)/config.h.in: @MAINTAINER_MODE_TRUE@ $(am__configure_deps) $(top_srcdir)/acconfig.h
+$(srcdir)/config.h.in: @MAINTAINER_MODE_TRUE@ $(am__configure_deps) 
 	cd $(top_srcdir) && $(AUTOHEADER)
 	rm -f stamp-h1
 	touch $@
