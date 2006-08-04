@@ -7,7 +7,7 @@
 INCLUDES = @INCLTDL@
 
 AM_CFLAGS =\
-     -I$(srcdir)/../include \
+     -I$(top_srcdir)/include \
 	 -Wall\
 	 -g
 
@@ -55,15 +55,4 @@ dvbctrl_LDFLAGS =
 
 dvbctrl_LDADD =
 
-#
-# Plugins
-#
-pluginsdir = @DVBSTREAMER_PLUGINDIR@
 
-plugins_LTLIBRARIES = udpoutput.la
-
-udpoutput_la_SOURCES = \
-    udp.c \
-    udpoutput.c
-
-udpoutput_la_LDFLAGS = -module -no-undefined -avoid-version
