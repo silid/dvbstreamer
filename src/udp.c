@@ -43,13 +43,17 @@ int UDPCreateSocket(sa_family_t family)
 
     if (socketfd < 0)
     {
+        #ifndef __CYGWIN__
         printlog(LOG_ERROR, "socket() failed\n");
+        #endif
         return -1;
     }
 
     if (setsockopt(socketfd, SOL_SOCKET, SO_REUSEADDR, &reuseAddr, sizeof(int)))
     {
+        #ifndef __CYGWIN__
         printlog(LOG_ERROR,"setsockopt(SOL_SOCKET, SO_REUSEADDR) failed\n");
+        #endif
         close(socketfd);
         return -1;
     }

@@ -55,15 +55,16 @@ am__vpath_adj = case $$p in \
     *) f=$$p;; \
   esac;
 am__strip_dir = `echo $$p | sed -e 's|^.*/||'`;
-am__installdirs = "$(DESTDIR)$(dvbstreamer_includedir)"
-dvbstreamer_includeDATA_INSTALL = $(INSTALL_DATA)
-DATA = $(dvbstreamer_include_DATA)
+am__installdirs = "$(DESTDIR)$(pkgincludedir)"
+pkgincludeDATA_INSTALL = $(INSTALL_DATA)
+DATA = $(pkginclude_DATA)
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMDEP_FALSE = @AMDEP_FALSE@
 AMDEP_TRUE = @AMDEP_TRUE@
 AMTAR = @AMTAR@
 AR = @AR@
+AS = @AS@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
@@ -80,6 +81,9 @@ CXXFLAGS = @CXXFLAGS@
 CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
+DLLTOOL = @DLLTOOL@
+DVBSTREAMER_MAJOR = @DVBSTREAMER_MAJOR@
+DVBSTREAMER_MINOR = @DVBSTREAMER_MINOR@
 DVBSTREAMER_PLUGINDIR = @DVBSTREAMER_PLUGINDIR@
 ECHO = @ECHO@
 ECHO_C = @ECHO_C@
@@ -107,6 +111,7 @@ MAINTAINER_MODE_TRUE = @MAINTAINER_MODE_TRUE@
 MAKEINFO = @MAKEINFO@
 NO_PREFIX_PACKAGE_DATA_DIR = @NO_PREFIX_PACKAGE_DATA_DIR@
 NO_PREFIX_PACKAGE_DOC_DIR = @NO_PREFIX_PACKAGE_DOC_DIR@
+OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
 PACKAGE = @PACKAGE@
 PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
@@ -123,9 +128,12 @@ SHELL = @SHELL@
 STRIP = @STRIP@
 VERSION = @VERSION@
 ac_ct_AR = @ac_ct_AR@
+ac_ct_AS = @ac_ct_AS@
 ac_ct_CC = @ac_ct_CC@
 ac_ct_CXX = @ac_ct_CXX@
+ac_ct_DLLTOOL = @ac_ct_DLLTOOL@
 ac_ct_F77 = @ac_ct_F77@
+ac_ct_OBJDUMP = @ac_ct_OBJDUMP@
 ac_ct_RANLIB = @ac_ct_RANLIB@
 ac_ct_STRIP = @ac_ct_STRIP@
 am__fastdepCC_FALSE = @am__fastdepCC_FALSE@
@@ -166,8 +174,7 @@ sharedstatedir = @sharedstatedir@
 subdirs = @subdirs@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
-dvbstreamer_includedir = $(pkgincludedir)/dvbstreamer
-dvbstreamer_include_DATA = \
+pkginclude_DATA = \
     cache.h \
     services.h \
     multiplexes.h \
@@ -181,7 +188,7 @@ dvbstreamer_include_DATA = \
     commands.h \
     deliverymethod.h
 
-EXTRA_DIST = $(dvbstreamer_include_DATA)
+EXTRA_DIST = $(pkginclude_DATA)
 all: all-am
 
 .SUFFIXES:
@@ -224,22 +231,22 @@ clean-libtool:
 distclean-libtool:
 	-rm -f libtool
 uninstall-info-am:
-install-dvbstreamer_includeDATA: $(dvbstreamer_include_DATA)
+install-pkgincludeDATA: $(pkginclude_DATA)
 	@$(NORMAL_INSTALL)
-	test -z "$(dvbstreamer_includedir)" || $(mkdir_p) "$(DESTDIR)$(dvbstreamer_includedir)"
-	@list='$(dvbstreamer_include_DATA)'; for p in $$list; do \
+	test -z "$(pkgincludedir)" || $(mkdir_p) "$(DESTDIR)$(pkgincludedir)"
+	@list='$(pkginclude_DATA)'; for p in $$list; do \
 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
 	  f=$(am__strip_dir) \
-	  echo " $(dvbstreamer_includeDATA_INSTALL) '$$d$$p' '$(DESTDIR)$(dvbstreamer_includedir)/$$f'"; \
-	  $(dvbstreamer_includeDATA_INSTALL) "$$d$$p" "$(DESTDIR)$(dvbstreamer_includedir)/$$f"; \
+	  echo " $(pkgincludeDATA_INSTALL) '$$d$$p' '$(DESTDIR)$(pkgincludedir)/$$f'"; \
+	  $(pkgincludeDATA_INSTALL) "$$d$$p" "$(DESTDIR)$(pkgincludedir)/$$f"; \
 	done
 
-uninstall-dvbstreamer_includeDATA:
+uninstall-pkgincludeDATA:
 	@$(NORMAL_UNINSTALL)
-	@list='$(dvbstreamer_include_DATA)'; for p in $$list; do \
+	@list='$(pkginclude_DATA)'; for p in $$list; do \
 	  f=$(am__strip_dir) \
-	  echo " rm -f '$(DESTDIR)$(dvbstreamer_includedir)/$$f'"; \
-	  rm -f "$(DESTDIR)$(dvbstreamer_includedir)/$$f"; \
+	  echo " rm -f '$(DESTDIR)$(pkgincludedir)/$$f'"; \
+	  rm -f "$(DESTDIR)$(pkgincludedir)/$$f"; \
 	done
 tags: TAGS
 TAGS:
@@ -279,7 +286,7 @@ check-am: all-am
 check: check-am
 all-am: Makefile $(DATA)
 installdirs:
-	for dir in "$(DESTDIR)$(dvbstreamer_includedir)"; do \
+	for dir in "$(DESTDIR)$(pkgincludedir)"; do \
 	  test -z "$$dir" || $(mkdir_p) "$$dir"; \
 	done
 install: install-am
@@ -324,7 +331,7 @@ info: info-am
 
 info-am:
 
-install-data-am: install-dvbstreamer_includeDATA
+install-data-am: install-pkgincludeDATA
 
 install-exec-am:
 
@@ -350,18 +357,18 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-dvbstreamer_includeDATA uninstall-info-am
+uninstall-am: uninstall-info-am uninstall-pkgincludeDATA
 
 .PHONY: all all-am check check-am clean clean-generic clean-libtool \
 	distclean distclean-generic distclean-libtool distdir dvi \
 	dvi-am html html-am info info-am install install-am \
-	install-data install-data-am install-dvbstreamer_includeDATA \
-	install-exec install-exec-am install-info install-info-am \
-	install-man install-strip installcheck installcheck-am \
-	installdirs maintainer-clean maintainer-clean-generic \
-	mostlyclean mostlyclean-generic mostlyclean-libtool pdf pdf-am \
-	ps ps-am uninstall uninstall-am \
-	uninstall-dvbstreamer_includeDATA uninstall-info-am
+	install-data install-data-am install-exec install-exec-am \
+	install-info install-info-am install-man \
+	install-pkgincludeDATA install-strip installcheck \
+	installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-generic \
+	mostlyclean-libtool pdf pdf-am ps ps-am uninstall uninstall-am \
+	uninstall-info-am uninstall-pkgincludeDATA
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

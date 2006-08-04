@@ -1,10 +1,19 @@
 /* config.h.in.  Generated from configure.in by autoheader.  */
 
+/* DVBStreamer Major version number */
+#undef DVBSTREAMER_MAJOR
+
+/* DVBStreamer Minor version number */
+#undef DVBSTREAMER_MINOR
+
 /* Define this to plugins directory location */
 #undef DVBSTREAMER_PLUGINDIR
 
 /* Define this to plugin directory relative to execution prefix */
 #undef DVBSTREAMER_REL_PLUGINDIR
+
+/* DVBStreamer combined version number as an int */
+#undef DVBSTREAMER_VERSION
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H

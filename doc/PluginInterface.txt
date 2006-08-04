@@ -33,7 +33,8 @@ PLUGIN_FEATURE_TYPE_NONE           0x00
 PLUGIN_FEATURE_TYPE_FILTER         0x01
 PLUGIN_FEATURE_TYPE_PATPROCESSOR   0x02
 PLUGIN_FEATURE_TYPE_PMTPROCESSOR   0x03
-PLUGIN_FEATURE_TYPE_DELIVERYMETHOD 0x10
+PLUGIN_FEATURE_TYPE_DELIVERYMETHOD 0x04
+PLUGIN_FEATURE_TYPE_CHANNELCHANGE  0x05
 
 struct PluginFeature_t
 {
@@ -50,23 +51,12 @@ struct FilterHandler_t
 }
 
 type = PLUGIN_FEATURE_TYPE_PATPROCESSOR
-details = An instance of the following structure:
-(Implementors should consider the following structure as the 'base class' and
-should extend it with the state they require.)
-
-struct PluginPATProcessor_t
-{
-    void (*ProcessPAT)(PluginPATProcessor_t *this, dvbpsi_pat_t* newpat);
-}
+details = A function pointer to a function with the following prototype:
+void PluginPATProcessor(dvbpsi_pat_t* newpat);
 
 type = PLUGIN_FEATURE_TYPE_PMTPROCESSOR
-details = An instance of the following structure:
-(Implementors should consider the following structure as the 'base class' and
-should extend it with the state they require.)
-struct PluginPMTProcessor_t
-{
-    void (*ProcessPMT)(PluginPMTProcessor_t *this, dvbpsi_pmt_t* newpmt);
-}
+details =  A function pointer to a function with the following prototype:
+void PluginPMTProcessor(dvbpsi_pmt_t* newpmt);
 
 type = PLUGIN_FEATURE_TYPE_DELIVERYMETHOD
 details = An instance of the following structure
@@ -103,3 +93,11 @@ struct UDPOutputDeliveryMethodInstance_t
 	int packetCount;
 	char *buffer;
 }
+
+type = PLUGIN_FEATURE_TYPE_CHANNELCHANGE
+details = A function pointer to a function with the following prototype:
+void PluginChannelChanged(Multiplex_t *newMultiplex, Service_t *newService);
+
+PluginChannelChanged function pointer will be called every time the primary service
+filter is updated. newMultiplex will contain the current multiplex and newService
+will contain the currentService.
