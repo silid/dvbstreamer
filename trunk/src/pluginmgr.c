@@ -30,7 +30,7 @@ Plugin Manager functions.
 #include "plugin.h"
 #include "logging.h"
 
-static void PluginLoadPlugin(char *filename, void *userarg);
+static int PluginLoadPlugin(const char *filename, void *userarg);
 static void PluginInstallPlugin(Plugin_t *pluginInterface);
 static void PluginUninstallPlugin(Plugin_t *pluginInterface);
 
@@ -83,9 +83,10 @@ void PluginManagerDeInit(void)
     printlog(LOG_DEBUG, "Plugin Manager Deinitialised\n");
 }
 
-static void PluginLoadPlugin(char *filename, void *userarg)
+static int PluginLoadPlugin(const char *filename, void *userarg)
 {
     lt_dlhandle handle = lt_dlopenext(filename);
+    printlog(LOG_INFOV, "Attempting to load %s\n", filename);
     if (handle)
     {
         Plugin_t *pluginInterface = lt_dlsym(handle, "PluginInterface");
@@ -100,10 +101,10 @@ static void PluginLoadPlugin(char *filename, void *userarg)
                 if (ListAdd(PluginsList, entry))
                 {
                     printlog(LOG_INFOV, "Loaded plugin %s\n", pluginInterface->name);
-                    return;
+                    return 0;
                 }
                 free(entry);
-                return;
+                return 0;
             }
         }
         else
@@ -116,6 +117,7 @@ static void PluginLoadPlugin(char *filename, void *userarg)
     {
         printlog(LOG_DEBUGV, "Failed to open plugin %s - reason %s\n", filename, lt_dlerror());
     }
+    return 0;
 }
 
 static void PluginInstallPlugin(Plugin_t *pluginInterface)
