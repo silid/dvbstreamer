@@ -56,6 +56,9 @@ am__strip_dir = `echo $$p | sed -e 's|^.*/||'`;
 am__installdirs = "$(DESTDIR)$(pluginsdir)"
 pluginsLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(plugins_LTLIBRARIES)
+nulloutput_la_LIBADD =
+am_nulloutput_la_OBJECTS = nulloutput.lo
+nulloutput_la_OBJECTS = $(am_nulloutput_la_OBJECTS)
 udpoutput_la_LIBADD =
 am_udpoutput_la_OBJECTS = udp.lo udpoutput.lo
 udpoutput_la_OBJECTS = $(am_udpoutput_la_OBJECTS)
@@ -70,8 +73,8 @@ LTCOMPILE = $(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) \
 CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = $(udpoutput_la_SOURCES)
-DIST_SOURCES = $(udpoutput_la_SOURCES)
+SOURCES = $(nulloutput_la_SOURCES) $(udpoutput_la_SOURCES)
+DIST_SOURCES = $(nulloutput_la_SOURCES) $(udpoutput_la_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -200,12 +203,16 @@ AM_CFLAGS = \
 	 -g
 
 pluginsdir = @DVBSTREAMER_PLUGINDIR@
-plugins_LTLIBRARIES = udpoutput.la
+plugins_LTLIBRARIES = udpoutput.la nulloutput.la
 udpoutput_la_SOURCES = \
     udp.c \
     udpoutput.c
 
 udpoutput_la_LDFLAGS = -module -no-undefined -avoid-version
+nulloutput_la_SOURCES = \
+    nulloutput.c
+
+nulloutput_la_LDFLAGS = -module -no-undefined -avoid-version
 all: all-am
 
 .SUFFIXES:
@@ -266,6 +273,8 @@ clean-pluginsLTLIBRARIES:
 	  echo "rm -f \"$${dir}/so_locations\""; \
 	  rm -f "$${dir}/so_locations"; \
 	done
+nulloutput.la: $(nulloutput_la_OBJECTS) $(nulloutput_la_DEPENDENCIES) 
+	$(LINK) -rpath $(pluginsdir) $(nulloutput_la_LDFLAGS) $(nulloutput_la_OBJECTS) $(nulloutput_la_LIBADD) $(LIBS)
 udpoutput.la: $(udpoutput_la_OBJECTS) $(udpoutput_la_DEPENDENCIES) 
 	$(LINK) -rpath $(pluginsdir) $(udpoutput_la_LDFLAGS) $(udpoutput_la_OBJECTS) $(udpoutput_la_LIBADD) $(LIBS)
 
@@ -275,6 +284,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nulloutput.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/udp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/udpoutput.Plo@am__quote@
 
