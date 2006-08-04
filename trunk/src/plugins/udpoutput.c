@@ -32,7 +32,6 @@ UDP Output Delivery Method handler.
 #include "udp.h"
 #include "deliverymethod.h"
 #include "logging.h"
-#include "udpoutput.h"
 
 #define MTU 1400 /* Conservative estimate */
 #define IP_HEADER (5*4)
@@ -57,7 +56,7 @@ struct UDPOutputState_t
 };
 
 bool UDPOutputCanHandle(char *mrl);
-void *UDPOutputCreate(char *arg);
+DeliveryMethodInstance_t *UDPOutputCreate(char *arg);
 void UDPOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet);
 void UDPOutputDestroy(DeliveryMethodInstance_t *this);
 
@@ -82,7 +81,7 @@ bool UDPOutputCanHandle(char *mrl)
     return (strncmp(UDPPrefix, mrl, PREFIX_LEN) == 0);
 }
 
-void *UDPOutputCreate(char *arg)
+DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
 {
     char *host_start;
     int host_len;
