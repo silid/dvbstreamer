@@ -201,7 +201,7 @@ sharedstatedir = @sharedstatedir@
 subdirs = @subdirs@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
-SUBDIRS = libltdl include src
+SUBDIRS = libltdl include src src/plugins
 dvbstreamerdocdir = ${prefix}/doc/DVBStreamer
 dvbstreamerdoc_DATA = \
 	README\
