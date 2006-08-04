@@ -4,9 +4,8 @@
 ## If you don't want it to overwrite it,
 ## 	Please disable it in the Anjuta project configuration
 
-dvbstreamer_includedir = $(pkgincludedir)/dvbstreamer
 
-dvbstreamer_include_DATA = \
+pkginclude_DATA = \
     cache.h \
     services.h \
     multiplexes.h \
@@ -21,5 +20,5 @@ dvbstreamer_include_DATA = \
     deliverymethod.h
 
 
-EXTRA_DIST = $(dvbstreamer_include_DATA)
+EXTRA_DIST = $(pkginclude_DATA)
 

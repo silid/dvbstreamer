@@ -1,7 +1,28 @@
 dnl Process this file with autoconf to produce a configure script.
 
 AC_INIT(configure.in)
-AM_INIT_AUTOMAKE(DVBStreamer, 0.5)
+
+dnl
+dnl Versioning Information:
+dnl     Increment Major more radical changes (ie re-rights)
+dnl     Increment Minor more additional features which don't break things
+dnl
+dnl     Exception to this rule is the Major version 0, minor version will be
+dnl     incremented until we are ready to say DVBStreamer is no longer alpha.
+
+DVBSTREAMER_MAJOR=0
+DVBSTREAMER_MINOR=5
+
+AC_SUBST(DVBSTREAMER_MAJOR)
+AC_SUBST(DVBSTREAMER_MINOR)
+
+AC_DEFINE_UNQUOTED(DVBSTREAMER_MAJOR, $DVBSTREAMER_MAJOR, [DVBStreamer Major version number])
+AC_DEFINE_UNQUOTED(DVBSTREAMER_MINOR, $DVBSTREAMER_MINOR, [DVBStreamer Minor version number])
+AC_DEFINE_UNQUOTED(DVBSTREAMER_VERSION, ((DVBSTREAMER_MAJOR<<16) | (DVBSTREAMER_MINOR)), [DVBStreamer combined version number as an int])
+
+SPEC_VERSION=$DVBSTREAMER_MAJOR.$DVBSTREAMER_MINOR
+
+AM_INIT_AUTOMAKE(dvbstreamer, $SPEC_VERSION)
 AC_CONFIG_SUBDIRS(libltdl)
 AM_CONFIG_HEADER(config.h)
 AM_MAINTAINER_MODE
@@ -11,14 +32,14 @@ AC_PROG_CC
 AM_PROG_CC_STDC
 AC_HEADER_STDC
 
-
+AC_LIBTOOL_WIN32_DLL dnl Make sure under cygwin we can load plugins !!!
 AC_LIBTOOL_DLOPEN
 AC_LIBLTDL_CONVENIENCE
 AC_PROG_LIBTOOL
 AC_SUBST(INCLTDL)
 AC_SUBST(LIBLTDL)
 
-dnl Work out the libdir name (copied from DVBSTREAMER-lib configure.ac)
+dnl Work out the libdir name (copied from xine-lib configure.ac)
 AC_MSG_CHECKING([libdir name])
 case $host in
 *-*-linux*)
@@ -77,7 +98,7 @@ AC_DEFINE_UNQUOTED(PACKAGE_DOC_DIR, "${packageprefix}/${packagedocdir}", [Define
 AC_DEFINE_UNQUOTED(PACKAGE_SOURCE_DIR, "${packagesrcdir}", [Define this to source directory location])
 
 dnl
-dnl Work out the Plugins path (Copied from DVBSTREAMER-lib configure.ac)
+dnl Work out the Plugins path (Copied from xine-lib configure.ac)
 dnl
 if test "x$prefix" = xNONE; then
    prefix="${ac_default_prefix}"

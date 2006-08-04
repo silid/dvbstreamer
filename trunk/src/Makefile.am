@@ -66,4 +66,4 @@ udpoutput_la_SOURCES = \
     udp.c \
     udpoutput.c
 
-udpoutput_la_LDFLAGS = -module -avoid-version
+udpoutput_la_LDFLAGS = -module -no-undefined -avoid-version

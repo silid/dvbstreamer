@@ -27,6 +27,7 @@ UDP Output Delivery Method handler.
 #include <sys/socket.h>
 #include <netdb.h>
 
+#include "plugin.h"
 #include "ts.h"
 #include "udp.h"
 #include "deliverymethod.h"
@@ -60,23 +61,21 @@ void *UDPOutputCreate(char *arg);
 void UDPOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet);
 void UDPOutputDestroy(DeliveryMethodInstance_t *this);
 
-#define PREFIX_LEN (sizeof(UDPPrefix) - 1)
-char UDPPrefix[] = "udp://";
-
+/** Plugin Interface **/
 DeliveryMethodHandler_t UDPOutputHandler = {
     UDPOutputCanHandle,
     UDPOutputCreate
 };
 
-void UDPOutputRegister(void)
-{
-    DeliveryMethodManagerRegister(&UDPOutputHandler);
-}
+PLUGIN_FEATURES(
+    PLUGIN_FEATURE_DELIVERYMETHOD(UDPOutputHandler)
+);
 
-void UDPOutputUnRegister(void)
-{
-    DeliveryMethodManagerUnRegister(&UDPOutputHandler);
-}
+PLUGIN_INTERFACE_F("UDP Output", "0.1", "Simple UDP Delivery method", "charrea6@users.sourceforge.net");
+
+/** Constants for the start of the MRL **/
+#define PREFIX_LEN (sizeof(UDPPrefix) - 1)
+char UDPPrefix[] = "udp://";
 
 bool UDPOutputCanHandle(char *mrl)
 {
@@ -166,13 +165,15 @@ void *UDPOutputCreate(char *arg)
     state = calloc(1, sizeof(struct UDPOutputState_t));
     if (state == NULL)
     {
+#ifndef __CYGWIN__
         printlog(LOG_DEBUG, "Failed to allocate UDP Output state\n");
+#endif
         return NULL;
     }
     state->SendPacket = UDPOutputSendPacket;
     state->DestroyInstance = UDPOutputDestroy;
-    printlog(LOG_DEBUG,"UDP Host \"%s\" Port \"%s\"\n", host, port);
 #ifndef __CYGWIN__
+    printlog(LOG_DEBUG,"UDP Host \"%s\" Port \"%s\"\n", host, port);
     memset((void *)&hints, 0, sizeof(hints));
     hints.ai_socktype = SOCK_DGRAM;
     hints.ai_flags = AI_ADDRCONFIG;

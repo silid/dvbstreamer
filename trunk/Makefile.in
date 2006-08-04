@@ -67,9 +67,11 @@ am__vpath_adj = case $$p in \
     *) f=$$p;; \
   esac;
 am__strip_dir = `echo $$p | sed -e 's|^.*/||'`;
-am__installdirs = "$(DESTDIR)$(dvbstreamerdocdir)"
+am__installdirs = "$(DESTDIR)$(dvbstreamerdocdir)" \
+	"$(DESTDIR)$(pkgincludedir)"
 dvbstreamerdocDATA_INSTALL = $(INSTALL_DATA)
-DATA = $(dvbstreamerdoc_DATA)
+pkgincludeDATA_INSTALL = $(INSTALL_DATA)
+DATA = $(dvbstreamerdoc_DATA) $(pkginclude_DATA)
 ETAGS = etags
 CTAGS = ctags
 DIST_SUBDIRS = $(SUBDIRS)
@@ -89,6 +91,7 @@ AMDEP_FALSE = @AMDEP_FALSE@
 AMDEP_TRUE = @AMDEP_TRUE@
 AMTAR = @AMTAR@
 AR = @AR@
+AS = @AS@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
@@ -105,6 +108,9 @@ CXXFLAGS = @CXXFLAGS@
 CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
+DLLTOOL = @DLLTOOL@
+DVBSTREAMER_MAJOR = @DVBSTREAMER_MAJOR@
+DVBSTREAMER_MINOR = @DVBSTREAMER_MINOR@
 DVBSTREAMER_PLUGINDIR = @DVBSTREAMER_PLUGINDIR@
 ECHO = @ECHO@
 ECHO_C = @ECHO_C@
@@ -132,6 +138,7 @@ MAINTAINER_MODE_TRUE = @MAINTAINER_MODE_TRUE@
 MAKEINFO = @MAKEINFO@
 NO_PREFIX_PACKAGE_DATA_DIR = @NO_PREFIX_PACKAGE_DATA_DIR@
 NO_PREFIX_PACKAGE_DOC_DIR = @NO_PREFIX_PACKAGE_DOC_DIR@
+OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
 PACKAGE = @PACKAGE@
 PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
@@ -148,9 +155,12 @@ SHELL = @SHELL@
 STRIP = @STRIP@
 VERSION = @VERSION@
 ac_ct_AR = @ac_ct_AR@
+ac_ct_AS = @ac_ct_AS@
 ac_ct_CC = @ac_ct_CC@
 ac_ct_CXX = @ac_ct_CXX@
+ac_ct_DLLTOOL = @ac_ct_DLLTOOL@
 ac_ct_F77 = @ac_ct_F77@
+ac_ct_OBJDUMP = @ac_ct_OBJDUMP@
 ac_ct_RANLIB = @ac_ct_RANLIB@
 ac_ct_STRIP = @ac_ct_STRIP@
 am__fastdepCC_FALSE = @am__fastdepCC_FALSE@
@@ -202,7 +212,10 @@ dvbstreamerdoc_DATA = \
 	NEWS\
 	TODO
 
-EXTRA_DIST = $(dvbstreamerdoc_DATA)
+pkginclude_DATA = \
+    config.h
+
+EXTRA_DIST = $(dvbstreamerdoc_DATA) $(pkginclude_DATA)
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
@@ -283,6 +296,23 @@ uninstall-dvbstreamerdocDATA:
 	  f=$(am__strip_dir) \
 	  echo " rm -f '$(DESTDIR)$(dvbstreamerdocdir)/$$f'"; \
 	  rm -f "$(DESTDIR)$(dvbstreamerdocdir)/$$f"; \
+	done
+install-pkgincludeDATA: $(pkginclude_DATA)
+	@$(NORMAL_INSTALL)
+	test -z "$(pkgincludedir)" || $(mkdir_p) "$(DESTDIR)$(pkgincludedir)"
+	@list='$(pkginclude_DATA)'; for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  f=$(am__strip_dir) \
+	  echo " $(pkgincludeDATA_INSTALL) '$$d$$p' '$(DESTDIR)$(pkgincludedir)/$$f'"; \
+	  $(pkgincludeDATA_INSTALL) "$$d$$p" "$(DESTDIR)$(pkgincludedir)/$$f"; \
+	done
+
+uninstall-pkgincludeDATA:
+	@$(NORMAL_UNINSTALL)
+	@list='$(pkginclude_DATA)'; for p in $$list; do \
+	  f=$(am__strip_dir) \
+	  echo " rm -f '$(DESTDIR)$(pkgincludedir)/$$f'"; \
+	  rm -f "$(DESTDIR)$(pkgincludedir)/$$f"; \
 	done
 
 # This directory's subdirectories are mostly independent; you can cd
@@ -566,7 +596,7 @@ check: check-recursive
 all-am: Makefile $(DATA) config.h
 installdirs: installdirs-recursive
 installdirs-am:
-	for dir in "$(DESTDIR)$(dvbstreamerdocdir)"; do \
+	for dir in "$(DESTDIR)$(dvbstreamerdocdir)" "$(DESTDIR)$(pkgincludedir)"; do \
 	  test -z "$$dir" || $(mkdir_p) "$$dir"; \
 	done
 install: install-recursive
@@ -613,7 +643,7 @@ info: info-recursive
 
 info-am:
 
-install-data-am: install-dvbstreamerdocDATA
+install-data-am: install-dvbstreamerdocDATA install-pkgincludeDATA
 
 install-exec-am:
 
@@ -641,7 +671,8 @@ ps: ps-recursive
 
 ps-am:
 
-uninstall-am: uninstall-dvbstreamerdocDATA uninstall-info-am
+uninstall-am: uninstall-dvbstreamerdocDATA uninstall-info-am \
+	uninstall-pkgincludeDATA
 
 uninstall-info: uninstall-info-recursive
 
@@ -654,13 +685,14 @@ uninstall-info: uninstall-info-recursive
 	distuninstallcheck dvi dvi-am html html-am info info-am \
 	install install-am install-data install-data-am \
 	install-dvbstreamerdocDATA install-exec install-exec-am \
-	install-info install-info-am install-man install-strip \
-	installcheck installcheck-am installdirs installdirs-am \
-	maintainer-clean maintainer-clean-generic \
-	maintainer-clean-recursive mostlyclean mostlyclean-generic \
-	mostlyclean-libtool mostlyclean-recursive pdf pdf-am ps ps-am \
-	tags tags-recursive uninstall uninstall-am \
-	uninstall-dvbstreamerdocDATA uninstall-info-am
+	install-info install-info-am install-man \
+	install-pkgincludeDATA install-strip installcheck \
+	installcheck-am installdirs installdirs-am maintainer-clean \
+	maintainer-clean-generic maintainer-clean-recursive \
+	mostlyclean mostlyclean-generic mostlyclean-libtool \
+	mostlyclean-recursive pdf pdf-am ps ps-am tags tags-recursive \
+	uninstall uninstall-am uninstall-dvbstreamerdocDATA \
+	uninstall-info-am uninstall-pkgincludeDATA
 
 
 # Copy all the spec files. Of cource, only one is actually used.

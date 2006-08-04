@@ -70,7 +70,7 @@ typedef struct sListIterator_t
  * Move to the next entry.
  * @param _iterator Iterator to update.
  */
-#define ListIterator_Next(_iterator)        ((_iterator).current = (_iterator).current->next)
+#define ListIterator_Next(_iterator)        ((_iterator).current = ((_iterator).current?((_iterator).current->next):NULL))
 /**
  * Retrieve the data stored at current entry.
  * @param _iterator The iterator to retrieve the data from.

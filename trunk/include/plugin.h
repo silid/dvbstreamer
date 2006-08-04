@@ -30,7 +30,8 @@ Plugin Interface structures and macros.
 
 #include "config.h"
 #include "types.h"
-#include "comannds.h"
+#include "ts.h"
+#include "commands.h"
 /**
  * @defgroup Plugin Plugin Interface
  * @{
@@ -56,7 +57,10 @@ Plugin Interface structures and macros.
  * Constant for a Delivery Method plugin feature.
  */
 #define PLUGIN_FEATURE_TYPE_DELIVERYMETHOD 0x04
-
+/**
+ * Constant for a Primary Channel Change feature.
+ */
+#define PLUGIN_FEATURE_TYPE_CHANNELCHANGE  0x05
 
 /**
  * Structure used to describe a single 'feature' of a plugin.
@@ -105,46 +109,123 @@ typedef struct Plugin_t
 }Plugin_t;
 
 /**
- * Structure used to describe a Filter Feature.
+ * Simple macro to help in defining the Plugin Interface with only commands.
  */
-typedef struct PluginFilterHandler_t
+#define PLUGIN_INTERFACE_C(_name, _version, _desc, _author) \
+    Plugin_t PluginInterface = { DVBSTREAMER_VERSION, _name, _version, _desc, _author, PluginCommands, NULL}
+
+/**
+ * Simple macro to help in defining the Plugin Interface with only features.
+ */
+#define PLUGIN_INTERFACE_F(_name, _version, _desc, _author) \
+    Plugin_t PluginInterface = { DVBSTREAMER_VERSION, _name, _version, _desc, _author, NULL, PluginFeatures}
+
+/**
+ * Simple macro to help in defining the Plugin Interface with both commands and
+ * features
+ */
+#define PLUGIN_INTERFACE_CF(_name, _version, _desc, _author) \
+    Plugin_t PluginInterface = { DVBSTREAMER_VERSION, _name, _version, _desc, _author, PluginCommands, PluginFeatures}
+
+/**
+ * Use this macro to define the commands a plugin provides.
+ * This should be used before PLUGININTERFACE.
+ * for example:
+ * @code
+ * PLUGIN_COMMANDS({"example", TRUE, 1, 1,"An example command", "example <arg>\nPrint out <arg>",ExampleCommand});
+ * PLUGININTERFACE("Example", "0.1", "An example plugin", "A Coder");
+ * @endcode
+ */
+#define PLUGIN_COMMANDS(_commands...) \
+    static Command_t PluginCommands[] = {\
+        _commands,\
+        {NULL, FALSE, 0, 0, NULL, NULL}\
+    }
+
+/**
+ * Use this macro to define the features a plugin provides.
+ * This should be used before PLUGININTERFACE.
+ * for example:
+ * @code
+ * PLUGIN_FEATURES(
+ *  PLUGIN_FEATURE_FILTER(myfilterfeature)
+ * );
+ * PLUGININTERFACE("Example", "0.1", "An example plugin", "A Coder");
+ * @endcode
+ * @param _features A list of features provided by this plugin.
+ */
+#define PLUGIN_FEATURES(_features...) \
+    static PluginFeature_t PluginFeatures[] = {\
+        _features,\
+        {PLUGIN_FEATURE_TYPE_NONE, NULL}\
+    }
+
+/**
+ * Simple macro to define a Plugin Filter feature
+ * @param _filter A PluginFilter_t instance (will be dereferenced).
+ */
+#define PLUGIN_FEATURE_FILTER(_filter)          {PLUGIN_FEATURE_TYPE_FILTER, (void*)&_filter}
+/**
+ * Simple macro to define a PAT Processor feature.
+ * @param _processor Function to call when a new PAT arrives.
+ */
+#define PLUGIN_FEATURE_PATPROCESSOR(_processor) {PLUGIN_FEATURE_TYPE_PATPROCESSOR, (void*)_processor}
+/**
+ * Simple macro to define a PMT Processor feature.
+ * @param _processor Function to call when a new PMT arrives.
+ */
+#define PLUGIN_FEATURE_PMTPROCESSOR(_processor) {PLUGIN_FEATURE_TYPE_PMTPROCESSOR, (void*)_processor}
+/**
+ * Simple macro to define a delivery method feature.
+ * @param _method A DeliveryMethod_t instance (will be dereferenced).
+ */
+#define PLUGIN_FEATURE_DELIVERYMETHOD(_method)  {PLUGIN_FEATURE_TYPE_DELIVERYMETHOD, (void*)&_method}
+
+/**
+ * Simple macro to define a Channel Changed feature.
+ * @param _cchanaged Function to call when the Primary service filter is updated.
+ */
+#define PLUGIN_FEATURE_CHANNELCHANGE(_cchanged) {PLUGIN_FEATURE_TYPE_CHANNELCHANGE, (void*)_cchanged}
+
+/**
+ * Structure used to describe a Filter Feature.
+ * Multiple filter features per plugin is allowed, but developers should try and
+ * keep the number to a minimum to keep the overheads of maintaining and calling
+ * lots of filters down.
+ */
+typedef struct PluginFilter_t
 {
+    PIDFilter_t *filter; /**< Filter assigned to this filter feature */
 	void (*InitFilter)(PIDFilter_t* filter); /**< Function pointer used to initialise the filter. */
+	void (*DeinitFilter)(PIDFilter_t* filter); /**< Function pointer used to deinitialise the filter. */
 }PluginFilterHandler_t;
 
-/**
- * Structure used to describe a PAT Processor Feature.
- * Implementors should consider the following structure as the 'base class' and
- * should extend it with the state they require.
- * For example:
- * @code
- * struct NITPATProcessor {
- * void (*ProcessPAT)(PluginPATProcessor_t *this, dvbpsi_pat_t* newpat);
- * uint16_t nitpid;
- * };
- * @endcode
- */
-typedef struct PluginPATProcessor_t
-{
-    void (*ProcessPAT)(PluginPATProcessor_t *this, dvbpsi_pat_t* newpat); /**< Function pointer to function to call when a new PAT arrives.*/
-}PluginPATProcessor_t;
+
 
 /**
- * Structure used to describe a PMT Processor Feature.
- * Implementors should consider the following structure as the 'base class' and
- * should extend it with the state they require.
- * For example:
- * @code
- * struct DSMCCPMTProcessor_t {
- * void (*ProcessPMT)(PluginPMTProcessor_t *this, dvbpsi_pmt_t* newpmt);
- * char *carouselBuffer;
- * };
- * @endcode
+ * Function pointer to function to call when a new PAT arrives.
+ * For use with the PLUGIN_FEATURE_TYPE_PATPROCESSOR feature type, only 1 per
+ * plugin is expected (allowed).
  */
-typedef struct PluginPMTProcessor_t
-{
-    void (*ProcessPMT)(PluginPMTProcessor_t *this, dvbpsi_pmt_t* newpmt); /**< Function pointer to function to call when a new PMT arrives.*/
-}PluginPMTProcessor_t;
+typedef void (*PluginPATProcessor_t)(dvbpsi_pat_t* newpat);
+
+
+/**
+ * Function pointer to function to call when a new PMT arrives.
+ * For use with the PLUGIN_FEATURE_TYPE_PMTPROCESSOR feature type, only 1 per
+ * plugin is expected (allowed).
+ */
+typedef void (*PluginPMTProcessor_t)(dvbpsi_pmt_t* newpmt);
+
+
+/**
+ * Function pointer to function to call after the primary service
+ * filter is updated. The newMultiplex argument will contain the multiplex currently
+ * being used and the newService will contain the service now being filtered.
+ * For use with the PLUGIN_FEATURE_TYPE_CHANNELCHANGE feature type, only 1 per
+ * plugin is expected (allowed).
+ */
+typedef void (*PluginChannelChange_t)(Multiplex_t *newMultiplex, Service_t *newService);
 
 /** @} */
 #endif
