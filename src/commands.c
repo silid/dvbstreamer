@@ -67,6 +67,7 @@ static void CommandStats(int argc, char **argv);
 static void CommandAddOutput(int argc, char **argv);
 static void CommandRmOutput(int argc, char **argv);
 static void CommandOutputs(int argc, char **argv);
+static void CommandSetOutputMRL(int argc, char **argv);
 static void CommandAddPID(int argc, char **argv);
 static void CommandRmPID(int argc, char **argv);
 static void CommandOutputPIDs(int argc, char **argv);
@@ -74,6 +75,7 @@ static void CommandAddSSF(int argc, char **argv);
 static void CommandRemoveSSF(int argc, char **argv);
 static void CommandSSFS(int argc, char **argv);
 static void CommandSetSSF(int argc, char **argv);
+static void CommandSetSFMRL(int argc, char **argv);
 static void CommandFEStatus(int argc, char **argv);
 static void CommandHelp(int argc, char **argv);
 
@@ -170,6 +172,15 @@ static Command_t coreCommands[] = {
                                       CommandOutputs
                                   },
                                   {
+                                      "setoutputmrl",
+                                      TRUE, 2, 2,
+                                      "Set the output's MRL",
+                                      "setoutputmrl <output name> <mrl>\n"
+                                      "Change the destination for packets sent to this output. If the MRL cannot be"
+                                      "parsed no change will be made to the output.",
+                                      CommandSetOutputMRL,
+                                  },
+                                  {
                                       "addpid",
                                       TRUE, 2, 2,
                                       "Adds a PID to filter to an output",
@@ -223,6 +234,15 @@ static Command_t coreCommands[] = {
                                       "setsf <output name> <service name>\n"
                                       "Stream the specified service to the secondary service output.",
                                       CommandSetSSF
+                                  },
+                                  {
+                                      "setsfmrl",
+                                      TRUE, 2, 2,
+                                      "Set the service filter's MRL",
+                                      "setsfmrl <output name> <mrl>\n"
+                                      "Change the destination for packets sent to this service filters output."
+                                      "If the MRL cannot be parsed no change will be made to the service filter.",
+                                      CommandSetSFMRL,
                                   },
                                   {
                                       "festatus",
@@ -419,7 +439,7 @@ static char *CompleteCommand(const char *text, int state)
         ListIterator_Init(iterator, commandsList);
     }
 
-    do
+    while(ListIterator_MoreEntries(iterator))
     {
         Command_t *commands = ListIterator_Current(iterator);
         for ( i = lastIndex + 1; commands[i].command; i ++)
@@ -431,7 +451,8 @@ static char *CompleteCommand(const char *text, int state)
             }
         }
         ListIterator_Next(iterator);
-    }while(ListIterator_MoreEntries(iterator));
+        lastIndex = -1;
+    }
 
     return NULL;
 }
@@ -810,6 +831,24 @@ static void CommandOutputs(int argc, char **argv)
     }
 }
 
+static void CommandSetOutputMRL(int argc, char **argv)
+{
+    Output_t *output = NULL;
+
+    output = OutputFind(argv[0], OutputType_Manual);
+    if (output == NULL)
+    {
+        return;
+    }
+    if (DeliveryMethodManagerFind(argv[1], output->filter))
+    {
+        CommandPrintf("MRL set to \"%s\" for %s\n", DeliveryMethodGetMRL(output->filter), argv[0]);
+    }
+    else
+    {
+        CommandPrintf("Failed to set MRL to \"%s\" for %s\n", argv[1], argv[0]);
+    }
+}
 static void CommandAddPID(int argc, char **argv)
 {
     Output_t *output = OutputFind(argv[0], OutputType_Manual);
@@ -966,6 +1005,25 @@ static void CommandSetSSF(int argc, char **argv)
     if (oldService)
     {
         ServiceFree(oldService);
+    }
+}
+
+static void CommandSetSFMRL(int argc, char **argv)
+{
+    Output_t *output = NULL;
+
+    output = OutputFind(argv[0], OutputType_Service);
+    if (output == NULL)
+    {
+        return;
+    }
+    if (DeliveryMethodManagerFind(argv[1], output->filter))
+    {
+        CommandPrintf("MRL set to \"%s\" for %s\n", DeliveryMethodGetMRL(output->filter), argv[0]);
+    }
+    else
+    {
+        CommandPrintf("Failed to set MRL to \"%s\" for %s\n", argv[1], argv[0]);
     }
 }
 
