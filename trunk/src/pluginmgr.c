@@ -21,6 +21,7 @@ Plugin Manager functions.
 
 */
 #include <stdlib.h>
+#include <string.h>
 
 #include "config.h"
 #include "ltdl.h"
@@ -30,9 +31,11 @@ Plugin Manager functions.
 #include "plugin.h"
 #include "logging.h"
 
-static int PluginLoadPlugin(const char *filename, void *userarg);
-static void PluginInstallPlugin(Plugin_t *pluginInterface);
-static void PluginUninstallPlugin(Plugin_t *pluginInterface);
+static int PluginManagerLoadPlugin(const char *filename, void *userarg);
+static void PluginManagerInstallPlugin(Plugin_t *pluginInterface);
+static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface);
+
+static void PluginManagerLsPlugins(int argc, char **argv);
 
 struct PluginEntry_t
 {
@@ -42,6 +45,16 @@ struct PluginEntry_t
 
 List_t *PluginsList;
 
+static Command_t PluginManagerCommands[] = {
+        {
+            "lsplugins",
+            FALSE, 0, 0,
+            "List loaded plugins.",
+            "List all plugins that where loaded at startup.",
+            PluginManagerLsPlugins
+        },
+        {NULL, FALSE, 0, 0, NULL, NULL}
+    };
 
 int PluginManagerInit(void)
 {
@@ -52,15 +65,16 @@ int PluginManagerInit(void)
     lt_dlsetsearchpath(DVBSTREAMER_PLUGINDIR);
 
     /* Load all the plugins */
-    lt_dlforeachfile(DVBSTREAMER_PLUGINDIR, PluginLoadPlugin, NULL);
+    lt_dlforeachfile(DVBSTREAMER_PLUGINDIR, PluginManagerLoadPlugin, NULL);
 
     /* Process the plugins */
     for ( ListIterator_Init(iterator, PluginsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         struct PluginEntry_t *entry = ListIterator_Current(iterator);
         printlog(LOG_DEBUG, "Installing %s\n", entry->pluginInterface->name);
-        PluginInstallPlugin(entry->pluginInterface);
+        PluginManagerInstallPlugin(entry->pluginInterface);
     }
+    CommandRegisterCommands(PluginManagerCommands);
     printlog(LOG_DEBUG, "Plugin Manager Initialised\n");
     return 0;
 }
@@ -69,11 +83,12 @@ void PluginManagerDeInit(void)
 {
     ListIterator_t iterator;
     printlog(LOG_DEBUG, "Plugin Manager Deinitialising...\n");
+    CommandUnRegisterCommands(PluginManagerCommands);
     for ( ListIterator_Init(iterator, PluginsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         struct PluginEntry_t *entry = ListIterator_Current(iterator);
         printlog(LOG_DEBUG, "Uninstalling %s\n", entry->pluginInterface->name);
-        PluginUninstallPlugin(entry->pluginInterface);
+        PluginManagerUninstallPlugin(entry->pluginInterface);
         ListRemoveCurrent(&iterator);
         lt_dlclose(entry->handle);
         free(entry);
@@ -83,28 +98,55 @@ void PluginManagerDeInit(void)
     printlog(LOG_DEBUG, "Plugin Manager Deinitialised\n");
 }
 
-static int PluginLoadPlugin(const char *filename, void *userarg)
+static int PluginManagerLoadPlugin(const char *filename, void *userarg)
 {
     lt_dlhandle handle = lt_dlopenext(filename);
-    printlog(LOG_INFOV, "Attempting to load %s\n", filename);
+    printlog(LOG_DEBUGV, "Attempting to load %s\n", filename);
     if (handle)
     {
         Plugin_t *pluginInterface = lt_dlsym(handle, "PluginInterface");
 
         if (pluginInterface)
         {
-            struct PluginEntry_t *entry = calloc(1, sizeof(struct PluginEntry_t));
-
-            if (entry)
+            ListIterator_t iterator;
+            struct PluginEntry_t *entry = NULL;
+            bool addPlugin = TRUE;
+            if (pluginInterface->RequiredVersion !=  DVBSTREAMER_VERSION)
             {
-                entry->pluginInterface = pluginInterface;
-                if (ListAdd(PluginsList, entry))
+                addPlugin = FALSE;
+            }
+
+            if (addPlugin)
+            {
+                /*
+                 * Only add the plugin if this is a unique plugin, ie no plugin
+                 * with the same name has already been loaded
+                 */
+                for ( ListIterator_Init(iterator, PluginsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
                 {
-                    printlog(LOG_INFOV, "Loaded plugin %s\n", pluginInterface->name);
-                    return 0;
+                    struct PluginEntry_t *entry = ListIterator_Current(iterator);
+                    if (strcmp(pluginInterface->name, entry->pluginInterface->name) == 0)
+                    {
+                        printlog(LOG_DEBUGV, "Plugin already loaded, igoring this instance.\n");
+                        addPlugin = FALSE;
+                        break;
+                    }
                 }
-                free(entry);
-                return 0;
+            }
+
+            if (addPlugin)
+            {
+                entry = calloc(1, sizeof(struct PluginEntry_t));
+                if (entry)
+                {
+                    entry->pluginInterface = pluginInterface;
+                    if (ListAdd(PluginsList, entry))
+                    {
+                        printlog(LOG_INFOV, "Loaded plugin %s\n", pluginInterface->name);
+                        return 0;
+                    }
+                    free(entry);
+                }
             }
         }
         else
@@ -120,7 +162,7 @@ static int PluginLoadPlugin(const char *filename, void *userarg)
     return 0;
 }
 
-static void PluginInstallPlugin(Plugin_t *pluginInterface)
+static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
 {
     int i;
     if (pluginInterface->commands)
@@ -142,7 +184,7 @@ static void PluginInstallPlugin(Plugin_t *pluginInterface)
     }
 }
 
-static void PluginUninstallPlugin(Plugin_t *pluginInterface)
+static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface)
 {
     int i;
     if (pluginInterface->commands)
@@ -161,5 +203,19 @@ static void PluginUninstallPlugin(Plugin_t *pluginInterface)
                 break;
             }
         }
+    }
+}
+
+static void PluginManagerLsPlugins(int argc, char **argv)
+{
+    ListIterator_t iterator;
+    for ( ListIterator_Init(iterator, PluginsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    {
+        struct PluginEntry_t *entry = ListIterator_Current(iterator);
+        CommandPrintf("%s - %s (Version %s, Author %s)\n",
+            entry->pluginInterface->name,
+            entry->pluginInterface->description,
+            entry->pluginInterface->version,
+            entry->pluginInterface->author);
     }
 }

@@ -234,6 +234,12 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+    if (CommandInit())
+    {
+        printlog(LOG_ERROR, "CommandInit failed!\n");
+        exit(1);
+    }
+
     /*
      * Start plugins after outputs but before creating the primary output to
      * allow pugins to create outputs and allow new delivery methods to be
@@ -254,11 +260,7 @@ int main(int argc, char *argv[])
     }
     printlog(LOG_DEBUG, "PrimaryServiceOutput=%p\n", PrimaryServiceOutput);
 
-    if (CommandInit())
-    {
-        printlog(LOG_ERROR, "CommandInit failed!\n");
-        exit(1);
-    }
+
 
     if (DaemonMode)
     {
@@ -289,16 +291,13 @@ int main(int argc, char *argv[])
     {
         BinaryCommsAcceptConnections();
         printlog(LOG_DEBUGV, "Binary comms finished, shutting down\n");
+        BinaryCommsDeInit();
     }
     else
     {
         CommandLoop();
         printlog(LOG_DEBUGV, "Command loop finished, shutting down\n");
     }
-
-    BinaryCommsDeInit();
-
-    CommandDeInit();
 
     OutputsDeInit();
     printlog(LOG_DEBUGV, "Outputs deinitialised\n");
@@ -309,6 +308,8 @@ int main(int argc, char *argv[])
      */
     PluginManagerDeInit();
     printlog(LOG_DEBUGV, "Plugins deinitialised\n");
+
+    CommandDeInit();
 
     /* Disable all the filters */
     for (i = 0; i < PIDFilterIndex_Count; i ++)
