@@ -26,10 +26,6 @@ Process Program Association Tables and update the services information.
 #include <string.h>
 #include <stdint.h>
 #include <assert.h>
-#include <dvbpsi/dvbpsi.h>
-#include <dvbpsi/descriptor.h>
-#include <dvbpsi/psi.h>
-#include <dvbpsi/pat.h>
 
 #include "multiplexes.h"
 #include "services.h"
@@ -39,6 +35,7 @@ Process Program Association Tables and update the services information.
 #include "cache.h"
 #include "logging.h"
 #include "main.h"
+#include "list.h"
 
 typedef struct PATProcessor_t
 {
@@ -52,6 +49,7 @@ PATProcessor_t;
 static TSPacket_t *PATProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
 static void PATHandler(void* arg, dvbpsi_pat_t* newpat);
 
+static List_t *NewPATCallbacksList = NULL;
 PIDFilter_t *PATProcessorCreate(TSFilter_t *tsfilter)
 {
     PIDFilter_t *result = NULL;
@@ -70,6 +68,10 @@ PIDFilter_t *PATProcessorCreate(TSFilter_t *tsfilter)
             free(state);
         }
     }
+    if (!NewPATCallbacksList)
+    {
+        NewPATCallbacksList = ListCreate();
+    }
     return result;
 }
 
@@ -83,6 +85,27 @@ void PATProcessorDestroy(PIDFilter_t *filter)
         dvbpsi_DetachPAT(state->pathandle);
     }
     free(state);
+
+    if (NewPATCallbacksList)
+    {
+        ListFree(NewPATCallbacksList);
+    }
+}
+
+void PATProcessorRegisterPATCallback(PluginPATProcessor_t callback)
+{
+    if (NewPATCallbacksList)
+    {
+        ListAdd(NewPATCallbacksList, callback);
+    }
+}
+
+void PATProcessorUnRegisterPATCallback(PluginPATProcessor_t callback)
+{
+    if (NewPATCallbacksList)
+    {
+        ListRemove(NewPATCallbacksList, callback);
+    }
 }
 
 static TSPacket_t *PATProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet)
@@ -119,6 +142,7 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
     printlog(LOG_DEBUG,"PAT recieved, version %d (old version %d)\n", newpat->i_version, multiplex->patversion);
     if (multiplex->patversion != newpat->i_version)
     {
+        ListIterator_t iterator;
         int count,i;
         Service_t **services;
 
@@ -171,6 +195,12 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
         }
 
         CacheUpdateMultiplex(multiplex, newpat->i_version, newpat->i_ts_id);
+
+        for (ListIterator_Init(iterator, NewPATCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+        {
+            PluginPATProcessor_t callback = ListIterator_Current(iterator);
+            callback(newpat);
+        }
     }
     dvbpsi_DeletePAT(newpat);
 }

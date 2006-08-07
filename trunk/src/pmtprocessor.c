@@ -25,10 +25,6 @@ Process Program Map Tables and update the services information and PIDs.
 #include <unistd.h>
 #include <stdint.h>
 #include <assert.h>
-#include <dvbpsi/dvbpsi.h>
-#include <dvbpsi/descriptor.h>
-#include <dvbpsi/dr.h>
-#include <dvbpsi/pmt.h>
 
 #include "multiplexes.h"
 #include "services.h"
@@ -37,6 +33,8 @@ Process Program Map Tables and update the services information and PIDs.
 #include "main.h"
 #include "cache.h"
 #include "logging.h"
+#include "list.h"
+#include "pmtprocessor.h"
 
 #define MAX_HANDLES 256
 
@@ -54,6 +52,9 @@ static TSPacket_t *PMTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, 
 static void PMTProcessorTSStructureChanged(PIDFilter_t *pidfilter, void *arg);
 static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt);
 
+
+static List_t *NewPMTCallbacksList = NULL;
+
 PIDFilter_t *PMTProcessorCreate(TSFilter_t *tsfilter)
 {
     PIDFilter_t *result = NULL;
@@ -69,6 +70,10 @@ PIDFilter_t *PMTProcessorCreate(TSFilter_t *tsfilter)
             free(state);
         }
         PIDFilterTSStructureChangeSet(result, PMTProcessorTSStructureChanged, state);
+    }
+    if (!NewPMTCallbacksList)
+    {
+        NewPMTCallbacksList = ListCreate();
     }
     return result;
 }
@@ -91,7 +96,28 @@ void PMTProcessorDestroy(PIDFilter_t *filter)
         }
     }
     free(state);
+    if (NewPMTCallbacksList)
+    {
+        ListFree(NewPMTCallbacksList);
+    }
 }
+
+void PMTProcessorRegisterPMTCallback(PluginPMTProcessor_t callback)
+{
+    if (NewPMTCallbacksList)
+    {
+        ListAdd(NewPMTCallbacksList, callback);
+    }
+}
+
+void PMTProcessorUnRegisterPMTCallback(PluginPMTProcessor_t callback)
+{
+    if (NewPMTCallbacksList)
+    {
+        ListRemove(NewPMTCallbacksList, callback);
+    }
+}
+
 
 static int PMTProcessorFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet)
 {
@@ -245,6 +271,7 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
     if (service->pmtversion != newpmt->i_version)
     {
         // Version has changed update the pids
+        ListIterator_t iterator;
         PID_t *pids;
         dvbpsi_pmt_es_t *esentry = newpmt->p_first_es;
         int count = 1;
@@ -297,6 +324,12 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
             }
             printlog(LOG_DEBUGV,"About to update cache\n");
             CacheUpdatePIDs(service, pids, count, newpmt->i_version);
+        }
+
+        for (ListIterator_Init(iterator, NewPMTCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+        {
+            PluginPMTProcessor_t callback = ListIterator_Current(iterator);
+            callback(newpmt);
         }
     }
     dvbpsi_DeletePMT(newpmt);

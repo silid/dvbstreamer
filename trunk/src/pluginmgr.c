@@ -27,6 +27,8 @@ Plugin Manager functions.
 #include "ltdl.h"
 #include "list.h"
 #include "deliverymethod.h"
+#include "patprocessor.h"
+#include "pmtprocessor.h"
 #include "pluginmgr.h"
 #include "plugin.h"
 #include "logging.h"
@@ -179,7 +181,16 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
                 printlog(LOG_DEBUGV, "plugin %s: Installed Delivery method.\n", pluginInterface->name);
                 DeliveryMethodManagerRegister(pluginInterface->features[i].details);
                 break;
+                case PLUGIN_FEATURE_TYPE_PATPROCESSOR:
+                printlog(LOG_DEBUGV, "plugin %s: Installed PAT processor.\n", pluginInterface->name);
+                PATProcessorRegisterPATCallback(pluginInterface->features[i].details);
+                break;
+                case PLUGIN_FEATURE_TYPE_PMTPROCESSOR:
+                printlog(LOG_DEBUGV, "plugin %s: Installed PMT processor.\n", pluginInterface->name);
+                PMTProcessorRegisterPMTCallback(pluginInterface->features[i].details);
+                break;
             }
+
         }
     }
 }
@@ -200,6 +211,14 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface)
                 case PLUGIN_FEATURE_TYPE_DELIVERYMETHOD:
                 printlog(LOG_DEBUG, "plugin %s: Uninstalled Delivery method.\n", pluginInterface->name);
                 DeliveryMethodManagerUnRegister(pluginInterface->features[i].details);
+                break;
+                case PLUGIN_FEATURE_TYPE_PATPROCESSOR:
+                printlog(LOG_DEBUGV, "plugin %s: Uninstalled PAT processor.\n", pluginInterface->name);
+                PATProcessorUnRegisterPATCallback(pluginInterface->features[i].details);
+                break;
+                case PLUGIN_FEATURE_TYPE_PMTPROCESSOR:
+                printlog(LOG_DEBUGV, "plugin %s: Uninstalled PMT processor.\n", pluginInterface->name);
+                PMTProcessorUnRegisterPMTCallback(pluginInterface->features[i].details);
                 break;
             }
         }
