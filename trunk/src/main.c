@@ -52,6 +52,23 @@ Entry point to the application.
 #include "binarycomms.h"
 #include "deliverymethod.h"
 #include "pluginmgr.h"
+#include "plugin.h"
+
+#define INIT(_func, _name) \
+    do {\
+        if (_func) \
+        { \
+            printlog(LOG_ERROR, "Failed to initialise %s.\n", _name); \
+            exit(1);\
+        }\
+        printlog(LOG_DEBUGV, "Initialised %s.\n", _name);\
+    }while(0)
+
+#define DEINIT(_func, _name) \
+    do {\
+        _func;\
+        printlog(LOG_DEBUGV, "Deinitialised %s\n", _name);\
+    }while(0)
 
 static void usage(char *appname);
 static void version(void);
@@ -71,22 +88,22 @@ bool DaemonMode = FALSE;
 char PrimaryService[] = "<Primary>";
 Output_t *PrimaryServiceOutput = NULL;
 
+static List_t *ChannelChangedCallbacksList = NULL;
 static char PidFile[PATH_MAX];
 
 int main(int argc, char *argv[])
 {
     char *startupFile = NULL;
     fe_type_t channelsFileType = FE_OFDM;
-    char channelsFile[PATH_MAX];
+    char *channelsFile = NULL;
     int i;
     int adapterNumber = 0;
-
     char *username = "dvbstreamer";
     char *password = "control";
     char *serverName = NULL;
     char *primaryOutput = NULL;
 
-    channelsFile[0] = 0;
+
     installsighandler();
 
     while (!ExitProgram)
@@ -105,28 +122,27 @@ int main(int argc, char *argv[])
                 version();
                 exit(0);
                 break;
-                case 'o':
-                primaryOutput = optarg;
+                case 'o': primaryOutput = optarg;
                 break;
                 case 'a': adapterNumber = atoi(optarg);
                 printlog(LOG_INFOV, "Using adapter %d\n", adapterNumber);
                 break;
-                case 'f': startupFile = strdup(optarg);
+                case 'f': startupFile = optarg;
                 printlog(LOG_INFOV, "Using startup script %s\n", startupFile);
                 break;
                 /* Database initialisation options*/
                 case 't':
-                strcpy(channelsFile, optarg);
+                channelsFile = optarg;
                 channelsFileType = FE_OFDM;
                 printlog(LOG_INFOV, "Using DVB-T channels file %s\n", channelsFile);
                 break;
                 case 's':
-                strcpy(channelsFile, optarg);
+                channelsFile = optarg;
                 channelsFileType = FE_QPSK;
                 printlog(LOG_INFOV, "Using DVB-S channels file %s\n", channelsFile);
                 break;
                 case 'c':
-                strcpy(channelsFile, optarg);
+                channelsFile = optarg;
                 channelsFileType = FE_QAM;
                 printlog(LOG_INFOV, "Using DVB-C channels file %s\n", channelsFile);
                 break;
@@ -162,28 +178,11 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    if (DBaseInit(adapterNumber))
-    {
-        printlog(LOG_ERROR, "Failed to initialise database\n");
-        exit(1);
-    }
-    printlog(LOG_DEBUGV, "Database initalised\n");
+    INIT(DBaseInit(adapterNumber), "database");
+    INIT(CacheInit(), "cache");
+    INIT(DeliveryMethodManagerInit(), "delivery method manager");
 
-    if (CacheInit())
-    {
-        printlog(LOG_ERROR,"Failed to initialise cache\n");
-        exit(1);
-    }
-    printlog(LOG_DEBUGV, "Cache initalised\n");
-
-    if (DeliveryMethodManagerInit())
-    {
-        printlog(LOG_ERROR,"Failed to initialise Delivery Method manager\n");
-        exit(1);
-    }
-    printlog(LOG_DEBUGV, "Delivery Method manager initalised\n");
-
-    if (strlen(channelsFile))
+    if (channelsFile)
     {
         printlog(LOG_INFO,"Importing services from %s\n", channelsFile);
         if (!parsezapfile(channelsFile, channelsFileType))
@@ -192,29 +191,16 @@ int main(int argc, char *argv[])
         }
         printlog(LOG_DEBUGV, "Channels file imported\n");
     }
-
     printlog(LOG_INFO, "%d Services available on %d Multiplexes\n", ServiceCount(), MultiplexCount());
 
     /* Initialise the DVB adapter */
-    DVBAdapter = DVBInit(adapterNumber);
-    if (!DVBAdapter)
-    {
-        printlog(LOG_ERROR, "Failed to open DVB adapter!\n");
-        exit(1);
-    }
-    printlog(LOG_DEBUGV, "DVB adapter initalised\n");
+    INIT(!(DVBAdapter = DVBInit(adapterNumber)), "DVB adapter");
 
     DVBDemuxStreamEntireTSToDVR(DVBAdapter);
     printlog(LOG_DEBUGV, "Streaming complete TS to DVR done\n");
 
     /* Create Transport stream filter thread */
-    TSFilter = TSFilterCreate(DVBAdapter);
-    if (!TSFilter)
-    {
-        printlog(LOG_ERROR, "Failed to create filter!\n");
-        exit(1);
-    }
-    printlog(LOG_DEBUGV, "TSFilter created\n");
+    INIT(!(TSFilter = TSFilterCreate(DVBAdapter)), "TS filter");
 
     /* Create PAT/PMT/SDT filters */
     PIDFilters[PIDFilterIndex_PAT] = PATProcessorCreate(TSFilter);
@@ -228,28 +214,17 @@ int main(int argc, char *argv[])
     }
     printlog(LOG_DEBUGV, "PID filters started\n");
 
-    if (OutputsInit())
-    {
-        printlog(LOG_ERROR, "OutputsInit failed!\n");
-        exit(1);
-    }
+    INIT(OutputsInit(), "outputs");
+    INIT(CommandInit(), "commands");
 
-    if (CommandInit())
-    {
-        printlog(LOG_ERROR, "CommandInit failed!\n");
-        exit(1);
-    }
+    ChannelChangedCallbacksList = ListCreate();
 
     /*
      * Start plugins after outputs but before creating the primary output to
      * allow pugins to create outputs and allow new delivery methods to be
      *  registered.
      */
-    if (PluginManagerInit())
-    {
-        printlog(LOG_ERROR, "PluginManagerInit failed!\n");
-        exit(1);
-    }
+    INIT(PluginManagerInit(), "plugin manager");
 
     /* Create Service filter */
     PrimaryServiceOutput = OutputAllocate(PrimaryService, OutputType_Service, primaryOutput);
@@ -258,9 +233,6 @@ int main(int argc, char *argv[])
         printlog(LOG_ERROR, "Failed to create primary service output, reason %s\n", OutputErrorStr);
         exit(1);
     }
-    printlog(LOG_DEBUG, "PrimaryServiceOutput=%p\n", PrimaryServiceOutput);
-
-
 
     if (DaemonMode)
     {
@@ -270,11 +242,7 @@ int main(int argc, char *argv[])
             sprintf(serverNameBuffer, "DVBStreamer Adapter %d", adapterNumber);
             serverName = serverNameBuffer;
         }
-        if (BinaryCommsInit(adapterNumber, serverName, username, password))
-        {
-            printlog(LOG_ERROR, "BinaryCommsInit failed!\n");
-            exit(1);
-        }
+        INIT(BinaryCommsInit(adapterNumber, serverName, username, password), "binary communications");
     }
 
     if (startupFile)
@@ -283,7 +251,6 @@ int main(int argc, char *argv[])
         {
             printlog(LOG_ERROR, "%s not found!\n", startupFile);
         }
-        free(startupFile);
     }
     printlog(LOG_DEBUGV, "Startup file processed\n");
 
@@ -299,17 +266,17 @@ int main(int argc, char *argv[])
         printlog(LOG_DEBUGV, "Command loop finished, shutting down\n");
     }
 
-    OutputsDeInit();
-    printlog(LOG_DEBUGV, "Outputs deinitialised\n");
+    DEINIT(OutputsDeInit(), "outputs");
 
     /*
      * Deinit Plugins after outputs so all delivery methods are properly torn
      * down.
      */
-    PluginManagerDeInit();
-    printlog(LOG_DEBUGV, "Plugins deinitialised\n");
+    DEINIT(PluginManagerDeInit(), "plugin manager");
 
-    CommandDeInit();
+    ListFree(ChannelChangedCallbacksList);
+
+    DEINIT(CommandDeInit(), "commands");
 
     /* Disable all the filters */
     for (i = 0; i < PIDFilterIndex_Count; i ++)
@@ -324,26 +291,167 @@ int main(int argc, char *argv[])
 
     printlog(LOG_DEBUGV, "Processors destroyed\n");
     /* Close the adapter and shutdown the filter etc*/
-    DVBDispose(DVBAdapter);
-    printlog(LOG_DEBUGV, "DVB Adapter shutdown\n");
-
-    TSFilterDestroy(TSFilter);
-    printlog(LOG_DEBUGV, "TSFilter destroyed\n");
-
-    DeliveryMethodManagerDeInit();
-    printlog(LOG_DEBUGV, "Delivery Method manager deinitalised\n");
-
-    CacheDeInit();
-    printlog(LOG_DEBUGV, "Cache deinitalised\n");
-
-    DBaseDeInit();
-    printlog(LOG_DEBUGV, "Database deinitalised\n");
+    DEINIT(DVBDispose(DVBAdapter), "DVB adapter");
+    DEINIT(TSFilterDestroy(TSFilter), "TS filter");
+    DEINIT(DeliveryMethodManagerDeInit(), "delivery method manager");
+    DEINIT(CacheDeInit(), "cache");
+    DEINIT(DBaseDeInit(), "database");
 
     if (DaemonMode)
     {
         DeinitDaemon();
     }
     return 0;
+}
+
+/*
+ * Output command line usage and help.
+ */
+static void usage(char *appname)
+{
+    fprintf(stderr,"Usage:%s <options>\n"
+            "      Options:\n"
+            "      -v            : Increase the amount of debug output, can be used multiple\n"
+            "                      times for more output\n"
+            "      -V            : Print version information then exit\n"
+            "      -o <host:port>: Output transport stream via UDP to the given host and port\n"
+            "      -a <adapter>  : Use adapter number (ie /dev/dvb/adapter<adapter>/...)\n"
+            "      -f <file>     : Run startup script file before starting the command prompt\n"
+            "      -t <file>     : Terrestrial channels.conf file to import services and \n"
+            "                      multiplexes from.\n"
+            "      -s <file>     : Satellite channels.conf file to import services and \n"
+            "                      multiplexes from.(EXPERIMENTAL)\n"
+            "      -c <file>     : Cable channels.conf file to import services and \n"
+            "                      multiplexes from.(EXPERIMENTAL)\n",
+            appname
+           );
+}
+
+/*
+ * Output version and license conditions
+ */
+static void version(void)
+{
+    printf("%s - %s\n"
+           "Written by Adam Charrett (charrea6@users.sourceforge.net).\n"
+           "\n"
+           "Copyright 2006 Adam Charrett\n"
+           "This is free software; see the source for copying conditions.  There is NO\n"
+           "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n",
+           PACKAGE, VERSION);
+}
+
+/*******************************************************************************
+* Signal Handling functions                                                   *
+*******************************************************************************/
+static void installsighandler(void)
+{
+    rl_catch_signals = 0;
+    signal(SIGTERM, sighandler);
+    signal(SIGINT, sighandler);
+    signal(SIGQUIT, sighandler);
+}
+
+static void sighandler(int signum)
+{
+    if (!DaemonMode)
+    {
+        switch (signum)
+        {
+            case SIGINT:
+            case SIGQUIT:
+                rl_free_line_state ();
+            case SIGTERM:
+                rl_cleanup_after_signal();
+                fclose(rl_instream);
+                break;
+        }
+    }
+    ExitProgram = TRUE;
+}
+
+/*******************************************************************************
+* Daemon functions                                                             *
+*******************************************************************************/
+static void InitDaemon(int adapter)
+{
+    char logfile[PATH_MAX];
+    /* Our process ID and Session ID */
+    pid_t pid, sid;
+
+    /* Fork off the parent process */
+    pid = fork();
+    if (pid < 0)
+    {
+        exit(1);
+    }
+
+    /* If we got a good PID, then
+       we can exit the parent process. */
+    if (pid > 0)
+    {
+        FILE *fp;
+        sprintf(PidFile, "/var/run/dvbstreamer-%d.pid", adapter);
+        fp = fopen(PidFile, "wt");
+        if (fp)
+        {
+            fprintf(fp, "%d", pid);
+            fclose(fp);
+        }
+        exit(0);
+    }
+
+    /* Create a new SID for the child process */
+    sid = setsid();
+    if (sid < 0)
+    {
+        /* Log the failure */
+        exit(1);
+    }
+
+    /* Change the current working directory */
+    if ((chdir("/")) < 0)
+    {
+        /* Log the failure */
+        exit(1);
+    }
+
+    /* Close out the standard file descriptors */
+    fclose(stdin);
+    fclose(stdout);
+    fclose(stderr);
+    sprintf(logfile, "/var/log/dvbstreamer-%d.err.log", adapter);
+    stderr = freopen(logfile, "at", stderr);
+    sprintf(logfile, "/var/log/dvbstreamer-%d.out.log", adapter);
+    stdout = freopen(logfile, "at", stdout);
+    DaemonMode = TRUE;
+}
+
+static void DeinitDaemon(void)
+{
+    /* Remove pid file */
+    unlink(PidFile);
+    exit(0);
+}
+
+/*******************************************************************************
+* Channel Change functions                                                     *
+*******************************************************************************/
+void ChannelChangedRegisterCallback(PluginChannelChanged_t callback)
+{
+
+    if (ChannelChangedCallbacksList)
+    {
+        ListAdd(ChannelChangedCallbacksList, callback);
+    }
+}
+
+void ChannelChangedUnRegisterCallback(PluginChannelChanged_t callback)
+{
+    if (ChannelChangedCallbacksList)
+    {
+        ListRemove(ChannelChangedCallbacksList, callback);
+    }
 }
 
 /*
@@ -418,135 +526,25 @@ Service_t *SetCurrentService(char *name)
         }
 
         TSFilterZeroStats(TSFilter);
-        OutputSetService(PrimaryServiceOutput, CurrentService);
+        OutputSetService(PrimaryServiceOutput, (Service_t*)CurrentService);
 
         printlog(LOG_DEBUGV,"Enabling filters\n");
         TSFilterEnable(TSFilter, TRUE);
+
+        /*
+         * Inform any interested parties that we have now changed the current
+         * service.
+         */
+        {
+            ListIterator_t iterator;
+            for (ListIterator_Init(iterator, ChannelChangedCallbacksList);
+                ListIterator_MoreEntries(iterator);ListIterator_Next(iterator))
+            {
+                PluginChannelChanged_t callback = ListIterator_Current(iterator);
+                callback((Multiplex_t *)CurrentMultiplex, (Service_t *)CurrentService);
+            }
+        }
     }
 
     return (Service_t*)CurrentService;
-}
-
-/*
- * Output command line usage and help.
- */
-static void usage(char *appname)
-{
-    fprintf(stderr,"Usage:%s <options>\n"
-            "      Options:\n"
-            "      -v            : Increase the amount of debug output, can be used multiple\n"
-            "                      times for more output\n"
-            "      -V            : Print version information then exit\n"
-            "      -o <host:port>: Output transport stream via UDP to the given host and port\n"
-            "      -a <adapter>  : Use adapter number (ie /dev/dvb/adapter<adapter>/...)\n"
-            "      -f <file>     : Run startup script file before starting the command prompt\n"
-            "      -t <file>     : Terrestrial channels.conf file to import services and \n"
-            "                      multiplexes from.\n"
-            "      -s <file>     : Satellite channels.conf file to import services and \n"
-            "                      multiplexes from.(EXPERIMENTAL)\n"
-            "      -c <file>     : Cable channels.conf file to import services and \n"
-            "                      multiplexes from.(EXPERIMENTAL)\n",
-            appname
-           );
-}
-
-/*
- * Output version and license conditions
- */
-static void version(void)
-{
-    printf("%s - %s\n"
-           "Written by Adam Charrett (charrea6@users.sourceforge.net).\n"
-           "\n"
-           "Copyright 2006 Adam Charrett\n"
-           "This is free software; see the source for copying conditions.  There is NO\n"
-           "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n",
-           PACKAGE, VERSION);
-}
-
-static void installsighandler(void)
-{
-    rl_catch_signals = 0;
-    signal(SIGTERM, sighandler);
-    signal(SIGINT, sighandler);
-    signal(SIGQUIT, sighandler);
-}
-
-static void sighandler(int signum)
-{
-    if (!DaemonMode)
-    {
-        switch (signum)
-        {
-            case SIGINT:
-            case SIGQUIT:
-                rl_free_line_state ();
-            case SIGTERM:
-                rl_cleanup_after_signal();
-                fclose(rl_instream);
-                break;
-        }
-    }
-    ExitProgram = TRUE;
-}
-
-static void InitDaemon(int adapter)
-{
-    char logfile[PATH_MAX];
-    /* Our process ID and Session ID */
-    pid_t pid, sid;
-
-    /* Fork off the parent process */
-    pid = fork();
-    if (pid < 0)
-    {
-        exit(1);
-    }
-
-    /* If we got a good PID, then
-       we can exit the parent process. */
-    if (pid > 0)
-    {
-        FILE *fp;
-        sprintf(PidFile, "/var/run/dvbstreamer-%d.pid", adapter);
-        fp = fopen(PidFile, "wt");
-        if (fp)
-        {
-            fprintf(fp, "%d", pid);
-            fclose(fp);
-        }
-        exit(0);
-    }
-
-    /* Create a new SID for the child process */
-    sid = setsid();
-    if (sid < 0)
-    {
-        /* Log the failure */
-        exit(1);
-    }
-
-    /* Change the current working directory */
-    if ((chdir("/")) < 0)
-    {
-        /* Log the failure */
-        exit(1);
-    }
-
-    /* Close out the standard file descriptors */
-    fclose(stdin);
-    fclose(stdout);
-    fclose(stderr);
-    sprintf(logfile, "/var/log/dvbstreamer-%d.err.log", adapter);
-    stderr = freopen(logfile, "at", stderr);
-    sprintf(logfile, "/var/log/dvbstreamer-%d.out.log", adapter);
-    stdout = freopen(logfile, "at", stdout);
-    DaemonMode = TRUE;
-}
-
-static void DeinitDaemon(void)
-{
-    /* Remove pid file */
-    unlink(PidFile);
-    exit(0);
 }

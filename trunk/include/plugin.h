@@ -22,11 +22,23 @@ Plugin Interface structures and macros.
 */
 #ifndef _PLUGIN_H
 #define _PLUGIN_H
+
+/* Annoyingly libdvbpsi causes a preprocessor warning when its header files are included more than once! */
+#ifndef _DVBPSI_DVBPSI_H_
 #include <dvbpsi/dvbpsi.h>
+#endif
+#ifndef _DVBPSI_DESCRIPTOR_H_
 #include <dvbpsi/descriptor.h>
+#endif
+#ifndef _DVBPSI_PSI_H_
 #include <dvbpsi/psi.h>
+#endif
+#ifndef _DVBPSI_PAT_H_
 #include <dvbpsi/pat.h>
+#endif
+#ifndef _DVBPSI_PMT_H_
 #include <dvbpsi/pmt.h>
+#endif
 
 #include "config.h"
 #include "types.h"
@@ -58,9 +70,9 @@ Plugin Interface structures and macros.
  */
 #define PLUGIN_FEATURE_TYPE_DELIVERYMETHOD 0x04
 /**
- * Constant for a Primary Channel Change feature.
+ * Constant for a Primary Channel Changed feature.
  */
-#define PLUGIN_FEATURE_TYPE_CHANNELCHANGE  0x05
+#define PLUGIN_FEATURE_TYPE_CHANNELCHANGED 0x05
 
 /**
  * Structure used to describe a single 'feature' of a plugin.
@@ -185,7 +197,7 @@ typedef struct Plugin_t
  * Simple macro to define a Channel Changed feature.
  * @param _cchanaged Function to call when the Primary service filter is updated.
  */
-#define PLUGIN_FEATURE_CHANNELCHANGE(_cchanged) {PLUGIN_FEATURE_TYPE_CHANNELCHANGE, (void*)_cchanged}
+#define PLUGIN_FEATURE_CHANNELCHANGED(_cchanged) {PLUGIN_FEATURE_TYPE_CHANNELCHANGED, (void*)_cchanged}
 
 /**
  * Structure used to describe a Filter Feature.
@@ -222,10 +234,10 @@ typedef void (*PluginPMTProcessor_t)(dvbpsi_pmt_t* newpmt);
  * Function pointer to function to call after the primary service
  * filter is updated. The newMultiplex argument will contain the multiplex currently
  * being used and the newService will contain the service now being filtered.
- * For use with the PLUGIN_FEATURE_TYPE_CHANNELCHANGE feature type, only 1 per
+ * For use with the PLUGIN_FEATURE_TYPE_CHANNELCHANGED feature type, only 1 per
  * plugin is expected (allowed).
  */
-typedef void (*PluginChannelChange_t)(Multiplex_t *newMultiplex, Service_t *newService);
+typedef void (*PluginChannelChanged_t)(Multiplex_t *newMultiplex, Service_t *newService);
 
 /** @} */
 #endif

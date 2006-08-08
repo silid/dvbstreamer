@@ -28,6 +28,7 @@ Entry point to the application.
 #include "ts.h"
 #include "services.h"
 #include "multiplexes.h"
+#include "plugin.h"
 
 /**
  * Enum describing the location of the main PID Filters in the PIDFilters array
@@ -90,4 +91,15 @@ extern bool DaemonMode;
  */
 extern char PrimaryService[];
 
+/**
+ * Register a function to be called when the primary output service is changed.
+ * @param callback The function to call.
+ */
+void ChannelChangedRegisterCallback(PluginChannelChanged_t callback);
+
+/**
+ * UnRegister a function to be called when the primary output service is changed.
+ * @param callback The function to call.
+ */
+void ChannelChangedUnRegisterCallback(PluginChannelChanged_t callback);
 #endif
