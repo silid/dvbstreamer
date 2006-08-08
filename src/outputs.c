@@ -47,7 +47,6 @@ int OutputsInit()
 
 void OutputsDeInit()
 {
-    ListIterator_t iterator;
     while(ManualOutputsList->head)
     {
         OutputFree((Output_t*)ManualOutputsList->head->data);
@@ -170,7 +169,7 @@ void OutputFree(Output_t *output)
     free(output->name);
 
     DeliveryMethodManagerFree(output->filter);
-    
+
     ListRemove( list, output);
     free(output);
 }
