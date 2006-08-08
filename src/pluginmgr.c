@@ -32,6 +32,7 @@ Plugin Manager functions.
 #include "pluginmgr.h"
 #include "plugin.h"
 #include "logging.h"
+#include "main.h"
 
 static int PluginManagerLoadPlugin(const char *filename, void *userarg);
 static void PluginManagerInstallPlugin(Plugin_t *pluginInterface);
@@ -189,6 +190,10 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
                 printlog(LOG_DEBUGV, "plugin %s: Installed PMT processor.\n", pluginInterface->name);
                 PMTProcessorRegisterPMTCallback(pluginInterface->features[i].details);
                 break;
+                case PLUGIN_FEATURE_TYPE_CHANNELCHANGED:
+                printlog(LOG_DEBUGV, "plugin %s: Installed channel changed callback.\n", pluginInterface->name);
+                ChannelChangedRegisterCallback(pluginInterface->features[i].details);
+                break;
             }
 
         }
@@ -219,6 +224,10 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface)
                 case PLUGIN_FEATURE_TYPE_PMTPROCESSOR:
                 printlog(LOG_DEBUGV, "plugin %s: Uninstalled PMT processor.\n", pluginInterface->name);
                 PMTProcessorUnRegisterPMTCallback(pluginInterface->features[i].details);
+                break;
+                case PLUGIN_FEATURE_TYPE_CHANNELCHANGED:
+                printlog(LOG_DEBUGV, "plugin %s: Uninstalled channel changed callback.\n", pluginInterface->name);
+                ChannelChangedUnRegisterCallback(pluginInterface->features[i].details);
                 break;
             }
         }
