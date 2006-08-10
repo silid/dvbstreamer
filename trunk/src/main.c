@@ -332,13 +332,13 @@ static void usage(char *appname)
  */
 static void version(void)
 {
-    printf("%s - %s\n"
+    printf("%s - %s (Compiled %s %s)\n"
            "Written by Adam Charrett (charrea6@users.sourceforge.net).\n"
            "\n"
            "Copyright 2006 Adam Charrett\n"
            "This is free software; see the source for copying conditions.  There is NO\n"
            "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n",
-           PACKAGE, VERSION);
+           PACKAGE, VERSION, __DATE__, __TIME__);
 }
 
 /*******************************************************************************
