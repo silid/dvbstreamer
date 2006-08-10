@@ -169,6 +169,7 @@ static void CommandStats(char *argv[]);
 static void CommandAddOutput(char *argv[]);
 static void CommandRmOutput(char *argv[]);
 static void CommandOutputs(char *argv[]);
+static void CommandSetOutputMRL(char *argv[]);
 static void CommandAddRmPID(char *argv[]);
 static void CommandListSFS(char *argv[]);
 static void CommandSetSF(char *argv[]);
@@ -195,6 +196,8 @@ static char addoutputCmd[] = "addoutput";
 static char addsfCmd[] = "addsf";
 static char rmoutputCmd[] = "rmoutput";
 static char rmsfCmd[] = "rmsf";
+static char setoutputmrlCmd[] = "setoutputmrl";
+static char setsfmrlCmd[] = "setsfmrl";
 
 static Command_t commands[] =
     {
@@ -252,6 +255,13 @@ static Command_t commands[] =
             CommandRmOutput
         },
         {
+            setoutputmrlCmd, 2,
+            "setoutputmrl <output name> <mrl>\n"
+            "Change the destination for packets sent to this output. If the MRL cannot be"
+            "parsed no change will be made to the output.",
+            CommandSetOutputMRL,
+        },
+        {
             "lsoutputs", 0,
             "List all active additonal output names and destinations.",
             CommandOutputs
@@ -298,6 +308,13 @@ static Command_t commands[] =
             CommandSetSF
         },
         {
+            setsfmrlCmd, 2,
+            "setsfmrl <output name> <mrl>\n"
+            "Change the destination for packets sent to this service filters output."
+            "If the MRL cannot be parsed no change will be made to the service filter.",
+            CommandSetOutputMRL,
+        },
+        {
             "festatus", 0,
             "Displays whether the front end is locked, the bit error rate and signal to noise"
             "ratio and the signal strength",
@@ -328,7 +345,6 @@ int main(int argc, char *argv[])
     int i, consumed;
     struct hostent *hostinfo;
     struct sockaddr_in sockaddr;
-
     while (TRUE)
     {
         char c;
@@ -454,13 +470,13 @@ static void usage(char *appname)
  */
 static void version(void)
 {
-    printf("%s - %s\n"
+    printf("%s - %s (Compiled %s %s)\n"
            "Written by Adam Charrett (charrea6@users.sourceforge.net).\n"
            "\n"
            "Copyright 2006 Adam Charrett\n"
            "This is free software; see the source for copying conditions.  There is NO\n"
            "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n",
-           PACKAGE, VERSION);
+           PACKAGE, VERSION, __DATE__, __TIME__);
 }
 /******************************************************************************/
 /* Command functions                                                          */
@@ -711,6 +727,26 @@ static void CommandAddOutput(char *argv[])
     MESSAGE_SENDRECV();
 
     CHECK_RERR_OK();
+}
+
+static void CommandSetOutputMRL(char *argv[])
+{
+    AUTHENTICATE();
+
+    if (strcmp(setoutputmrlCmd, argv[0]) == 0)
+    {
+        MessageInit(&message, MSGCODE_COSD);
+    }
+    else
+    {
+        MessageInit(&message, MSGCODE_CSSD);
+    }
+    MessageEncode(&message, "ss", argv[1], argv[2]);
+
+    MESSAGE_SENDRECV();
+
+    CHECK_RERR_OK();
+
 }
 
 static void CommandRmOutput(char *argv[])
