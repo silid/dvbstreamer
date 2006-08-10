@@ -375,6 +375,7 @@ static void sighandler(int signum)
 *******************************************************************************/
 static void InitDaemon(int adapter)
 {
+    char *logdir = "/var/log";
     char logfile[PATH_MAX];
     /* Our process ID and Session ID */
     pid_t pid, sid;
@@ -393,6 +394,12 @@ static void InitDaemon(int adapter)
         FILE *fp;
         sprintf(PidFile, "/var/run/dvbstreamer-%d.pid", adapter);
         fp = fopen(PidFile, "wt");
+        if (!fp)
+        {
+            sprintf(PidFile, "%s/dvbstreamer-%d.pid", getenv("HOME"), adapter);
+            fp = fopen(PidFile, "wt");
+        }
+
         if (fp)
         {
             fprintf(fp, "%d", pid);
@@ -405,6 +412,7 @@ static void InitDaemon(int adapter)
     sid = setsid();
     if (sid < 0)
     {
+        printlog(LOG_ERROR, "setsid failed\n");
         /* Log the failure */
         exit(1);
     }
@@ -412,6 +420,7 @@ static void InitDaemon(int adapter)
     /* Change the current working directory */
     if ((chdir("/")) < 0)
     {
+        printlog(LOG_ERROR, "chdir failed\n");
         /* Log the failure */
         exit(1);
     }
@@ -420,10 +429,16 @@ static void InitDaemon(int adapter)
     fclose(stdin);
     fclose(stdout);
     fclose(stderr);
-    sprintf(logfile, "/var/log/dvbstreamer-%d.err.log", adapter);
-    stderr = freopen(logfile, "at", stderr);
-    sprintf(logfile, "/var/log/dvbstreamer-%d.out.log", adapter);
-    stdout = freopen(logfile, "at", stdout);
+
+    sprintf(logfile, "%s/dvbstreamer-%d.err.log", logdir, adapter);
+    if (!freopen(logfile, "at", stderr))
+    {
+        logdir = getenv("HOME");
+        sprintf(logfile, "%s/dvbstreamer-%d.err.log", logdir, adapter);
+        freopen(logfile, "at", stderr);
+    }
+    sprintf(logfile, "%s/dvbstreamer-%d.out.log",logdir, adapter);
+    freopen(logfile, "at", stdout);
     DaemonMode = TRUE;
 }
 
