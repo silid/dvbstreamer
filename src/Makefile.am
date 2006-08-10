@@ -36,10 +36,10 @@ dvbstreamer_SOURCES = \
     deliverymethod.c\
     pluginmgr.c
 
-dvbstreamer_LDFLAGS =
+dvbstreamer_LDFLAGS = -rdynamic
 
 dvbstreamer_LDADD = \
-	 -ldvbpsi -lpthread -lsqlite3 -lreadline -ltermcap @LIBLTDL@
+	 -ldvbpsi -lpthread -lsqlite3 -lreadline -ltermcap @LIBLTDL@ 
 
 #
 # dvbctrl

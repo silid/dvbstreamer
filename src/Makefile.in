@@ -36,7 +36,6 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-LIBOBJDIR =
 bin_PROGRAMS = dvbstreamer$(EXEEXT) dvbctrl$(EXEEXT)
 subdir = src
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
@@ -225,9 +224,9 @@ dvbstreamer_SOURCES = \
     deliverymethod.c\
     pluginmgr.c
 
-dvbstreamer_LDFLAGS = 
+dvbstreamer_LDFLAGS = -rdynamic
 dvbstreamer_LDADD = \
-	 -ldvbpsi -lpthread -lsqlite3 -lreadline -ltermcap @LIBLTDL@
+	 -ldvbpsi -lpthread -lsqlite3 -lreadline -ltermcap @LIBLTDL@ 
 
 
 #
