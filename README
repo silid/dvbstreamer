@@ -1,8 +1,8 @@
 About
 -----
-DVBStreamer is an console based application to stream an entire DVB service 
-over UDP. 
-It differs from other DVB streaming applications by the use of the DVB-SI to 
+DVBStreamer is an console based application to stream an entire DVB service
+over UDP.
+It differs from other DVB streaming applications by the use of the DVB-SI to
 work out the PIDs to stream and correctly stream services which use a separate
 PCR PID.
 
@@ -14,7 +14,7 @@ dvbpsi  (http://developers.videolan.org/libdvbpsi/)
 
 Installation
 ------------
-Before building dvbstreamer you will need the latest version of the following 
+Before building dvbstreamer you will need the latest version of the following
 packages:
 
 libdvbpsi
@@ -22,7 +22,7 @@ sqlite3
 
 Now download and extract the latest source from the sourceforge download page
 
-Once you've done that the next thing to do is run configure to setup the 
+Once you've done that the next thing to do is run configure to setup the
 makefile, to do this enter the following at the command prompt (add any options
  you would normal add when building using configure)
 
@@ -33,7 +33,7 @@ When configure has finished and created all the make files its just a matter of
 
 make
 
-Once make has finished doing its thing the next step is installing dvbstreamer 
+Once make has finished doing its thing the next step is installing dvbstreamer
 to you chosen location. You will probably want to do this step as root
 
 make install
@@ -41,21 +41,21 @@ make install
 
 Setup
 -----
-Before you can actually start to use dvbstreamer you need to initialise it's 
+Before you can actually start to use dvbstreamer you need to initialise it's
 database of service to do this you'll need a channels.conf file produces by the
  linuxtv.org utility scan. Go here if you need help with scan.
 
-When you have a channels.conf file you then need to start dvbstreamer with the 
--t option specifying the file you've just created. The information in the 
+When you have a channels.conf file you then need to start dvbstreamer with the
+-t option specifying the file you've just created. The information in the
 channels.conf file is expected to be for a terrestrial tuner.
 
-To start dvbstream sending packets to UDP port 1234 on the local machine and 
-initialise the database using channels.conf file in the current directory use 
+To start dvbstream sending packets to UDP port 1234 on the local machine and
+initialise the database using channels.conf file in the current directory use
 the following
 
-dvbstream -o localhost:1234 -t channels.conf
+dvbstream -o udp://localhost:1234 -t channels.conf
 
-To find out what services have been imported use the services command which 
+To find out what services have been imported use the services command which
 will list all the available service
 
 dvbstream> service
@@ -64,12 +64,12 @@ To quit out of dvbstreamer type quit
 
 dvbstream> quit
 
-One point to note is that each dvb adapter has its own database, thus meaning 
-that once dvbstreamer supports cable and satellite cards you could use 
+One point to note is that each dvb adapter has its own database, thus meaning
+that once dvbstreamer supports cable and satellite cards you could use
 dvbstreamer on 2 or more different cards with out problems
 
-If you have 2 or more cards of the same type in your system you can link the 
-first cards database to the second cards database by simply creating a hard 
+If you have 2 or more cards of the same type in your system you can link the
+first cards database to the second cards database by simply creating a hard
 link in the dvbstreamer directory in your home directory ~/.dvbstreamer
 
 for example to use the same database for card 1 and 2 you would do the following
@@ -80,10 +80,10 @@ ln ~/.dvbstreamer/adapter1.db ~/.dvbstreamer/adapter2.db
 Running
 -------
 To start dvbstreamer you need to specify an IP address and a UDP port where the
-selected service will be streamed to. You can also optionally specify which 
+selected service will be streamed to. You can also optionally specify which
 adapter to use using the -a option.
 
-For example to start dvbstreamer using adapter 2 and send the selected service 
+For example to start dvbstreamer using adapter 2 and send the selected service
 to 192.168.1.1 and UDP port 1234 you would use the following command
 
 dvbstreamer -a 2 -o 192.168.1.1:1234
@@ -114,17 +114,17 @@ Command			Description
 
 Start up files
 --------------
-Start up files can be useful for doing things that you always want to be setup 
-before you get to the dvbstreamer prompt. For example you may always want the 
+Start up files can be useful for doing things that you always want to be setup
+before you get to the dvbstreamer prompt. For example you may always want the
 TDT and EIT tables redirected to a specific UDP port on your local computer.
 
-To use a startup file simple add the -f option on the command line specifying 
+To use a startup file simple add the -f option on the command line specifying
 the file to read.
 
-For example to use the file eitredirect to redirect EIT tables to port 1235 on 
+For example to use the file eitredirect to redirect EIT tables to port 1235 on
 your local computer you would use the following:
 
-dvbstreamer -o localhost:1234 -f eitredirect
+dvbstreamer -o udp://localhost:1234 -f eitredirect
 
 And in eitredirect you would have
 
@@ -132,19 +132,19 @@ And in eitredirect you would have
 addoutput eitoutput localhost:1235
 addpid eitoutput 0x12
 
-Its as simple as that, you can use all the commands that you can use on the 
+Its as simple as that, you can use all the commands that you can use on the
 dvbstreamer prompt.
 
 Daemon mode and DVBCtrl
 -----------------------
-This program allows you to control dvbstreamer when it is running in daemon 
-mode. To start dvbstreamer in daemon mode use the '-d' option. It is also 
+This program allows you to control dvbstreamer when it is running in daemon
+mode. To start dvbstreamer in daemon mode use the '-d' option. It is also
 recommend to change the default username and password used to prevent someone
-else changing the channel. To change the default username and password 
+else changing the channel. To change the default username and password
 (dvbstreamer, control) use the '-u <username>' and '-p <password>' options.
 For example:
 
-dvbstreamer -d -u adam -p alkhluln
+dvbstreamer -d -u adam -p alkhluln -o null://
 
 Then to control dvbstreamer you'll need to use dvbctrl. DVBCtrl allows you to
 use all of the commands available on the command line interface. Simple add the

@@ -1,30 +1,44 @@
+0.5
+---
+* Plugins! They can add commands, delivery methods, PMT/PAT processors and
+  channel change callbacks.
+* Ability to change the output destination after creating a service filter or
+  manual output.
+* New delivery methods, currently only udp://<ip address>:<port>(which was
+  already there :-) ) and null:// (which just throws away the packets)
+* Seg fault on exit fixed.
+* Version number updated.
+* Most header files are now documented.
+* New list structure means there is no limit (apart from memory and CPU bandwidth)
+  on the number of filters/outputs you can add.
+
 0.4
 ---
-* Daemon mode, can now run dvbstreamer in the background and use dvbctrl to 
+* Daemon mode, can now run dvbstreamer in the background and use dvbctrl to
   control/monitor it.
-* Secondary service filters, allows more than 1 service to be streamed (each 
+* Secondary service filters, allows more than 1 service to be streamed (each
   to separate IP Address:Ports).
 * Signal handling (No exit in a nice clean manner, making sure the database is
   updated).
 * IPv6 support added. (Thanks again Tero)
-* Minor name changes to commands (mostly commands that list things now start 
+* Minor name changes to commands (mostly commands that list things now start
   with ls, mostly :-) )
 * Minor change to behaviour, dvbstreamer now no longer waits for the signal to
-  lock before returning from a command, useful when you have a low siganl 
+  lock before returning from a command, useful when you have a low siganl
   strength/high noise problem!
 
 0.3
 ---
 * Command completion.
 * Automatic service addition/removal, new service are automatically added
-  to the database and services no longer signaled in the PAT are removed. 
+  to the database and services no longer signaled in the PAT are removed.
 * All TS pid (use pid 8192 when adding a pid to a manual output to get the
   entire TS)
 * Added SDT processing, can now get/update services names.
 * Refactored service filter and PAT/PMT handling so now PAT and PMT processor
   only process the incoming PAT/PMT and service filter actually does the PAT
   rewrite (should allow more than 1 service filter in the future).
-* Add DVB-S/C support (database has now changed slightly although shouldn't 
+* Add DVB-S/C support (database has now changed slightly although shouldn't
   affect anyone upgrading from 0.2)
 * Fixed bug in cache.c when PAT version changed.
 * Several patches from Tero Pelander - Thanks! (including Bug ID 1487683)
@@ -32,12 +46,12 @@
 0.2
 ---
 * Added some new commands
-* Rewrote the TS filter callbacks todo more what they say they do. ie filter 
-  now returns a bool, process now returns a packet or null, and output just 
+* Rewrote the TS filter callbacks todo more what they say they do. ie filter
+  now returns a bool, process now returns a packet or null, and output just
   sends the packets.
 * Fixed a couple of memory leaks where I wasn't freeing the PSI sections after
   using them.
-* Continued general tidying up the project directory and getting to know 
+* Continued general tidying up the project directory and getting to know
   subversion better.
 
 0.1
