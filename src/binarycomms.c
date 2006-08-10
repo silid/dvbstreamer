@@ -153,10 +153,12 @@ static void ProcessPrimaryServiceSelect(Connection_t *connection, Message_t *mes
 static void ProcessSecondaryServiceAdd(Connection_t *connection, Message_t *message);
 static void ProcessSecondaryServiceSet(Connection_t *connection, Message_t *message);
 static void ProcessSecondaryServiceRemove(Connection_t *connection, Message_t *message);
+static void ProcessServiceSetDestination(Connection_t *connection, Message_t *message);
 static void ProcessOutputAdd(Connection_t *connection, Message_t *message);
 static void ProcessOutputRemove(Connection_t *connection, Message_t *message);
 static void ProcessOutputPIDAdd(Connection_t *connection, Message_t *message);
 static void ProcessOutputPIDRemove(Connection_t *connection, Message_t *message);
+static void ProcessOutputSetDestination(Connection_t *connection, Message_t *message);
 static void ProcessPrimaryServiceCurrent(Connection_t *connection, Message_t *message);
 static void ProcessSecondaryServiceList(Connection_t *connection, Message_t *message);
 static void ProcessOutputsList(Connection_t *connection, Message_t *message);
@@ -336,9 +338,9 @@ static void HandleConnection(Connection_t *connection)
 
 static void ProcessMessage(Connection_t *connection, Message_t *message)
 {
-    printlog(LOG_DEBUG, "%s:%d : Processing message 0x%04x length %d\n",
+    printlog(LOG_DEBUG, "%s:%d : Processing message 0x%04x length %d (%s)\n",
              inet_ntoa(connection->clientAddress.sin_addr), connection->clientAddress.sin_port,
-             MessageGetCode(message), MessageGetLength(message));
+             MessageGetCode(message), MessageGetLength(message), __TIME__);
     switch (message->code)
     {
         case MSGCODE_INFO:
@@ -363,6 +365,9 @@ static void ProcessMessage(Connection_t *connection, Message_t *message)
         case MSGCODE_CSSR:
             IFAUTHENTICATED(ProcessSecondaryServiceRemove, connection, message);
             break;
+        case MSGCODE_CSSD:
+            IFAUTHENTICATED(ProcessServiceSetDestination, connection, message);
+            break;
         case MSGCODE_COAO:
             IFAUTHENTICATED(ProcessOutputAdd, connection, message);
             break;
@@ -374,6 +379,9 @@ static void ProcessMessage(Connection_t *connection, Message_t *message)
             break;
         case MSGCODE_CORP:
             IFAUTHENTICATED(ProcessOutputPIDRemove, connection, message);
+            break;
+        case MSGCODE_COSD:
+            IFAUTHENTICATED(ProcessOutputSetDestination, connection, message);
             break;
             /* Status Messages */
         case MSGCODE_SSPS:
@@ -629,6 +637,32 @@ static void ProcessSecondaryServiceRemove(Connection_t *connection, Message_t *m
     free(serviceOutputName);
 }
 
+static void ProcessServiceSetDestination(Connection_t *connection, Message_t *message)
+{
+    Output_t *output = NULL;
+    char *serviceOutputName = NULL;
+    char *mrl = NULL;
+    READ2STRINGS(serviceOutputName, mrl);
+    output = OutputFind(serviceOutputName, OutputType_Service);
+    if (!output)
+    {
+        MessageRERR(message, RERR_NOTFOUND, serviceOutputName);
+    }
+    else
+    {
+        if (DeliveryMethodManagerFind(mrl, output->filter))
+        {
+            MessageRERR(message, RERR_OK, "");
+        }
+        else
+        {
+            MessageRERR(message, RERR_GENERIC, "No handler for specified MRL");
+        }
+    }
+    free(serviceOutputName);
+    free(mrl);
+}
+
 static void ProcessOutputAdd(Connection_t *connection, Message_t *message)
 {
     Output_t *output = NULL;
@@ -733,6 +767,31 @@ static void ProcessOutputPIDRemove(Connection_t *connection, Message_t *message)
     }
 }
 
+static void ProcessOutputSetDestination(Connection_t *connection, Message_t *message)
+{
+    Output_t *output = NULL;
+    char *manualOutputName = NULL;
+    char *mrl = NULL;
+    READ2STRINGS(manualOutputName, mrl);
+    output = OutputFind(manualOutputName, OutputType_Manual);
+    if (!output)
+    {
+        MessageRERR(message, RERR_NOTFOUND, manualOutputName);
+    }
+    else
+    {
+        if (DeliveryMethodManagerFind(mrl, output->filter))
+        {
+            MessageRERR(message, RERR_OK, "");
+        }
+        else
+        {
+            MessageRERR(message, RERR_GENERIC, "No handler for specified MRL");
+        }
+    }
+    free(manualOutputName);
+    free(mrl);
+}
 
 static void ProcessPrimaryServiceCurrent(Connection_t *connection, Message_t *message)
 {
