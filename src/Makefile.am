@@ -7,9 +7,7 @@
 INCLUDES = @INCLTDL@
 
 AM_CFLAGS =\
-     -I$(top_srcdir)/include \
-	 -Wall\
-	 -g
+     -I$(top_srcdir)/include
 
 bin_PROGRAMS = dvbstreamer dvbctrl
 

@@ -198,9 +198,7 @@ target_alias = @target_alias@
 # Plugins
 #
 AM_CFLAGS = \
-     -I$(top_srcdir)/include \
-	 -Wall\
-	 -g
+     -I$(top_srcdir)/include
 
 pluginsdir = @DVBSTREAMER_PLUGINDIR@
 plugins_LTLIBRARIES = udpoutput.la nulloutput.la

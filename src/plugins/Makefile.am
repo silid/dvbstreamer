@@ -2,9 +2,7 @@
 # Plugins
 #
 AM_CFLAGS =\
-     -I$(top_srcdir)/include \
-	 -Wall\
-	 -g
+     -I$(top_srcdir)/include
 
 pluginsdir = @DVBSTREAMER_PLUGINDIR@
 
