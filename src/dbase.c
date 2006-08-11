@@ -1,30 +1,29 @@
 /*
 Copyright (C) 2006  Adam Charrett
- 
+
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
- 
+
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
- 
+
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
- 
+
 dbase.c
- 
+
 Opens/Closes and setups the sqlite database for use by the rest of the application.
- 
+
 */
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <limits.h>
-#include <sys/stat.h>
 #include <sys/types.h>
 
 #include "dbase.h"
@@ -44,14 +43,10 @@ int DBaseCheckVersion();
 
 int DBaseInit(int adapter)
 {
-    char dir[PATH_MAX];
     char file[PATH_MAX];
     int rc;
 
-    sprintf(dir, "%s/.dvbstreamer", getenv("HOME"));
-    mkdir(dir, S_IRWXU);
-
-    sprintf(file, "%s/adapter%d.db", dir, adapter);
+    sprintf(file, "%s/adapter%d.db", DataDirectory, adapter);
     rc = sqlite3_open(file, &DBaseInstance);
     if( rc )
     {
@@ -145,7 +140,7 @@ int DBaseCreateTables(double version)
 	        printlog(LOG_ERROR, "Failed to create OFDMParameters table: %s\n", sqlite3_errmsg(DBaseInstance));
 	        return rc;
 	    }
-		
+
 	    rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " PIDS_TABLE " ( "
 	                      PID_MPLEXFREQ ","
 	                      PID_SERVICEID ","
@@ -201,7 +196,7 @@ int DBaseCreateTables(double version)
 	        return rc;
 	    }
 	}
-	
+
     rc = sqlite3_exec(DBaseInstance, "DELETE FROM " VERSION_TABLE ";", NULL, NULL, NULL);
 	rc = sqlite3_exec(DBaseInstance, "INSERT INTO " VERSION_TABLE " VALUES ( " TOSTRING(DBASE_VERSION) " );", NULL, NULL, NULL);
     return rc;

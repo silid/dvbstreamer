@@ -31,6 +31,7 @@ Entry point to the application.
 #include <ctype.h>
 #include <signal.h>
 #include <sys/unistd.h>
+#include <sys/stat.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -59,6 +60,10 @@ Entry point to the application.
         if (_func) \
         { \
             printlog(LOG_ERROR, "Failed to initialise %s.\n", _name); \
+            if (DaemonMode)\
+            {\
+                unlink(PidFile);\
+            }\
             exit(1);\
         }\
         printlog(LOG_DEBUGV, "Initialised %s.\n", _name);\
@@ -88,6 +93,8 @@ bool DaemonMode = FALSE;
 char PrimaryService[] = "<Primary>";
 Output_t *PrimaryServiceOutput = NULL;
 
+char DataDirectory[PATH_MAX];
+
 static List_t *ChannelChangedCallbacksList = NULL;
 static char PidFile[PATH_MAX];
 
@@ -101,8 +108,11 @@ int main(int argc, char *argv[])
     char *username = "dvbstreamer";
     char *password = "control";
     char *serverName = NULL;
-    char *primaryOutput = NULL;
+    char *primaryOutput = "null://";
 
+    /* Create the data directory */
+    sprintf(DataDirectory, "%s/.dvbstreamer", getenv("HOME"));
+    mkdir(DataDirectory, S_IRWXU);
 
     installsighandler();
 
@@ -396,7 +406,7 @@ static void InitDaemon(int adapter)
         fp = fopen(PidFile, "wt");
         if (!fp)
         {
-            sprintf(PidFile, "%s/dvbstreamer-%d.pid", getenv("HOME"), adapter);
+            sprintf(PidFile, "%s/dvbstreamer-%d.pid", DataDirectory, adapter);
             fp = fopen(PidFile, "wt");
         }
 
@@ -433,8 +443,8 @@ static void InitDaemon(int adapter)
     sprintf(logfile, "%s/dvbstreamer-%d.err.log", logdir, adapter);
     if (!freopen(logfile, "at", stderr))
     {
-        logdir = getenv("HOME");
-        sprintf(logfile, "%s/dvbstreamer-%d.err.log", logdir, adapter);
+        logdir = DataDirectory;
+        sprintf(logfile, "%s/dvbstreamer-%d.err.log", DataDirectory, adapter);
         freopen(logfile, "at", stderr);
     }
     sprintf(logfile, "%s/dvbstreamer-%d.out.log",logdir, adapter);
