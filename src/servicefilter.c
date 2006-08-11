@@ -101,7 +101,7 @@ static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t
     if (state->service != state->nextservice)
     {
         state->service = state->nextservice;
-        state->multiplex = CurrentMultiplex;
+        state->multiplex = (Multiplex_t *)CurrentMultiplex;
         state->rewritepat = TRUE;
     }
 
