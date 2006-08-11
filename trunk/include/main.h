@@ -92,6 +92,11 @@ extern bool DaemonMode;
 extern char PrimaryService[];
 
 /**
+ * Directory path where DVBStreamer stores its data.
+ */
+extern char DataDirectory[];
+
+/**
  * Register a function to be called when the primary output service is changed.
  * @param callback The function to call.
  */
