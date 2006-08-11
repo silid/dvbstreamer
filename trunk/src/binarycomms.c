@@ -148,7 +148,7 @@ static void ProcessMessage(Connection_t *connection, Message_t *message);
 static void ProcessInfo(Connection_t *connection, Message_t *message);
 static void ProcessAuth(Connection_t *connection, Message_t *message);
 static void ProcessQuote(Connection_t *connection, Message_t *message);
-static void QuoteMessagePrintf(char *fmt, ...);
+static int QuoteMessagePrintf(char *fmt, ...);
 static void ProcessPrimaryServiceSelect(Connection_t *connection, Message_t *message);
 static void ProcessSecondaryServiceAdd(Connection_t *connection, Message_t *message);
 static void ProcessSecondaryServiceSet(Connection_t *connection, Message_t *message);
@@ -508,7 +508,7 @@ static void ProcessQuote(Connection_t *connection, Message_t *message)
 
 }
 
-static void QuoteMessagePrintf(char *fmt, ...)
+static int QuoteMessagePrintf(char *fmt, ...)
 {
     int available;
     int result;
@@ -521,6 +521,7 @@ static void QuoteMessagePrintf(char *fmt, ...)
     QuoteMessage->currentpos += result;
     QuoteMessage->length = QuoteMessage->currentpos;
     va_end(valist);
+    return result;
 }
 
 static void ProcessPrimaryServiceSelect(Connection_t *connection, Message_t *message)
