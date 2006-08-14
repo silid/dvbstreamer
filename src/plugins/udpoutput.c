@@ -202,12 +202,12 @@ DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
     }
     #endif
     state->datagramfullcount = MAX_TS_PACKETS_PER_DATAGRAM;
-    return state;
+    return (DeliveryMethodInstance_t *)state;
 }
 
 void UDPOutputDestroy(DeliveryMethodInstance_t *this)
 {
-    struct UDPOutputState_t *state = this;
+    struct UDPOutputState_t *state = (struct UDPOutputState_t *)this;
 #ifndef __CYGWIN__
     close(state->socket);
 #endif
