@@ -98,6 +98,13 @@ PID_t *CachePIDsGet(Service_t *service, int *count);
 void CacheUpdateMultiplex(Multiplex_t *multiplex, int patversion, int tsid);
 
 /**
+ * Update the specified Multiplex's network id.
+ * @param multiplex The multiplex to update.
+ * @param netid The network id to set.
+ */
+void CacheUpdateNetworkId(Multiplex_t *multiplex, int netid);
+
+/**
  * Update the cached service with a new PMT PID.
  * @param service The service to update.
  * @param pmtpid The new PMT PID.

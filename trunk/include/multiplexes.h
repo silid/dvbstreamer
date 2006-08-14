@@ -37,6 +37,7 @@ typedef struct Multiplex_t
 {
     int freq;       /**< Frequency the multiplex is broadcast on. */
     int tsid;       /**< Transport Stream ID. */
+    int netid;      /**< Network ID */
     fe_type_t type; /**< The type of frontend used to receive this transport stream. */
     int patversion; /**< Last processed version of the PAT */
 }
@@ -114,6 +115,14 @@ int MultiplexPATVersionSet(Multiplex_t *multiplex, int patversion);
  * @return 0 on success, otherwise an SQLite error code.
  */
 int MultiplexTSIdSet(Multiplex_t *multiplex, int tsid);
+
+/**
+ * Set the network ID of the multiplex.
+ * @param multiplex The multiplex to update.
+ * @param netid The network id to set.
+ * @return 0 on success, otherwise an SQLite error code.
+ */
+int MultiplexNetworkIdSet(Multiplex_t *multiplex, int netid);
 
 /** @} */
 #endif
