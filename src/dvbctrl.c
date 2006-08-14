@@ -423,9 +423,18 @@ int main(int argc, char *argv[])
         {
             if (strcasecmp(argv[i], commands[c].name) == 0)
             {
-                consumed = 1 + commands[c].nrofArgs;
-                commands[c].func(&argv[i]);
-                found = TRUE;
+                if ((argc - (optind + consumed + 1)) < commands[c].nrofArgs)
+                {
+                    printlog(LOG_ERROR, "Not enough arguments for command!\n");
+                    i = argc; /* Break out of the loop */
+                }
+                else
+                {
+                    consumed = 1 + commands[c].nrofArgs;
+                    commands[c].func(&argv[i]);
+                    found = TRUE;
+                }
+                break;
             }
         }
         if (!found)
