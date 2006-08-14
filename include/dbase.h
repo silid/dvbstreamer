@@ -69,6 +69,10 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 /**
  * Constant for Multiplex column name
  */
+#define MULTIPLEX_NETID         "netid"
+/**
+ * Constant for Multiplex column name
+ */
 #define MULTIPLEX_TYPE          "type"
 /**
  * Constant for Multiplex column name

@@ -34,7 +34,7 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 #define TOSTRING(x) STRINGIFY(x)
 
 /* This is the version of the database not the application!*/
-#define DBASE_VERSION 0.2
+#define DBASE_VERSION 0.3
 
 sqlite3 *DBaseInstance;
 
@@ -165,7 +165,7 @@ int DBaseCreateTables(double version)
 	        return rc;
 	    }
 	}
-	/* Version 0.2 tables */
+	/* Version 0.2 - 0.3 tables */
 	if (version < 0.2)
 	{
 		/*
@@ -193,6 +193,18 @@ int DBaseCreateTables(double version)
 	    if (rc)
 	    {
 	        printlog(LOG_ERROR, "Failed to create OFDMParameters table: %s\n", sqlite3_errmsg(DBaseInstance));
+	        return rc;
+	    }
+	}
+
+	/* Version 0.3 tables */
+	if (version < 0.3)
+	{
+	    rc = sqlite3_exec(DBaseInstance, "ALTER TABLE " MULTIPLEXES_TABLE " ADD " MULTIPLEX_NETID ";", NULL, NULL, NULL);
+
+	    if (rc)
+	    {
+	        printlog(LOG_ERROR, "Failed to add network id column to multiplexes table: %s\n", sqlite3_errmsg(DBaseInstance));
 	        return rc;
 	    }
 	}

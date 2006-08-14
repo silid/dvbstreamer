@@ -189,12 +189,22 @@ PID_t *CachePIDsGet(Service_t *service, int *count)
     }
     return result;
 }
+
 void CacheUpdateMultiplex(Multiplex_t *multiplex, int patversion, int tsid)
 {
     if (cachedServicesMultiplex && MultiplexAreEqual(multiplex, cachedServicesMultiplex))
     {
         cachedServicesMultiplex->patversion = patversion;
         cachedServicesMultiplex->tsid = tsid;
+        cachedServicesMultiplexDirty = 1;
+    }
+}
+
+void CacheUpdateNetworkId(Multiplex_t *multiplex, int netid)
+{
+    if (cachedServicesMultiplex && MultiplexAreEqual(multiplex, cachedServicesMultiplex))
+    {
+        cachedServicesMultiplex->netid = netid;
         cachedServicesMultiplexDirty = 1;
     }
 }
@@ -319,6 +329,11 @@ void CacheWriteback()
         if (rc)
         {
             printlog(LOG_ERROR, "Failed to update Multiplex TS ID (0x%x)", rc);
+        }
+        rc = MultiplexNetworkIdSet(cachedServicesMultiplex, cachedServicesMultiplex->netid);
+        if (rc)
+        {
+            printlog(LOG_ERROR, "Failed to update Multiplex Original Network ID (0x%x)", rc);
         }
         cachedServicesMultiplexDirty = 0;
     }
