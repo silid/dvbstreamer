@@ -340,7 +340,7 @@ static void ProcessMessage(Connection_t *connection, Message_t *message)
 {
     printlog(LOG_DEBUG, "%s:%d : Processing message 0x%04x length %d (%s)\n",
              inet_ntoa(connection->clientAddress.sin_addr), connection->clientAddress.sin_port,
-             MessageGetCode(message), MessageGetLength(message), __TIME__);
+             MessageGetCode(message), MessageGetLength(message));
     switch (message->code)
     {
         case MSGCODE_INFO:
