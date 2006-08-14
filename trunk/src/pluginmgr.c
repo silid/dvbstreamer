@@ -39,6 +39,7 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface);
 static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface);
 
 static void PluginManagerLsPlugins(int argc, char **argv);
+static void PluginManagerPluginInfo(int argc, char **argv);
 
 struct PluginEntry_t
 {
@@ -55,6 +56,14 @@ static Command_t PluginManagerCommands[] = {
             "List loaded plugins.",
             "List all plugins that where loaded at startup.",
             PluginManagerLsPlugins
+        },
+        {
+            "plugininfo",
+            TRUE, 1, 1,
+            "Display the information about a plugin",
+            "plugininfo <pluginname>\n"
+            "Displays the version, author and descriptor for a specific plugin.",
+            PluginManagerPluginInfo
         },
         {NULL, FALSE, 0, 0, NULL, NULL}
     };
@@ -240,10 +249,38 @@ static void PluginManagerLsPlugins(int argc, char **argv)
     for ( ListIterator_Init(iterator, PluginsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         struct PluginEntry_t *entry = ListIterator_Current(iterator);
-        CommandPrintf("%s - %s (Version %s, Author %s)\n",
-            entry->pluginInterface->name,
-            entry->pluginInterface->description,
-            entry->pluginInterface->version,
-            entry->pluginInterface->author);
+        CommandPrintf("%s\n", entry->pluginInterface->name);
+    }
+}
+
+static void PluginManagerPluginInfo(int argc, char **argv)
+{
+    ListIterator_t iterator;
+    Plugin_t *pluginInterface = NULL;
+    for ( ListIterator_Init(iterator, PluginsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    {
+        struct PluginEntry_t *entry = ListIterator_Current(iterator);
+
+        if (strcmp(entry->pluginInterface->name, argv[0]) == 0)
+        {
+            pluginInterface = entry->pluginInterface;
+            break;
+        }
+    }
+
+    if (pluginInterface)
+    {
+        CommandPrintf("Name    : %s\n"
+                      "Version : %s\n"
+                      "Author  : %s\n"
+                      "Description:\n%s\n",
+                      pluginInterface->name,
+                      pluginInterface->version,
+                      pluginInterface->author,
+                      pluginInterface->description);
+    }
+    else
+    {
+        CommandPrintf("Plugin \"%s\" not found.\n", argv[0]);
     }
 }

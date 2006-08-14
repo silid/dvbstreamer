@@ -47,7 +47,7 @@ PLUGIN_FEATURES(
     PLUGIN_FEATURE_DELIVERYMETHOD(NullOutputHandler)
 );
 
-PLUGIN_INTERFACE_F("Null Output", "0.1", "Null Delivery method, all packets are dropped.", "charrea6@users.sourceforge.net");
+PLUGIN_INTERFACE_F("NullOutput", "0.1", "Null Delivery method, all packets are dropped.", "charrea6@users.sourceforge.net");
 
 /** Constants for the start of the MRL **/
 #define PREFIX_LEN (sizeof(NullPrefix) - 1)
