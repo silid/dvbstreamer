@@ -70,7 +70,7 @@ PLUGIN_FEATURES(
     PLUGIN_FEATURE_DELIVERYMETHOD(UDPOutputHandler)
 );
 
-PLUGIN_INTERFACE_F("UDP Output", "0.1", "Simple UDP Delivery method", "charrea6@users.sourceforge.net");
+PLUGIN_INTERFACE_F("UDPOutput", "0.1", "Simple UDP Delivery method", "charrea6@users.sourceforge.net");
 
 /** Constants for the start of the MRL **/
 #define PREFIX_LEN (sizeof(UDPPrefix) - 1)
