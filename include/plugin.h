@@ -210,7 +210,7 @@ typedef struct PluginFilter_t
     PIDFilter_t *filter; /**< Filter assigned to this filter feature */
 	void (*InitFilter)(PIDFilter_t* filter); /**< Function pointer used to initialise the filter. */
 	void (*DeinitFilter)(PIDFilter_t* filter); /**< Function pointer used to deinitialise the filter. */
-}PluginFilterHandler_t;
+}PluginFilter_t;
 
 
 
