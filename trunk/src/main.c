@@ -81,6 +81,7 @@ static void sighandler(int signum);
 static void installsighandler(void);
 static void InitDaemon(int adapter);
 static void DeinitDaemon(void);
+static void ChannelChangeDoCallbacks(Multiplex_t *multiplex, Service_t *service);
 
 volatile Multiplex_t *CurrentMultiplex = NULL;
 volatile Service_t *CurrentService = NULL;
@@ -479,6 +480,17 @@ void ChannelChangedUnRegisterCallback(PluginChannelChanged_t callback)
     }
 }
 
+static void ChannelChangeDoCallbacks(Multiplex_t *multiplex, Service_t *service)
+{
+    ListIterator_t iterator;
+    for (ListIterator_Init(iterator, ChannelChangedCallbacksList);
+        ListIterator_MoreEntries(iterator);ListIterator_Next(iterator))
+    {
+        PluginChannelChanged_t callback = ListIterator_Current(iterator);
+        callback(multiplex, service);
+    }
+}
+
 /*
  * Find the service named <name> and tune to the new frequency for the multiplex the service is
  * on (if required) and then select the new service id to filter packets for.
@@ -553,22 +565,16 @@ Service_t *SetCurrentService(char *name)
         TSFilterZeroStats(TSFilter);
         OutputSetService(PrimaryServiceOutput, (Service_t*)CurrentService);
 
-        printlog(LOG_DEBUGV,"Enabling filters\n");
-        TSFilterEnable(TSFilter, TRUE);
-
         /*
          * Inform any interested parties that we have now changed the current
          * service.
          */
-        {
-            ListIterator_t iterator;
-            for (ListIterator_Init(iterator, ChannelChangedCallbacksList);
-                ListIterator_MoreEntries(iterator);ListIterator_Next(iterator))
-            {
-                PluginChannelChanged_t callback = ListIterator_Current(iterator);
-                callback((Multiplex_t *)CurrentMultiplex, (Service_t *)CurrentService);
-            }
-        }
+        ChannelChangedDoCallbacks((Multiplex_t *)CurrentMultiplex, (Service_t *)CurrentService);
+
+        printlog(LOG_DEBUGV,"Enabling filters\n");
+        TSFilterEnable(TSFilter, TRUE);
+
+
     }
 
     return (Service_t*)CurrentService;
