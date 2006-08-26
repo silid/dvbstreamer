@@ -81,7 +81,7 @@ static void sighandler(int signum);
 static void installsighandler(void);
 static void InitDaemon(int adapter);
 static void DeinitDaemon(void);
-static void ChannelChangeDoCallbacks(Multiplex_t *multiplex, Service_t *service);
+static void ChannelChangedDoCallbacks(Multiplex_t *multiplex, Service_t *service);
 
 volatile Multiplex_t *CurrentMultiplex = NULL;
 volatile Service_t *CurrentService = NULL;
@@ -480,7 +480,7 @@ void ChannelChangedUnRegisterCallback(PluginChannelChanged_t callback)
     }
 }
 
-static void ChannelChangeDoCallbacks(Multiplex_t *multiplex, Service_t *service)
+static void ChannelChangedDoCallbacks(Multiplex_t *multiplex, Service_t *service)
 {
     ListIterator_t iterator;
     for (ListIterator_Init(iterator, ChannelChangedCallbacksList);
