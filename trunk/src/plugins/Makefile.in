@@ -55,6 +55,9 @@ am__strip_dir = `echo $$p | sed -e 's|^.*/||'`;
 am__installdirs = "$(DESTDIR)$(pluginsdir)"
 pluginsLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(plugins_LTLIBRARIES)
+fileoutput_la_LIBADD =
+am_fileoutput_la_OBJECTS = fileoutput.lo
+fileoutput_la_OBJECTS = $(am_fileoutput_la_OBJECTS)
 nulloutput_la_LIBADD =
 am_nulloutput_la_OBJECTS = nulloutput.lo
 nulloutput_la_OBJECTS = $(am_nulloutput_la_OBJECTS)
@@ -72,8 +75,10 @@ LTCOMPILE = $(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) \
 CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = $(nulloutput_la_SOURCES) $(udpoutput_la_SOURCES)
-DIST_SOURCES = $(nulloutput_la_SOURCES) $(udpoutput_la_SOURCES)
+SOURCES = $(fileoutput_la_SOURCES) $(nulloutput_la_SOURCES) \
+	$(udpoutput_la_SOURCES)
+DIST_SOURCES = $(fileoutput_la_SOURCES) $(nulloutput_la_SOURCES) \
+	$(udpoutput_la_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -200,7 +205,7 @@ AM_CFLAGS = \
      -I$(top_srcdir)/include
 
 pluginsdir = @DVBSTREAMER_PLUGINDIR@
-plugins_LTLIBRARIES = udpoutput.la nulloutput.la
+plugins_LTLIBRARIES = udpoutput.la nulloutput.la fileoutput.la
 udpoutput_la_SOURCES = \
     udp.c \
     udpoutput.c
@@ -210,6 +215,10 @@ nulloutput_la_SOURCES = \
     nulloutput.c
 
 nulloutput_la_LDFLAGS = -module -no-undefined -avoid-version
+fileoutput_la_SOURCES = \
+    fileoutput.c
+
+fileoutput_la_LDFLAGS = -module -no-undefined -avoid-version
 all: all-am
 
 .SUFFIXES:
@@ -270,6 +279,8 @@ clean-pluginsLTLIBRARIES:
 	  echo "rm -f \"$${dir}/so_locations\""; \
 	  rm -f "$${dir}/so_locations"; \
 	done
+fileoutput.la: $(fileoutput_la_OBJECTS) $(fileoutput_la_DEPENDENCIES) 
+	$(LINK) -rpath $(pluginsdir) $(fileoutput_la_LDFLAGS) $(fileoutput_la_OBJECTS) $(fileoutput_la_LIBADD) $(LIBS)
 nulloutput.la: $(nulloutput_la_OBJECTS) $(nulloutput_la_DEPENDENCIES) 
 	$(LINK) -rpath $(pluginsdir) $(nulloutput_la_LDFLAGS) $(nulloutput_la_OBJECTS) $(nulloutput_la_LIBADD) $(LIBS)
 udpoutput.la: $(udpoutput_la_OBJECTS) $(udpoutput_la_DEPENDENCIES) 
@@ -281,6 +292,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fileoutput.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nulloutput.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/udp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/udpoutput.Plo@am__quote@
