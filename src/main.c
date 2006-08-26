@@ -119,7 +119,7 @@ int main(int argc, char *argv[])
 
     while (!ExitProgram)
     {
-        char c;
+        int c;
         c = getopt(argc, argv, "vVdo:a:t:s:c:f:u:p:n:");
         if (c == -1)
         {
