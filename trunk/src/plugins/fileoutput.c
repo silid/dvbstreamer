@@ -53,7 +53,7 @@ PLUGIN_FEATURES(
     PLUGIN_FEATURE_DELIVERYMETHOD(FileOutputHandler)
 );
 
-PLUGIN_INTERFACE_F("FileOutput", "0.1", "File Delivery method.", "charrea6@users.sourceforge.net");
+PLUGIN_INTERFACE_F("FileOutput", "0.1", "File Delivery method.\nUse file://<file name>\nFile name can be in absolute or relative.\nFor an absolute file name use file:///home/user/myts.ts.\nFor a relative file name use file://myts.ts.", "charrea6@users.sourceforge.net");
 
 /** Constants for the start of the MRL **/
 #define PREFIX_LEN (sizeof(FilePrefix) - 1)
