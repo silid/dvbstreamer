@@ -23,9 +23,7 @@ NULL Delivery Method handler, doesn't write any output, to anywhere, period.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <netdb.h>
+#include <stdint.h>
 
 #include "plugin.h"
 #include "ts.h"
