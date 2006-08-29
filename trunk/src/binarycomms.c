@@ -82,6 +82,7 @@ Binary Communications protocol for control DVBStreamer.
             connection->connected = FALSE;\
             return ;\
         }\
+        printlog(LOG_DEBUGV, "%s = %s\n", TOSTRING(_var), _var);\
     }while(0)
 
 #define READ2STRINGS(_var1, _var2)\
@@ -99,6 +100,8 @@ Binary Communications protocol for control DVBStreamer.
             free(_var1);\
             return ;\
         }\
+        printlog(LOG_DEBUGV, "%s = %s\n", TOSTRING(_var1), _var1);\
+        printlog(LOG_DEBUGV, "%s = %s\n", TOSTRING(_var2), _var2);\
     }while(0)
 
 #define READUINT8(_var)\
@@ -109,6 +112,7 @@ Binary Communications protocol for control DVBStreamer.
             connection->connected = FALSE;\
             return ;\
         }\
+        printlog(LOG_DEBUGV, "%s = %u\n", TOSTRING(_var), (unsigned int)_var);\
     }while(0)
 
 #define READUINT16(_var)\
@@ -119,6 +123,7 @@ Binary Communications protocol for control DVBStreamer.
             connection->connected = FALSE;\
             return ;\
         }\
+        printlog(LOG_DEBUGV, "%s = %u\n", TOSTRING(_var), (unsigned int)_var);\
     }while(0)
 
 #define READUINT32(_var)\
@@ -129,6 +134,7 @@ Binary Communications protocol for control DVBStreamer.
             connection->connected = FALSE;\
             return ;\
         }\
+        printlog(LOG_DEBUGV, "%s = %u\n", TOSTRING(_var), (unsigned int)_var);\
     }while(0)
 
 typedef struct Connection_t
