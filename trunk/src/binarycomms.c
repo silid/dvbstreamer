@@ -197,7 +197,7 @@ int BinaryCommsInit(int adapter, char *streamername, char *username, char *passw
     serverAddress.sin_port = htons(BINARYCOMMS_PORT + adapter);
     if (bind(serverSocket, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0)
     {
-        printlog(LOG_ERROR, "Failed to bind server to port %d", BINARYCOMMS_PORT + adapter);
+        printlog(LOG_ERROR, "Failed to bind server to port %d\n", BINARYCOMMS_PORT + adapter);
         close(serverSocket);
         return 1;
     }
@@ -338,7 +338,7 @@ static void HandleConnection(Connection_t *connection)
 
 static void ProcessMessage(Connection_t *connection, Message_t *message)
 {
-    printlog(LOG_DEBUG, "%s:%d : Processing message 0x%04x length %d (%s)\n",
+    printlog(LOG_DEBUG, "%s:%d : Processing message 0x%04x length %d\n",
              inet_ntoa(connection->clientAddress.sin_addr), connection->clientAddress.sin_port,
              MessageGetCode(message), MessageGetLength(message));
     switch (message->code)
