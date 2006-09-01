@@ -44,12 +44,12 @@ Application to control dvbstreamer in daemon mode.
         if (MessageSend(&message, socketfd))\
         {\
             printlog(LOG_ERROR, "Sending message failed!\n");\
-            exit(1);\
+            exit(-1);\
         }\
         if (MessageRecv(&message, socketfd))\
         {\
             printlog(LOG_ERROR, "Failed to receive message!\n");\
-            exit(1);\
+            exit(-1);\
         }\
     }while(0)
 
@@ -66,14 +66,14 @@ Application to control dvbstreamer in daemon mode.
             MessageReadString(&message, &text);\
             printf("ERROR (%d) %s\n", code, text);\
             free(text);\
-            return;\
+            return FALSE;\
         }\
     }\
     else\
     {\
         printlog(LOG_ERROR, "Unexpected response message! (type 0x%02x)\n",\
                  MessageGetCode(&message) );\
-        return;\
+        return FALSE;\
     }\
     }while(0)
 
@@ -88,13 +88,13 @@ Application to control dvbstreamer in daemon mode.
         MessageReadString(&message, &text);\
         printf("ERROR (%d) %s\n", code, text);\
         free(text);\
-        return;\
+        return FALSE;\
     }\
     else if (MessageGetCode(&message) != (_expected))\
     {\
         printlog(LOG_ERROR, "Unexpected response message! (type 0x%02x)",\
                  MessageGetCode(&message) );\
-        return;\
+        return FALSE;\
     }\
     }while(0)
 
@@ -103,6 +103,7 @@ Application to control dvbstreamer in daemon mode.
         if (!Authenticate())\
         {\
             printf("Failed to Authenticate username/password!\n");\
+            return FALSE;\
         }\
     }while(0)
 
@@ -140,7 +141,7 @@ typedef struct InfoParam_t
 }
 InfoParam_t;
 
-typedef void (*CommandFunc_t)(char *argv[]);
+typedef bool (*CommandFunc_t)(char *argv[]);
 
 typedef struct Command_t
 {
@@ -160,21 +161,21 @@ static void FreeServiceOutputs(ServiceOutputList_t *list);
 static ManualOutputList_t* GetManualOutputs();
 static void FreeManualOutputs(ManualOutputList_t *outputs);
 
-static void CommandInfo(char *argv[]);
-static void CommandServices(char *argv[]);
-static void CommandSelect(char *argv[]);
-static void CommandCurrent(char *argv[]);
-static void CommandPids(char *argv[]);
-static void CommandStats(char *argv[]);
-static void CommandAddOutput(char *argv[]);
-static void CommandRmOutput(char *argv[]);
-static void CommandOutputs(char *argv[]);
-static void CommandSetOutputMRL(char *argv[]);
-static void CommandAddRmPID(char *argv[]);
-static void CommandListSFS(char *argv[]);
-static void CommandSetSF(char *argv[]);
-static void CommandFEStatus(char *argv[]);
-static void CommandQuote(char *argv[]);
+static bool CommandInfo(char *argv[]);
+static bool CommandServices(char *argv[]);
+static bool CommandSelect(char *argv[]);
+static bool CommandCurrent(char *argv[]);
+static bool CommandPids(char *argv[]);
+static bool CommandStats(char *argv[]);
+static bool CommandAddOutput(char *argv[]);
+static bool CommandRmOutput(char *argv[]);
+static bool CommandOutputs(char *argv[]);
+static bool CommandSetOutputMRL(char *argv[]);
+static bool CommandAddRmPID(char *argv[]);
+static bool CommandListSFS(char *argv[]);
+static bool CommandSetSF(char *argv[]);
+static bool CommandFEStatus(char *argv[]);
+static bool CommandQuote(char *argv[]);
 
 /* Used by logging to determine whether to include date/time info */
 int DaemonMode = FALSE;
@@ -342,7 +343,7 @@ static InfoParam_t infoParams[] =
 
 int main(int argc, char *argv[])
 {
-    int i, consumed;
+    int i, consumed, commandCount=0;
     struct hostent *hostinfo;
     struct sockaddr_in sockaddr;
     while (TRUE)
@@ -419,6 +420,7 @@ int main(int argc, char *argv[])
     {
         int c;
         bool found = FALSE;
+        commandCount ++;
         for (c = 0; commands[c].name; c ++)
         {
             if (strcasecmp(argv[i], commands[c].name) == 0)
@@ -431,7 +433,10 @@ int main(int argc, char *argv[])
                 else
                 {
                     consumed = 1 + commands[c].nrofArgs;
-                    commands[c].func(&argv[i]);
+                    if (!commands[c].func(&argv[i]))
+                    {
+                        exit(commandCount);
+                    }
                     found = TRUE;
                 }
                 break;
@@ -490,7 +495,7 @@ static void version(void)
 /******************************************************************************/
 /* Command functions                                                          */
 /******************************************************************************/
-static void CommandInfo(char *argv[])
+static bool CommandInfo(char *argv[])
 {
     int i;
     int found = -1;
@@ -506,7 +511,7 @@ static void CommandInfo(char *argv[])
     if (found < 0)
     {
         printlog(LOG_ERROR, "Unknown info \"%s\"\n", argv[1]);
-        return ;
+        return FALSE;
     }
     printlog(LOG_DEBUG, "Querying host for \"%s\"\n", infoParams[found].name);
 
@@ -518,26 +523,29 @@ static void CommandInfo(char *argv[])
 
     if (MessageGetCode(&message) == MSGCODE_RERR)
     {
+        bool result = FALSE;
         uint8_t code;
         char *text = NULL;
         MessageDecode(&message, "bs", &code, &text);
         if (code == 0)
         {
             printf("%s\n", text);
+            result = TRUE;
         }
         else
         {
             printf("ERROR (%d) %s\n", code, text);
         }
+        free(text);
+        return result;
     }
-    else
-    {
-        printlog(LOG_ERROR, "Unexpected response message! (type 0x%02x)",
-                 MessageGetCode(&message) );
-    }
+    printlog(LOG_ERROR, "Unexpected response message! (type 0x%02x)",
+             MessageGetCode(&message) );
+
+    return FALSE;
 }
 
-static void CommandServices(char *argv[])
+static bool CommandServices(char *argv[])
 {
     uint16_t servicecount = 0;
     int i;
@@ -568,9 +576,10 @@ static void CommandServices(char *argv[])
             free(name);
         }
     }
+    return TRUE;
 }
 
-static void CommandSelect(char *argv[])
+static bool CommandSelect(char *argv[])
 {
     if (!Authenticate())
     {
@@ -584,9 +593,10 @@ static void CommandSelect(char *argv[])
     MESSAGE_SENDRECV();
 
     CHECK_RERR_OK();
+    return TRUE;
 }
 
-static void CommandCurrent(char *argv[])
+static bool CommandCurrent(char *argv[])
 {
     MessageInit(&message, MSGCODE_SSPS);
 
@@ -594,26 +604,29 @@ static void CommandCurrent(char *argv[])
 
     if (MessageGetCode(&message) == MSGCODE_RERR)
     {
+        bool result = FALSE;
         uint8_t code;
         char *text = NULL;
         MessageDecode(&message, "bs", &code, &text);
         if (code == 0)
         {
+            result = TRUE;
             printf("%s\n", text);
         }
         else
         {
             printf("ERROR (%d) %s\n", code, text);
         }
+        free(text);
+        return result;
     }
-    else
-    {
-        printlog(LOG_ERROR, "Unexpected response message! (type 0x%02x)",
-                 MessageGetCode(&message) );
-    }
+
+    printlog(LOG_ERROR, "Unexpected response message! (type 0x%02x)",
+                MessageGetCode(&message) );
+    return FALSE;
 }
 
-static void CommandPids(char *argv[])
+static bool CommandPids(char *argv[])
 {
     uint16_t i;
     uint16_t pidCount = 0;
@@ -641,9 +654,11 @@ static void CommandPids(char *argv[])
         MessageReadUint16(&message, &pid);
         printf("0x%04x\n", pid);
     }
+
+    return TRUE;
 }
 
-static void CommandStats(char *argv[])
+static bool CommandStats(char *argv[])
 {
     uint32_t bitrate = 0;
     uint32_t totalPC = 0;
@@ -717,9 +732,11 @@ static void CommandStats(char *argv[])
 
     printf("Total packets processed: %u\n", (unsigned int)totalPC);
     printf("Approximate TS bitrate : %gMbs\n", ((double)bitrate / (1024.0 * 1024.0)));
+
+    return TRUE;
 }
 
-static void CommandAddOutput(char *argv[])
+static bool CommandAddOutput(char *argv[])
 {
     AUTHENTICATE();
 
@@ -736,9 +753,11 @@ static void CommandAddOutput(char *argv[])
     MESSAGE_SENDRECV();
 
     CHECK_RERR_OK();
+
+    return TRUE;
 }
 
-static void CommandSetOutputMRL(char *argv[])
+static bool CommandSetOutputMRL(char *argv[])
 {
     AUTHENTICATE();
 
@@ -756,9 +775,10 @@ static void CommandSetOutputMRL(char *argv[])
 
     CHECK_RERR_OK();
 
+    return TRUE;
 }
 
-static void CommandRmOutput(char *argv[])
+static bool CommandRmOutput(char *argv[])
 {
     AUTHENTICATE();
 
@@ -775,9 +795,11 @@ static void CommandRmOutput(char *argv[])
     MESSAGE_SENDRECV();
 
     CHECK_RERR_OK();
+
+    return TRUE;
 }
 
-static void CommandOutputs(char *argv[])
+static bool CommandOutputs(char *argv[])
 {
     int i;
     ManualOutputList_t *outputs = NULL;
@@ -791,9 +813,11 @@ static void CommandOutputs(char *argv[])
         }
         FreeManualOutputs(outputs);
     }
+
+    return TRUE;
 }
 
-static void CommandAddRmPID(char *argv[])
+static bool CommandAddRmPID(char *argv[])
 {
     int pid = ParsePID(argv[2]);
     if (pid == -1)
@@ -815,9 +839,11 @@ static void CommandAddRmPID(char *argv[])
     MESSAGE_SENDRECV();
 
     CHECK_RERR_OK();
+
+    return TRUE;
 }
 
-static void CommandListSFS(char *argv[])
+static bool CommandListSFS(char *argv[])
 {
     int i;
     ServiceOutputList_t *outputs = NULL;
@@ -834,9 +860,11 @@ static void CommandListSFS(char *argv[])
         }
         FreeServiceOutputs(outputs);
     }
+
+    return TRUE;
 }
 
-static void CommandSetSF(char *argv[])
+static bool CommandSetSF(char *argv[])
 {
     AUTHENTICATE();
 
@@ -846,9 +874,11 @@ static void CommandSetSF(char *argv[])
     MESSAGE_SENDRECV();
 
     CHECK_RERR_OK();
+
+    return TRUE;
 }
 
-static void CommandFEStatus(char *argv[])
+static bool CommandFEStatus(char *argv[])
 {
     uint8_t status = 0;
     uint32_t ber = 0;
@@ -870,9 +900,11 @@ static void CommandFEStatus(char *argv[])
            (status & FE_HAS_VITERBI)?"VITERBI, ":"",
            (status & FE_HAS_SYNC)?"Sync, ":"");
     printf("BER = %u Signal Strength = %u SNR = %u\n", (unsigned int)ber, (unsigned int)strength, (unsigned int)snr);
+
+    return TRUE;
 }
 
-static void CommandQuote(char *argv[])
+static bool CommandQuote(char *argv[])
 {
     AUTHENTICATE();
 
@@ -883,6 +915,8 @@ static void CommandQuote(char *argv[])
 
     CHECK_EXPECTED(MSGCODE_RTXT);
     fwrite(message.buffer, 1, message.length, stdout);
+
+    return TRUE;
 }
 
 static bool Authenticate()
