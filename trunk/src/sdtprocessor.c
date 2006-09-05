@@ -148,7 +148,16 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
                     if (service)
                     {
                         char name[255];
-                        memcpy(name, servicedesc->i_service_name, servicedesc->i_service_name_length);
+                        int i;
+                        for (i = 0; i < servicedesc->i_service_name_length; i ++)
+                        {
+                            char chr = servicedesc->i_service_name[i];
+                            if (FilterServiceNames && !isprint(chr))
+                            {
+                                chr = FilterReplacementChar;
+                            }
+                            name[i] = chr;
+                        }
                         name[servicedesc->i_service_name_length] = 0;
                         /* Only update the name if it has changed */
                         if (strcmp(name, service->name))
@@ -167,7 +176,7 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
     /* Set the Original Network id, this is a hack should really get and decode the NIT */
     if (CurrentMultiplex->netid != newSDT->i_network_id)
     {
-        CacheUpdateNetworkId(CurrentMultiplex, newSDT->i_network_id);
+        CacheUpdateNetworkId((Multiplex_t *)CurrentMultiplex, newSDT->i_network_id);
     }
     dvbpsi_DeleteSDT(newSDT);
 }

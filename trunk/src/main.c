@@ -91,6 +91,8 @@ DVBAdapter_t *DVBAdapter;
 
 bool ExitProgram = FALSE;
 bool DaemonMode = FALSE;
+bool FilterServiceNames = FALSE;
+char FilterReplacementChar = ' ';
 char PrimaryService[] = "<Primary>";
 Output_t *PrimaryServiceOutput = NULL;
 
@@ -120,7 +122,7 @@ int main(int argc, char *argv[])
     while (!ExitProgram)
     {
         int c;
-        c = getopt(argc, argv, "vVdo:a:t:s:c:f:u:p:n:");
+        c = getopt(argc, argv, "vVdo:a:t:s:c:f:u:p:n:F:");
         if (c == -1)
         {
             break;
@@ -140,6 +142,11 @@ int main(int argc, char *argv[])
                 break;
                 case 'f': startupFile = optarg;
                 printlog(LOG_INFOV, "Using startup script %s\n", startupFile);
+                break;
+                case 'F':
+                FilterServiceNames = TRUE;
+                FilterReplacementChar = optarg[0];
+                printlog(LOG_INFOV, "Non-printable characters will be replaced with \'%c\'\n", FilterReplacementChar);
                 break;
                 /* Database initialisation options*/
                 case 't':

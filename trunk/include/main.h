@@ -87,6 +87,16 @@ extern bool ExitProgram;
 extern bool DaemonMode;
 
 /**
+ * Boolean indicating whether to filter out non-printable characters from service names.
+ */
+extern bool FilterServiceNames;
+
+/**
+ * The character to replace non-printable characters with when filtering service names.
+ */
+extern char FilterReplacementChar;
+
+/**
  * Constant for the PrimaryService output name
  */
 extern char PrimaryService[];
