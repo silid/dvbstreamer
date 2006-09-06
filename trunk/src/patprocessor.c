@@ -152,19 +152,19 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
         {
             if (patentry->i_number != 0x0000)
             {
-            Service_t *service = CacheServiceFindId(patentry->i_number);
+                Service_t *service = CacheServiceFindId(patentry->i_number);
                 if (!service)
-            {
-                printlog(LOG_DEBUG, "Service not found in cache while processing PAT, adding 0x%04x\n", patentry->i_number);
-                service = CacheServiceAdd(patentry->i_number);
-                /* Cause a TS Structure change call back*/
-                state->tsfilter->tsstructurechanged = TRUE;
-            }
+                {
+                    printlog(LOG_DEBUG, "Service not found in cache while processing PAT, adding 0x%04x\n", patentry->i_number);
+                    service = CacheServiceAdd(patentry->i_number);
+                    /* Cause a TS Structure change call back*/
+                    state->tsfilter->tsstructurechanged = TRUE;
+                }
 
-            if (service && (service->pmtpid != patentry->i_pid))
-            {
-                CacheUpdateService(service, patentry->i_pid);
-            }
+                if (service && (service->pmtpid != patentry->i_pid))
+                {
+                    CacheUpdateService(service, patentry->i_pid);
+                }
             }
             patentry = patentry->p_next;
         }
@@ -173,13 +173,12 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
         services = CacheServicesGet(&count);
         for (i = 0; i < count; i ++)
         {
-            int found = 0;
-
+            bool found = FALSE;
             for (patentry = newpat->p_first_program; patentry; patentry = patentry->p_next)
             {
                 if (services[i]->id == patentry->i_number)
                 {
-                    found = 1;
+                    found = TRUE;
                     break;
                 }
             }
@@ -189,6 +188,7 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
                     services[i]->id, services[i]->name);
                 CacheServiceDelete(services[i]);
                 services = CacheServicesGet(&count);
+                i --;
                 /* Cause a TS Structure change call back*/
                 state->tsfilter->tsstructurechanged = TRUE;
             }
