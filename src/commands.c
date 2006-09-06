@@ -656,19 +656,13 @@ static void CommandMultiplex(int argc, char **argv)
     }
     else
     {
-        ServiceEnumerator_t enumerator = ServiceEnumeratorForMultiplex(CurrentMultiplex->freq);
-        Service_t *service;
-        do
+        Service_t **services;
+        int i, count;
+        services = CacheServicesGet(&count);
+        for ( i = 0; i < count; i ++)
         {
-            service = ServiceGetNext(enumerator);
-            if (service)
-            {
-                CommandPrintf("%4x: %s\n", service->id, service->name);
-                ServiceFree(service);
-            }
+            CommandPrintf("%4x: %s\n", services[i]->id, services[i]->name);
         }
-        while(service && !ExitProgram);
-        ServiceEnumeratorDestroy(enumerator);
     }
 }
 
