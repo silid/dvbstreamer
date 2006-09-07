@@ -44,6 +44,7 @@ typedef struct PMTProcessor_t
     Service_t     *services[MAX_HANDLES];
     unsigned short pmtpids[MAX_HANDLES];
     dvbpsi_handle  pmthandles[MAX_HANDLES];
+    bool           payloadstartonly[MAX_HANDLES];
 }
 PMTProcessor_t;
 
@@ -178,6 +179,7 @@ static TSPacket_t * PMTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg,
             state->pmtpids[i] = services[i]->pmtpid;
             state->services[i] = services[i];
             state->pmthandles[i] = dvbpsi_AttachPMT(services[i]->id, PMTHandler, (void*)services[i]);
+            state->payloadstartonly[i] = TRUE;
         }
         state->multiplex = (Multiplex_t*)CurrentMultiplex;
     }
@@ -189,7 +191,19 @@ static TSPacket_t * PMTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg,
             /* Different program PMTs may be on the same so pass the packet to
                all handlers that match the pid
             */
-            dvbpsi_PushPacket(state->pmthandles[i], (uint8_t*)packet);
+            if (state->payloadstartonly[i])
+            {
+                if (TSPACKET_ISPAYLOADUNITSTART(*packet))
+                {
+                    state->pmthandles[i]->i_continuity_counter = (TSPACKET_GETCOUNT(*packet) - 1) & 0xf;
+                    dvbpsi_PushPacket(state->pmthandles[i], (uint8_t*)packet);
+                    state->payloadstartonly[i] = FALSE;
+                }
+            }
+            else
+            {
+                dvbpsi_PushPacket(state->pmthandles[i], (uint8_t*)packet);
+            }
         }
     }
 

@@ -43,6 +43,7 @@ typedef struct PATProcessor_t
     PIDFilterSimpleFilter_t simplefilter;
     Multiplex_t *multiplex;
     dvbpsi_handle pathandle;
+    bool payloadstartonly;
 }
 PATProcessor_t;
 
@@ -123,12 +124,25 @@ static TSPacket_t *PATProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, 
         if (CurrentMultiplex)
         {
             state->pathandle = dvbpsi_AttachPAT(PATHandler, (void*)state);
+            state->payloadstartonly = TRUE;
         }
     }
 
     if (state->multiplex)
     {
-        dvbpsi_PushPacket(state->pathandle, (uint8_t*)packet);
+        if (state->payloadstartonly)
+        {
+            if (TSPACKET_ISPAYLOADUNITSTART(*packet))
+            {
+                state->pathandle->i_continuity_counter = (TSPACKET_GETCOUNT(*packet) - 1) & 0xf;
+                dvbpsi_PushPacket(state->pathandle, (uint8_t*)packet);
+                state->payloadstartonly = FALSE;
+            }
+        }
+        else
+        {
+            dvbpsi_PushPacket(state->pathandle, (uint8_t*)packet);
+        }
     }
 
     return result;
