@@ -55,10 +55,10 @@ the following
 
 dvbstream -o udp://localhost:1234 -t channels.conf
 
-To find out what services have been imported use the services command which
+To find out what services have been imported use the lsservices command which
 will list all the available service
 
-dvbstream> service
+dvbstream> lsservices
 
 To quit out of dvbstreamer type quit
 
@@ -93,8 +93,8 @@ Once dvbstreamer has started you have the following commands at your disposal:
 Command			Description
 -------------------------------------------------------------------------------
       quit - Exit the program
-  services - List all available services
- multiplex - List all the services on the current multiplex
+lsservices - List all services or for a specific multiplex.
+   lsmuxes - List multiplexes
     select - Select a new service to stream
    current - Print out the service currently being streamed.
       pids - List the PIDs for a specified service
@@ -102,6 +102,7 @@ Command			Description
  addoutput - Add a new destination for manually filtered PIDs.
   rmoutput - Remove a destination for manually filtered PIDs.
  lsoutputs - List current outputs
+setoutputmrl - Set the output's MRL
     addpid - Adds a PID to filter to an output
      rmpid - Removes a PID to filter from an output
     lspids - List PIDs for output
@@ -109,8 +110,11 @@ Command			Description
       rmsf - Remove a service filter for secondary services
      lssfs - List all secondary service filters
      setsf - Select a service to stream to a secondary service output
+  setsfmrl - Set the service filter's MRL
   festatus - Displays the status of the tuner.
       help - Display the list of commands or help on a specific command
+ lsplugins - List loaded plugins.
+plugininfo - Display the information about a plugin
 
 Start up files
 --------------
@@ -158,6 +162,24 @@ Note the use of quotes to pass BBC ONE as 1 command line parameter!
 
 Use -h for more details on available commands and options.
 
+Plugins
+-------
+Plugins allow DVBStreamer to be extended beyond the simple filtering and
+streaming of DVB services.
+
+Plugins can:
+    - Add new delivery methods (check out fileoutput.c for a simple example of a
+      delivery method plugin)
+    - Add new commands.
+    - Add new PID filters (for example to extract EPG data)
+    - Detect when the service/multiplex is changed.
+
+The commands lsplugins and plugininfo can be used to inspected the loaded plugins.
+
+Documentation for the interfaces into DVBStreamer can be generated using the
+doxygen and the doxygen.config file in the base directory of dvbstreamer.
+
+
 Bugs
 ----
 Please report all bugs to the sourceforge forums.
@@ -167,9 +189,12 @@ Credits
 -------
 Adam Charrett - Author
 Tero Pelander - IPv6 support along with several patches and tested DVB-C.
+Thomas Sattle - Lots of testing for 0.5.
+Nicholas Humfrey - Power PC testing and patch.
 
 History
 -------
+0.5 Plugin Release
 0.4 Daemon mode
 0.3 Service Addition/Removal
 0.2 Add new commands (addoutput etc)

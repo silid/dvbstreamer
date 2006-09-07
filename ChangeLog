@@ -11,6 +11,13 @@
 * Most header files are now documented.
 * New list structure means there is no limit (apart from memory and CPU bandwidth)
   on the number of filters/outputs you can add.
+* Service name filtering, it is now possible to remove unprintable characters from
+  service names by using the -F <chararcter to use instead> option.
+* Bugs Fixed.
+  - 1548113 Command line processing on PPC doesn't work
+  - 1538096 Not possible to specify log file destination
+  - Removing service no longer in the transport stream, only some where removed, not all.
+  - Service names getting corrupted by repeated cache writebacks.
 
 0.4
 ---
