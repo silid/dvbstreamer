@@ -87,6 +87,14 @@ TSPacket_t;
  */
 #define TSPACKET_SETCOUNT(packet, count) \
 	((packet).header[3] = ((packet).header[3] & 0xf0) | ((count) & 0x0f))
+
+/**
+ * Boolean test to determine whether this packet is the start of a payload.
+ * @param packet The packet to check.
+ */
+#define TSPACKET_ISPAYLOADUNITSTART(packet) \
+    (((packet).header[1] & 0x40) == 0x40)
+
 /**@}*/
 
 /**
