@@ -586,3 +586,10 @@ Service_t *SetCurrentService(char *name)
 
     return (Service_t*)CurrentService;
 }
+
+void UpdateDatabase()
+{
+    TSFilterLock(TSFilter);
+    CacheWriteback();
+    TSFilterUnLock(TSFilter);
+}

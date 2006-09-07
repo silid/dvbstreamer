@@ -58,8 +58,8 @@ static char *Trim(char *str);
 static int CommandPrintfImpl(char *fmt, ...);
 
 static void CommandQuit(int argc, char **argv);
-static void CommandServices(int argc, char **argv);
-static void CommandMultiplex(int argc, char **argv);
+static void CommandListServices(int argc, char **argv);
+static void CommandListMuxes(int argc, char **argv);
 static void CommandSelect(int argc, char **argv);
 static void CommandCurrent(int argc, char **argv);
 static void CommandPids(int argc, char **argv);
@@ -99,19 +99,21 @@ static Command_t coreCommands[] = {
                                       CommandQuit
                                   },
                                   {
-                                      "services",
-                                      FALSE, 0, 0,
-                                      "List all available services",
-                                      "Lists all the services currently in the database. This list will be "
-                                      "updated as updates to the PAT are detected.",
-                                      CommandServices
+                                      "lsservices",
+                                      TRUE, 0, 1,
+                                      "List all services or for a specific multiplex.",
+                                      "lsservies [mux | <multiplex frequency>]\n"
+                                      "Lists all the services currently in the database if no multiplex is specified or"
+                                      "if \"mux\" is specified only the services available of the current mux or if a"
+                                      "frequency is specified only the services available on that multiplex.",
+                                      CommandListServices
                                   },
                                   {
-                                      "multiplex",
+                                      "lsmuxes",
                                       FALSE, 0, 0,
-                                      "List all the services on the current multiplex",
-                                      "List only the services on the same multiplex as the currently selected service.",
-                                      CommandMultiplex,
+                                      "List multiplexes",
+                                      "List all multiplexes.",
+                                      CommandListMuxes,
                                   },
                                   {
                                       "select",
@@ -631,39 +633,74 @@ static void CommandQuit(int argc, char **argv)
     quit = TRUE;
 }
 
-static void CommandServices(int argc, char **argv)
+static void CommandListServices(int argc, char **argv)
 {
-    ServiceEnumerator_t enumerator = ServiceEnumeratorGet();
+    ServiceEnumerator_t enumerator;
     Service_t *service;
-    do
-    {
-        service = ServiceGetNext(enumerator);
-        if (service)
-        {
-            CommandPrintf("%4x: %s\n", service->id, service->name);
-            ServiceFree(service);
-        }
-    }
-    while(service && !ExitProgram);
-    ServiceEnumeratorDestroy(enumerator);
-}
 
-static void CommandMultiplex(int argc, char **argv)
-{
-    if (CurrentMultiplex == NULL)
+    /* Make sure the database is up-to-date before displaying the names */
+    UpdateDatabase();
+
+    if (argc == 1)
     {
-        CommandPrintf("No multiplex currently selected!\n");
+        char *mux = argv[0];
+        int muxfreq;
+        if (strcmp(mux, "mux") == 0)
+        {
+            if (CurrentMultiplex)
+            {
+                muxfreq = CurrentMultiplex->freq;
+            }
+            else
+            {
+                CommandPrintf("No multiplex currently selected!\n");
+            }
+        }
+        else
+        {
+            muxfreq = atoi(mux);
+        }
+        enumerator = ServiceEnumeratorForMultiplex(muxfreq);
+        if (enumerator == NULL)
+        {
+            CommandPrintf("Failed to find multiplex \"%s\"\n", mux);
+            return;
+        }
     }
     else
     {
-        Service_t **services;
-        int i, count;
-        services = CacheServicesGet(&count);
-        for ( i = 0; i < count; i ++)
-        {
-            CommandPrintf("%4x: %s\n", services[i]->id, services[i]->name);
-        }
+        enumerator = ServiceEnumeratorGet();
     }
+
+    if (enumerator != NULL)
+    {
+        do
+        {
+            service = ServiceGetNext(enumerator);
+            if (service)
+            {
+                CommandPrintf("%s\n", service->name);
+                ServiceFree(service);
+            }
+        }
+        while(service && !ExitProgram);
+        ServiceEnumeratorDestroy(enumerator);
+    }
+}
+
+static void CommandListMuxes(int argc, char **argv)
+{
+    MultiplexEnumerator_t enumerator = MultiplexEnumeratorGet();
+    Multiplex_t *multiplex;
+    do
+    {
+        multiplex = MultiplexGetNext(enumerator);
+        if (multiplex)
+        {
+            CommandPrintf("%d\n", multiplex->freq);
+        }
+    }while(multiplex && ! ExitProgram);
+    MultiplexEnumeratorDestroy(enumerator);
 }
 
 static void CommandSelect(int argc, char **argv)

@@ -68,13 +68,7 @@ extern TSFilter_t   *TSFilter;
  */
 extern DVBAdapter_t *DVBAdapter;
 
-/**
- * Set the current service being stream to the primary output.
- * Changing this can cause a re-tune!.
- * @param name Name of the new service.
- * @return The new services Service_t structure or NULL if the service was not found.
- */
-extern Service_t *SetCurrentService(char *name);
+
 
 /**
  * Boolean used to signal the program to terminate.
@@ -117,4 +111,18 @@ void ChannelChangedRegisterCallback(PluginChannelChanged_t callback);
  * @param callback The function to call.
  */
 void ChannelChangedUnRegisterCallback(PluginChannelChanged_t callback);
+
+/**
+ * Set the current service being stream to the primary output.
+ * Changing this can cause a re-tune!.
+ * @param name Name of the new service.
+ * @return The new services Service_t structure or NULL if the service was not found.
+ */
+extern Service_t *SetCurrentService(char *name);
+
+/**
+ * Writes any changes in the cache back to the database, ensuring the TS Filter is disabled.
+ */
+void UpdateDatabase();
+
 #endif
