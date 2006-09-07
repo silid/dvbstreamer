@@ -52,6 +52,7 @@ typedef struct SDTProcessor_t
     PIDFilterSimpleFilter_t simplefilter;
     Multiplex_t *multiplex;
     dvbpsi_handle demuxhandle;
+    bool payloadstartonly;
 }
 SDTProcessor_t;
 
@@ -111,11 +112,24 @@ static TSPacket_t * SDTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg,
         if (CurrentMultiplex)
         {
             state->demuxhandle = dvbpsi_AttachDemux(SubTableHandler, (void*)state);
+            state->payloadstartonly = TRUE;
         }
         state->multiplex = (Multiplex_t*)CurrentMultiplex;
     }
 
-    dvbpsi_PushPacket(state->demuxhandle, (uint8_t*)packet);
+    if (state->payloadstartonly)
+    {
+        if (TSPACKET_ISPAYLOADUNITSTART(*packet))
+        {
+            state->demuxhandle->i_continuity_counter = (TSPACKET_GETCOUNT(*packet) - 1) & 0xf;
+            dvbpsi_PushPacket(state->demuxhandle, (uint8_t*)packet);
+            state->payloadstartonly = FALSE;
+        }
+    }
+    else
+    {
+        dvbpsi_PushPacket(state->demuxhandle, (uint8_t*)packet);
+    }
 
     return 0;
 }
