@@ -1,24 +1,24 @@
 /*
 Copyright (C) 2006  Adam Charrett
- 
+
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
- 
+
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
- 
+
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
- 
+
 services.c
- 
+
 Manage services and PIDs.
- 
+
 */
 #include <stdlib.h>
 #include <string.h>
@@ -144,9 +144,10 @@ int ServiceNameSet(Service_t  *service, char *name)
     STATEMENT_STEP();
     if (rc == SQLITE_DONE)
     {
+        char *oldname = service->name;
         printlog(LOG_DEBUGV,"Updated 0x%04x %d\n", service->id, service->multiplexfreq);
-		free(service->name);
 		service->name = strdup(name);
+		free(oldname);
         rc = SQLITE_OK;
     }
     else
@@ -278,7 +279,7 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
 
         return service;
     }
-    
+
     if (rc != SQLITE_DONE)
     {
         PRINTLOG_SQLITE3ERROR();

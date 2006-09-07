@@ -370,6 +370,7 @@ void CacheWriteback()
             printlog(LOG_DEBUG, "Updating name for 0x%04x new name %s\n", cachedServices[i]->id, cachedServices[i]->name);
             ServiceNameSet(cachedServices[i], cachedServices[i]->name);
         }
+        cacheFlags[i] = 0;
     }
 
     /* Delete deleted services from the database along with their PIDs*/
