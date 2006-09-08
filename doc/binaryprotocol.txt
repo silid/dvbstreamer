@@ -226,17 +226,35 @@ SFES = Status Front End Status
 
 	Responses: RFES
 
-SSLA = Status Services List All - List all avaialable services
+SSL = Status List Services
 
-	No Data section
+    DATA
+    ---------------------
+    | Multiplex (uint32)|
+    ---------------------
 
-	Responses: RSL
+    Where Multiplex can be the ID of a multiplex to list services on that multiplex,
 
-SSLM = Status Services List Multiplex - List services available on the current multiplex
+--CODES-START--=SSLMULTIPLEX
 
-	No Data section
+0x00000000 = ALL     = All services
+0xffffffff = CURRENT = Current Multiplex
 
-	Responses: RSL
+--CODES-END--
+
+    Responses: RSL
+
+SMC = Status Current Multiplex
+
+    No Data section
+
+    Responses: RLM (with only 1 multiplex in)
+
+SML = Status List Multiplexes
+
+    No Data section
+
+    Responses: RLM
 
 SSPL = Status Services List PIDs
 
@@ -313,9 +331,6 @@ RFES = Response Front End Status
 	| Status (uint8) | BER (uint32) | SNR (uint16) | Signal Strength (uint16) |
 	---------------------------------------------------------------------------
 
-
-
-
 RLS  = Response Services List
 
 	DATA
@@ -333,6 +348,12 @@ RTXT = Response Text
 	|Text ... |
 	-----    --
 
+RLM = Response Mulitplex List
+
+    DATA
+    --------------------------------------------------    -
+    | # of multiplexes (uint8)| Multiplex 0 (uint32) |....|
+    --------------------------------------------------    -
 
 Message Codes/Names to Values
 -----------------------------
@@ -361,9 +382,10 @@ Message Codes/Names to Values
 0x2203 = SOPC = Status Output Packet Count
 0x2F01 = STSS = Status TS Stats
 0x2F02 = SFES = Status Front End Status
-0x2F03 = SSLA = Status Services List All - List all avaialable services
-0x2F04 = SSLM = Status Services List Multiplex - List services avaialable of the current multiplex
-0x2F05 = SSPL = Status Services List PIDs
+0x2F03 = SSL  = Status List Services
+0x2F04 = SMC  = Status Current Multiplex
+0x2F05 = SML  = Status List Multiplexes
+0x2F06 = SSPL = Status Services List PIDs
 
 0xF001 = RSSL = Response Service Secondary List
 0xF002 = ROLO = Response Outputs List outputs
@@ -373,7 +395,9 @@ Message Codes/Names to Values
 0xF006 = RFES = Response Front End Status
 0xF007 = RLS  = Response Services List
 0xF008 = RTXT = Response Text
+0xF009 = RLM  = Response Mulitplex List
 0xFFFF = RERR = Response Error
+
 
 --CODES-END--
 
