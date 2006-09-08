@@ -162,7 +162,8 @@ static ManualOutputList_t* GetManualOutputs();
 static void FreeManualOutputs(ManualOutputList_t *outputs);
 
 static bool CommandInfo(char *argv[]);
-static bool CommandServices(char *argv[]);
+static bool CommandListServices(char *argv[]);
+static bool CommandListMuxes(char *argv[]);
 static bool CommandSelect(char *argv[]);
 static bool CommandCurrent(char *argv[]);
 static bool CommandPids(char *argv[]);
@@ -189,8 +190,6 @@ static char *password = NULL;
 
 static char pidsCmd[] = "pids";
 static char lspidsCmd[] ="lspids";
-static char servicesCmd[] = "services";
-static char multiplexCmd[]= "multiplex";
 static char addpidCmd[] = "addpid";
 static char rmpidCmd[]  = "rmpid";
 static char addoutputCmd[] = "addoutput";
@@ -211,14 +210,16 @@ static Command_t commands[] =
             CommandInfo
         },
         {
-            servicesCmd, 0,
-            "List all available services.",
-            CommandServices
+            "lsservices", 1,
+            "List available services. Specify \'all\' for all available services,"
+            " \'current\' for the services on the current multiplex, or a multiplex"
+            " for only the services available on that multiplex",
+            CommandListServices
         },
         {
-            multiplexCmd, 0,
-            "List all the services on the current multiplex.",
-            CommandServices
+            "lsmuxes", 0,
+            "List all multiplexes.",
+            CommandListMuxes
         },
         {
             "select", 1,
@@ -428,6 +429,7 @@ int main(int argc, char *argv[])
                 if ((argc - (optind + consumed + 1)) < commands[c].nrofArgs)
                 {
                     printlog(LOG_ERROR, "Not enough arguments for command!\n");
+                    printlog(LOG_ERROR, "Help:\n%s\n", commands[c].help);
                     i = argc; /* Break out of the loop */
                 }
                 else
@@ -437,8 +439,8 @@ int main(int argc, char *argv[])
                     {
                         exit(commandCount);
                     }
-                    found = TRUE;
                 }
+                found = TRUE;
                 break;
             }
         }
@@ -545,19 +547,24 @@ static bool CommandInfo(char *argv[])
     return FALSE;
 }
 
-static bool CommandServices(char *argv[])
+static bool CommandListServices(char *argv[])
 {
     uint16_t servicecount = 0;
     int i;
 
     MessageReset(&message);
-    if (strcmp(servicesCmd, argv[0]) == 0)
+    MessageSetCode(&message, MSGCODE_SSL);
+
+    if (strcasecmp("all", argv[1]) == 0)
     {
-        MessageSetCode(&message, MSGCODE_SSLA);
+        MessageWriteUint32(&message, SSLMULTIPLEX_ALL);
+    }else if (strcasecmp("current", argv[1]) == 0)
+    {
+        MessageWriteUint32(&message, SSLMULTIPLEX_CURRENT);
     }
-    if (strcmp(multiplexCmd, argv[0]) == 0)
+    else
     {
-        MessageSetCode(&message, MSGCODE_SSLM);
+        MessageWriteUint32(&message, atoi(argv[1]));
     }
 
     MESSAGE_SENDRECV();
@@ -577,6 +584,26 @@ static bool CommandServices(char *argv[])
         }
     }
     return TRUE;
+}
+
+static bool CommandListMuxes(char *argv[])
+{
+    uint8_t count = 0, i;
+    MessageReset(&message);
+    MessageSetCode(&message, MSGCODE_SML);
+
+    MESSAGE_SENDRECV();
+
+    CHECK_EXPECTED(MSGCODE_RLM);
+
+    MessageReadUint8(&message, &count);
+
+    for (i = 0; i < count; i ++)
+    {
+        uint32_t multiplex;
+        MessageReadUint32(&message, &multiplex);
+        printf("%u\n", multiplex);
+    }
 }
 
 static bool CommandSelect(char *argv[])
@@ -612,6 +639,19 @@ static bool CommandCurrent(char *argv[])
         {
             result = TRUE;
             printf("%s\n", text);
+
+            MessageInit(&message, MSGCODE_SMC);
+
+            MESSAGE_SENDRECV();
+
+            if (MessageGetCode(&message) == MSGCODE_RLM)
+            {
+                uint8_t count = 0;
+                uint32_t multiplex;
+                MessageReadUint8(&message, &count);
+                MessageReadUint32(&message, &multiplex);
+                printf("%u\n", multiplex);
+            }
         }
         else
         {

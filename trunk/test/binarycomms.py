@@ -84,19 +84,19 @@ def MessageDecode(type, body):
         (code, body) = MessageReadUInt8(body)
         (str,  body) = MessageReadString(body)
         return (code, str)
-    if type == MSGCODE_RSSL : # Response Service Secondary List  
-        pass
-    if type == MSGCODE_ROLO : # Response Outputs List outputs  
-        pass
-    if type == MSGCODE_RLP  : # Response Output List pids  
-        pass
-    if type == MSGCODE_ROPC : # Response Output Packet Count  
-        pass
-    if type == MSGCODE_RTSS : # Response TS Stats  
-        pass
-    if type == MSGCODE_RFES : # Response Front End Status  
-        pass
-    if type == MSGCODE_RLS  : # Response Services List      
+    elif type == MSGCODE_RSSL : # Response Service Secondary List  
+        pass #TODO
+    elif type == MSGCODE_ROLO : # Response Outputs List outputs  
+        pass #TODO
+    elif type == MSGCODE_RLP  : # Response Output List pids  
+        pass #TODO
+    elif type == MSGCODE_ROPC : # Response Output Packet Count  
+        pass #TODO
+    elif type == MSGCODE_RTSS : # Response TS Stats  
+        pass #TODO
+    elif type == MSGCODE_RFES : # Response Front End Status  
+        pass #TODO
+    elif type == MSGCODE_RLS  : # Response Services List      
         (nrofservices, body) = MessageReadUInt16(body)
         i = 0
         services = []
@@ -105,6 +105,10 @@ def MessageDecode(type, body):
             services.append(service)
             i = i + 1
         return (services,)
+    elif type == MSGCODE_RLM: # Response Multiplex List
+        pass #TODO
+    elif type == MSGCODE_RTXT: # Response Text
+        return (body,)
     
     return ()
 
@@ -149,13 +153,16 @@ def MessageEncode(type, *args):
         for pid in pids:
             body = MessageWriteUInt16(body, pid)
 
+    elif (type == MSGCODE_SSL) # Status Services List - List avaialable services
+        body = MessageWriteUInt32(body, args[0])
+        
     elif ((type == MSGCODE_SSPC) or # Status Service Primary Current - Return current service name for primary output.  
          (type == MSGCODE_SSSL) or # Status Service Secondary List - List secondary outputs.  
          (type == MSGCODE_SOLO) or # Status Outputs List outputs  
          (type == MSGCODE_STSS) or # Status TS Stats  
          (type == MSGCODE_SFES) or # Status Front End Status  
-         (type == MSGCODE_SSLA) or # Status Services List All - List all avaialable services  
-         (type == MSGCODE_SSLM)) : # Status Services List Multiplex - List services avaialable of the current multiplex  
+         (type == MSGCODE_SMC) or  # Status Multiplex Current
+         (type == MSGCODE_SML)) : # Status Multiplex List - List multiplexes
         pass
     else:
         print "Unknown message type to encode %d!\n" % type

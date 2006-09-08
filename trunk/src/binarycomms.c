@@ -173,7 +173,9 @@ static void ProcessServiceFilterPacketCount(Connection_t *connection, Message_t 
 static void ProcessOutputPacketCount(Connection_t *connection, Message_t *message);
 static void ProcessTSStats(Connection_t *connection, Message_t *message);
 static void ProcessFEStatus(Connection_t *connection, Message_t *message);
-static void ProcessServiceList(Connection_t *connection, Message_t *message, int all);
+static void ProcessServiceList(Connection_t *connection, Message_t *message);
+static void ProcessMultiplexCurrent(Connection_t *connection, Message_t *message);
+static void ProcessMultiplexList(Connection_t *connection, Message_t *message);
 static void ProcessServicePids(Connection_t *connection, Message_t *message);
 
 static int activeConnections = 0;
@@ -414,11 +416,14 @@ static void ProcessMessage(Connection_t *connection, Message_t *message)
         case MSGCODE_SFES:
             ProcessFEStatus(connection, message);
             break;
-        case MSGCODE_SSLA:
-            ProcessServiceList(connection, message, 1);
+        case MSGCODE_SSL:
+            ProcessServiceList(connection, message);
             break;
-        case MSGCODE_SSLM:
-            ProcessServiceList(connection, message, 0);
+        case MSGCODE_SMC:
+            ProcessMultiplexCurrent(connection, message);
+            break;
+        case MSGCODE_SML:
+            ProcessMultiplexList(connection, message);
             break;
         case MSGCODE_SSPL:
             ProcessServicePids(connection, message);
@@ -962,30 +967,42 @@ static void ProcessFEStatus(Connection_t *connection, Message_t *message)
     MessageEncode(message, "bldd", status, ber, snr, strength);
 }
 
-static void ProcessServiceList(Connection_t *connection, Message_t *message, int all)
+static void ProcessServiceList(Connection_t *connection, Message_t *message)
 {
+    uint32_t mplexfreq;
     uint16_t count = 0;
     ServiceEnumerator_t enumerator = NULL;
-    MessageInit(message, MSGCODE_RLS);
-    MessageWriteUint16(message, count);
 
-    if (all)
-    {
-        enumerator = ServiceEnumeratorGet();
-    }
-    else
-    {
-        if (CurrentMultiplex != NULL)
-        {
-            enumerator = ServiceEnumeratorForMultiplex(CurrentMultiplex->freq);
-        }
+    READUINT32(mplexfreq);
 
+    UpdateDatabase();
+
+    switch (mplexfreq)
+    {
+        case SSLMULTIPLEX_ALL:
+            enumerator = ServiceEnumeratorGet();
+            break;
+        case SSLMULTIPLEX_CURRENT:
+            if (CurrentMultiplex != NULL)
+            {
+                enumerator = ServiceEnumeratorForMultiplex(CurrentMultiplex->freq);
+            }
+            else
+            {
+                MessageRERR(message, RERR_GENERIC, "No current multiplex");
+            }
+            break;
+        default:
+            enumerator = ServiceEnumeratorForMultiplex(mplexfreq);
+            break;
     }
 
     if (enumerator != NULL)
     {
-
         Service_t *service;
+
+        MessageInit(message, MSGCODE_RLS);
+        MessageWriteUint16(message, count);
         do
         {
             service = ServiceGetNext(enumerator);
@@ -1002,6 +1019,45 @@ static void ProcessServiceList(Connection_t *connection, Message_t *message, int
         MessageSeek(message, 0);
         MessageWriteUint16(message, count);
     }
+}
+
+static void ProcessMultiplexCurrent(Connection_t *connection, Message_t *message)
+{
+    if (CurrentMultiplex != NULL)
+    {
+        MessageInit(message, MSGCODE_RLM);
+        MessageWriteUint8(message, 1);
+        MessageWriteUint32(message, CurrentMultiplex->freq);
+    }
+    else
+    {
+        MessageRERR(message, RERR_GENERIC, "No current multiplex");
+    }
+}
+
+static void ProcessMultiplexList(Connection_t *connection, Message_t *message)
+{
+    MultiplexEnumerator_t enumerator = MultiplexEnumeratorGet();
+    Multiplex_t *multiplex;
+    uint8_t count = 0;
+
+    MessageInit(message, MSGCODE_RLM);
+    MessageWriteUint8(message, 0);
+
+    do
+    {
+        multiplex = MultiplexGetNext(enumerator);
+        if (multiplex)
+        {
+            MessageWriteUint32(message, multiplex->freq);
+            free(multiplex);
+            count ++;
+        }
+    }while(multiplex && ! ExitProgram);
+    MultiplexEnumeratorDestroy(enumerator);
+
+    MessageSeek(message, 0);
+    MessageWriteUint8(message, count);
 }
 
 static void ProcessServicePids(Connection_t *connection, Message_t *message)
