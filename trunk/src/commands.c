@@ -698,6 +698,7 @@ static void CommandListMuxes(int argc, char **argv)
         if (multiplex)
         {
             CommandPrintf("%d\n", multiplex->freq);
+            free(multiplex);
         }
     }while(multiplex && ! ExitProgram);
     MultiplexEnumeratorDestroy(enumerator);
