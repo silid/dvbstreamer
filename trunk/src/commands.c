@@ -723,8 +723,8 @@ static void CommandCurrent(int argc, char **argv)
 {
 	if ( CurrentService)
 	{
-		CommandPrintf("Current Service : \"%s\" (0x%04x) Multiplex: %f MHz\n",
-			CurrentService->name, CurrentService->id, (double)CurrentMultiplex->freq / 1000000.0);
+		CommandPrintf("Current Service : \"%s\" (0x%04x) Multiplex: %d\n",
+			CurrentService->name, CurrentService->id, CurrentMultiplex->freq);
 	}
 	else
 	{
