@@ -6,18 +6,32 @@
   manual output.
 * New delivery methods, currently only udp://<ip address>:<port>(which was
   already there :-) ) and null:// (which just throws away the packets)
-* Seg fault on exit fixed.
+* Several new commands, including:
+  - lsservices = Replaces services command and can list all the service/
+                 only the services on the current multiplex/only the services
+                 on a specified multiplex.
+  - lsmuxes = lists all the available multiplex.
+  - lsplugins = Lists loaded plugins
+  - plugininfo = Displays information on a specific plugin.
 * Version number updated.
 * Most header files are now documented.
-* New list structure means there is no limit (apart from memory and CPU bandwidth)
-  on the number of filters/outputs you can add.
-* Service name filtering, it is now possible to remove unprintable characters from
-  service names by using the -F <chararcter to use instead> option.
+* New list structure means there is no limit (apart from memory and CPU
+  bandwidth) on the number of filters/outputs you can add.
+* Service name filtering, it is now possible to remove unprintable
+  characters from service names by using the -F <chararcter to use instead>
+  option.
+* !!!NOTE!!! Binary protocol change (slightly) to remove SSLA and SSLM and
+  replaced with 1 message that takes a multiplex. Also 2 other new messages to
+  get the current multiplex and another to list the available multiplexes.
 * Bugs Fixed.
   - 1548113 Command line processing on PPC doesn't work
   - 1538096 Not possible to specify log file destination
-  - Removing service no longer in the transport stream, only some where removed, not all.
+  - Seg fault on exit fixed.
+  - Removing service no longer in the transport stream, only some where removed
+    but not all.
   - Service names getting corrupted by repeated cache writebacks.
+  - Removed annoying warning from libdvbpsi about TS discontinuity after a
+    multiplex change.
 
 0.4
 ---
