@@ -344,6 +344,7 @@ void CacheWriteback()
         {
             printlog(LOG_DEBUG, "Adding service %s (0x%04x)\n", cachedServices[i]->name, cachedServices[i]->id);
             ServiceAdd(cachedServices[i]->multiplexfreq, cachedServices[i]->name, cachedServices[i]->id, cachedServices[i]->pmtversion, cachedServices[i]->pmtpid);
+            cacheFlags[i] = 0;
             continue;
         }
 
