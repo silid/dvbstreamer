@@ -72,7 +72,7 @@ DeliveryMethodInstance_t *FileOutputCreate(char *arg)
     {
         instance->SendPacket = FileOutputSendPacket;
         instance->DestroyInstance = FileOutputDestroy;
-        instance->fp = fopen(arg + PREFIX_LEN, "wb");
+        instance->fp = fopen64(arg + PREFIX_LEN, "wb");
         if (!instance->fp)
         {
             free(instance);
