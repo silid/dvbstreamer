@@ -1524,7 +1524,7 @@ _ACEOF
 
 
 cat >>confdefs.h <<_ACEOF
-#define DVBSTREAMER_VERSION "((DVBSTREAMER_MAJOR<<16) | (DVBSTREAMER_MINOR))"
+#define DVBSTREAMER_VERSION ((DVBSTREAMER_MAJOR<<16) | (DVBSTREAMER_MINOR))
 _ACEOF
 
 
@@ -20812,6 +20812,7 @@ See \`config.log' for more details." >&2;}
 fi
 
 
+LIBS=""
 
 packagesrcdir=`cd $srcdir && pwd`
 
