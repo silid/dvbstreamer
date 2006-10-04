@@ -55,7 +55,7 @@ typedef struct SDTProcessor_t
     bool payloadstartonly;
 }
 SDTProcessor_t;
-
+static void SDTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex);
 static TSPacket_t * SDTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
 static void SubTableHandler(void * state, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension);
 static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT);
@@ -76,6 +76,7 @@ PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter)
         {
             free(state);
         }
+        PIDFilterMultiplexChangeSet(result,SDTProcessorMultiplexChanged, state);
     }
     return result;
 }
@@ -93,28 +94,28 @@ void SDTProcessorDestroy(PIDFilter_t *filter)
     free(state);
 }
 
+static void SDTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex)
+{
+    SDTProcessor_t *state = (SDTProcessor_t *)arg;
+    if (state->multiplex)
+    {
+        dvbpsi_DetachDemux(state->demuxhandle);
+    }
+    if (newmultiplex)
+    {
+        state->demuxhandle = dvbpsi_AttachDemux(SubTableHandler, (void*)state);
+        state->payloadstartonly = TRUE;
+    }
+    state->multiplex = newmultiplex;
+}
 
 static TSPacket_t * SDTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet)
 {
     SDTProcessor_t *state = (SDTProcessor_t *)arg;
 
-    if (CurrentMultiplex == NULL)
+    if (state->multiplex == NULL)
     {
         return 0;
-    }
-
-    if (state->multiplex != CurrentMultiplex)
-    {
-        if (state->multiplex)
-        {
-            dvbpsi_DetachDemux(state->demuxhandle);
-        }
-        if (CurrentMultiplex)
-        {
-            state->demuxhandle = dvbpsi_AttachDemux(SubTableHandler, (void*)state);
-            state->payloadstartonly = TRUE;
-        }
-        state->multiplex = (Multiplex_t*)CurrentMultiplex;
     }
 
     if (state->payloadstartonly)
@@ -150,16 +151,16 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
     printlog(LOG_DEBUG,"SDT recieved, version %d\n", newSDT->i_version);
     while(sdtservice)
     {
-        dvbpsi_descriptor_t* descriptor = sdtservice->p_first_descriptor;
-        while(descriptor)
+        Service_t *service = CacheServiceFindId(sdtservice->i_service_id);
+        if (service)
         {
-            if (descriptor->i_tag == DESCRIPTOR_SERVICE)
+            dvbpsi_descriptor_t* descriptor = sdtservice->p_first_descriptor;
+            while(descriptor)
             {
-                dvbpsi_service_dr_t* servicedesc = dvbpsi_DecodeServiceDr(descriptor);
-                if (servicedesc)
+                if (descriptor->i_tag == DESCRIPTOR_SERVICE)
                 {
-                    Service_t *service = CacheServiceFindId(sdtservice->i_service_id);
-                    if (service)
+                    dvbpsi_service_dr_t* servicedesc = dvbpsi_DecodeServiceDr(descriptor);
+                    if (servicedesc)
                     {
                         char name[255];
                         int i;
@@ -182,8 +183,12 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
                     }
                     break;
                 }
+                descriptor = descriptor->p_next;
             }
-            descriptor = descriptor->p_next;
+            service->conditionalaccess = sdtservice->b_free_ca;
+            service->runningstatus = sdtservice->i_running_status;
+            service->eitpresentfollowing = sdtservice->b_eit_present;
+            service->eitschedule = sdtservice->b_eit_schedule;
         }
         sdtservice =sdtservice->p_next;
     }

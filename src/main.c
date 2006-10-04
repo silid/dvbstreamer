@@ -32,6 +32,7 @@ Entry point to the application.
 #include <signal.h>
 #include <sys/unistd.h>
 #include <sys/stat.h>
+#include <malloc.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -564,6 +565,9 @@ Service_t *SetCurrentService(char *name)
 
             printlog(LOG_DEBUGV,"Tuning\n");
             DVBFrontEndTune(DVBAdapter, &feparams);
+
+            printlog(LOG_DEBUGV,"Informing TSFilter multiplex has changed!\n");
+            TSFilterMultiplexChanged(TSFilter, CurrentMultiplex);
 
             CurrentService = CacheServiceFindId(service->id);
             ServiceFree(service);

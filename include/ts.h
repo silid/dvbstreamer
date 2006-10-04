@@ -106,6 +106,14 @@ typedef struct PIDFilter_t PIDFilter_t;
 
 /*---- Filter function pointer type----*/
 /**
+ * Callback used to signal that the transport stream has changed to a new multiplex.
+ *
+ * @param pidfilter The PID Filter this callback belongs to.
+ * @param userarg   A user defined argument.
+ */
+typedef void (*MultiplexChanged)(PIDFilter_t *pidfilter, void *userarg, Multiplex_t *multiplex);
+
+/**
  * Callback used to signal that a change has occured to the underlying structure
  * of the transport stream.
  * @param pidfilter The PID Filter this callback belongs to.
@@ -154,6 +162,9 @@ struct PIDFilter_t
 {
     struct TSFilter_t *tsfilter;           /**< TS Filter instance this filter belongs to. */
     volatile bool enabled;                 /**< Boolean indicating whether this filter is enabled and should process packets */
+
+    MultiplexChanged multiplexchanged;     /**< Callback to call when the Multiplex is changed. */
+    void *mcarg;                           /**< User defined argument to pass to the multiplexchanged callback */
 
     TSStructureChanged tsstructurechanged; /**< Callback to call when the underlying TS structure changes */
     void *tscarg;                          /**< User defined argument to pass to the tsstructurechanged callback */
@@ -224,20 +235,14 @@ typedef struct TSFilter_t
     pthread_t thread;                   /**< Thread used to read and process TS packets */
     bool enabled;                       /**< Whether packets should be read/processed */
     pthread_mutex_t mutex;              /**< Mutex used to protect access to this structure */
+    bool multiplexchanged;              /**< Whether the multiplex has been changed. */
+    Multiplex_t *multiplex;             /**< The multiplex the transport stream is coming from. */
     bool tsstructurechanged;            /**< Whether the underlying TS structure has changed. */
 
     volatile int totalpackets;          /**< Total number of packets processed by this instance. */
 	volatile int bitrate;               /**< Approximate bit rate of the transport stream being processed. */
 
     List_t *pidfilters;
-#if 0
-    struct
-    {
-        int allocated;
-        struct PIDFilter_t filter;
-    }
-    pidfilters[MAX_FILTERS];             /**< Array of PID filters */
-#endif
 }
 TSFilter_t;
 
@@ -347,7 +352,14 @@ PIDFilter_t *PIDFilterSetup(TSFilter_t *tsfilter,
  */
 #define PIDFilterTSStructureChangeSet(_pidfilter, _callback, _arg) \
     do{ (_pidfilter)->tscarg = _arg; (_pidfilter)->tsstructurechanged = _callback; } while(0)
-
+/**
+ * Sets the multiplexchanged callback and user argument.
+ * @param _pidfilter The PIDFilter_t instance to set.
+ * @param _callback  The function to set as the multiplexchanged callback.
+ * @param _arg       The user argument to pass to the callback.
+ */
+#define PIDFilterMultiplexChangeSet(_pidfilter, _callback, _arg) \
+    do{ (_pidfilter)->mcarg = _arg; (_pidfilter)->multiplexchanged = _callback; } while(0)
 /**@}*/
 
 
