@@ -47,6 +47,7 @@ typedef struct PATProcessor_t
 }
 PATProcessor_t;
 
+static void PATProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex);
 static TSPacket_t *PATProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
 static void PATHandler(void* arg, dvbpsi_pat_t* newpat);
 
@@ -68,6 +69,7 @@ PIDFilter_t *PATProcessorCreate(TSFilter_t *tsfilter)
         {
             free(state);
         }
+        PIDFilterMultiplexChangeSet(result, PATProcessorMultiplexChanged, state);
     }
     if (!NewPATCallbacksList)
     {
@@ -109,24 +111,25 @@ void PATProcessorUnRegisterPATCallback(PluginPATProcessor_t callback)
     }
 }
 
+static void PATProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex)
+{
+    PATProcessor_t *state= (PATProcessor_t*)arg;
+    if (state->multiplex)
+    {
+        dvbpsi_DetachPAT(state->pathandle);
+    }
+    state->multiplex = newmultiplex;
+    if (newmultiplex)
+    {
+        state->pathandle = dvbpsi_AttachPAT(PATHandler, (void*)state);
+        state->payloadstartonly = TRUE;
+    }
+}
+
 static TSPacket_t *PATProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet)
 {
     TSPacket_t *result = NULL;
     PATProcessor_t *state= (PATProcessor_t*)arg;
-
-    if (state->multiplex != CurrentMultiplex)
-    {
-        if (state->multiplex)
-        {
-            dvbpsi_DetachPAT(state->pathandle);
-        }
-        state->multiplex = (Multiplex_t*)CurrentMultiplex;
-        if (CurrentMultiplex)
-        {
-            state->pathandle = dvbpsi_AttachPAT(PATHandler, (void*)state);
-            state->payloadstartonly = TRUE;
-        }
-    }
 
     if (state->multiplex)
     {
@@ -149,7 +152,6 @@ static TSPacket_t *PATProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, 
 }
 
 static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
-
 {
     PATProcessor_t *state = (PATProcessor_t*)arg;
     Multiplex_t *multiplex = state->multiplex;

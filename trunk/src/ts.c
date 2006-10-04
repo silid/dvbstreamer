@@ -40,6 +40,7 @@ Transport stream processing and filter management.
 static void *FilterTS(void *arg);
 static void ProcessPacket(TSFilter_t *state, TSPacket_t *packet);
 static void InformTSStructureChanged(TSFilter_t *state);
+static void InformMultiplexChanged(TSFilter_t *state);
 
 TSFilter_t* TSFilterCreate(DVBAdapter_t *adapter)
 {
@@ -92,6 +93,14 @@ void TSFilterZeroStats(TSFilter_t* tsfilter)
         filter->packetsprocessed = 0;
         filter->packetsoutput    = 0;
     }
+    pthread_mutex_unlock(&tsfilter->mutex);
+}
+
+void TSFilterMultiplexChanged(TSFilter_t *tsfilter, Multiplex_t *newmultiplex)
+{
+    pthread_mutex_lock(&tsfilter->mutex);
+    tsfilter->multiplexchanged = TRUE;
+    tsfilter->multiplex = newmultiplex;
     pthread_mutex_unlock(&tsfilter->mutex);
 }
 
@@ -171,11 +180,19 @@ static void *FilterTS(void *arg)
     while (!state->quit)
     {
         int p;
-        //Read in packet
+        /* Read in packet */
         count = DVBDVRRead(adapter, (char*)state->readbuffer, sizeof(state->readbuffer), 100);
         if (state->quit)
         {
             break;
+        }
+
+        if (state->multiplexchanged)
+        {
+            InformMultiplexChanged(state);
+            state->multiplexchanged = FALSE;
+            /* Thow away these packets as they could be a mix of packets from the old TS and the new TS */
+            continue;
         }
 
         pthread_mutex_lock(&state->mutex);
@@ -248,6 +265,19 @@ static void InformTSStructureChanged(TSFilter_t *state)
         if (filter->enabled && filter->tsstructurechanged)
         {
             filter->tsstructurechanged(filter, filter->tscarg);
+        }
+    }
+}
+
+static void InformMultiplexChanged(TSFilter_t *state)
+{
+    ListIterator_t iterator;
+    for ( ListIterator_Init(iterator, state->pidfilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    {
+        PIDFilter_t *filter =(PIDFilter_t *)ListIterator_Current(iterator);
+        if (filter->enabled && filter->multiplexchanged)
+        {
+            filter->multiplexchanged(filter, filter->mcarg, state->multiplex);
         }
     }
 }
