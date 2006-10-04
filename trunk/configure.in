@@ -80,6 +80,7 @@ dnl Check for libdvbpsi
 dnl ---------------------------------------------------------------------------
 AC_CHECK_LIB([dvbpsi], [dvbpsi_PushPacket], [], [AC_MSG_FAILURE([libdvbpsi not found])])
 
+LIBS=""
 dnl ---------------------------------------------------------------------------
 dnl Setup package directories
 dnl ---------------------------------------------------------------------------
