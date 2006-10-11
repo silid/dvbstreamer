@@ -23,11 +23,13 @@ Caches service and PID information from the database for the current multiplex.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 #include "ts.h"
 #include "multiplexes.h"
 #include "services.h"
 #include "logging.h"
 #include "cache.h"
+#include "dbase.h"
 
 #define SERVICES_MAX (256)
 
@@ -45,6 +47,7 @@ static Multiplex_t *cachedServicesMultiplex = NULL;
 static int cachedServicesCount = 0;
 static int cachedDeletedServicesCount = 0;
 
+static pthread_mutex_t cacheUpdateMutex;
 static enum CacheFlags cacheFlags[SERVICES_MAX];
 static Service_t*      cachedServices[SERVICES_MAX];
 static Service_t*      cachedDeletedServices[SERVICES_MAX];
@@ -57,7 +60,7 @@ static int CachePIDsLoad(Service_t *service, int index);
 
 int CacheInit()
 {
-    /* Do nothing for the moment */
+    pthread_mutex_init(&cacheUpdateMutex, NULL);
     return 0;
 }
 
@@ -66,11 +69,15 @@ void CacheDeInit()
     CacheWriteback();
     CacheServicesFree();
     CachePIDsFree();
+    pthread_mutex_destroy(&cacheUpdateMutex);
 }
 
 int CacheLoad(Multiplex_t *multiplex)
 {
+    int result = 1;
     int count = ServiceForMultiplexCount(multiplex->freq);
+
+    pthread_mutex_lock(&cacheUpdateMutex);
 
     /* Free the services and PIDs from the previous multiplex */
     CacheServicesFree();
@@ -94,9 +101,12 @@ int CacheLoad(Multiplex_t *multiplex)
         cachedServicesCount = count;
         cachedServicesMultiplex = multiplex;
         cachedServicesMultiplexDirty = 0;
-        return 0;
+        result = 0;
     }
-    return 1;
+
+    pthread_mutex_unlock(&cacheUpdateMutex);
+
+    return result;
 }
 
 Service_t *CacheServiceFindId(int id)
@@ -123,9 +133,10 @@ Service_t *CacheServiceFindName(char *name, Multiplex_t **multiplex)
     int i;
     if (cachedServices)
     {
-        printlog(LOG_DEBUGV,"Checking cached services\n");
+        printlog(LOG_DEBUGV,"Checking cached services for \"%s\"\n", name);
         for (i = 0; i < cachedServicesCount; i ++)
         {
+            printlog(LOG_DEBUGV, "cachedServices[%d]->name = %s\n", i, cachedServices[i]->name);
             if (strcmp(cachedServices[i]->name, name) == 0)
             {
                 result = cachedServices[i];
@@ -192,26 +203,36 @@ PID_t *CachePIDsGet(Service_t *service, int *count)
 
 void CacheUpdateMultiplex(Multiplex_t *multiplex, int patversion, int tsid)
 {
+    pthread_mutex_lock(&cacheUpdateMutex);
+
     if (cachedServicesMultiplex && MultiplexAreEqual(multiplex, cachedServicesMultiplex))
     {
         cachedServicesMultiplex->patversion = patversion;
         cachedServicesMultiplex->tsid = tsid;
         cachedServicesMultiplexDirty = 1;
     }
+
+    pthread_mutex_unlock(&cacheUpdateMutex);
 }
 
 void CacheUpdateNetworkId(Multiplex_t *multiplex, int netid)
 {
+    pthread_mutex_lock(&cacheUpdateMutex);
+
     if (cachedServicesMultiplex && MultiplexAreEqual(multiplex, cachedServicesMultiplex))
     {
         cachedServicesMultiplex->netid = netid;
         cachedServicesMultiplexDirty = 1;
     }
+
+    pthread_mutex_unlock(&cacheUpdateMutex);
 }
 
 void CacheUpdateService(Service_t *service, int pmtpid)
 {
     int i;
+    pthread_mutex_lock(&cacheUpdateMutex);
+
     for (i = 0; i < cachedServicesCount; i ++)
     {
         if ((cachedServices[i]) && ServiceAreEqual(service, cachedServices[i]))
@@ -221,11 +242,15 @@ void CacheUpdateService(Service_t *service, int pmtpid)
             break;
         }
     }
+
+    pthread_mutex_unlock(&cacheUpdateMutex);
 }
 
 void CacheUpdateServiceName(Service_t *service, char *name)
 {
     int i;
+    pthread_mutex_lock(&cacheUpdateMutex);
+
     for (i = 0; i < cachedServicesCount; i ++)
     {
         if ((cachedServices[i]) && ServiceAreEqual(service, cachedServices[i]))
@@ -236,11 +261,15 @@ void CacheUpdateServiceName(Service_t *service, char *name)
             break;
         }
     }
+
+    pthread_mutex_unlock(&cacheUpdateMutex);
 }
 
 void CacheUpdatePIDs(Service_t *service, PID_t *pids, int count, int pmtversion)
 {
     int i;
+    pthread_mutex_lock(&cacheUpdateMutex);
+
     for (i = 0; i < cachedServicesCount; i ++)
     {
         if ((cachedServices[i]) && ServiceAreEqual(service, cachedServices[i]))
@@ -256,6 +285,8 @@ void CacheUpdatePIDs(Service_t *service, PID_t *pids, int count, int pmtversion)
             break;
         }
     }
+
+    pthread_mutex_unlock(&cacheUpdateMutex);
 }
 
 Service_t *CacheServiceAdd(int id)
@@ -269,11 +300,16 @@ Service_t *CacheServiceAdd(int id)
         result->name = malloc(5);
         sprintf(result->name, "%04x", id);
         result->multiplexfreq = cachedServicesMultiplex->freq;
+
+        pthread_mutex_lock(&cacheUpdateMutex);
+
         cachedServices[cachedServicesCount] = result;
         cachedPIDs[cachedServicesCount] = NULL;
         cachedPIDsCount[cachedServicesCount] = 0;
         cacheFlags[cachedServicesCount]  = CacheFlag_Dirty_Added;
         cachedServicesCount ++;
+
+        pthread_mutex_unlock(&cacheUpdateMutex);
     }
     return result;
 }
@@ -282,6 +318,8 @@ void CacheServiceDelete(Service_t *service)
 {
     int deletedIndex = -1;
     int i;
+    pthread_mutex_lock(&cacheUpdateMutex);
+
     for (i = 0; i < cachedServicesCount; i ++)
     {
         if ((cachedServices[i]) && ServiceAreEqual(service, cachedServices[i]))
@@ -309,12 +347,18 @@ void CacheServiceDelete(Service_t *service)
         cachedDeletedServices[cachedDeletedServicesCount] = service;
         cachedDeletedServicesCount ++;
     }
+
+    pthread_mutex_unlock(&cacheUpdateMutex);
 }
 
 void CacheWriteback()
 {
     int i;
+
+    pthread_mutex_lock(&cacheUpdateMutex);
     printlog(LOG_DEBUG, "Writing changes to cache back to database\n");
+
+    sqlite3_exec(DBaseInstance, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 
     if (cachedServicesMultiplexDirty)
     {
@@ -383,6 +427,9 @@ void CacheWriteback()
         ServiceFree(cachedDeletedServices[i]);
     }
     cachedDeletedServicesCount = 0;
+
+    sqlite3_exec(DBaseInstance, "COMMIT TRANSACTION;", NULL, NULL, NULL);
+    pthread_mutex_unlock(&cacheUpdateMutex);
 }
 
 static void CacheServicesFree()
