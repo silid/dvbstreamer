@@ -68,7 +68,6 @@ void CacheDeInit()
 {
     CacheWriteback();
     CacheServicesFree();
-    CachePIDsFree();
     pthread_mutex_destroy(&cacheUpdateMutex);
 }
 
@@ -81,7 +80,6 @@ int CacheLoad(Multiplex_t *multiplex)
 
     /* Free the services and PIDs from the previous multiplex */
     CacheServicesFree();
-    CachePIDsFree();
 
     printlog(LOG_DEBUG,"Loading %d services for %d\n", count, multiplex->freq);
     if (count > 0)
@@ -443,24 +441,14 @@ static void CacheServicesFree()
             {
                 ServiceFree(cachedServices[i]);
             }
-        }
-        cachedServicesCount = 0;
-        cachedServicesMultiplex = NULL;
-    }
-}
-
-static void CachePIDsFree()
-{
-    if (cachedPIDs)
-    {
-        int i;
-        for (i = 0; i < cachedServicesCount; i ++)
-        {
             if (cachedPIDs[i])
             {
                 free(cachedPIDs[i]);
             }
             cachedPIDsCount[i] = 0;
         }
+        cachedServicesCount = 0;
+        cachedServicesMultiplex = NULL;
     }
 }
+
