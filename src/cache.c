@@ -179,6 +179,10 @@ static int CachePIDsLoad(Service_t *service, int index)
         cachedPIDsCount[index] = count;
         return 0;
     }
+    else
+    {
+        cachedPIDs[index] = NULL;
+    } 
     return 1;
 }
 

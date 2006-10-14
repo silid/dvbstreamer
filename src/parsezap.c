@@ -269,6 +269,7 @@ static int parsezapline(char * str, fe_type_t fe_type)
     id = strtoul(field, NULL, 0);
     printlog(LOG_DEBUGV, "Adding service \"%s\" %d\n", name, id);
     ServiceAdd(front_param.frequency, name, id, -1, -1);
+    free(name);
     return 0;
 }
 

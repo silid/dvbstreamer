@@ -315,7 +315,10 @@ int main(int argc, char *argv[])
     DEINIT(DeliveryMethodManagerDeInit(), "delivery method manager");
     DEINIT(CacheDeInit(), "cache");
     DEINIT(DBaseDeInit(), "database");
-
+    if (CurrentMultiplex)
+    {
+        free((void *)CurrentMultiplex);
+    }
     if (DaemonMode)
     {
         DeinitDaemon();
