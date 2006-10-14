@@ -236,6 +236,9 @@ void BinaryCommsDeInit(void)
             connections[i].connected = FALSE;
         }
     }
+    free(infoStreamerName);
+    free(authUsername);
+    free(authPassword);
 }
 
 void BinaryCommsAcceptConnections(void)

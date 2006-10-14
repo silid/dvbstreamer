@@ -69,6 +69,7 @@ void TSFilterDestroy(TSFilter_t* tsfilter)
         ListRemoveCurrent(&iterator);
     }
     ListFree( tsfilter->pidfilters);
+    free(tsfilter);
 }
 
 void TSFilterEnable(TSFilter_t* tsfilter, bool enable)
