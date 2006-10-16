@@ -62,6 +62,7 @@ static void CommandListServices(int argc, char **argv);
 static void CommandListMuxes(int argc, char **argv);
 static void CommandSelect(int argc, char **argv);
 static void CommandCurrent(int argc, char **argv);
+static void CommandServiceInfo(int argc, char **argv);
 static void CommandPids(int argc, char **argv);
 static void CommandStats(int argc, char **argv);
 static void CommandAddOutput(int argc, char **argv);
@@ -130,6 +131,14 @@ static Command_t coreCommands[] = {
                                       "Print out the service currently being streamed.",
                                       "Shows the service that is currently being streamed to the default output.",
                                       CommandCurrent
+                                  },
+                                  {
+                                      "serviceinfo",
+                                      FALSE, 1, 1,
+                                      "Display information about a service.",
+                                      "serviceinfo <service name>\n"
+                                      "Displays information about the specified service.",
+                                      CommandServiceInfo,
                                   },
                                   {
                                       "pids",
@@ -731,6 +740,37 @@ static void CommandCurrent(int argc, char **argv)
 	{
 		CommandPrintf("No current service\n");
 	}
+}
+
+static void CommandServiceInfo(int argc, char **argv)
+{
+    Service_t *service;
+    Multiplex_t *multiplex;
+
+    service = CacheServiceFindName(argv[0], &multiplex);
+    if (service)
+    {
+        CommandPrintf("ID : 0x%04x\n", service->id);
+        if (MultiplexAreEqual(multiplex, CurrentMultiplex))
+        {
+            char *runningstatus[] = {
+                "Unknown",
+                "Not Running",
+                "Starts in a few seconds",
+                "Pausing",
+                "Running",
+            };
+            CommandPrintf("Free to Air/CA       : %s\n", service->conditionalaccess ? "CA":"Free to Air");
+            CommandPrintf("EPG Present/Following: %s\n", service->eitpresentfollowing ? "Yes":"No");
+            CommandPrintf("EPG Schedule         : %s\n", service->eitschedule ? "Yes":"No");
+            CommandPrintf("Running Status       : %s\n", runningstatus[service->runningstatus]);
+        }
+        else
+        {
+            CommandPrintf("Not in current multiplex, no further information available.\n");
+            ServiceFree(service);
+        }
+    }
 }
 
 static void CommandPids(int argc, char **argv)
