@@ -271,8 +271,7 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
         name = STATEMENT_COLUMN_TEXT( 2);
         if (name)
         {
-            service->name = calloc(strlen(name) + 1, 1);
-            strcpy(service->name, name);
+            service->name = strdup(name);
         }
         service->pmtversion = STATEMENT_COLUMN_INT( 3);
         service->pmtpid = STATEMENT_COLUMN_INT( 4);
