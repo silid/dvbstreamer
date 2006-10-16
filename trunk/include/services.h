@@ -22,12 +22,21 @@ Manage services and PIDs.
 */
 #ifndef _SERVICES_H
 #define _SERVICES_H
-
+#include "types.h"
 #include "multiplexes.h"
 /**
  * @defgroup Service Service information
  * @{
  */
+
+typedef enum RunningStatus_e
+{
+    RunningStatus_Undefined       = 0,
+    RunningStatus_NotRunning      = 1,
+    RunningStatus_StartsInSeconds = 2,
+    RunningStatus_Pausing         = 3,
+    RunningStatus_Running         = 4,
+}RunningStatus_e;
 
 /**
  * Structure desribing a digital TV service.
@@ -39,6 +48,12 @@ typedef struct Service_t
     int id;            /**< Service/Program ID of the service. */
     int pmtversion;    /**< Last processed version of the PMT. */
     int pmtpid;        /**< PID the PMT for this service is sent on. */
+
+    /* Transient Fields - not stored in the database */
+    bool conditionalaccess;        /**< Whether 1 or more streams in for this service are controlled by CA */
+    RunningStatus_e runningstatus; /**< Running status of the service */
+    bool eitpresentfollowing;      /**< Indicates whether EIT Present/Following information is available. */
+    bool eitschedule;              /**< Indicates whether EIT schedule information is available. */
 }
 Service_t;
 
