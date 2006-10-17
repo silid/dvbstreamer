@@ -59,6 +59,7 @@ static void SDTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Mult
 static TSPacket_t * SDTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
 static void SubTableHandler(void * state, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension);
 static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT);
+static List_t *NewSDTCallbacksList = NULL;
 
 PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter)
 {
@@ -78,6 +79,12 @@ PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter)
         }
         PIDFilterMultiplexChangeSet(result,SDTProcessorMultiplexChanged, state);
     }
+
+    if (!NewSDTCallbacksList)
+    {
+        NewSDTCallbacksList = ListCreate();
+    }
+
     return result;
 }
 
@@ -92,6 +99,22 @@ void SDTProcessorDestroy(PIDFilter_t *filter)
         dvbpsi_DetachDemux(state->demuxhandle);
     }
     free(state);
+}
+
+void SDTProcessorRegisterSDTCallback(PluginSDTProcessor_t callback)
+{
+    if (NewSDTCallbacksList)
+    {
+        ListAdd(NewSDTCallbacksList, callback);
+    }
+}
+
+void SDTProcessorUnRegisterSDTCallback(PluginSDTProcessor_t callback)
+{
+    if (NewSDTCallbacksList)
+    {
+        ListRemove(NewSDTCallbacksList, callback);
+    }
 }
 
 static void SDTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex)
@@ -147,6 +170,7 @@ static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t table
 
 static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
 {
+    ListIterator_t iterator;
     dvbpsi_sdt_service_t* sdtservice = newSDT->p_first_service;
     printlog(LOG_DEBUG,"SDT recieved, version %d\n", newSDT->i_version);
     while(sdtservice)
@@ -197,5 +221,12 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
     {
         CacheUpdateNetworkId((Multiplex_t *)CurrentMultiplex, newSDT->i_network_id);
     }
+
+    for (ListIterator_Init(iterator, NewSDTCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    {
+        PluginSDTProcessor_t callback = ListIterator_Current(iterator);
+        callback(newSDT);
+    }
+
     dvbpsi_DeleteSDT(newSDT);
 }

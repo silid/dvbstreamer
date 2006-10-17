@@ -187,10 +187,18 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
         {
             switch(pluginInterface->features[i].type)
             {
-                case PLUGIN_FEATURE_TYPE_DELIVERYMETHOD:
-                printlog(LOG_DEBUGV, "plugin %s: Installed Delivery method.\n", pluginInterface->name);
-                DeliveryMethodManagerRegister(pluginInterface->features[i].details);
+                case PLUGIN_FEATURE_TYPE_FILTER:
+                {
+                    PluginFilter_t *pluginFilter = pluginInterface->features[i].details;
+                    pluginFilter->filter = PIDFilterAllocate(TSFilter);
+                    if (pluginFilter->filter)
+                    {
+                        printlog(LOG_DEBUGV, "plugin %s: Installed filter.\n", pluginInterface->name);
+                        pluginFilter->InitFilter(pluginFilter->filter);
+                    }
+                }
                 break;
+
                 case PLUGIN_FEATURE_TYPE_PATPROCESSOR:
                 printlog(LOG_DEBUGV, "plugin %s: Installed PAT processor.\n", pluginInterface->name);
                 PATProcessorRegisterPATCallback(pluginInterface->features[i].details);
@@ -199,9 +207,17 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
                 printlog(LOG_DEBUGV, "plugin %s: Installed PMT processor.\n", pluginInterface->name);
                 PMTProcessorRegisterPMTCallback(pluginInterface->features[i].details);
                 break;
+                case PLUGIN_FEATURE_TYPE_DELIVERYMETHOD:
+                printlog(LOG_DEBUGV, "plugin %s: Installed Delivery method.\n", pluginInterface->name);
+                DeliveryMethodManagerRegister(pluginInterface->features[i].details);
+                break;
                 case PLUGIN_FEATURE_TYPE_CHANNELCHANGED:
                 printlog(LOG_DEBUGV, "plugin %s: Installed channel changed callback.\n", pluginInterface->name);
                 ChannelChangedRegisterCallback(pluginInterface->features[i].details);
+                break;
+                case PLUGIN_FEATURE_TYPE_SDTPROCESSOR:
+                printlog(LOG_DEBUGV, "plugin %s: Installed SDT processor.\n", pluginInterface->name);
+                SDTProcessorRegisterSDTCallback(pluginInterface->features[i].details);
                 break;
             }
 
@@ -222,9 +238,16 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface)
         {
             switch(pluginInterface->features[i].type)
             {
-                case PLUGIN_FEATURE_TYPE_DELIVERYMETHOD:
-                printlog(LOG_DEBUG, "plugin %s: Uninstalled Delivery method.\n", pluginInterface->name);
-                DeliveryMethodManagerUnRegister(pluginInterface->features[i].details);
+                case PLUGIN_FEATURE_TYPE_FILTER:
+                {
+                    PluginFilter_t *pluginFilter = pluginInterface->features[i].details;
+                    if (pluginFilter->filter)
+                    {
+                        printlog(LOG_DEBUGV, "plugin %s: Uninstalled filter.\n", pluginInterface->name);
+                        pluginFilter->DeinitFilter(pluginFilter->filter);
+                        PIDFilterFree(pluginFilter->filter);
+                    }
+                }
                 break;
                 case PLUGIN_FEATURE_TYPE_PATPROCESSOR:
                 printlog(LOG_DEBUGV, "plugin %s: Uninstalled PAT processor.\n", pluginInterface->name);
@@ -234,9 +257,17 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface)
                 printlog(LOG_DEBUGV, "plugin %s: Uninstalled PMT processor.\n", pluginInterface->name);
                 PMTProcessorUnRegisterPMTCallback(pluginInterface->features[i].details);
                 break;
+                case PLUGIN_FEATURE_TYPE_DELIVERYMETHOD:
+                printlog(LOG_DEBUG, "plugin %s: Uninstalled Delivery method.\n", pluginInterface->name);
+                DeliveryMethodManagerUnRegister(pluginInterface->features[i].details);
+                break;
                 case PLUGIN_FEATURE_TYPE_CHANNELCHANGED:
                 printlog(LOG_DEBUGV, "plugin %s: Uninstalled channel changed callback.\n", pluginInterface->name);
                 ChannelChangedUnRegisterCallback(pluginInterface->features[i].details);
+                break;
+                case PLUGIN_FEATURE_TYPE_SDTPROCESSOR:
+                printlog(LOG_DEBUGV, "plugin %s: Uninstalled SDT processor.\n", pluginInterface->name);
+                SDTProcessorUnRegisterSDTCallback(pluginInterface->features[i].details);
                 break;
             }
         }

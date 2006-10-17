@@ -39,6 +39,12 @@ Plugin Interface structures and macros.
 #ifndef _DVBPSI_PMT_H_
 #include <dvbpsi/pmt.h>
 #endif
+#ifndef _DVBPSI_DEMUX_H_
+#include <dvbpsi/demux.h>
+#endif
+#ifndef _DVBPSI_SDT_H_
+#include <dvbpsi/sdt.h>
+#endif
 
 #include "config.h"
 #include "types.h"
@@ -73,6 +79,10 @@ Plugin Interface structures and macros.
  * Constant for a Primary Channel Changed feature.
  */
 #define PLUGIN_FEATURE_TYPE_CHANNELCHANGED 0x05
+/**
+ * Constant for a SDT processor plugin feature.
+ */
+#define PLUGIN_FEATURE_TYPE_SDTPROCESSOR   0x06
 
 /**
  * Structure used to describe a single 'feature' of a plugin.
@@ -200,6 +210,12 @@ typedef struct Plugin_t
 #define PLUGIN_FEATURE_CHANNELCHANGED(_cchanged) {PLUGIN_FEATURE_TYPE_CHANNELCHANGED, (void*)_cchanged}
 
 /**
+ * Simple macro to define a SDT Processor feature.
+ * @param _processor Function to call when a new SDT arrives.
+ */
+#define PLUGIN_FEATURE_SDTPROCESSOR(_processor) {PLUGIN_FEATURE_TYPE_SDTPROCESSOR, (void*)_processor}
+
+/**
  * Structure used to describe a Filter Feature.
  * Multiple filter features per plugin is allowed, but developers should try and
  * keep the number to a minimum to keep the overheads of maintaining and calling
@@ -229,6 +245,12 @@ typedef void (*PluginPATProcessor_t)(dvbpsi_pat_t* newpat);
  */
 typedef void (*PluginPMTProcessor_t)(dvbpsi_pmt_t* newpmt);
 
+/**
+ * Function pointer to function to call when a new SDT arrives.
+ * For use with the PLUGIN_FEATURE_TYPE_SDTPROCESSOR feature type, only 1 per
+ * plugin is expected (allowed).
+ */
+typedef void (*PluginSDTProcessor_t)(dvbpsi_sdt_t* newsdt);
 
 /**
  * Function pointer to function to call after the primary service
