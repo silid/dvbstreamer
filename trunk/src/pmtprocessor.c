@@ -287,68 +287,65 @@ static void PMTProcessorTSStructureChanged(PIDFilter_t *pidfilter, void *arg)
 static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
 {
     Service_t *service = (Service_t*)arg;
+    ListIterator_t iterator;
+    PID_t *pids;
+    dvbpsi_pmt_es_t *esentry = newpmt->p_first_es;
+    int count = 1;
+
     printlog(LOG_DEBUG,"PMT recieved, version %d on PID %d (old version %d)\n", newpmt->i_version, service->pmtpid, service->pmtversion);
-    if (service->pmtversion != newpmt->i_version)
+
+    while(esentry)
     {
-        // Version has changed update the pids
-        ListIterator_t iterator;
-        PID_t *pids;
-        dvbpsi_pmt_es_t *esentry = newpmt->p_first_es;
-        int count = 1;
+        esentry = esentry->p_next;
+        count ++;
+    }
+    printlog(LOG_DEBUGV,"%d PIDs in PMT\n", count);
+    pids = calloc(count, sizeof(PID_t));
 
-        while(esentry)
+    if (pids)
+    {
+        int i;
+        esentry = newpmt->p_first_es;
+
+        // Store PCR PID
+        pids[0].pid = newpmt->i_pcr_pid;
+        pids[0].type = 0;
+        pids[0].subtype = 0;
+
+        for (i = 1; i < count; i ++)
         {
-            esentry = esentry->p_next;
-            count ++;
-        }
-        printlog(LOG_DEBUGV,"%d PIDs in PMT\n", count);
-        pids = calloc(count, sizeof(PID_t));
+            printlog(LOG_DEBUGV, "0x%04x %d\n", esentry->i_pid, esentry->i_type);
+            pids[i].pid = esentry->i_pid;
+            pids[i].type = esentry->i_type;
 
-        if (pids)
-        {
-            int i;
-            esentry = newpmt->p_first_es;
-
-            // Store PCR PID
-            pids[0].pid = newpmt->i_pcr_pid;
-            pids[0].type = 0;
-            pids[0].subtype = 0;
-
-            for (i = 1; i < count; i ++)
+            if ((esentry->i_type == 3) || (esentry->i_type == 4))
             {
-                printlog(LOG_DEBUGV, "0x%04x %d\n", esentry->i_pid, esentry->i_type);
-                pids[i].pid = esentry->i_pid;
-                pids[i].type = esentry->i_type;
-
-                if ((esentry->i_type == 3) || (esentry->i_type == 4))
+                dvbpsi_descriptor_t *desc = esentry->p_first_descriptor;
+                while(desc)
                 {
-                    dvbpsi_descriptor_t *desc = esentry->p_first_descriptor;
-                    while(desc)
+                    printlog(LOG_DEBUGV,"Descriptor %d\n", desc->i_tag);
+                    if (desc->i_tag == 10) /* ISO 639 Language Descriptor */
                     {
-                        printlog(LOG_DEBUGV,"Descriptor %d\n", desc->i_tag);
-                        if (desc->i_tag == 10) /* ISO 639 Language Descriptor */
-                        {
-                            dvbpsi_iso639_dr_t *iso639 = dvbpsi_DecodeISO639Dr(desc);
-                            pids[i].subtype = iso639->i_audio_type;
-                        }
-                        desc = desc->p_next;
+                        dvbpsi_iso639_dr_t *iso639 = dvbpsi_DecodeISO639Dr(desc);
+                        pids[i].subtype = iso639->i_audio_type;
                     }
+                    desc = desc->p_next;
                 }
-                else
-                {
-                    pids[i].subtype = 0;
-                }
-                esentry = esentry->p_next;
             }
-            printlog(LOG_DEBUGV,"About to update cache\n");
-            CacheUpdatePIDs(service, pids, count, newpmt->i_version);
+            else
+            {
+                pids[i].subtype = 0;
+            }
+            esentry = esentry->p_next;
         }
+        printlog(LOG_DEBUGV,"About to update cache\n");
+        CacheUpdatePIDs(service, pids, count, newpmt->i_version);
+    }
 
-        for (ListIterator_Init(iterator, NewPMTCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
-        {
-            PluginPMTProcessor_t callback = ListIterator_Current(iterator);
-            callback(newpmt);
-        }
+    for (ListIterator_Init(iterator, NewPMTCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    {
+        PluginPMTProcessor_t callback = ListIterator_Current(iterator);
+        callback(newpmt);
     }
     dvbpsi_DeletePMT(newpmt);
 }

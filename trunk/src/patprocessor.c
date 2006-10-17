@@ -155,68 +155,65 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
 {
     PATProcessor_t *state = (PATProcessor_t*)arg;
     Multiplex_t *multiplex = state->multiplex;
+    ListIterator_t iterator;
+    int count,i;
+    Service_t **services;
+
     printlog(LOG_DEBUG,"PAT recieved, version %d (old version %d)\n", newpat->i_version, multiplex->patversion);
-    if (multiplex->patversion != newpat->i_version)
+    /* Version has changed update the services */
+    dvbpsi_pat_program_t *patentry = newpat->p_first_program;
+    while(patentry)
     {
-        ListIterator_t iterator;
-        int count,i;
-        Service_t **services;
-
-        /* Version has changed update the services */
-        dvbpsi_pat_program_t *patentry = newpat->p_first_program;
-        while(patentry)
+        if (patentry->i_number != 0x0000)
         {
-            if (patentry->i_number != 0x0000)
+            Service_t *service = CacheServiceFindId(patentry->i_number);
+            if (!service)
             {
-                Service_t *service = CacheServiceFindId(patentry->i_number);
-                if (!service)
-                {
-                    printlog(LOG_DEBUG, "Service not found in cache while processing PAT, adding 0x%04x\n", patentry->i_number);
-                    service = CacheServiceAdd(patentry->i_number);
-                    /* Cause a TS Structure change call back*/
-                    state->tsfilter->tsstructurechanged = TRUE;
-                }
-
-                if (service && (service->pmtpid != patentry->i_pid))
-                {
-                    CacheUpdateService(service, patentry->i_pid);
-                }
-            }
-            patentry = patentry->p_next;
-        }
-
-        /* Delete any services that no longer exist */
-        services = CacheServicesGet(&count);
-        for (i = 0; i < count; i ++)
-        {
-            bool found = FALSE;
-            for (patentry = newpat->p_first_program; patentry; patentry = patentry->p_next)
-            {
-                if (services[i]->id == patentry->i_number)
-                {
-                    found = TRUE;
-                    break;
-                }
-            }
-            if (!found)
-            {
-                printlog(LOG_DEBUG, "Service not found in PAT while checking cache, deleting 0x%04x (%s)\n",
-                    services[i]->id, services[i]->name);
-                CacheServiceDelete(services[i]);
-                services = CacheServicesGet(&count);
-                i --;
+                printlog(LOG_DEBUG, "Service not found in cache while processing PAT, adding 0x%04x\n", patentry->i_number);
+                service = CacheServiceAdd(patentry->i_number);
                 /* Cause a TS Structure change call back*/
                 state->tsfilter->tsstructurechanged = TRUE;
             }
+
+            if (service && (service->pmtpid != patentry->i_pid))
+            {
+                CacheUpdateService(service, patentry->i_pid);
+            }
         }
+        patentry = patentry->p_next;
+    }
 
-        CacheUpdateMultiplex(multiplex, newpat->i_version, newpat->i_ts_id);
-
-        for (ListIterator_Init(iterator, NewPATCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    /* Delete any services that no longer exist */
+    services = CacheServicesGet(&count);
+    for (i = 0; i < count; i ++)
+    {
+        bool found = FALSE;
+        for (patentry = newpat->p_first_program; patentry; patentry = patentry->p_next)
         {
-            PluginPATProcessor_t callback = ListIterator_Current(iterator);
-            callback(newpat);
+            if (services[i]->id == patentry->i_number)
+            {
+                found = TRUE;
+                break;
+            }
         }
+        if (!found)
+        {
+            printlog(LOG_DEBUG, "Service not found in PAT while checking cache, deleting 0x%04x (%s)\n",
+                services[i]->id, services[i]->name);
+            CacheServiceDelete(services[i]);
+            services = CacheServicesGet(&count);
+            i --;
+            /* Cause a TS Structure change call back*/
+            state->tsfilter->tsstructurechanged = TRUE;
+        }
+    }
+
+    CacheUpdateMultiplex(multiplex, newpat->i_version, newpat->i_ts_id);
+
+    for (ListIterator_Init(iterator, NewPATCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    {
+        PluginPATProcessor_t callback = ListIterator_Current(iterator);
+        callback(newpat);
     }
     dvbpsi_DeletePAT(newpat);
 }
