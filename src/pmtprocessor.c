@@ -290,7 +290,7 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
     ListIterator_t iterator;
     PID_t *pids;
     dvbpsi_pmt_es_t *esentry = newpmt->p_first_es;
-    int count = 1;
+    int count = 0;
 
     printlog(LOG_DEBUG,"PMT recieved, version %d on PID %d (old version %d)\n", newpmt->i_version, service->pmtpid, service->pmtversion);
 
@@ -307,7 +307,7 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
         int i;
         esentry = newpmt->p_first_es;
 
-        for (i = 1; i < count; i ++)
+        for (i = 0; i < count; i ++)
         {
             printlog(LOG_DEBUGV, "0x%04x %d\n", esentry->i_pid, esentry->i_type);
             pids[i].pid = esentry->i_pid;
