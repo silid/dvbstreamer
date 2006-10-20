@@ -53,6 +53,10 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
  * Constant for Service Table Column name
  */
 #define SERVICE_PMTVERSION      "pmtversion"
+/**
+ * Constant for Service Table Column name
+ */
+#define SERVICE_PCRPID          "pcrpid"
 
 /**
  * Constant for the Multiplexes table name.

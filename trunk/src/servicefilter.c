@@ -111,7 +111,7 @@ static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t
         PID_t *pids;
 
         /* Handle PAT and PMT pids */
-        if ((pid == 0) || (pid == state->service->pmtpid))
+        if ((pid == 0) || (pid == state->service->pmtpid) || (pid == state->service->pcrpid))
         {
             return 1;
         }

@@ -27,6 +27,13 @@ Manage services and PIDs.
 #include "services.h"
 #include "logging.h"
 
+#define SERVICE_FIELDS SERVICE_MPLEXFREQ "," \
+                       SERVICE_ID "," \
+                       SERVICE_NAME "," \
+                       SERVICE_PMTVERSION "," \
+                       SERVICE_PMTPID ","\
+                       SERVICE_PCRPID " "
+
 int ServiceCount()
 {
     int result = -1;
@@ -60,7 +67,7 @@ int ServiceDelete(Service_t  *service)
     return 0;
 }
 
-int ServiceAdd(int multiplexfreq, char *name, int id, int pmtversion, int pmtpid)
+int ServiceAdd(int multiplexfreq, char *name, int id, int pmtversion, int pmtpid, int pcrpid)
 {
     STATEMENT_INIT;
 
@@ -69,9 +76,10 @@ int ServiceAdd(int multiplexfreq, char *name, int id, int pmtversion, int pmtpid
                         SERVICE_ID ","
                         SERVICE_PMTVERSION ","
                         SERVICE_PMTPID ","
+                        SERVICE_PCRPID ","
                         SERVICE_NAME ")"
-                        "VALUES (%d,%d,%d,%d,'%q');",
-                        multiplexfreq, id, pmtversion, pmtpid, name);
+                        "VALUES (%d,%d,%d,%d,%d,'%q');",
+                        multiplexfreq, id, pmtversion, pmtpid, pcrpid, name);
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
@@ -119,8 +127,31 @@ int ServicePMTPIDSet(Service_t  *service, int pmtpid)
     STATEMENT_STEP();
     if (rc == SQLITE_DONE)
     {
-        printlog(LOG_DEBUGV,"Updated 0x%04x %d\n", service->id, service->multiplexfreq);
         service->pmtpid = pmtpid;
+        rc = SQLITE_OK;
+    }
+    else
+    {
+        PRINTLOG_SQLITE3ERROR();
+    }
+    STATEMENT_FINALIZE();
+    return rc;
+}
+
+int ServicePCRPIDSet(Service_t  *service, int pcrpid)
+{
+    STATEMENT_INIT;
+
+    STATEMENT_PREPAREVA("UPDATE " SERVICES_TABLE " "
+                        "SET " SERVICE_PCRPID "=%d "
+                        "WHERE " SERVICE_MPLEXFREQ "=%d AND " SERVICE_ID "=%d;",
+                        pcrpid, service->multiplexfreq,  service->id);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+    if (rc == SQLITE_DONE)
+    {
+        service->pcrpid = pcrpid;
         rc = SQLITE_OK;
     }
     else
@@ -145,7 +176,6 @@ int ServiceNameSet(Service_t  *service, char *name)
     if (rc == SQLITE_DONE)
     {
         char *oldname = service->name;
-        printlog(LOG_DEBUGV,"Updated 0x%04x %d\n", service->id, service->multiplexfreq);
 		service->name = strdup(name);
 		free(oldname);
         rc = SQLITE_OK;
@@ -163,11 +193,7 @@ Service_t *ServiceFindName(char *name)
     STATEMENT_INIT;
     Service_t *result;
 
-    STATEMENT_PREPAREVA("SELECT "	SERVICE_MPLEXFREQ ","
-                        SERVICE_ID ","
-                        SERVICE_NAME ","
-                        SERVICE_PMTVERSION ","
-                        SERVICE_PMTPID " "
+    STATEMENT_PREPAREVA("SELECT " SERVICE_FIELDS
                         "FROM " SERVICES_TABLE " WHERE " SERVICE_NAME "='%q';",
                         name);
     RETURN_ON_ERROR(NULL);
@@ -183,11 +209,7 @@ Service_t *ServiceFindId(Multiplex_t *multiplex, int id)
     STATEMENT_INIT;
     Service_t *result;
 
-    STATEMENT_PREPAREVA("SELECT "	SERVICE_MPLEXFREQ ","
-                        SERVICE_ID ","
-                        SERVICE_NAME ","
-                        SERVICE_PMTVERSION ","
-                        SERVICE_PMTPID " "
+    STATEMENT_PREPAREVA("SELECT " SERVICE_FIELDS
                         "FROM " SERVICES_TABLE " WHERE " SERVICE_MPLEXFREQ "=%d AND " SERVICE_ID "=%d;",
                         multiplex->freq, id);
     RETURN_ON_ERROR(NULL);
@@ -200,11 +222,7 @@ Service_t *ServiceFindId(Multiplex_t *multiplex, int id)
 ServiceEnumerator_t ServiceEnumeratorGet()
 {
     STATEMENT_INIT;
-    STATEMENT_PREPARE("SELECT "	SERVICE_MPLEXFREQ ","
-                      SERVICE_ID ","
-                      SERVICE_NAME ","
-                      SERVICE_PMTVERSION ","
-                      SERVICE_PMTPID " "
+    STATEMENT_PREPARE("SELECT "	SERVICE_FIELDS
                       "FROM " SERVICES_TABLE ";");
     RETURN_ON_ERROR(NULL);
     return stmt;
@@ -235,11 +253,7 @@ ServiceEnumerator_t ServiceEnumeratorForMultiplex(int freq)
 {
     STATEMENT_INIT;
 
-    STATEMENT_PREPAREVA("SELECT "	SERVICE_MPLEXFREQ ","
-                        SERVICE_ID ","
-                        SERVICE_NAME ","
-                        SERVICE_PMTVERSION ","
-                        SERVICE_PMTPID " "
+    STATEMENT_PREPAREVA("SELECT " SERVICE_FIELDS
                         "FROM " SERVICES_TABLE " WHERE " SERVICE_MPLEXFREQ"=%d;",
                         freq);
     RETURN_ON_ERROR(NULL);
@@ -275,6 +289,7 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
         }
         service->pmtversion = STATEMENT_COLUMN_INT( 3);
         service->pmtpid = STATEMENT_COLUMN_INT( 4);
+        service->pcrpid = STATEMENT_COLUMN_INT( 5);
 
         return service;
     }

@@ -1,26 +1,26 @@
 /*
 Copyright (C) 2006  Adam Charrett
- 
+
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
 of the License, or (at your option) any later version.
- 
+
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
- 
+
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
- 
+
 parsezap.c
- 
+
 Parse channels.conf file and add services to the database.
- 
+
 Majority of the parsing code taken from the xine input_dvb plugin code.
- 
+
 */
 #include <stdlib.h>
 #include <string.h>
@@ -119,14 +119,14 @@ static int parsezapline(char * str, fe_type_t fe_type)
 		(DVBT) OFDM: <channel name>:<frequency>:<inversion>:
 						<bw>:<fec_hp>:<fec_lp>:<qam>:
 						<transmissionm>:<guardlist>:<hierarchinfo>:<vpid>:<apid>
-		
+
 		<channel name> = any string not containing ':'
 		<frequency>    = unsigned long
 		<polarisation> = 'v' or 'h'
 		<sat_no>       = unsigned long, usually 0 :D
 		<sym_rate>     = symbol rate in MSyms/sec
-		
-		
+
+
 		<inversion>    = INVERSION_ON | INVERSION_OFF | INVERSION_AUTO
 		<fec>          = FEC_1_2, FEC_2_3, FEC_3_4 .... FEC_AUTO ... FEC_NONE
 		<qam>          = QPSK, QAM_128, QAM_16 ...
@@ -157,8 +157,8 @@ static int parsezapline(char * str, fe_type_t fe_type)
     /* find the frequency */
     NEXTFIELD();
     freq = strtoul(field,NULL,0);
-	
-	
+
+
 	switch(fe_type)
 	{
 		case FE_QPSK:
@@ -173,8 +173,8 @@ static int parsezapline(char * str, fe_type_t fe_type)
 			}*/
 			front_param.frequency = freq;
 			front_param.inversion = INVERSION_AUTO;
-	  
-			/* find out the polarisation */ 
+
+			/* find out the polarisation */
 			NEXTFIELD();
 			/*diseqcsettings->pol = (field[0] == 'h' ? 0 : 1);*/
 
@@ -190,7 +190,7 @@ static int parsezapline(char * str, fe_type_t fe_type)
 		break;
 		case FE_QAM:
 			front_param.frequency = freq;
-			
+
 			/* find out the inversion */
 			NEXTFIELD();
 			front_param.inversion = find_param(inversion_list, field);
@@ -259,7 +259,7 @@ static int parsezapline(char * str, fe_type_t fe_type)
     {
         free(multiplex);
     }
-	
+
     /* Video PID - not used but we'll take it anyway */
     NEXTFIELD();
     /* Audio PID - it's only for mpegaudio so we don't use it anymore */
@@ -268,7 +268,7 @@ static int parsezapline(char * str, fe_type_t fe_type)
     NEXTFIELD();
     id = strtoul(field, NULL, 0);
     printlog(LOG_DEBUGV, "Adding service \"%s\" %d\n", name, id);
-    ServiceAdd(front_param.frequency, name, id, -1, -1);
+    ServiceAdd(front_param.frequency, name, id, -1, -1, -1);
     free(name);
     return 0;
 }
