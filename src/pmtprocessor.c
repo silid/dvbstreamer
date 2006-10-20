@@ -307,11 +307,6 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
         int i;
         esentry = newpmt->p_first_es;
 
-        // Store PCR PID
-        pids[0].pid = newpmt->i_pcr_pid;
-        pids[0].type = 0;
-        pids[0].subtype = 0;
-
         for (i = 1; i < count; i ++)
         {
             printlog(LOG_DEBUGV, "0x%04x %d\n", esentry->i_pid, esentry->i_type);
@@ -339,7 +334,7 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
             esentry = esentry->p_next;
         }
         printlog(LOG_DEBUGV,"About to update cache\n");
-        CacheUpdatePIDs(service, pids, count, newpmt->i_version);
+        CacheUpdatePIDs(service, newpmt->i_pcr_pid, pids, count, newpmt->i_version);
     }
 
     for (ListIterator_Init(iterator, NewPMTCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))

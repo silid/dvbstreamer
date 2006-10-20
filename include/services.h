@@ -48,6 +48,7 @@ typedef struct Service_t
     int id;            /**< Service/Program ID of the service. */
     int pmtversion;    /**< Last processed version of the PMT. */
     int pmtpid;        /**< PID the PMT for this service is sent on. */
+    int pcrpid;        /**< PID the PCR for this service is sent on. */
 
     /* Transient Fields - not stored in the database */
     bool conditionalaccess;        /**< Whether 1 or more streams in for this service are controlled by CA */
@@ -104,9 +105,10 @@ int ServiceDelete(Service_t  *service);
  * @param id The service/program id of the service.
  * @param pmtversion The version of the last PMT processed.
  * @param pmtpid The PID the service's PMT is transmitted on.
+ * @param pcrpid The PID the service's PCR is transmitted on.
  * @return 0 on success, otherwise an SQLite error code.
  */
-int ServiceAdd(int multiplexfreq, char *name, int id, int pmtversion, int pmtpid);
+int ServiceAdd(int multiplexfreq, char *name, int id, int pmtversion, int pmtpid, int pcrpid);
 
 /**
  * Set the PMT version for the given service.
@@ -123,6 +125,14 @@ int ServicePMTVersionSet(Service_t  *service, int pmtversion);
  * @return 0 on success, otherwise an SQLite error code.
  */
 int ServicePMTPIDSet(Service_t  *service, int pmtpid);
+
+/**
+ * Set the PCR PID for the given service.
+ * @param service The service to update.
+ * @param pmtpid The new PID of the PCR.
+ * @return 0 on success, otherwise an SQLite error code.
+ */
+int ServicePCRPIDSet(Service_t  *service, int pcrpid);
 
 /**
  * Set the service name for the given service.

@@ -37,7 +37,7 @@ enum CacheFlags
 {
     CacheFlag_Clean         = 0x00,
     CacheFlag_Dirty_PMTPID  = 0x01,
-    CacheFlag_Dirty_PIDs    = 0x02, /* Also means PMT Version needs to be updated */
+    CacheFlag_Dirty_PIDs    = 0x02, /* Also means PMT Version and PCR PID needs to be updated */
     CacheFlag_Dirty_Name    = 0x04,
     CacheFlag_Dirty_Added   = 0x10,
 };
@@ -182,7 +182,7 @@ static int CachePIDsLoad(Service_t *service, int index)
     else
     {
         cachedPIDs[index] = NULL;
-    } 
+    }
     return 1;
 }
 
@@ -267,7 +267,7 @@ void CacheUpdateServiceName(Service_t *service, char *name)
     pthread_mutex_unlock(&cacheUpdateMutex);
 }
 
-void CacheUpdatePIDs(Service_t *service, PID_t *pids, int count, int pmtversion)
+void CacheUpdatePIDs(Service_t *service, int pcrpid, PID_t *pids, int count, int pmtversion)
 {
     int i;
     pthread_mutex_lock(&cacheUpdateMutex);
@@ -282,6 +282,7 @@ void CacheUpdatePIDs(Service_t *service, PID_t *pids, int count, int pmtversion)
             }
             cachedPIDs[i] = pids;
             cachedPIDsCount[i] = count;
+            cachedServices[i]->pcrpid = pcrpid;
             cachedServices[i]->pmtversion = pmtversion;
             cacheFlags[i] |= CacheFlag_Dirty_PIDs;
             break;
@@ -389,7 +390,8 @@ void CacheWriteback()
         if (cacheFlags[i] & CacheFlag_Dirty_Added)
         {
             printlog(LOG_DEBUG, "Adding service %s (0x%04x)\n", cachedServices[i]->name, cachedServices[i]->id);
-            ServiceAdd(cachedServices[i]->multiplexfreq, cachedServices[i]->name, cachedServices[i]->id, cachedServices[i]->pmtversion, cachedServices[i]->pmtpid);
+            ServiceAdd(cachedServices[i]->multiplexfreq, cachedServices[i]->name, cachedServices[i]->id,
+                cachedServices[i]->pmtversion, cachedServices[i]->pmtpid, cachedServices[i]->pcrpid);
             cacheFlags[i] = 0;
             continue;
         }
@@ -410,6 +412,7 @@ void CacheWriteback()
                 ServicePIDAdd(cachedServices[i], pids[p].pid, pids[p].type, pids[p].subtype, cachedServices[i]->pmtversion);
             }
             ServicePMTVersionSet(cachedServices[i], cachedServices[i]->pmtversion);
+            ServicePCRPIDSet(cachedServices[i], cachedServices[i]->pcrpid);
         }
 
         if (cacheFlags[i] & CacheFlag_Dirty_Name)

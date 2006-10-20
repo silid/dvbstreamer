@@ -34,7 +34,7 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 #define TOSTRING(x) STRINGIFY(x)
 
 /* This is the version of the database not the application!*/
-#define DBASE_VERSION 0.3
+#define DBASE_VERSION 0.4
 
 sqlite3 *DBaseInstance;
 
@@ -201,6 +201,17 @@ int DBaseCreateTables(double version)
 	if (version < 0.3)
 	{
 	    rc = sqlite3_exec(DBaseInstance, "ALTER TABLE " MULTIPLEXES_TABLE " ADD " MULTIPLEX_NETID ";", NULL, NULL, NULL);
+
+	    if (rc)
+	    {
+	        printlog(LOG_ERROR, "Failed to add network id column to multiplexes table: %s\n", sqlite3_errmsg(DBaseInstance));
+	        return rc;
+	    }
+	}
+
+	if (version < 0.4)
+	{
+	    rc = sqlite3_exec(DBaseInstance, "ALTER TABLE " SERVICES_TABLE " ADD " SERVICE_PCRPID ";", NULL, NULL, NULL);
 
 	    if (rc)
 	    {
