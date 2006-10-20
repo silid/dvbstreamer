@@ -211,7 +211,7 @@ int DBaseCreateTables(double version)
 
 	if (version < 0.4)
 	{
-	    rc = sqlite3_exec(DBaseInstance, "ALTER TABLE " SERVICES_TABLE " ADD " SERVICE_PCRPID ";", NULL, NULL, NULL);
+	    rc = sqlite3_exec(DBaseInstance, "ALTER TABLE " SERVICES_TABLE " ADD " SERVICE_PCRPID " DEFAULT -1;", NULL, NULL, NULL);
 
 	    if (rc)
 	    {
