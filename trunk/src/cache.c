@@ -278,7 +278,7 @@ void CacheUpdatePIDs(Service_t *service, int pcrpid, PID_t *pids, int count, int
         {
             if (cachedPIDs[i])
             {
-                free(cachedPIDs[i]);
+                ServicePIDFree(cachedPIDs[i], cachedPIDsCount[i]);
             }
             cachedPIDs[i] = pids;
             cachedPIDsCount[i] = count;
@@ -335,11 +335,12 @@ void CacheServiceDelete(Service_t *service)
     if (deletedIndex != -1)
     {
         /* Get rid of the pids as we don't need them any more! */
-        free(cachedPIDs[deletedIndex]);
+        ServicePIDFree(cachedPIDs[deletedIndex], cachedPIDsCount[deletedIndex]);
         /* Remove the deleted service from the list */
         for (i = deletedIndex; i < cachedServicesCount; i ++)
         {
             cachedPIDs[i] = cachedPIDs[i + 1];
+            cachedPIDsCount[i] = cachedPIDsCount[i + 1];
             cachedServices[i] = cachedServices[i +1];
             cacheFlags[i] = cacheFlags [i + 1];
         }
@@ -392,8 +393,7 @@ void CacheWriteback()
             printlog(LOG_DEBUG, "Adding service %s (0x%04x)\n", cachedServices[i]->name, cachedServices[i]->id);
             ServiceAdd(cachedServices[i]->multiplexfreq, cachedServices[i]->name, cachedServices[i]->id,
                 cachedServices[i]->pmtversion, cachedServices[i]->pmtpid, cachedServices[i]->pcrpid);
-            cacheFlags[i] = 0;
-            continue;
+            cacheFlags[i] &= ~CacheFlag_Dirty_Name;
         }
 
         if (cacheFlags[i] & CacheFlag_Dirty_PMTPID)
@@ -409,7 +409,7 @@ void CacheWriteback()
             ServicePIDRemove(cachedServices[i]);
             for ( p = 0; p < cachedPIDsCount[i]; p ++)
             {
-                ServicePIDAdd(cachedServices[i], pids[p].pid, pids[p].type, pids[p].subtype, cachedServices[i]->pmtversion);
+                ServicePIDAdd(cachedServices[i], pids[p].pid, pids[p].type, pids[p].subtype, cachedServices[i]->pmtversion, pids[p].descriptors);
             }
             ServicePMTVersionSet(cachedServices[i], cachedServices[i]->pmtversion);
             ServicePCRPIDSet(cachedServices[i], cachedServices[i]->pcrpid);
@@ -450,7 +450,7 @@ static void CacheServicesFree()
             }
             if (cachedPIDs[i])
             {
-                free(cachedPIDs[i]);
+                ServicePIDFree(cachedPIDs[i], cachedPIDsCount[i]);
             }
             cachedPIDsCount[i] = 0;
         }

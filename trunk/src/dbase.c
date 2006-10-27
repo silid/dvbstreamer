@@ -215,9 +215,18 @@ int DBaseCreateTables(double version)
 
 	    if (rc)
 	    {
-	        printlog(LOG_ERROR, "Failed to add network id column to multiplexes table: %s\n", sqlite3_errmsg(DBaseInstance));
+	        printlog(LOG_ERROR, "Failed to add pcrpid column to services table: %s\n", sqlite3_errmsg(DBaseInstance));
 	        return rc;
 	    }
+
+	    rc = sqlite3_exec(DBaseInstance, "ALTER TABLE " PIDS_TABLE " ADD " PID_DESCRIPTORS " DEFAULT NULL;", NULL, NULL, NULL);
+
+	    if (rc)
+	    {
+	        printlog(LOG_ERROR, "Failed to add descriptors column to pids table: %s\n", sqlite3_errmsg(DBaseInstance));
+	        return rc;
+	    }
+
 	}
 
     rc = sqlite3_exec(DBaseInstance, "DELETE FROM " VERSION_TABLE ";", NULL, NULL, NULL);

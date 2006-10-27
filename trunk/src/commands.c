@@ -813,7 +813,7 @@ static void CommandPids(int argc, char **argv)
 
             if (!cached)
             {
-                free(pids);
+                ServicePIDFree(pids, count);
             }
         }
         ServiceFree(service);
