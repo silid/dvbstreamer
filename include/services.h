@@ -24,6 +24,11 @@ Manage services and PIDs.
 #define _SERVICES_H
 #include "types.h"
 #include "multiplexes.h"
+
+#ifndef _DVBPSI_DESCRIPTOR_H_
+#include <dvbpsi/descriptor.h>
+#endif
+
 /**
  * @defgroup Service Service information
  * @{
@@ -67,6 +72,7 @@ typedef struct PID_t
     int type;       /**< Type of data this PID is used to transmit. */
     int subtype;    /**< Additional information on the type (ie language code for audio) */
     int pmtversion; /**< Version of the services PMT that this PID appears in */
+    dvbpsi_descriptor_t *descriptors; /**< Linked list of descriptors for this PID */
 }
 PID_t;
 
@@ -196,9 +202,10 @@ void ServiceFree(Service_t *service);
  * @param type The type of the data transmitted on the PID.
  * @param subtype Additional information on the type.
  * @param pmtversion The PMT version that this PID appeared in.
+ * @param descriptors The descriptors associated with the PID.
  * @return 0 on success, otherwise an SQLite error code.
  */
-int ServicePIDAdd(Service_t *service, int pid, int type, int subtype, int pmtversion);
+int ServicePIDAdd(Service_t *service, int pid, int type, int subtype, int pmtversion, dvbpsi_descriptor_t *descriptors);
 
 /**
  * Remove all the PIDs for a given service.
@@ -222,5 +229,20 @@ int ServicePIDCount(Service_t *service);
  * @return 0 on success, otherwise an SQLite error code.
  */
 int ServicePIDGet(Service_t *service, PID_t *pids, int *count);
+
+/**
+ * Retrieve all the PIDS for the specified service.
+ * @param service The service to retrieve the PIDs of.
+ * @param count Used to return the number of PIDs retrieved.
+ * @return A pointer to an array of PID_t structures or NULL on error.
+ */
+PID_t *ServicePIDGetAll(Service_t *service, int *count);
+
+/**
+ * Free the array of PID_t structures returned by ServicePIDGetAll.
+ * @param pids The array of PID_t structures to free.
+ * @param count The number of entries in pids.
+ */
+void ServicePIDFree(PID_t *pids, int count);
 /** @} */
 #endif

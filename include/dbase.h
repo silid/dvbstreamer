@@ -199,6 +199,10 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
  * Constant for PID column name.
  */
 #define PID_PMTVERSION          "pmtversion"
+/**
+ * Constant for PID column name.
+ */
+#define PID_DESCRIPTORS         "descriptors"
 
 /**
  * Constant for Version table name.

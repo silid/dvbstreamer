@@ -312,6 +312,7 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
             printlog(LOG_DEBUGV, "0x%04x %d\n", esentry->i_pid, esentry->i_type);
             pids[i].pid = esentry->i_pid;
             pids[i].type = esentry->i_type;
+            pids[i].descriptors = esentry->p_first_descriptor;
 
             if ((esentry->i_type == 3) || (esentry->i_type == 4))
             {
@@ -341,6 +342,16 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
     {
         PluginPMTProcessor_t callback = ListIterator_Current(iterator);
         callback(newpmt);
+    }
+
+    /* Take over the descriptors */
+    esentry = newpmt->p_first_es;
+    while(esentry)
+    {
+        esentry->p_first_descriptor = NULL;
+        esentry = esentry->p_next;
+
+
     }
     dvbpsi_DeletePMT(newpmt);
 }

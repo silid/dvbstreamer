@@ -1111,7 +1111,7 @@ static void ProcessServicePids(Connection_t *connection, Message_t *message)
 
         if ((count > 0) && (!cached))
         {
-            free(pids);
+            ServicePIDFree(pids, count);
         }
 
         ServiceFree(service);
