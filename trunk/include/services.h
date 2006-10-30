@@ -22,12 +22,16 @@ Manage services and PIDs.
 */
 #ifndef _SERVICES_H
 #define _SERVICES_H
-#include "types.h"
-#include "multiplexes.h"
+
+#include <stdint.h>
 
 #ifndef _DVBPSI_DESCRIPTOR_H_
 #include <dvbpsi/descriptor.h>
 #endif
+
+#include "types.h"
+#include "multiplexes.h"
+
 
 /**
  * @defgroup Service Service information
