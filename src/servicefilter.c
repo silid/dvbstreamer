@@ -32,6 +32,7 @@ the output to only include this service.
 
 #include "multiplexes.h"
 #include "services.h"
+#include "pids.h"
 #include "dvb.h"
 #include "ts.h"
 #include "main.h"
@@ -108,7 +109,7 @@ static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t
     if (state->service)
     {
         int count;
-        PID_t *pids;
+        PIDList_t *pids;
 
         /* Handle PAT and PMT pids */
         if ((pid == 0) || (pid == state->service->pmtpid) || (pid == state->service->pcrpid))
@@ -116,10 +117,10 @@ static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t
             return 1;
         }
 
-        pids = CachePIDsGet(state->service, &count);
-        for (i = 0; i < count; i ++)
+        pids = CachePIDsGet(state->service);
+        for (i = 0; i < pids->count; i ++)
         {
-            if (pid == pids[i].pid)
+            if (pid == pids->pids[i].pid)
             {
                 return 1;
             }

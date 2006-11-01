@@ -20,6 +20,7 @@ dvbstreamer_SOURCES = \
 	parsezap.c\
 	multiplexes.c\
 	services.c\
+	pids.c\
 	ts.c\
 	patprocessor.c\
 	pmtprocessor.c\
@@ -39,7 +40,7 @@ dvbstreamer_SOURCES = \
 dvbstreamer_LDFLAGS = -rdynamic
 
 dvbstreamer_LDADD = \
-	 -ldvbpsi -lpthread -lsqlite3 -lreadline -ltermcap @LIBLTDL@ 
+	 -ldvbpsi -lpthread -lsqlite3 -lreadline -ltermcap @LIBLTDL@
 
 #
 # dvbctrl

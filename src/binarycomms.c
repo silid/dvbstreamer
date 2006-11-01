@@ -1079,39 +1079,23 @@ static void ProcessServicePids(Connection_t *connection, Message_t *message)
     {
         int cached = 1;
         int i;
-        int count = 0;
-        PID_t *pids;
-        pids = CachePIDsGet(service, &count);
+        PIDList_t *pids = CachePIDsGet(service);
         if (pids == NULL)
         {
-            count = ServicePIDCount(service);
+            pids = PIDListGet(service);
             cached = 0;
         }
 
-        if ((count > 0) && (!cached))
-        {
-            pids = calloc(count, sizeof(PID_t));
-            if (pids)
-            {
-                ServicePIDGet(service, pids, &count);
-            }
-            else
-            {
-                MessageRERR(message, RERR_GENERIC, "No memory to retrieve PIDs\n");
-                return ;
-            }
-        }
-
         MessageInit(message, MSGCODE_RLP);
-        MessageWriteUint16(message, (uint16_t)count);
-        for (i = 0; i < count; i ++)
+        MessageWriteUint16(message, (uint16_t) (pids ? pids->count:0));
+        for (i = 0; pids && (i < pids->count); i ++)
         {
-            MessageWriteUint16(message, pids[i].pid);
+            MessageWriteUint16(message,  pids->pids[i].pid);
         }
 
-        if ((count > 0) && (!cached))
+        if (pids && !cached)
         {
-            ServicePIDFree(pids, count);
+            PIDListFree(pids);
         }
 
         ServiceFree(service);

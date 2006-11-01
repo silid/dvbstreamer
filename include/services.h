@@ -67,19 +67,6 @@ typedef struct Service_t
 }
 Service_t;
 
-/**
- * Structure describing a PID used by a service.
- */
-typedef struct PID_t
-{
-    int pid;        /**< PID in question. */
-    int type;       /**< Type of data this PID is used to transmit. */
-    int subtype;    /**< Additional information on the type (ie language code for audio) */
-    int pmtversion; /**< Version of the services PMT that this PID appears in */
-    dvbpsi_descriptor_t *descriptors; /**< Linked list of descriptors for this PID */
-}
-PID_t;
-
 typedef void *ServiceEnumerator_t;
 
 /**
@@ -198,55 +185,5 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator);
  * @return 0 on success, otherwise an SQLite error code.
  */
 void ServiceFree(Service_t *service);
-
-/**
- * Add a PID to a service, for a given version of the PMT.
- * @param service The service to add the PID to.
- * @param pid The PID to add.
- * @param type The type of the data transmitted on the PID.
- * @param subtype Additional information on the type.
- * @param pmtversion The PMT version that this PID appeared in.
- * @param descriptors The descriptors associated with the PID.
- * @return 0 on success, otherwise an SQLite error code.
- */
-int ServicePIDAdd(Service_t *service, int pid, int type, int subtype, int pmtversion, dvbpsi_descriptor_t *descriptors);
-
-/**
- * Remove all the PIDs for a given service.
- * @param service The service of which to remove the PIDs.
- * @return 0 on success, otherwise an SQLite error code.
- */
-int ServicePIDRemove(Service_t *service);
-
-/**
- * Retrieve the number of PIDs for the specified service.
- * @param service The service to query.
- * @return The number of PIDs found for the service.
- */
-int ServicePIDCount(Service_t *service);
-
-/**
- * Retrieve all the PIDs for the specified service.
- * @param service The service to retrieve the PIDs of.
- * @param pids A pre-allocated array of PID_t structures to be filled in.
- * @param count Used to return the number of PIDs retrieved.
- * @return 0 on success, otherwise an SQLite error code.
- */
-int ServicePIDGet(Service_t *service, PID_t *pids, int *count);
-
-/**
- * Retrieve all the PIDS for the specified service.
- * @param service The service to retrieve the PIDs of.
- * @param count Used to return the number of PIDs retrieved.
- * @return A pointer to an array of PID_t structures or NULL on error.
- */
-PID_t *ServicePIDGetAll(Service_t *service, int *count);
-
-/**
- * Free the array of PID_t structures returned by ServicePIDGetAll.
- * @param pids The array of PID_t structures to free.
- * @param count The number of entries in pids.
- */
-void ServicePIDFree(PID_t *pids, int count);
 /** @} */
 #endif

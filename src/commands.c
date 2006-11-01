@@ -782,38 +782,24 @@ static void CommandPids(int argc, char **argv)
     {
         bool cached = TRUE;
         int i;
-        int count;
-        PID_t *pids;
-        pids = CachePIDsGet(service, &count);
+        PIDList_t *pids;
+        pids = CachePIDsGet(service);
         if (pids == NULL)
         {
-            count = ServicePIDCount(service);
+            pids = PIDListGet(service);
             cached = FALSE;
         }
-        CommandPrintf("%d PIDs for \"%s\" %s\n", count, argv[0], cached ? "(Cached)":"");
-        if (count > 0)
+        CommandPrintf("%d PIDs for \"%s\" %s\n", pids->count, argv[0], cached ? "(Cached)":"");
+        if (pids->count > 0)
         {
-            if (!cached)
+            for (i = 0; i < pids->count; i ++)
             {
-                pids = calloc(count, sizeof(PID_t));
-                if (pids)
-                {
-                    ServicePIDGet(service, pids, &count);
-                }
-                else
-                {
-                    CommandPrintf("No memory to retrieve PIDs\n");
-                }
-            }
-
-            for (i = 0; i < count; i ++)
-            {
-                CommandPrintf("%2d: %d %d %d\n", i, pids[i].pid, pids[i].type, pids[i].subtype);
+                CommandPrintf("%2d: %d %d %d\n", i, pids->pids[i].pid, pids->pids[i].type, pids->pids[i].subtype);
             }
 
             if (!cached)
             {
-                ServicePIDFree(pids, count);
+                PIDListFree(pids);
             }
         }
         ServiceFree(service);
