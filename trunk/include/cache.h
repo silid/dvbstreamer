@@ -27,6 +27,7 @@ Caches service and PID information from the database for the current multiplex.
 #include "ts.h"
 #include "multiplexes.h"
 #include "services.h"
+#include "pids.h"
 
 /** @defgroup Cache Service Cache Management
  * @{
@@ -84,10 +85,9 @@ Service_t **CacheServicesGet(int *count);
 /**
  * Retrieve the PIDs for a given service.
  * @param service Service to retrieve the PIDs for.
- * @param count Used to store the number of PIDs retrieved.
- * @return An array of PID_t structures, should be free'd after use.
+ * @return A PIDList_t structure.
  */
-PID_t *CachePIDsGet(Service_t *service, int *count);
+PIDList_t *CachePIDsGet(Service_t *service);
 
 /**
  * Update the specified Multiplex's pat version and TS id.
@@ -122,11 +122,11 @@ void CacheUpdateServiceName(Service_t *service, char *name);
  * Update the PIDs for the specified service.
  * @param service The service to update.
  * @param pcrpid The PID the PCR is being sent on.
- * @param pids An array of new PIDs.
+ * @param pids A PIDList_t structure of new PIDs.
  * @param count The number of PIDs.
  * @param pmtversion The new PMT version.
  */
-void CacheUpdatePIDs(Service_t *service, int pcrpid, PID_t *pids, int count, int pmtversion);
+void CacheUpdatePIDs(Service_t *service, int pcrpid, PIDList_t *pids, int pmtversion);
 
 /**
  * Add a new Service to the cache.

@@ -28,6 +28,7 @@ Process Program Map Tables and update the services information and PIDs.
 
 #include "multiplexes.h"
 #include "services.h"
+#include "pids.h"
 #include "dvb.h"
 #include "ts.h"
 #include "main.h"
@@ -288,7 +289,7 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
 {
     Service_t *service = (Service_t*)arg;
     ListIterator_t iterator;
-    PID_t *pids;
+    PIDList_t *pids;
     dvbpsi_pmt_es_t *esentry = newpmt->p_first_es;
     int count = 0;
 
@@ -300,7 +301,7 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
         count ++;
     }
     printlog(LOG_DEBUGV,"%d PIDs in PMT\n", count);
-    pids = calloc(count, sizeof(PID_t));
+    pids = PIDListNew(count);
 
     if (pids)
     {
@@ -310,9 +311,9 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
         for (i = 0; i < count; i ++)
         {
             printlog(LOG_DEBUGV, "0x%04x %d\n", esentry->i_pid, esentry->i_type);
-            pids[i].pid = esentry->i_pid;
-            pids[i].type = esentry->i_type;
-            pids[i].descriptors = esentry->p_first_descriptor;
+            pids->pids[i].pid = esentry->i_pid;
+            pids->pids[i].type = esentry->i_type;
+            pids->pids[i].descriptors = esentry->p_first_descriptor;
 
             if ((esentry->i_type == 3) || (esentry->i_type == 4))
             {
@@ -323,19 +324,19 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
                     if (desc->i_tag == 10) /* ISO 639 Language Descriptor */
                     {
                         dvbpsi_iso639_dr_t *iso639 = dvbpsi_DecodeISO639Dr(desc);
-                        pids[i].subtype = iso639->i_audio_type;
+                        pids->pids[i].subtype = iso639->i_audio_type;
                     }
                     desc = desc->p_next;
                 }
             }
             else
             {
-                pids[i].subtype = 0;
+                pids->pids[i].subtype = 0;
             }
             esentry = esentry->p_next;
         }
         printlog(LOG_DEBUGV,"About to update cache\n");
-        CacheUpdatePIDs(service, newpmt->i_pcr_pid, pids, count, newpmt->i_version);
+        CacheUpdatePIDs(service, newpmt->i_pcr_pid, pids, newpmt->i_version);
     }
 
     for (ListIterator_Init(iterator, NewPMTCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
@@ -350,8 +351,6 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
     {
         esentry->p_first_descriptor = NULL;
         esentry = esentry->p_next;
-
-
     }
     dvbpsi_DeletePMT(newpmt);
 }

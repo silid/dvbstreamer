@@ -36,6 +36,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
+LIBOBJDIR =
 bin_PROGRAMS = dvbstreamer$(EXEEXT) dvbctrl$(EXEEXT)
 subdir = src
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
@@ -56,11 +57,12 @@ dvbctrl_OBJECTS = $(am_dvbctrl_OBJECTS)
 dvbctrl_DEPENDENCIES =
 am_dvbstreamer_OBJECTS = main.$(OBJEXT) dvb.$(OBJEXT) \
 	parsezap.$(OBJEXT) multiplexes.$(OBJEXT) services.$(OBJEXT) \
-	ts.$(OBJEXT) patprocessor.$(OBJEXT) pmtprocessor.$(OBJEXT) \
-	sdtprocessor.$(OBJEXT) servicefilter.$(OBJEXT) dbase.$(OBJEXT) \
-	cache.$(OBJEXT) logging.$(OBJEXT) commands.$(OBJEXT) \
-	binarycomms.$(OBJEXT) messages.$(OBJEXT) outputs.$(OBJEXT) \
-	list.$(OBJEXT) deliverymethod.$(OBJEXT) pluginmgr.$(OBJEXT)
+	pids.$(OBJEXT) ts.$(OBJEXT) patprocessor.$(OBJEXT) \
+	pmtprocessor.$(OBJEXT) sdtprocessor.$(OBJEXT) \
+	servicefilter.$(OBJEXT) dbase.$(OBJEXT) cache.$(OBJEXT) \
+	logging.$(OBJEXT) commands.$(OBJEXT) binarycomms.$(OBJEXT) \
+	messages.$(OBJEXT) outputs.$(OBJEXT) list.$(OBJEXT) \
+	deliverymethod.$(OBJEXT) pluginmgr.$(OBJEXT)
 dvbstreamer_OBJECTS = $(am_dvbstreamer_OBJECTS)
 dvbstreamer_DEPENDENCIES =
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
@@ -205,6 +207,7 @@ dvbstreamer_SOURCES = \
 	parsezap.c\
 	multiplexes.c\
 	services.c\
+	pids.c\
 	ts.c\
 	patprocessor.c\
 	pmtprocessor.c\
@@ -223,7 +226,7 @@ dvbstreamer_SOURCES = \
 
 dvbstreamer_LDFLAGS = -rdynamic
 dvbstreamer_LDADD = \
-	 -ldvbpsi -lpthread -lsqlite3 -lreadline -ltermcap @LIBLTDL@ 
+	 -ldvbpsi -lpthread -lsqlite3 -lreadline -ltermcap @LIBLTDL@
 
 
 #
@@ -325,6 +328,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/outputs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/parsezap.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/patprocessor.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pids.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pluginmgr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pmtprocessor.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sdtprocessor.Po@am__quote@
