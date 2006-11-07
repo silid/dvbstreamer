@@ -118,11 +118,14 @@ static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t
         }
 
         pids = CachePIDsGet(state->service);
-        for (i = 0; i < pids->count; i ++)
+        if (pids)
         {
-            if (pid == pids->pids[i].pid)
+            for (i = 0; i < pids->count; i ++)
             {
-                return 1;
+                if (pid == pids->pids[i].pid)
+                {
+                    return 1;
+                }
             }
         }
     }
