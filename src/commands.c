@@ -790,7 +790,7 @@ static void CommandPids(int argc, char **argv)
             cached = FALSE;
         }
         CommandPrintf("%d PIDs for \"%s\" %s\n", pids->count, argv[0], cached ? "(Cached)":"");
-        if (pids->count > 0)
+        if (pids && (pids->count > 0))
         {
             for (i = 0; i < pids->count; i ++)
             {
