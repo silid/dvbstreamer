@@ -83,6 +83,7 @@ static void installsighandler(void);
 static void InitDaemon(int adapter);
 static void DeinitDaemon(void);
 static void ChannelChangedDoCallbacks(Multiplex_t *multiplex, Service_t *service);
+static void TuneMultiplex(Multiplex_t *multiplex);
 
 volatile Multiplex_t *CurrentMultiplex = NULL;
 volatile Service_t *CurrentService = NULL;
@@ -553,24 +554,7 @@ Service_t *SetCurrentService(char *name)
         }
         else
         {
-            struct dvb_frontend_parameters feparams;
-            if (CurrentMultiplex)
-            {
-                free((void*)CurrentMultiplex);
-            }
-
-            printlog(LOG_DEBUGV,"Caching Services\n");
-            CacheLoad(multiplex);
-            CurrentMultiplex = multiplex;
-
-            printlog(LOG_DEBUGV,"Getting Frondend parameters\n");
-            MultiplexFrontendParametersGet((Multiplex_t*)CurrentMultiplex, &feparams);
-
-            printlog(LOG_DEBUGV,"Tuning\n");
-            DVBFrontEndTune(DVBAdapter, &feparams);
-
-            printlog(LOG_DEBUGV,"Informing TSFilter multiplex has changed!\n");
-            TSFilterMultiplexChanged(TSFilter, CurrentMultiplex);
+            TuneMultiplex(multiplex);
 
             CurrentService = CacheServiceFindId(service->id);
             ServiceFree(service);
@@ -587,11 +571,56 @@ Service_t *SetCurrentService(char *name)
 
         printlog(LOG_DEBUGV,"Enabling filters\n");
         TSFilterEnable(TSFilter, TRUE);
-
-
     }
 
     return (Service_t*)CurrentService;
+}
+
+void SetMultiplex(Multiplex_t *multiplex)
+{
+    TSFilterLock(TSFilter);
+    printlog(LOG_DEBUG,"Writing changes back to database.\n");
+    CacheWriteback();
+    TSFilterUnLock(TSFilter);
+
+    printlog(LOG_DEBUGV,"Disabling filters\n");
+    TSFilterEnable(TSFilter, FALSE);
+    OutputSetService(PrimaryServiceOutput, NULL);
+
+    TuneMultiplex(multiplex);
+
+    TSFilterZeroStats(TSFilter);
+
+    /*
+     * Inform any interested parties that we have now changed the current
+     * service.
+     */
+    ChannelChangedDoCallbacks((Multiplex_t *)CurrentMultiplex, NULL);
+
+    printlog(LOG_DEBUGV,"Enabling filters\n");
+    TSFilterEnable(TSFilter, TRUE);
+}
+
+static void TuneMultiplex(Multiplex_t *multiplex)
+{
+    struct dvb_frontend_parameters feparams;
+    if (CurrentMultiplex)
+    {
+        free((void*)CurrentMultiplex);
+    }
+
+    printlog(LOG_DEBUGV,"Caching Services\n");
+    CacheLoad(multiplex);
+    CurrentMultiplex = multiplex;
+
+    printlog(LOG_DEBUGV,"Getting Frondend parameters\n");
+    MultiplexFrontendParametersGet((Multiplex_t*)CurrentMultiplex, &feparams);
+
+    printlog(LOG_DEBUGV,"Tuning\n");
+    DVBFrontEndTune(DVBAdapter, &feparams);
+
+    printlog(LOG_DEBUGV,"Informing TSFilter multiplex has changed!\n");
+    TSFilterMultiplexChanged(TSFilter, CurrentMultiplex);
 }
 
 void UpdateDatabase()
