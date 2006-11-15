@@ -338,6 +338,19 @@ void CacheWriteback()
 
     sqlite3_exec(DBaseInstance, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 
+    /* Delete deleted services from the database along with their PIDs
+       NOTE: Delete these first encase we have seen them again after
+       they where initial deleted.
+    */
+    for (i = 0; i < cachedDeletedServicesCount; i ++)
+    {
+        printlog(LOG_DEBUG, "Deleting service %s (0x%04x)\n", cachedDeletedServices[i]->name, cachedDeletedServices[i]->id);
+        ServiceDelete(cachedDeletedServices[i]);
+        PIDListRemove(cachedDeletedServices[i]);
+        ServiceFree(cachedDeletedServices[i]);
+    }
+    cachedDeletedServicesCount = 0;
+
     if (cachedServicesMultiplexDirty)
     {
         int rc;
@@ -394,15 +407,7 @@ void CacheWriteback()
         cacheFlags[i] = 0;
     }
 
-    /* Delete deleted services from the database along with their PIDs*/
-    for (i = 0; i < cachedDeletedServicesCount; i ++)
-    {
-        printlog(LOG_DEBUG, "Deleting service %s (0x%04x)\n", cachedDeletedServices[i]->name, cachedDeletedServices[i]->id);
-        ServiceDelete(cachedDeletedServices[i]);
-        PIDListRemove(cachedDeletedServices[i]);
-        ServiceFree(cachedDeletedServices[i]);
-    }
-    cachedDeletedServicesCount = 0;
+
 
     sqlite3_exec(DBaseInstance, "COMMIT TRANSACTION;", NULL, NULL, NULL);
     pthread_mutex_unlock(&cacheUpdateMutex);
