@@ -121,6 +121,14 @@ void ChannelChangedUnRegisterCallback(PluginChannelChanged_t callback);
 extern Service_t *SetCurrentService(char *name);
 
 /**
+ * Set the current multiplex. Retunes to the new multiplex, TS stats are reset,
+ * ChannelChange listeners are informed and the primary service is set to NULL.
+ * Primary use for this is scanning a multiplex for services.
+ * @param multiplex The new multiplex to tune to.
+ */
+extern void SetMultiplex(Multiplex_t *multiplex);
+
+/**
  * Writes any changes in the cache back to the database, ensuring the TS Filter is disabled.
  */
 void UpdateDatabase();

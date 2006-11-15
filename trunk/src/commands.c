@@ -29,6 +29,7 @@ Command Processing and command functions.
 #include <pthread.h>
 #include <getopt.h>
 #include <ctype.h>
+#include <time.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -43,10 +44,17 @@ Command Processing and command functions.
 #include "outputs.h"
 #include "main.h"
 #include "deliverymethod.h"
+#include "plugin.h"
 
 #define PROMPT "DVBStream>"
 
 #define MAX_ARGS (10)
+
+struct PMTReceived_t
+{
+    uint16_t id;
+    bool received;
+};
 
 static void GetCommand(char **command, char **argument);
 static char **AttemptComplete (const char *text, int start, int end);
@@ -78,9 +86,14 @@ static void CommandSSFS(int argc, char **argv);
 static void CommandSetSSF(int argc, char **argv);
 static void CommandSetSFMRL(int argc, char **argv);
 static void CommandFEStatus(int argc, char **argv);
+static void CommandScan(int argc, char **argv);
 static void CommandHelp(int argc, char **argv);
 
 static int ParsePID(char *argument);
+
+static void PATCallback(dvbpsi_pat_t* newpat);
+static void PMTCallback(dvbpsi_pmt_t* newpmt);
+static void SDTCallback(dvbpsi_sdt_t* newsdt);
 
 int (*CommandPrintf)(char *fmt, ...);
 
@@ -264,6 +277,14 @@ static Command_t coreCommands[] = {
                                       CommandFEStatus
                                   },
                                   {
+                                      "scan",
+                                      TRUE, 1,1,
+                                      "Scan the specified multiplex for services.",
+                                      "scan <multiplex>\n"
+                                      "Tunes to the specified multiplex and wait 5 seconds for PAT/PMT/SDT.",
+                                      CommandScan
+                                  },
+                                  {
                                       "help",
                                       TRUE, 0, 1,
                                       "Display the list of commands or help on a specific command",
@@ -277,6 +298,17 @@ static char *args[MAX_ARGS];
 static bool quit = FALSE;
 static List_t *commandsList;
 
+/* Variables used by the scan function */
+static bool scanning = FALSE;
+static bool patreceived = FALSE;
+static bool allpmtsreceived = FALSE;
+static bool sdtreceived = FALSE;
+static int pmtcount = 0;
+static struct PMTReceived_t *pmtsreceived = NULL;
+static pthread_mutex_t scanningmutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t scanningcond = PTHREAD_COND_INITIALIZER;
+
+
 int CommandInit(void)
 {
     rl_readline_name = "DVBStreamer";
@@ -288,12 +320,19 @@ int CommandInit(void)
         return -1;
     }
     ListAdd( commandsList, coreCommands);
+    PATProcessorRegisterPATCallback(PATCallback);
+    PMTProcessorRegisterPMTCallback(PMTCallback);
+    SDTProcessorRegisterSDTCallback(SDTCallback);
     return 0;
 }
 
 void CommandDeInit(void)
 {
     ListFree( commandsList);
+    scanning = FALSE;
+    PATProcessorUnRegisterPATCallback(PATCallback);
+    PMTProcessorUnRegisterPMTCallback(PMTCallback);
+    SDTProcessorUnRegisterSDTCallback(SDTCallback);
 }
 
 void CommandRegisterCommands(Command_t *commands)
@@ -1141,6 +1180,152 @@ static void CommandHelp(int argc, char **argv)
     }
 }
 
+
+
+static void CommandScan(int argc, char **argv)
+{
+    int muxfreq = atoi(argv[0]);
+    Multiplex_t *multiplex;
+
+    multiplex = MultiplexFind(muxfreq);
+    if (multiplex)
+    {
+        struct timespec timeout;
+        char *currservice = NULL;
+        bool patreceivedstate = FALSE;
+        bool allpmtsreceivedstate = FALSE;
+        bool sdtreceivedstate = FALSE;
+
+
+        if (CurrentService)
+        {
+            currservice = strdup(CurrentService->name);
+        }
+        SetMultiplex(multiplex);
+
+        patreceived = FALSE;
+        sdtreceived = FALSE;
+        allpmtsreceived = FALSE;
+        pmtcount = 0;
+        pmtsreceived = NULL;
+        clock_gettime( CLOCK_REALTIME, &timeout);
+        timeout.tv_sec += 5;
+        scanning = TRUE;
+
+        pthread_mutex_lock(&scanningmutex);
+        pthread_cond_timedwait(&scanningcond, &scanningmutex, &timeout);
+        pthread_mutex_unlock(&scanningmutex);
+        CommandPrintf(" PAT received? %s\n", patreceived ? "YES":"NO");
+
+        pthread_mutex_lock(&scanningmutex);
+        pthread_cond_timedwait(&scanningcond, &scanningmutex, &timeout);
+        pthread_mutex_unlock(&scanningmutex);
+        CommandPrintf(" PMT received? %s\n", allpmtsreceived ? "YES":"NO");
+
+        pthread_mutex_lock(&scanningmutex);
+        pthread_cond_timedwait(&scanningcond, &scanningmutex, &timeout);
+        pthread_mutex_unlock(&scanningmutex);
+        CommandPrintf(" SDT received? %s\n", sdtreceived ? "YES":"NO");
+
+        scanning = FALSE;
+
+        if (pmtsreceived)
+        {
+            free(pmtsreceived);
+        }
+
+        if (currservice)
+        {
+            SetCurrentService(currservice);
+        }
+    }
+}
+/************************** Scan Callback Functions **************************/
+static void PATCallback(dvbpsi_pat_t* newpat)
+{
+    if (scanning && !patreceived)
+    {
+        int i;
+        dvbpsi_pat_program_t *patentry = newpat->p_first_program;
+        pmtcount = 0;
+        while(patentry)
+        {
+            if (patentry->i_number != 0x0000)
+            {
+                pmtcount ++;
+            }
+            patentry = patentry->p_next;
+        }
+        pmtsreceived = calloc(sizeof(struct PMTReceived_t), pmtcount);
+        patentry = newpat->p_first_program;
+        i = 0;
+        while(patentry)
+        {
+            if (patentry->i_number != 0x0000)
+            {
+                pmtsreceived[i].id = patentry->i_number;
+                i ++;
+            }
+            patentry = patentry->p_next;
+        }
+        patreceived = TRUE;
+        TSFilter->tsstructurechanged = TRUE; /* Force all PMTs to be received again incase we are scanning a mux we have pids for */
+        if (patreceived)
+        {
+            pthread_mutex_lock(&scanningmutex);
+            pthread_cond_signal(&scanningcond);
+            pthread_mutex_unlock(&scanningmutex);
+        }
+    }
+}
+
+static void PMTCallback(dvbpsi_pmt_t* newpmt)
+{
+    if (scanning && patreceived && !allpmtsreceived)
+    {
+        bool all = TRUE;
+        int i;
+        for (i = 0; i < pmtcount; i ++)
+        {
+            if (pmtsreceived[i].id == newpmt->i_program_number)
+            {
+                pmtsreceived[i].received = TRUE;
+            }
+        }
+
+        for (i = 0; i < pmtcount; i ++)
+        {
+            if (!pmtsreceived[i].received)
+            {
+                all = FALSE;
+            }
+        }
+
+        allpmtsreceived = all;
+        if (all)
+        {
+            pthread_mutex_lock(&scanningmutex);
+            pthread_cond_signal(&scanningcond);
+            pthread_mutex_unlock(&scanningmutex);
+        }
+    }
+}
+
+static void SDTCallback(dvbpsi_sdt_t* newsdt)
+{
+    if (scanning && patreceived && !sdtreceived)
+    {
+        sdtreceived = TRUE;
+        if (sdtreceived)
+        {
+            pthread_mutex_lock(&scanningmutex);
+            pthread_cond_signal(&scanningcond);
+            pthread_mutex_unlock(&scanningmutex);
+        }
+    }
+}
+
+/************************** Helper Functions *********************************/
 static int ParsePID(char *argument)
 {
     char *formatstr;
