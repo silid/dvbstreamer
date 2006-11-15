@@ -1,3 +1,14 @@
+0.6
+---
+* New scan command.
+* Database changes
+    - Descriptors now stored for PIDs in a service.
+    - PCR pid moved into Services table from PIDs table.
+* Bugs fixed.
+    - Memory leak in cache.c
+    - service deletion bug in cache.c
+    - other stability fixes I've forgotten about :-)
+
 0.5
 ---
 * Plugins! They can add commands, delivery methods, PMT/PAT processors and
