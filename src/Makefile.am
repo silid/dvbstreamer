@@ -40,7 +40,7 @@ dvbstreamer_SOURCES = \
 dvbstreamer_LDFLAGS = -rdynamic
 
 dvbstreamer_LDADD = \
-	 -ldvbpsi -lpthread -lsqlite3 -lreadline -ltermcap @LIBLTDL@
+	 -ldvbpsi -lpthread -lsqlite3 -lreadline -ltermcap -lrt @LIBLTDL@
 
 #
 # dvbctrl
