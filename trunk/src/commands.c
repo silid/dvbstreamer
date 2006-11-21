@@ -45,6 +45,7 @@ Command Processing and command functions.
 #include "main.h"
 #include "deliverymethod.h"
 #include "plugin.h"
+#include "servicefilter.h"
 
 #define PROMPT "DVBStream>"
 
@@ -83,6 +84,7 @@ static void CommandOutputPIDs(int argc, char **argv);
 static void CommandAddSSF(int argc, char **argv);
 static void CommandRemoveSSF(int argc, char **argv);
 static void CommandSSFS(int argc, char **argv);
+static void CommandSetSFAVSOnly(int argc, char **argv);
 static void CommandSetSSF(int argc, char **argv);
 static void CommandSetSFMRL(int argc, char **argv);
 static void CommandFEStatus(int argc, char **argv);
@@ -267,6 +269,15 @@ static Command_t coreCommands[] = {
                                       "Change the destination for packets sent to this service filters output."
                                       "If the MRL cannot be parsed no change will be made to the service filter.",
                                       CommandSetSFMRL,
+                                  },
+                                  {
+                                      "setsfavsonly",
+                                      TRUE, 2, 2,
+                                      "Enable/disable streaming of Audio/Video/Subtitles only.",
+                                      "setsfavsonly <output name> on|off\n"
+                                      "Enabling AVS Only cause the PMT to be rewritten to only include the first"
+                                      "video stream, normal audio stream and the subtitles stream only.",
+                                      CommandSetSFAVSOnly,
                                   },
                                   {
                                       "festatus",
@@ -1121,6 +1132,29 @@ static void CommandSetSFMRL(int argc, char **argv)
     else
     {
         CommandPrintf("Failed to set MRL to \"%s\" for %s\n", argv[1], argv[0]);
+    }
+}
+
+static void CommandSetSFAVSOnly(int argc, char **argv)
+{
+    Output_t *output = NULL;
+
+    output = OutputFind(argv[0], OutputType_Service);
+    if (output == NULL)
+    {
+        return;
+    }
+    if (strcasecmp(argv[1], "on") == 0)
+    {
+        ServiceFilterAVSOnlySet(output->filter, TRUE);
+    }
+    else if (strcasecmp(argv[1], "off") == 0)
+    {
+        ServiceFilterAVSOnlySet(output->filter, FALSE);
+    }
+    else
+    {
+        CommandPrintf("Need to specify on or off.\n");
     }
 }
 
