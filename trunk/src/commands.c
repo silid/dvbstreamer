@@ -47,7 +47,7 @@ Command Processing and command functions.
 #include "plugin.h"
 #include "servicefilter.h"
 
-#define PROMPT "DVBStream>"
+#define PROMPT "DVBStreamer>"
 
 #define MAX_ARGS (10)
 
@@ -110,7 +110,7 @@ static Command_t coreCommands[] = {
                                   {
                                       "quit",
                                       FALSE, 0, 0,
-                                      "Exit the program",
+                                      "Exit the program.",
                                       "Exit the program, can be used in the startup file to stop further processing.",
                                       CommandQuit
                                   },
@@ -121,20 +121,20 @@ static Command_t coreCommands[] = {
                                       "lsservies [mux | <multiplex frequency>]\n"
                                       "Lists all the services currently in the database if no multiplex is specified or"
                                       "if \"mux\" is specified only the services available of the current mux or if a"
-                                      "frequency is specified only the services available on that multiplex.",
+                                      " frequency is specified only the services available on that multiplex.",
                                       CommandListServices
                                   },
                                   {
                                       "lsmuxes",
                                       FALSE, 0, 0,
-                                      "List multiplexes",
+                                      "List multiplexes.",
                                       "List all multiplexes.",
                                       CommandListMuxes,
                                   },
                                   {
                                       "select",
                                       FALSE, 1, 1,
-                                      "Select a new service to stream",
+                                      "Select a new service to stream.",
                                       "select <service name>\n"
                                       "Sets <service name> as the current service, this may mean tuning to a different "
                                       "multiplex.",
@@ -158,7 +158,7 @@ static Command_t coreCommands[] = {
                                   {
                                       "pids",
                                       FALSE, 1, 1,
-                                      "List the PIDs for a specified service",
+                                      "List the PIDs for a specified service.",
                                       "pids <service name>\n"
                                       "List the PIDs for <service name>.",
                                       CommandPids
@@ -166,19 +166,19 @@ static Command_t coreCommands[] = {
                                   {
                                       "stats",
                                       FALSE, 0, 0,
-                                      "Display the stats for the PAT,PMT and service PID filters",
-                                      "Display the number of packets processed and the number of packets "
-                                      "filtered by each filter.",
+                                      "Display the stats for the PAT,PMT and service PID filters.",
+                                      "Display the number of packets processed for the PSI/SI filters and the number of"
+                                      " packets filtered for each service filter and manual output.",
                                       CommandStats
                                   },
                                   {
                                       "addoutput",
                                       TRUE, 2, 2,
                                       "Add a new destination for manually filtered PIDs.",
-                                      "addoutput <output name> <ipaddress>:<udp port>\n"
+                                      "addoutput <output name> <mrl>\n"
                                       "Adds a new destination for sending packets to. This is only used for "
                                       "manually filtered packets. "
-                                      "To send packets to this destination you'll need to also call \'filterpid\' "
+                                      "To send packets to this destination you'll need to also call \'addpid\' "
                                       "with this output as an argument.",
                                       CommandAddOutput
                                   },
@@ -193,55 +193,57 @@ static Command_t coreCommands[] = {
                                   {
                                       "lsoutputs",
                                       FALSE, 0, 0,
-                                      "List current outputs",
+                                      "List current outputs.",
                                       "List all active additonal output names and destinations.",
                                       CommandOutputs
                                   },
                                   {
                                       "setoutputmrl",
                                       TRUE, 2, 2,
-                                      "Set the output's MRL",
+                                      "Set the output's MRL.",
                                       "setoutputmrl <output name> <mrl>\n"
                                       "Change the destination for packets sent to this output. If the MRL cannot be"
-                                      "parsed no change will be made to the output.",
+                                      " parsed no change will be made to the output.",
                                       CommandSetOutputMRL,
                                   },
                                   {
                                       "addpid",
                                       TRUE, 2, 2,
-                                      "Adds a PID to filter to an output",
+                                      "Adds a PID to filter to an output.",
                                       "addpid <output name> <pid>\n"
-                                      "Adds a PID to the filter to be sent to the specified output.",
+                                      "Adds a PID to the filter to be sent to the specified output. The PID can be "
+                                      "specified in either hex (starting with 0x) or decimal format.",
                                       CommandAddPID
                                   },
                                   {
                                       "rmpid",
                                       TRUE, 2, 2,
-                                      "Removes a PID to filter from an output",
+                                      "Removes a PID to filter from an output.",
                                       "rmpid <output name> <pid>\n"
-                                      "Removes the PID from the filter that is sending packets to the specified output.",
+                                      "Removes the PID from the filter that is sending packets to the specified output."
+                                      "The PID can be specified in either hex (starting with 0x) or decimal format.",
                                       CommandRmPID
                                   },
                                   {
                                       "lspids",
                                       TRUE, 1, 1,
-                                      "List PIDs for output",
+                                      "List PIDs for output.",
                                       "lspids <output name>\n"
-                                      "List the PIDs being filtered for a specific output",
+                                      "List the PIDs being filtered for a specific output.",
                                       CommandOutputPIDs
                                   },
                                   {
                                       "addsf",
                                       TRUE, 2, 2,
-                                      "Add a service filter for secondary services",
-                                      "addsf <output name> <ipaddress>:<udp port>\n"
+                                      "Add a service filter for secondary services.",
+                                      "addsf <output name> <mrl>\n"
                                       "Adds a new destination for sending a secondary service to.",
                                       CommandAddSSF
                                   },
                                   {
                                       "rmsf",
                                       TRUE, 1, 1,
-                                      "Remove a service filter for secondary services",
+                                      "Remove a service filter for secondary services.",
                                       "rmsf <output name>\n"
                                       "Remove a destination for sending secondary services to.",
                                       CommandRemoveSSF
@@ -249,14 +251,14 @@ static Command_t coreCommands[] = {
                                   {
                                       "lssfs",
                                       FALSE,0,0,
-                                      "List all secondary service filters",
+                                      "List all secondary service filters.",
                                       "List all secondary service filters their names, destinations and currently selected service.",
                                       CommandSSFS
                                   },
                                   {
                                       "setsf",
                                       FALSE, 1, 1,
-                                      "Select a service to stream to a secondary service output",
+                                      "Select a service to stream to a secondary service output.",
                                       "setsf <output name> <service name>\n"
                                       "Stream the specified service to the secondary service output.",
                                       CommandSetSSF
@@ -264,7 +266,7 @@ static Command_t coreCommands[] = {
                                   {
                                       "setsfmrl",
                                       TRUE, 2, 2,
-                                      "Set the service filter's MRL",
+                                      "Set the service filter's MRL.",
                                       "setsfmrl <output name> <mrl>\n"
                                       "Change the destination for packets sent to this service filters output."
                                       "If the MRL cannot be parsed no change will be made to the service filter.",
@@ -275,7 +277,7 @@ static Command_t coreCommands[] = {
                                       TRUE, 2, 2,
                                       "Enable/disable streaming of Audio/Video/Subtitles only.",
                                       "setsfavsonly <output name> on|off\n"
-                                      "Enabling AVS Only cause the PMT to be rewritten to only include the first"
+                                      "Enabling AVS Only cause the PMT to be rewritten to only include the first "
                                       "video stream, normal audio stream and the subtitles stream only.",
                                       CommandSetSFAVSOnly,
                                   },
@@ -298,9 +300,9 @@ static Command_t coreCommands[] = {
                                   {
                                       "help",
                                       TRUE, 0, 1,
-                                      "Display the list of commands or help on a specific command",
-                                      "help <command>\n"
-                                      "Displays help for the specified command.",
+                                      "Display the list of commands or help on a specific command.",
+                                      "help [<command>]\n"
+                                      "List all available commands or displays specific help for the command specifed.",
                                       CommandHelp
                                   },
                                   {NULL, FALSE, 0, 0, NULL,NULL}
@@ -1195,10 +1197,10 @@ static void CommandHelp(int argc, char **argv)
                     break;
                 }
             }
-            if (!commandFound)
-            {
-                CommandPrintf("No help for unknown command \"%s\"\n", argv[0]);
-            }
+        }
+        if (!commandFound)
+        {
+            CommandPrintf("No help for unknown command \"%s\"\n", argv[0]);
         }
     }
     else
@@ -1208,7 +1210,7 @@ static void CommandHelp(int argc, char **argv)
             Command_t *commands = ListIterator_Current(iterator);
             for (i = 0; commands[i].command; i ++)
             {
-                CommandPrintf("%10s - %s\n", commands[i].command, commands[i].shorthelp);
+                CommandPrintf("%12s - %s\n", commands[i].command, commands[i].shorthelp);
             }
         }
     }
