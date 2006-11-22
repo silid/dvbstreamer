@@ -60,7 +60,7 @@ static Command_t PluginManagerCommands[] = {
         {
             "plugininfo",
             TRUE, 1, 1,
-            "Display the information about a plugin",
+            "Display the information about a plugin.",
             "plugininfo <pluginname>\n"
             "Displays the version, author and descriptor for a specific plugin.",
             PluginManagerPluginInfo
