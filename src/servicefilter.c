@@ -225,7 +225,6 @@ static void ServiceFilterPATRewrite(ServiceFilter_t *state)
 static void ServiceFilterPMTRewrite(ServiceFilter_t *state)
 {
     int i;
-    int count;
     PIDList_t *pids;
     bool vfound = FALSE;
     bool afound = FALSE;
@@ -242,7 +241,7 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t *state)
     printlog(LOG_DEBUG, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     printlog(LOG_DEBUG, "Rewriting PMT on PID %x\n", state->service->pmtpid);
     pids = CachePIDsGet(state->service);
-    for (i = 0; (i < count) && (!vfound || !afound || !sfound); i ++)
+    for (i = 0; (i < pids->count) && (!vfound || !afound || !sfound); i ++)
     {
         printlog(LOG_DEBUG, "\tpid = %x type =%d subtype = %d\n", pids->pids[i].pid, pids->pids[i].type, pids->pids[i].subtype);
         if (!vfound && ((pids->pids[i].type == 1) || (pids->pids[i].type == 2)))
