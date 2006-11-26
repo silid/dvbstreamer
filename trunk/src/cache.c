@@ -96,12 +96,13 @@ int CacheLoad(Multiplex_t *multiplex)
             cacheFlags[i] = CacheFlag_Clean;
         }
         ServiceEnumeratorDestroy(enumerator);
-        cachedServicesCount = count;
-        cachedServicesMultiplex = multiplex;
-        cachedServicesMultiplexDirty = 0;
-        result = 0;
     }
-
+    
+    cachedServicesCount = count;
+    cachedServicesMultiplex = multiplex;
+    cachedServicesMultiplexDirty = 0;
+    result = 0;
+    
     pthread_mutex_unlock(&cacheUpdateMutex);
 
     return result;
