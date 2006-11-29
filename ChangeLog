@@ -1,6 +1,8 @@
 0.6
 ---
-* New scan command.
+* New scan command, to rescan a specific multiplex for changes.
+* New setsfavsonly command, to enable streaming of only the audio/video/subtitle pids.
+  Also rewrites the services PMT to only include these.
 * Database changes
     - Descriptors now stored for PIDs in a service.
     - PCR pid moved into Services table from PIDs table.
@@ -8,6 +10,8 @@
     - Memory leak in cache.c
     - service deletion bug in cache.c
     - other stability fixes I've forgotten about :-)
+* File output changed to use fopen64 for large file support (files greater than 2GB)
+
 
 0.5
 ---
@@ -16,7 +20,8 @@
 * Ability to change the output destination after creating a service filter or
   manual output.
 * New delivery methods, currently only udp://<ip address>:<port>(which was
-  already there :-) ) and null:// (which just throws away the packets)
+  already there :-) ), null:// (which just throws away the packets) and 
+  file://<filename>
 * Several new commands, including:
   - lsservices = Replaces services command and can list all the service/
                  only the services on the current multiplex/only the services
@@ -24,6 +29,7 @@
   - lsmuxes = lists all the available multiplex.
   - lsplugins = Lists loaded plugins
   - plugininfo = Displays information on a specific plugin.
+* Was using a char for getopt instead of an int, now fixed.
 * Version number updated.
 * Most header files are now documented.
 * New list structure means there is no limit (apart from memory and CPU
