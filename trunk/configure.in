@@ -8,9 +8,9 @@ dnl
 dnl     Exception to this rule is the Major version 0, minor version will be
 dnl     incremented until we are ready to say DVBStreamer is no longer alpha.
 dnl ---------------------------------------------------------------------------
-AC_INIT(dvbstreamer, 0.5)
+AC_INIT(dvbstreamer, 0.6)
 DVBSTREAMER_MAJOR=0
-DVBSTREAMER_MINOR=5
+DVBSTREAMER_MINOR=6
 
 AC_SUBST(DVBSTREAMER_MAJOR)
 AC_SUBST(DVBSTREAMER_MINOR)
