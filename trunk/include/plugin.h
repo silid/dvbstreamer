@@ -45,6 +45,8 @@ Plugin Interface structures and macros.
 #ifndef _DVBPSI_SDT_H_
 #include <dvbpsi/sdt.h>
 #endif
+#include "dvbpsi/nit.h"
+#include "dvbpsi/tdttot.h"
 
 #include "config.h"
 #include "types.h"
@@ -83,6 +85,14 @@ Plugin Interface structures and macros.
  * Constant for a SDT processor plugin feature.
  */
 #define PLUGIN_FEATURE_TYPE_SDTPROCESSOR   0x06
+/**
+ * Constant for a NIT processor plugin feature.
+ */
+#define PLUGIN_FEATURE_TYPE_NITPROCESSOR   0x07
+/**
+ * Constant for a TDT/TOT processor plugin feature.
+ */
+#define PLUGIN_FEATURE_TYPE_TDTPROCESSOR   0x08
 
 /**
  * Structure used to describe a single 'feature' of a plugin.
@@ -214,6 +224,16 @@ typedef struct Plugin_t
  * @param _processor Function to call when a new SDT arrives.
  */
 #define PLUGIN_FEATURE_SDTPROCESSOR(_processor) {PLUGIN_FEATURE_TYPE_SDTPROCESSOR, (void*)_processor}
+/**
+ * Simple macro to define a NIT Processor feature.
+ * @param _processor Function to call when a new NIT arrives.
+ */
+#define PLUGIN_FEATURE_NITPROCESSOR(_processor) {PLUGIN_FEATURE_TYPE_NITPROCESSOR, (void*)_processor}
+/**
+ * Simple macro to define a TDT/TOT Processor feature.
+ * @param _processor Function to call when a new TDT or TOT arrives.
+ */
+#define PLUGIN_FEATURE_TDTPROCESSOR(_processor) {PLUGIN_FEATURE_TYPE_TDTPROCESSOR, (void*)_processor}
 
 /**
  * Structure used to describe a Filter Feature.
@@ -237,7 +257,6 @@ typedef struct PluginFilter_t
  */
 typedef void (*PluginPATProcessor_t)(dvbpsi_pat_t* newpat);
 
-
 /**
  * Function pointer to function to call when a new PMT arrives.
  * For use with the PLUGIN_FEATURE_TYPE_PMTPROCESSOR feature type, only 1 per
@@ -251,6 +270,20 @@ typedef void (*PluginPMTProcessor_t)(dvbpsi_pmt_t* newpmt);
  * plugin is expected (allowed).
  */
 typedef void (*PluginSDTProcessor_t)(dvbpsi_sdt_t* newsdt);
+
+/**
+ * Function pointer to function to call when a new NIT arrives.
+ * For use with the PLUGIN_FEATURE_TYPE_NITPROCESSOR feature type, only 1 per
+ * plugin is expected (allowed).
+ */
+typedef void (*PluginNITProcessor_t)(dvbpsi_nit_t* newnit);
+
+/**
+ * Function pointer to function to call when a new TDT/TOT arrives.
+ * For use with the PLUGIN_FEATURE_TYPE_TDTPROCESSOR feature type, only 1 per
+ * plugin is expected (allowed).
+ */
+typedef void (*PluginTDTProcessor_t)(dvbpsi_tdt_tot_t* newtdttot);
 
 /**
  * Function pointer to function to call after the primary service

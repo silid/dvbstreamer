@@ -103,7 +103,8 @@ static char *PIDFilterNames[] = {
                                     "PAT",
                                     "PMT",
                                     "SDT",
-                                    "Service",
+                                    "NIT",
+                                    "TDT/TOT",
                                 };
 
 static Command_t coreCommands[] = {

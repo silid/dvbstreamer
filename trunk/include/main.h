@@ -38,6 +38,8 @@ enum PIDFilterIndex
     PIDFilterIndex_PAT = 0, /**< Index of the PAT PID Filter. */
     PIDFilterIndex_PMT,     /**< Index of the PMT PID Filter. */
     PIDFilterIndex_SDT,     /**< Index of the SDT PID Filter. */
+    PIDFilterIndex_NIT,     /**< Index of the NIT PID Filter. */
+    PIDFilterIndex_TDT,     /**< Index of the TDT PID Filter. */
 
     PIDFilterIndex_Count    /**< Number of main PID filters. */
 };
