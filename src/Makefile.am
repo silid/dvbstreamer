@@ -35,7 +35,11 @@ dvbstreamer_SOURCES = \
     outputs.c\
     list.c\
     deliverymethod.c\
-    pluginmgr.c
+    pluginmgr.c \
+    nitprocessor.c \
+    tdtprocessor.c \
+    dvbpsi/nit.c \
+    dvbpsi/tdttot.c
 
 dvbstreamer_LDFLAGS = -rdynamic
 

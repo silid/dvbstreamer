@@ -46,6 +46,8 @@ Entry point to the application.
 #include "patprocessor.h"
 #include "pmtprocessor.h"
 #include "sdtprocessor.h"
+#include "nitprocessor.h"
+#include "tdtprocessor.h"
 #include "servicefilter.h"
 #include "cache.h"
 #include "logging.h"
@@ -226,6 +228,8 @@ int main(int argc, char *argv[])
     PIDFilters[PIDFilterIndex_PAT] = PATProcessorCreate(TSFilter);
     PIDFilters[PIDFilterIndex_PMT] = PMTProcessorCreate(TSFilter);
     PIDFilters[PIDFilterIndex_SDT] = SDTProcessorCreate(TSFilter);
+    PIDFilters[PIDFilterIndex_NIT] = NITProcessorCreate(TSFilter);
+    PIDFilters[PIDFilterIndex_TDT] = TDTProcessorCreate(TSFilter);
 
     /* Enable all the filters */
     for (i = 0; i < PIDFilterIndex_Count; i ++)
@@ -308,6 +312,8 @@ int main(int argc, char *argv[])
     PATProcessorDestroy( PIDFilters[PIDFilterIndex_PAT]);
     PMTProcessorDestroy( PIDFilters[PIDFilterIndex_PMT]);
     SDTProcessorDestroy( PIDFilters[PIDFilterIndex_SDT]);
+    NITProcessorDestroy( PIDFilters[PIDFilterIndex_NIT]);
+    TDTProcessorDestroy( PIDFilters[PIDFilterIndex_TDT]);
 
     printlog(LOG_DEBUGV, "Processors destroyed\n");
     /* Close the adapter and shutdown the filter etc*/
