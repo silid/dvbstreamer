@@ -69,6 +69,7 @@ PIDFilter_t *PATProcessorCreate(TSFilter_t *tsfilter)
         {
             free(state);
         }
+        result->name = "PAT";
         PIDFilterMultiplexChangeSet(result, PATProcessorMultiplexChanged, state);
     }
     if (!NewPATCallbacksList)

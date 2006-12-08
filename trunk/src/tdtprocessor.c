@@ -77,6 +77,7 @@ PIDFilter_t *TDTProcessorCreate(TSFilter_t *tsfilter)
         {
             free(state);
         }
+        result->name = "TDT/TOT";
         PIDFilterMultiplexChangeSet(result,TDTProcessorMultiplexChanged, state);
     }
 

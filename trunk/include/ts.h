@@ -160,6 +160,7 @@ typedef void (*PacketOutput)(PIDFilter_t *pidfilter, void *userarg, TSPacket_t* 
  */
 struct PIDFilter_t
 {
+    char *name;                            /**< Name of this instance */
     struct TSFilter_t *tsfilter;           /**< TS Filter instance this filter belongs to. */
     volatile bool enabled;                 /**< Boolean indicating whether this filter is enabled and should process packets */
 

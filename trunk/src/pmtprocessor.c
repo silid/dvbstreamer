@@ -74,6 +74,7 @@ PIDFilter_t *PMTProcessorCreate(TSFilter_t *tsfilter)
         {
             free(state);
         }
+        result->name = "PMT";
         PIDFilterTSStructureChangeSet(result, PMTProcessorTSStructureChanged, state);
         PIDFilterMultiplexChangeSet(result, PMTProcessorMultiplexChanged, state);
     }

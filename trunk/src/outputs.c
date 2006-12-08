@@ -141,7 +141,7 @@ Output_t *OutputAllocate(char *name, OutputType type, char *destination)
         return NULL;
     }
     output->filter->enabled = 1;
-    output->name = strdup(name);
+    output->filter->name=output->name = strdup(name);
 
     return output;
 }
