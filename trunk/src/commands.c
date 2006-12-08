@@ -842,9 +842,10 @@ static void CommandPids(int argc, char **argv)
             pids = PIDListGet(service);
             cached = FALSE;
         }
-        CommandPrintf("%d PIDs for \"%s\" %s\n", pids->count, argv[0], cached ? "(Cached)":"");
-        if (pids && (pids->count > 0))
+
+        if (pids)
         {
+            CommandPrintf("%d PIDs for \"%s\" %s\n", pids->count, argv[0], cached ? "(Cached)":"");
             for (i = 0; i < pids->count; i ++)
             {
                 CommandPrintf("%2d: %d %d %d\n", i, pids->pids[i].pid, pids->pids[i].type, pids->pids[i].subtype);
@@ -854,6 +855,10 @@ static void CommandPids(int argc, char **argv)
             {
                 PIDListFree(pids);
             }
+        }
+        else
+        {
+            CommandPrintf("0 PIDs for \"%s\"\n",argv[0]);
         }
         ServiceFree(service);
     }
