@@ -77,6 +77,7 @@ PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter)
         {
             free(state);
         }
+        result->name = "SDT";
         PIDFilterMultiplexChangeSet(result,SDTProcessorMultiplexChanged, state);
     }
 

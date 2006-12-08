@@ -78,6 +78,7 @@ PIDFilter_t *NITProcessorCreate(TSFilter_t *tsfilter)
         {
             free(state);
         }
+        result->name = "NIT";
         PIDFilterMultiplexChangeSet(result,NITProcessorMultiplexChanged, state);
     }
 

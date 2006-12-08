@@ -99,14 +99,6 @@ static void SDTCallback(dvbpsi_sdt_t* newsdt);
 
 int (*CommandPrintf)(char *fmt, ...);
 
-static char *PIDFilterNames[] = {
-                                    "PAT",
-                                    "PMT",
-                                    "SDT",
-                                    "NIT",
-                                    "TDT/TOT",
-                                };
-
 static Command_t coreCommands[] = {
                                   {
                                       "quit",
@@ -877,7 +869,7 @@ static void CommandStats(int argc, char **argv)
 
     for (i = 0; i < PIDFilterIndex_Count; i ++)
     {
-        CommandPrintf("\t%-15s : %d\n", PIDFilterNames[i], PIDFilters[i]->packetsprocessed);
+        CommandPrintf("\t%-15s : %d\n", PIDFilters[i]->name, PIDFilters[i]->packetsprocessed);
     }
     CommandPrintf("\n");
 
