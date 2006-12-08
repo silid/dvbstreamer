@@ -60,39 +60,44 @@ Plugin Interface structures and macros.
 /**
  * Constant for No Feature, use to end a list of features.
  */
-#define PLUGIN_FEATURE_TYPE_NONE           0x00
+#define PLUGIN_FEATURE_TYPE_NONE             0x00
 /**
  * Constant for a Filter plugin feature.
  */
-#define PLUGIN_FEATURE_TYPE_FILTER         0x01
+#define PLUGIN_FEATURE_TYPE_FILTER           0x01
 /**
  * Constant for a PAT processor plugin feature.
  */
-#define PLUGIN_FEATURE_TYPE_PATPROCESSOR   0x02
+#define PLUGIN_FEATURE_TYPE_PATPROCESSOR     0x02
 /**
  * Constant for a PMT processor plugin feature.
  */
-#define PLUGIN_FEATURE_TYPE_PMTPROCESSOR   0x03
+#define PLUGIN_FEATURE_TYPE_PMTPROCESSOR     0x03
 /**
  * Constant for a Delivery Method plugin feature.
  */
-#define PLUGIN_FEATURE_TYPE_DELIVERYMETHOD 0x04
+#define PLUGIN_FEATURE_TYPE_DELIVERYMETHOD   0x04
 /**
  * Constant for a Primary Channel Changed feature.
  */
-#define PLUGIN_FEATURE_TYPE_CHANNELCHANGED 0x05
+#define PLUGIN_FEATURE_TYPE_CHANNELCHANGED   0x05
 /**
  * Constant for a SDT processor plugin feature.
  */
-#define PLUGIN_FEATURE_TYPE_SDTPROCESSOR   0x06
+#define PLUGIN_FEATURE_TYPE_SDTPROCESSOR     0x06
 /**
  * Constant for a NIT processor plugin feature.
  */
-#define PLUGIN_FEATURE_TYPE_NITPROCESSOR   0x07
+#define PLUGIN_FEATURE_TYPE_NITPROCESSOR     0x07
 /**
  * Constant for a TDT/TOT processor plugin feature.
  */
-#define PLUGIN_FEATURE_TYPE_TDTPROCESSOR   0x08
+#define PLUGIN_FEATURE_TYPE_TDTPROCESSOR     0x08
+/**
+ * Constant for a generic section processor plugin feature.
+ */
+#define PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR 0x09
+
 
 /**
  * Structure used to describe a single 'feature' of a plugin.
@@ -234,6 +239,12 @@ typedef struct Plugin_t
  * @param _processor Function to call when a new TDT or TOT arrives.
  */
 #define PLUGIN_FEATURE_TDTPROCESSOR(_processor) {PLUGIN_FEATURE_TYPE_TDTPROCESSOR, (void*)_processor}
+/**
+ * Simple macro to define a generic Section Processor feature.
+ * @param _details A PluginSectionProcessorDetails_t containing the pid to
+ *                 process and the callback to call when a new section arrives.
+ */
+#define PLUGIN_FEATURE_SECTIONPROCESSOR(_details) {PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR, (void*)_details}
 
 /**
  * Structure used to describe a Filter Feature.
@@ -247,7 +258,6 @@ typedef struct PluginFilter_t
 	void (*InitFilter)(PIDFilter_t* filter); /**< Function pointer used to initialise the filter. */
 	void (*DeinitFilter)(PIDFilter_t* filter); /**< Function pointer used to deinitialise the filter. */
 }PluginFilter_t;
-
 
 
 /**
@@ -286,6 +296,22 @@ typedef void (*PluginNITProcessor_t)(dvbpsi_nit_t* newnit);
 typedef void (*PluginTDTProcessor_t)(dvbpsi_tdt_tot_t* newtdttot);
 
 /**
+ * Function pointer to function to call when a new section arrives on the specified PID.
+ * For use with the PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR feature type.
+ */
+typedef void (*PluginSectionProcessor_t)(dvbpsi_psi_section_t* newsection);
+
+/**
+ * Structure used to describe the pid to process and the function to call when
+ * a new section arrives.
+ */
+typedef struct PluginSectionProcessorDetails_t
+{
+    uint16_t pid;                       /**< PID to process. */
+    PluginSectionProcessor_t processor; /**< Function to call when a new section is received. */
+}PluginSectionProcessorDetails_t;
+
+/**
  * Function pointer to function to call after the primary service
  * filter is updated. The newMultiplex argument will contain the multiplex currently
  * being used and the newService will contain the service now being filtered.
@@ -293,6 +319,7 @@ typedef void (*PluginTDTProcessor_t)(dvbpsi_tdt_tot_t* newtdttot);
  * plugin is expected (allowed).
  */
 typedef void (*PluginChannelChanged_t)(Multiplex_t *newMultiplex, Service_t *newService);
+
 
 /** @} */
 #endif

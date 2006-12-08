@@ -39,7 +39,8 @@ dvbstreamer_SOURCES = \
     nitprocessor.c \
     tdtprocessor.c \
     dvbpsi/nit.c \
-    dvbpsi/tdttot.c
+    dvbpsi/tdttot.c \
+    sectionprocessor.c
 
 dvbstreamer_LDFLAGS = -rdynamic
 
