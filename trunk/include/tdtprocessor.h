@@ -28,7 +28,7 @@ Process Time/Date and Time offset Tables.
 PIDFilter_t *TDTProcessorCreate(TSFilter_t *tsfilter);
 void TDTProcessorDestroy(PIDFilter_t *filter);
 
-void TDTProcessorRegisterSDTCallback(PluginTDTProcessor_t callback);
-void TDTProcessorUnRegisterSDTCallback(PluginTDTProcessor_t callback);
+void TDTProcessorRegisterTDTCallback(PluginTDTProcessor_t callback);
+void TDTProcessorUnRegisterTDTCallback(PluginTDTProcessor_t callback);
 
 #endif
