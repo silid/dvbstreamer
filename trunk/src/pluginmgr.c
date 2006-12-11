@@ -219,6 +219,14 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
                 printlog(LOG_DEBUGV, "plugin %s: Installed SDT processor.\n", pluginInterface->name);
                 SDTProcessorRegisterSDTCallback(pluginInterface->features[i].details);
                 break;
+                case PLUGIN_FEATURE_TYPE_NITPROCESSOR:
+                printlog(LOG_DEBUGV, "plugin %s: Installed NIT processor.\n", pluginInterface->name);
+                NITProcessorRegisterNITCallback(pluginInterface->features[i].details);
+                break;
+                case PLUGIN_FEATURE_TYPE_TDTPROCESSOR:
+                printlog(LOG_DEBUGV, "plugin %s: Installed TDT processor.\n", pluginInterface->name);
+                TDTProcessorRegisterTDTCallback(pluginInterface->features[i].details);
+                break;
             }
 
         }
@@ -268,6 +276,14 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface)
                 case PLUGIN_FEATURE_TYPE_SDTPROCESSOR:
                 printlog(LOG_DEBUGV, "plugin %s: Uninstalled SDT processor.\n", pluginInterface->name);
                 SDTProcessorUnRegisterSDTCallback(pluginInterface->features[i].details);
+                break;
+                case PLUGIN_FEATURE_TYPE_NITPROCESSOR:
+                printlog(LOG_DEBUGV, "plugin %s: Uninstalled NIT processor.\n", pluginInterface->name);
+                NITProcessorUnRegisterNITCallback(pluginInterface->features[i].details);
+                break;
+                case PLUGIN_FEATURE_TYPE_TDTPROCESSOR:
+                printlog(LOG_DEBUGV, "plugin %s: Uninstalled TDT processor.\n", pluginInterface->name);
+                TDTProcessorUnRegisterTDTCallback(pluginInterface->features[i].details);
                 break;
             }
         }
