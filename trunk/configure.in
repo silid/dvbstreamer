@@ -74,13 +74,39 @@ dnl ---------------------------------------------------------------------------
 dnl Check for sqlite 3
 dnl ---------------------------------------------------------------------------
 AC_CHECK_LIB([sqlite3], [sqlite3_libversion], [], [AC_MSG_FAILURE([sqlite3 not found])])
+LIBS=""
 
 dnl ---------------------------------------------------------------------------
 dnl Check for libdvbpsi
 dnl ---------------------------------------------------------------------------
 AC_CHECK_LIB([dvbpsi], [dvbpsi_PushPacket], [], [AC_MSG_FAILURE([libdvbpsi not found])])
+LIBS=""
+
+dnl ---------------------------------------------------------------------------
+dnl Check for libreadline
+dnl ---------------------------------------------------------------------------
+AC_CHECK_HEADER([readline/readline.h], [], [AC_MSG_FAILURE([readline header file not found])])
+
+AC_CHECK_LIB([readline], [readline], [READLINE_TERMCAP="-lncurses"],
+    [AC_CHECK_LIB([readline], [readline], [READLINE_TERMCAP="-ltermcap"],
+        [AC_MSG_FAILURE([readline not found])],
+        [-ltermcap])],
+    [-lncurses])
+
+AC_SUBST(READLINE_TERMCAP)
 
 LIBS=""
+
+dnl ---------------------------------------------------------------------------
+dnl Check whether librt is needed.
+dnl ---------------------------------------------------------------------------
+AC_SEARCH_LIBS(clock_gettime, [rt], [GETTIME_LIB=$LIBS], [AC_MSG_FAILURE([Failed to find a library defining clock_gettime])])
+
+AC_SUBST(GETTIME_LIB)
+
+LIBS=""
+
+
 dnl ---------------------------------------------------------------------------
 dnl Setup package directories
 dnl ---------------------------------------------------------------------------
