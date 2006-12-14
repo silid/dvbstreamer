@@ -1,0 +1,72 @@
+Remote Control Protocol Specification
+-------------------------------------
+
+Introduction
+------------
+After the initial implementation of the binary protocol was complete and
+working it was decided that it was in fact too complicated to implement outside
+of dvbstreamer and a need for a simpler text based remote control interface
+was identified.
+
+This document describes the text based remote control interface (the protocol
+and interactions between client and server)
+
+Connecting Stage
+----------------
+The client will make a TCP connection to port 54197 + (dvb adapter # - 1).
+For example DVBStreamer running on the first dvb adapter will be listening on
+port 54197 and an instance running on the third adapter will be listening on
+port 54199.
+
+After the TCP connection has been made the server will send the 'ready' line
+and the command stage of the connection can being.
+
+The 'ready' line is:
+
+DVBStreamer/<version>/0 Ready\n
+
+Where <version> is the version of DVBStreamer that is running. The 0 after the
+second slash indicates an error code of OK.
+(Note \n here is the character 13/new line)
+
+If for some reason the server cannot accept the connection it will return an
+'error' line and then close the connection.
+
+The error line will be in the form:
+
+DVBStreamer/<version>/<Error Number> <Error message>\n
+
+Where <Error Number> is a 32bit hexdecimal integer, and <Error Message> is a
+string describing the error.
+
+Command Stage
+-------------
+In this stage the client sends commands to the server as a single line of text
+(the same that would be entered on the console) terminated by '\n'.
+The server will then attempt to execute that command and send any output of the
+command to the client.
+Once the command has been executed the server will send an appropriate response
+line in the form.
+
+DVBStreamer/<version>/<Error Number> <Error message>\n
+
+Where for a successful command <Error Number> will be 0.
+
+Once the response line has been received by the client a new command can be sent.
+
+Termination Stage
+-----------------
+If no command is recieved by the server for 30 seconds the connection will be
+terminated. The connection may also be terminated by the client at anytime.
+
+Error Codes
+-----------
+   0 - OK.
+   1 - Too many connections.
+   2 - Unknown command.
+   3 - Wrong number of arguments supplied.
+   .
+   .
+   .
+ffff - Unspecified error.
+

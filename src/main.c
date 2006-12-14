@@ -53,7 +53,7 @@ Entry point to the application.
 #include "logging.h"
 #include "commands.h"
 #include "outputs.h"
-#include "binarycomms.h"
+#include "remoteintf.h"
 #include "deliverymethod.h"
 #include "pluginmgr.h"
 #include "plugin.h"
@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
     char *password = "control";
     char *serverName = NULL;
     char *primaryOutput = "null://";
-
+    bool remoteinterface = FALSE;
     /* Create the data directory */
     sprintf(DataDirectory, "%s/.dvbstreamer", getenv("HOME"));
     mkdir(DataDirectory, S_IRWXU);
@@ -126,7 +126,7 @@ int main(int argc, char *argv[])
     while (!ExitProgram)
     {
         int c;
-        c = getopt(argc, argv, "vVdo:a:t:s:c:f:u:p:n:F:");
+        c = getopt(argc, argv, "vVdro:a:t:s:c:f:u:p:n:F:");
         if (c == -1)
         {
             break;
@@ -170,6 +170,8 @@ int main(int argc, char *argv[])
                 break;
                 /* Daemon options */
                 case 'd': DaemonMode = TRUE;
+                break;
+                case 'r': remoteinterface = TRUE;
                 break;
                 case 'u': username = optarg;
                 break;
@@ -258,7 +260,7 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    if (DaemonMode)
+    if (DaemonMode || remoteinterface)
     {
         char serverNameBuffer[40];
         if (!serverName)
@@ -266,7 +268,7 @@ int main(int argc, char *argv[])
             sprintf(serverNameBuffer, "DVBStreamer Adapter %d", adapterNumber);
             serverName = serverNameBuffer;
         }
-        INIT(BinaryCommsInit(adapterNumber, serverName, username, password), "binary communications");
+        INIT(RemoteInterfaceInit(adapterNumber, serverName, username, password), "remote interface");
     }
 
     if (startupFile)
@@ -280,14 +282,24 @@ int main(int argc, char *argv[])
 
     if (DaemonMode)
     {
-        BinaryCommsAcceptConnections();
-        printlog(LOG_DEBUGV, "Binary comms finished, shutting down\n");
-        BinaryCommsDeInit();
+        RemoteInterfaceAcceptConnections();
+        printlog(LOG_DEBUGV, "Remote interface finished, shutting down\n");
+        RemoteInterfaceDeInit();
     }
     else
     {
+        if (remoteinterface)
+        {
+            RemoteInterfaceAsyncAcceptConnections();
+        }
+
         CommandLoop();
         printlog(LOG_DEBUGV, "Command loop finished, shutting down\n");
+
+        if (remoteinterface)
+        {
+            RemoteInterfaceDeInit();
+        }
     }
 
     DEINIT(OutputsDeInit(), "outputs");

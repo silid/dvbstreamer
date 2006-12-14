@@ -28,6 +28,14 @@ Command Processing and command functions.
  *@{
  */
 
+#define COMMAND_OK                    0x0000
+#define COMMAND_ERROR_TOO_MANY_CONNS  0x0001
+#define COMMAND_ERROR_UNKNOWN_COMMAND 0x0002
+#define COMMAND_ERROR_WRONG_ARGS      0x0003
+#define COMMAND_ERROR_AUTHENTICATION  0x0004
+#define COMMAND_ERROR_GENERIC         0xffff
+
+#define MAX_ERR_MSG 256
 /**
  * Structure used to define a command.
  */
@@ -41,6 +49,29 @@ typedef struct Command_t
     char *longhelp; /**< Long description of the command, displayed by help <command> */
     void (*commandfunc)(int argc, char **argv); /**< Function to call to execute command */
 }Command_t;
+
+/**
+ * Structure used to define the context a command is running in.
+ */
+typedef struct CommandContext_t
+{
+    char *interface;    /**< Human readable string containing the interface name,
+                             ie Console for console or an IP address if a remote connection.*/
+    bool remote;        /**< Whether this is a remote connection, ie not via the console. */
+    void *privatearg;   /**< Private pointer for use by the owner of the context. */
+    bool authenticated; /**< Whether this context has been authenticated against the admin username/password.*/
+    uint16_t errorno;   /**< Error number from the last command executed. */
+    char errormessage[MAX_ERR_MSG]; /**< Error message text from the last command executed. */
+}CommandContext_t;
+
+/**
+ * Macro for making error reporting simpler and consistent.
+ */
+#define CommandError(_errcode, _msgformat...) \
+    do{\
+        CurrentCommandContext->errorno = _errcode;\
+        snprintf(CurrentCommandContext->errormessage, MAX_ERR_MSG,_msgformat);\
+    }while(0)
 
 
 /**
@@ -61,7 +92,7 @@ void CommandDeInit(void);
 void CommandRegisterCommands(Command_t *commands);
 
 /**
- * Unregister an array of commands previously registered by a call to 
+ * Unregister an array of commands previously registered by a call to
  * CommandRegisterCommands.
  * @param commands The array of commands to remove.
  */
@@ -82,10 +113,12 @@ int CommandProcessFile(char *file);
 
 /**
  * Execute the command line supplied.
+ * @param context The context the command is being executed.
+ * @param cmdprintf Function pointer to set CommandPrintf to.
  * @param command The command line to execute.
  * @return true if the command was found, false otherwise.
  */
-bool CommandExecute(char *command);
+bool CommandExecute(CommandContext_t *context, int (*cmdprintf)(char *, ...), char *command);
 
 /**
  * Printf style output function that should be in command functions to send
@@ -95,5 +128,9 @@ bool CommandExecute(char *command);
  */
 int (*CommandPrintf)(char *fmt, ...);
 
+/**
+ * Context the currently running command is executing in.
+ */
+extern CommandContext_t *CurrentCommandContext;
 /** @} */
 #endif

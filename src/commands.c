@@ -51,6 +51,15 @@ Command Processing and command functions.
 
 #define MAX_ARGS (10)
 
+#define CheckAuthenticated() \
+    do{\
+        if (!CurrentCommandContext->authenticated)\
+        {\
+            CommandError(COMMAND_ERROR_AUTHENTICATION, "Not authenticated!");\
+            return;\
+        }\
+    }while(0)
+
 struct PMTReceived_t
 {
     uint16_t id;
@@ -98,6 +107,7 @@ static void PMTCallback(dvbpsi_pmt_t* newpmt);
 static void SDTCallback(dvbpsi_sdt_t* newsdt);
 
 int (*CommandPrintf)(char *fmt, ...);
+CommandContext_t *CurrentCommandContext;
 
 static Command_t coreCommands[] = {
                                   {
@@ -356,24 +366,35 @@ void CommandLoop(void)
     char *command;
     char *argument;
     quit = FALSE;
-    CommandPrintf = CommandPrintfImpl;
+    CommandContext_t context;
+
+    /* Setup context */
+    context.interface = "console";
+    context.authenticated = TRUE;
+    context.remote = FALSE;
 
     /* Start Command loop */
     while(!quit && !ExitProgram)
     {
-        GetCommand(&command, &argument);
-
-        if (command)
+        char *line = readline(PROMPT);
+        if (line)
         {
-            if (!ProcessCommand(command, argument))
+            if (CommandExecute(&context, CommandPrintfImpl, line))
             {
-                CommandPrintf("Unknown command \"%s\"\n", command);
+                if (context.errorno != COMMAND_OK)
+                {
+                    printf("%s\n", context.errormessage);
+                }
+                add_history(line);
             }
-            free(command);
-            if (argument)
+            else
             {
-                free(argument);
+                if (context.errorno == COMMAND_ERROR_UNKNOWN_COMMAND)
+                {
+                    printf("Unknown command \"%s\"\n", command);
+                }
             }
+            free(line);
         }
     }
 }
@@ -387,11 +408,18 @@ int CommandProcessFile(char *file)
     char line[256];
     char *nl;
 
+    CommandContext_t context;
+
     fp = fopen(file, "r");
     if (!fp)
     {
         return 1;
     }
+
+    /* Setup context */
+    context.interface = file;
+    context.authenticated = TRUE;
+    context.remote = FALSE;
 
     quit = FALSE;
     while(!feof(fp) && !quit)
@@ -408,31 +436,26 @@ int CommandProcessFile(char *file)
             *nl = 0;
         }
         lineno ++;
-        ParseLine(line, &command, &argument);
-        if (command && (strlen(command) > 0))
+        if (!CommandExecute(&context, CommandPrintfImpl, line))
         {
-            if (!ProcessCommand(command, argument))
-            {
-                fprintf(stderr, "%s(%d): Unknown command \"%s\"\n", file, lineno, command);
-            }
-            free(command);
-            if (argument)
-            {
-                free(argument);
-            }
+            fprintf(stderr, "%s(%d): Unknown command \"%s\"\n", file, lineno, command);
         }
-
     }
 
     fclose(fp);
     return 0;
 }
 
-bool CommandExecute(char *line)
+bool CommandExecute(CommandContext_t *context, int (*cmdprintf)(char *, ...), char *line)
 {
     bool commandFound = FALSE;
     char *command;
     char *argument;
+
+    CurrentCommandContext = context;
+    CommandPrintf = cmdprintf;
+
+    CommandError(COMMAND_OK, "OK");
     ParseLine(line, &command, &argument);
     if (command && (strlen(command) > 0))
     {
@@ -442,31 +465,15 @@ bool CommandExecute(char *line)
         {
             free(argument);
         }
+        if (!commandFound)
+        {
+            CommandError(COMMAND_ERROR_UNKNOWN_COMMAND, "Unknown command");
+        }
     }
     return commandFound;
 }
 
 /*************** Command parsing functions ***********************************/
-static void GetCommand(char **command, char **argument)
-{
-    char *line = readline(PROMPT);
-    *command = NULL;
-    *argument = NULL;
-
-    /* If the user has entered a non blank line process it */
-    if (line && line[0])
-    {
-        add_history(line);
-        ParseLine(line, command, argument);
-    }
-
-    /* Make sure we free the line buffer */
-    if (line)
-    {
-        free(line);
-    }
-}
-
 static char **AttemptComplete (const char *text, int start, int end)
 {
     char **matches = (char **)NULL;
@@ -556,7 +563,7 @@ static bool ProcessCommand(char *command, char *argument)
                 }
                 else
                 {
-                    CommandPrintf("Incorrect number of arguments see help for more information!\n\n%s\n\n",commands[i].longhelp);
+                    CommandError(COMMAND_ERROR_WRONG_ARGS, "Incorrect number of arguments!");
                 }
 
                 if (commands[i].tokenise)
@@ -684,7 +691,14 @@ static int CommandPrintfImpl(char *fmt, ...)
 /************************** Command Functions ********************************/
 static void CommandQuit(int argc, char **argv)
 {
-    quit = TRUE;
+    if (CurrentCommandContext->remote)
+    {
+        CommandError(COMMAND_ERROR_GENERIC, "Only console sessions can do that!");
+    }
+    else
+    {
+        quit = TRUE;
+    }
 }
 
 static void CommandListServices(int argc, char **argv)
@@ -762,6 +776,8 @@ static void CommandSelect(int argc, char **argv)
 {
     Service_t *service;
 
+    CheckAuthenticated();
+
     service = SetCurrentService(argv[0]);
     if (service)
     {
@@ -770,7 +786,7 @@ static void CommandSelect(int argc, char **argv)
     }
     else
     {
-        CommandPrintf("Could not find \"%s\"\n", argv[0]);
+        CommandError(COMMAND_ERROR_GENERIC, "Service not found!");
     }
 }
 
@@ -901,6 +917,8 @@ static void CommandAddOutput(int argc, char **argv)
 {
     Output_t *output = NULL;
 
+    CheckAuthenticated();
+
     printlog(LOG_DEBUGV,"Name = \"%s\" Destination = \"%s\"\n", argv[0], argv[1]);
 
     output = OutputAllocate(argv[0], OutputType_Manual, argv[1]);
@@ -913,6 +931,8 @@ static void CommandAddOutput(int argc, char **argv)
 static void CommandRmOutput(int argc, char **argv)
 {
     Output_t *output = NULL;
+
+    CheckAuthenticated();
 
     if (strcmp(argv[0], PrimaryService) == 0)
     {
@@ -943,6 +963,8 @@ static void CommandSetOutputMRL(int argc, char **argv)
 {
     Output_t *output = NULL;
 
+    CheckAuthenticated();
+
     output = OutputFind(argv[0], OutputType_Manual);
     if (output == NULL)
     {
@@ -959,7 +981,10 @@ static void CommandSetOutputMRL(int argc, char **argv)
 }
 static void CommandAddPID(int argc, char **argv)
 {
-    Output_t *output = OutputFind(argv[0], OutputType_Manual);
+    Output_t *output;
+    CheckAuthenticated();
+
+    output = OutputFind(argv[0], OutputType_Manual);
     if (output)
     {
         int i;
@@ -974,7 +999,11 @@ static void CommandAddPID(int argc, char **argv)
 
 static void CommandRmPID(int argc, char **argv)
 {
-    Output_t *output = OutputFind(argv[0], OutputType_Manual);
+    Output_t *output;
+
+    CheckAuthenticated();
+
+    output = OutputFind(argv[0], OutputType_Manual);
     if (output)
     {
         int i;
@@ -1018,6 +1047,8 @@ static void CommandAddSSF(int argc, char **argv)
 {
     Output_t *output = NULL;
 
+    CheckAuthenticated();
+
     printlog(LOG_DEBUGV,"Name = \"%s\" Destination = \"%s\"\n", argv[0], argv[1]);
 
     output = OutputAllocate(argv[0], OutputType_Service, argv[1]);
@@ -1031,6 +1062,8 @@ static void CommandRemoveSSF(int argc, char **argv)
 {
     Output_t *output = NULL;
     Service_t *oldService;
+
+    CheckAuthenticated();
 
     if (strcmp(argv[0], PrimaryService) == 0)
     {
@@ -1072,6 +1105,8 @@ static void CommandSetSSF(int argc, char **argv)
     char *outputName = argv[0];
     char *serviceName;
     Service_t *service, *oldService = NULL;
+
+    CheckAuthenticated();
 
     serviceName = strchr(outputName, ' ');
     if (!serviceName)
@@ -1120,6 +1155,8 @@ static void CommandSetSFMRL(int argc, char **argv)
 {
     Output_t *output = NULL;
 
+    CheckAuthenticated();
+
     output = OutputFind(argv[0], OutputType_Service);
     if (output == NULL)
     {
@@ -1138,6 +1175,8 @@ static void CommandSetSFMRL(int argc, char **argv)
 static void CommandSetSFAVSOnly(int argc, char **argv)
 {
     Output_t *output = NULL;
+
+    CheckAuthenticated();
 
     output = OutputFind(argv[0], OutputType_Service);
     if (output == NULL)
@@ -1220,6 +1259,8 @@ static void CommandScan(int argc, char **argv)
 {
     int muxfreq = atoi(argv[0]);
     Multiplex_t *multiplex;
+
+    CheckAuthenticated();
 
     multiplex = MultiplexFind(muxfreq);
     if (multiplex)
