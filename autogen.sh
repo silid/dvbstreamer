@@ -19,7 +19,7 @@ aclocal $aclocalinclude
 echo "Running autoheader..."
 autoheader
 echo "Running automake --gnu $am_opt ..."
-automake --add-missing --gnu $am_opt
+automake --add-missing --force --copy --gnu $am_opt
 echo "Running autoconf ..."
 autoconf
 )
