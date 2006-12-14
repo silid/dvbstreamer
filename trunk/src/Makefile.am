@@ -30,8 +30,7 @@ dvbstreamer_SOURCES = \
 	cache.c\
 	logging.c\
     commands.c\
-    binarycomms.c\
-    messages.c\
+    remoteintf.c\
     outputs.c\
     list.c\
     deliverymethod.c\
