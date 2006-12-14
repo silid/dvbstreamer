@@ -216,8 +216,11 @@ void dvbpsi_EmptyNIT(dvbpsi_nit_t* p_nit)
   dvbpsi_DeleteDescriptors(p_nit->p_first_descriptor);
   while (p_transport)
   {
+    dvbpsi_nit_transport_t *p_next;
     dvbpsi_DeleteDescriptors(p_transport->p_first_descriptor);
+    p_next = p_transport->p_next;
     free(p_transport);
+    p_transport = p_next;
   }
 }
 
