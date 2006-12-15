@@ -51,7 +51,6 @@ dvbstreamer_LDADD = \
 #
 dvbctrl_SOURCES = \
     dvbctrl.c\
-    messages.c\
     logging.c
 
 dvbctrl_LDFLAGS =
