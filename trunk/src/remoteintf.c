@@ -65,6 +65,7 @@ static void HandleConnection(Connection_t *connection);
 static void RemoteInterfaceAuthenticate(int argc, char **argv);
 static void RemoteInterfaceWho(int argc, char **argv);
 static void RemoteInterfaceLogout(int argc, char **argv);
+static void RemoteInterfaceInfo(int argc, char **argv);
 static bool PrintResponse(FILE *fp, uint16_t errno, char * msg);
 static int  RemoteInterfacePrintfImpl(char *format, ...);
 
@@ -100,7 +101,7 @@ static Command_t RemoteInterfaceCommands[] = {
             "Available properties are:\n"
             "\tname   : Server name.\n"
             "\tuptime : Uptime of the server.\n"
-            "\tupsec  : Number of seconds the server has been up.\n"
+            "\tupsec  : Number of seconds the server has been up.\n",
             RemoteInterfaceInfo
         },
         {NULL, FALSE, 0, 0, NULL, NULL}
@@ -387,4 +388,34 @@ static void RemoteInterfaceLogout(int argc, char **argv)
         CommandError(COMMAND_ERROR_GENERIC, "Not a remote connection!");
     }
 }
+static void RemoteInterfaceInfo(int argc, char **argv)
+{
+    if (strcmp("name", argv[0]) == 0)
+    {
+        CommandPrintf("%s\n", infoStreamerName);
+    }
+    else if (strcmp("uptime", argv[0]) == 0)
+    {
+        time_t now;
+        int seconds;
+        int d, h, m, s;
+        time(&now);
+        seconds = (int)difftime(now, serverStartTime);
+        d = seconds / (24 * 60 * 60);
+        h = (seconds - (d * 24 * 60 * 60)) / (60 * 60);
+        m = (seconds - ((d * 24 * 60 * 60) + (h * 60 * 60))) / 60;
+        s = (seconds - ((d * 24 * 60 * 60) + (h * 60 * 60) + (m * 60)));
+        CommandPrintf("%d Days %d Hours %d Minutes %d seconds\n", d, h, m, s);
+    }
+    else if (strcmp("upsecs", argv[0]) == 0)
+    {
+        time_t now;
+        time(&now);
 
+        CommandPrintf("%d\n", (int)difftime(now, serverStartTime));
+    }
+    else
+    {
+        CommandError(COMMAND_ERROR_GENERIC, "Unknown property");
+    }
+}
