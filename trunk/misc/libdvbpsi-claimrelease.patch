@@ -1,0 +1,414 @@
+diff -u -r libdvbpsi4-0.1.5-orig/src/demux.c libdvbpsi4-0.1.5/src/demux.c
+--- libdvbpsi4-0.1.5-orig/src/demux.c	2005-05-17 19:35:24.000000000 +0100
++++ libdvbpsi4-0.1.5/src/demux.c	2006-11-09 16:21:42.718750000 +0000
+@@ -138,7 +138,7 @@
+   }
+   else
+   {
+-    dvbpsi_DeletePSISections(p_section);
++    dvbpsi_ReleasePSISections(p_section);
+   }
+ }
+ 
+@@ -167,6 +167,6 @@
+ 
+   free(p_demux);
+   if(h_dvbpsi->p_current_section)
+-    dvbpsi_DeletePSISections(h_dvbpsi->p_current_section);
++    dvbpsi_ReleasePSISections(h_dvbpsi->p_current_section);
+   free(h_dvbpsi);
+ }
+diff -u -r libdvbpsi4-0.1.5-orig/src/dvbpsi.c libdvbpsi4-0.1.5/src/dvbpsi.c
+--- libdvbpsi4-0.1.5-orig/src/dvbpsi.c	2005-07-04 17:21:29.000000000 +0100
++++ libdvbpsi4-0.1.5/src/dvbpsi.c	2006-11-09 16:21:45.390625000 +0000
+@@ -87,7 +87,7 @@
+     h_dvbpsi->b_discontinuity = 1;
+     if(h_dvbpsi->p_current_section)
+     {
+-      dvbpsi_DeletePSISections(h_dvbpsi->p_current_section);
++      dvbpsi_ReleasePSISections(h_dvbpsi->p_current_section);
+       h_dvbpsi->p_current_section = NULL;
+     }
+   }
+@@ -122,7 +122,7 @@
+       /* Allocation of the structure */
+       h_dvbpsi->p_current_section
+                         = p_section
+-                        = dvbpsi_NewPSISection(h_dvbpsi->i_section_max_size);
++                        = dvbpsi_ClaimPSISection(h_dvbpsi->i_section_max_size);
+       /* Update the position in the packet */
+       p_payload_pos = p_new_pos;
+       /* New section is being handled */
+@@ -164,7 +164,7 @@
+         if(h_dvbpsi->i_need > h_dvbpsi->i_section_max_size - 3)
+         {
+           DVBPSI_ERROR("PSI decoder", "PSI section too long");
+-          dvbpsi_DeletePSISections(p_section);
++          dvbpsi_ReleasePSISections(p_section);
+           h_dvbpsi->p_current_section = NULL;
+           /* If there is a new section not being handled then go forward
+              in the packet */
+@@ -172,7 +172,7 @@
+           {
+             h_dvbpsi->p_current_section
+                         = p_section
+-                        = dvbpsi_NewPSISection(h_dvbpsi->i_section_max_size);
++                        = dvbpsi_ClaimPSISection(h_dvbpsi->i_section_max_size);
+             p_payload_pos = p_new_pos;
+             p_new_pos = NULL;
+             h_dvbpsi->i_need = 3;
+@@ -219,7 +219,7 @@
+         else
+         {
+           /* PSI section isn't valid => trash it */
+-          dvbpsi_DeletePSISections(p_section);
++          dvbpsi_ReleasePSISections(p_section);
+           h_dvbpsi->p_current_section = NULL;
+         }
+ 
+@@ -235,7 +235,7 @@
+         {
+           h_dvbpsi->p_current_section
+                         = p_section
+-                        = dvbpsi_NewPSISection(h_dvbpsi->i_section_max_size);
++                        = dvbpsi_ClaimPSISection(h_dvbpsi->i_section_max_size);
+           p_payload_pos = p_new_pos;
+           p_new_pos = NULL;
+           h_dvbpsi->i_need = 3;
+diff -u -r libdvbpsi4-0.1.5-orig/src/psi.c libdvbpsi4-0.1.5/src/psi.c
+--- libdvbpsi4-0.1.5-orig/src/psi.c	2005-05-17 19:35:24.000000000 +0100
++++ libdvbpsi4-0.1.5/src/psi.c	2006-11-09 17:00:40.843750000 +0000
+@@ -136,6 +136,76 @@
+   0xbcb4666d, 0xb8757bda, 0xb5365d03, 0xb1f740b4
+ };
+ 
++/*****************************************************************************
++ * sp_free_sections
++ *****************************************************************************
++ * List of sections available for reuse.
++ ****************************************************************************/
++static dvbpsi_psi_section_t * sp_free_sections = NULL;
++
++/*****************************************************************************
++ * dvbpsi_ClaimPSISection
++ *****************************************************************************
++ * Return a previously released section if one is available or create a new one.
++ *****************************************************************************/
++dvbpsi_psi_section_t * dvbpsi_ClaimPSISection(int i_max_size)
++{
++    dvbpsi_psi_section_t *p_current = sp_free_sections;
++    dvbpsi_psi_section_t *p_prev = NULL;
++
++    while (p_current)
++    {
++        if (p_current->i_max_size == i_max_size)
++        {
++            p_current->p_payload_end = p_current->p_data;
++            
++            if (p_prev)
++            {
++                p_prev->p_next = p_current->p_next;
++            }
++            else
++            {
++                sp_free_sections= p_current->p_next;
++            }
++            
++            p_current->p_next = NULL;
++            return p_current;
++        }
++        p_prev = p_current;
++        p_current = p_current->p_next;
++    }
++
++    return dvbpsi_NewPSISection(i_max_size);
++}
++
++/*****************************************************************************
++ * dvbpsi_ReleasePSISections
++ *****************************************************************************
++ * Release sections so they can be reused.
++ *****************************************************************************/
++void dvbpsi_ReleasePSISections(dvbpsi_psi_section_t * p_section)
++{
++    dvbpsi_psi_section_t *p_tail = p_section;
++    /* find the last section in the sections to release */
++    while (p_tail->p_next)
++    {
++        p_tail = p_tail->p_next;
++    }
++    
++    p_tail->p_next = sp_free_sections;
++    sp_free_sections = p_section;
++}
++
++/*****************************************************************************
++ * dvbpsi_FreePSISectionsCache
++ *****************************************************************************
++ * Delete all the sections currently cached for reuse in sp_free_sections.
++ *****************************************************************************/
++void dvbpsi_FreePSISectionsCache(void)
++{
++   dvbpsi_DeletePSISections(sp_free_sections);
++   sp_free_sections = NULL;
++}
+ 
+ /*****************************************************************************
+  * dvbpsi_NewPSISection
+@@ -155,6 +225,7 @@
+ 
+     if(p_section->p_data != NULL)
+     {
++      p_section->i_max_size = i_max_size;
+       p_section->p_payload_end = p_section->p_data;
+     }
+     else
+@@ -169,7 +240,6 @@
+   return p_section;
+ }
+ 
+-
+ /*****************************************************************************
+  * dvbpsi_DeletePSISections
+  *****************************************************************************
+diff -u -r libdvbpsi4-0.1.5-orig/src/psi.h libdvbpsi4-0.1.5/src/psi.h
+--- libdvbpsi4-0.1.5-orig/src/psi.h	2004-06-01 18:42:49.000000000 +0100
++++ libdvbpsi4-0.1.5/src/psi.h	2006-11-09 16:15:56.062500000 +0000
+@@ -92,12 +92,45 @@
+   /* used if b_syntax_indicator is true */
+   uint32_t      i_crc;                  /*!< CRC_32 */
+ 
++  /* for reusing this section */
++  uint32_t      i_max_size;             /*!< maximum size of p_data */
++  
+   /* list handling */
+   struct dvbpsi_psi_section_s *         p_next;         /*!< next element of
+                                                              the list */
+ 
+ };
++/*****************************************************************************
++ * dvbpsi_ClaimPSISection
++ *****************************************************************************/
++/*!
++ * \fn dvbpsi_psi_section_t * dvbpsi_ClaimPSISection(int i_max_size)
++ * \brief Return a previously released section if one is available or create a new one.
++ * \param i_max_size max size in bytes of the section
++ * \return a pointer to the new PSI section structure.
++ */
++dvbpsi_psi_section_t * dvbpsi_ClaimPSISection(int i_max_size);
++
++/*****************************************************************************
++ * dvbpsi_ReleasePSISections
++ *****************************************************************************/
++ /*!
++ * \fn void dvbpsi_ReleasePSISections(dvbpsi_psi_section_t * p_section)
++ * \brief Release a section so it can be reused.
++ * \param p_section pointer to the first PSI section structure
++ * \return nothing.
++ */
++void dvbpsi_ReleasePSISections(dvbpsi_psi_section_t * p_section);
+ 
++/*****************************************************************************
++ * dvbpsi_FreePSISectionsCache
++ *****************************************************************************/
++  /*!
++ * \fn void dvbpsi_FreePSISectionsCache(void)
++ * \brief Delete all the sections currently cached for reuse in sp_free_sections.
++ * \return nothing.
++ */
++void dvbpsi_FreePSISectionsCache(void);
+ 
+ /*****************************************************************************
+  * dvbpsi_NewPSISection
+diff -u -r libdvbpsi4-0.1.5-orig/src/tables/eit.c libdvbpsi4-0.1.5/src/tables/eit.c
+--- libdvbpsi4-0.1.5-orig/src/tables/eit.c	2005-05-17 19:35:24.000000000 +0100
++++ libdvbpsi4-0.1.5/src/tables/eit.c	2006-11-09 16:21:43.281250000 +0000
+@@ -140,7 +140,7 @@
+   for(i = 0; i <= 255; i++)
+   {
+     if(p_eit_decoder->ap_sections[i])
+-      dvbpsi_DeletePSISections(p_eit_decoder->ap_sections[i]);
++      dvbpsi_ReleasePSISections(p_eit_decoder->ap_sections[i]);
+   }
+ 
+   free(p_subdec->p_cb_data);
+@@ -378,7 +378,7 @@
+     {
+       if(p_eit_decoder->ap_sections[i] != NULL)
+       {
+-        dvbpsi_DeletePSISections(p_eit_decoder->ap_sections[i]);
++        dvbpsi_ReleasePSISections(p_eit_decoder->ap_sections[i]);
+         p_eit_decoder->ap_sections[i] = NULL;
+       }
+     }
+@@ -412,7 +412,7 @@
+     {
+       DVBPSI_DEBUG_ARG("EIT decoder", "overwrite section number %d",
+                        p_section->i_number);
+-      dvbpsi_DeletePSISections(p_eit_decoder->ap_sections[p_section->i_number]);
++      dvbpsi_ReleasePSISections(p_eit_decoder->ap_sections[p_section->i_number]);
+     }
+     p_eit_decoder->ap_sections[p_section->i_number] = p_section;
+ 
+@@ -443,7 +443,7 @@
+       dvbpsi_DecodeEITSections(p_eit_decoder->p_building_eit,
+                                p_eit_decoder->ap_sections[0]);
+       /* Delete the sections */
+-      dvbpsi_DeletePSISections(p_eit_decoder->ap_sections[0]);
++      dvbpsi_ReleasePSISections(p_eit_decoder->ap_sections[0]);
+       /* signal the new EIT */
+       p_eit_decoder->pf_callback(p_eit_decoder->p_cb_data,
+                                  p_eit_decoder->p_building_eit);
+@@ -455,7 +455,7 @@
+   }
+   else
+   {
+-    dvbpsi_DeletePSISections(p_section);
++    dvbpsi_ReleasePSISections(p_section);
+   }
+ }
+ 
+diff -u -r libdvbpsi4-0.1.5-orig/src/tables/pat.c libdvbpsi4-0.1.5/src/tables/pat.c
+--- libdvbpsi4-0.1.5-orig/src/tables/pat.c	2005-05-17 19:35:24.000000000 +0100
++++ libdvbpsi4-0.1.5/src/tables/pat.c	2006-11-09 16:21:44.828125000 +0000
+@@ -109,7 +109,7 @@
+ 
+   free(h_dvbpsi->p_private_decoder);
+   if(h_dvbpsi->p_current_section)
+-    dvbpsi_DeletePSISections(h_dvbpsi->p_current_section);
++    dvbpsi_ReleasePSISections(h_dvbpsi->p_current_section);
+   free(h_dvbpsi);
+ }
+ 
+@@ -301,7 +301,7 @@
+     {
+       if(p_pat_decoder->ap_sections[i] != NULL)
+       {
+-        dvbpsi_DeletePSISections(p_pat_decoder->ap_sections[i]);
++        dvbpsi_ReleasePSISections(p_pat_decoder->ap_sections[i]);
+         p_pat_decoder->ap_sections[i] = NULL;
+       }
+     }
+@@ -329,7 +329,7 @@
+     {
+       DVBPSI_DEBUG_ARG("PAT decoder", "overwrite section number %d",
+                        p_section->i_number);
+-      dvbpsi_DeletePSISections(p_pat_decoder->ap_sections[p_section->i_number]);
++      dvbpsi_ReleasePSISections(p_pat_decoder->ap_sections[p_section->i_number]);
+     }
+     p_pat_decoder->ap_sections[p_section->i_number] = p_section;
+ 
+@@ -360,7 +360,7 @@
+       dvbpsi_DecodePATSections(p_pat_decoder->p_building_pat,
+                                p_pat_decoder->ap_sections[0]);
+       /* Delete the sections */
+-      dvbpsi_DeletePSISections(p_pat_decoder->ap_sections[0]);
++      dvbpsi_ReleasePSISections(p_pat_decoder->ap_sections[0]);
+       /* signal the new PAT */
+       p_pat_decoder->pf_callback(p_pat_decoder->p_cb_data,
+                                  p_pat_decoder->p_building_pat);
+@@ -372,7 +372,7 @@
+   }
+   else
+   {
+-    dvbpsi_DeletePSISections(p_section);
++    dvbpsi_ReleasePSISections(p_section);
+   }
+ }
+ 
+diff -u -r libdvbpsi4-0.1.5-orig/src/tables/pmt.c libdvbpsi4-0.1.5/src/tables/pmt.c
+--- libdvbpsi4-0.1.5-orig/src/tables/pmt.c	2005-05-17 19:35:24.000000000 +0100
++++ libdvbpsi4-0.1.5/src/tables/pmt.c	2006-11-09 16:21:44.203125000 +0000
+@@ -113,7 +113,7 @@
+ 
+   free(h_dvbpsi->p_private_decoder);
+   if(h_dvbpsi->p_current_section)
+-    dvbpsi_DeletePSISections(h_dvbpsi->p_current_section);
++    dvbpsi_ReleasePSISections(h_dvbpsi->p_current_section);
+   free(h_dvbpsi);
+ }
+ 
+@@ -374,7 +374,7 @@
+     {
+       if(p_pmt_decoder->ap_sections[i] != NULL)
+       {
+-        dvbpsi_DeletePSISections(p_pmt_decoder->ap_sections[i]);
++        dvbpsi_ReleasePSISections(p_pmt_decoder->ap_sections[i]);
+         p_pmt_decoder->ap_sections[i] = NULL;
+       }
+     }
+@@ -404,7 +404,7 @@
+     {
+       DVBPSI_DEBUG_ARG("PMT decoder", "overwrite section number %d",
+                        p_section->i_number);
+-      dvbpsi_DeletePSISections(p_pmt_decoder->ap_sections[p_section->i_number]);
++      dvbpsi_ReleasePSISections(p_pmt_decoder->ap_sections[p_section->i_number]);
+     }
+     p_pmt_decoder->ap_sections[p_section->i_number] = p_section;
+ 
+@@ -435,7 +435,7 @@
+       dvbpsi_DecodePMTSections(p_pmt_decoder->p_building_pmt,
+                                p_pmt_decoder->ap_sections[0]);
+       /* Delete the sections */
+-      dvbpsi_DeletePSISections(p_pmt_decoder->ap_sections[0]);
++      dvbpsi_ReleasePSISections(p_pmt_decoder->ap_sections[0]);
+       /* signal the new PMT */
+       p_pmt_decoder->pf_callback(p_pmt_decoder->p_cb_data,
+                                  p_pmt_decoder->p_building_pmt);
+@@ -447,7 +447,7 @@
+   }
+   else
+   {
+-    dvbpsi_DeletePSISections(p_section);
++    dvbpsi_ReleasePSISections(p_section);
+   }
+ }
+ 
+diff -u -r libdvbpsi4-0.1.5-orig/src/tables/sdt.c libdvbpsi4-0.1.5/src/tables/sdt.c
+--- libdvbpsi4-0.1.5-orig/src/tables/sdt.c	2005-07-04 17:14:57.000000000 +0100
++++ libdvbpsi4-0.1.5/src/tables/sdt.c	2006-11-09 16:21:40.843750000 +0000
+@@ -139,7 +139,7 @@
+   for(i = 0; i <= 255; i++)
+   {
+     if(p_sdt_decoder->ap_sections[i])
+-      dvbpsi_DeletePSISections(p_sdt_decoder->ap_sections[i]);
++      dvbpsi_ReleasePSISections(p_sdt_decoder->ap_sections[i]);
+   }
+ 
+   free(p_subdec->p_cb_data);
+@@ -375,7 +375,7 @@
+     {
+       if(p_sdt_decoder->ap_sections[i] != NULL)
+       {
+-        dvbpsi_DeletePSISections(p_sdt_decoder->ap_sections[i]);
++        dvbpsi_ReleasePSISections(p_sdt_decoder->ap_sections[i]);
+         p_sdt_decoder->ap_sections[i] = NULL;
+       }
+     }
+@@ -405,7 +405,7 @@
+     {
+       DVBPSI_DEBUG_ARG("SDT decoder", "overwrite section number %d",
+                        p_section->i_number);
+-      dvbpsi_DeletePSISections(p_sdt_decoder->ap_sections[p_section->i_number]);
++      dvbpsi_ReleasePSISections(p_sdt_decoder->ap_sections[p_section->i_number]);
+     }
+     p_sdt_decoder->ap_sections[p_section->i_number] = p_section;
+ 
+@@ -436,7 +436,7 @@
+       dvbpsi_DecodeSDTSections(p_sdt_decoder->p_building_sdt,
+                                p_sdt_decoder->ap_sections[0]);
+       /* Delete the sections */
+-      dvbpsi_DeletePSISections(p_sdt_decoder->ap_sections[0]);
++      dvbpsi_ReleasePSISections(p_sdt_decoder->ap_sections[0]);
+       /* signal the new SDT */
+       p_sdt_decoder->pf_callback(p_sdt_decoder->p_cb_data,
+                                  p_sdt_decoder->p_building_sdt);
+@@ -448,7 +448,7 @@
+   }
+   else
+   {
+-    dvbpsi_DeletePSISections(p_section);
++    dvbpsi_ReleasePSISections(p_section);
+   }
+ }
+ 
