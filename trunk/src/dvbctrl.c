@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
 
     while (TRUE)
     {
-        char c;
+        int c;
         c = getopt(argc, argv, "vVh:a:u:p:f:");
         if (c == -1)
         {
