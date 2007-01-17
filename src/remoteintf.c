@@ -44,8 +44,6 @@ Remote Interface functions.
 #define MAX_CONNECTIONS   2 /* 1 for monitoring by web and another for control */
 #define MAX_LINE_LENGTH 256
 
-#define PRINTRESPONSE(_fp, _errno, _errmsg) \
-
 
 typedef struct Connection_t
 {
@@ -86,7 +84,7 @@ static Command_t RemoteInterfaceCommands[] = {
             "Available properties are:\n"
             "\tname   : Server name.\n"
             "\tuptime : Uptime of the server.\n"
-            "\tupsec  : Number of seconds the server has been up.\n",
+            "\tupsecs : Number of seconds the server has been up.\n",
             RemoteInterfaceInfo
         },
         {NULL, FALSE, 0, 0, NULL, NULL}
