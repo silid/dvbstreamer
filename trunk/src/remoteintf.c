@@ -71,26 +71,11 @@ static int  RemoteInterfacePrintfImpl(char *format, ...);
 
 static Command_t RemoteInterfaceCommands[] = {
         {
-            "auth",
-            TRUE, 2, 2,
-            "Login to control dvbstreamer.",
-            "auth <username> <password>\n"
-            "Authenticate as the user that is able to select channels etc.",
-            RemoteInterfaceAuthenticate
-        },
-        {
             "who",
             FALSE, 0, 0,
             "Display current control connections.",
             "List all the control connections and if they are authenticated.",
             RemoteInterfaceWho
-        },
-        {
-            "logout",
-            FALSE, 0, 0,
-            "Close the current control connection.",
-            "Close the current control connection (only works for remote connections).",
-            RemoteInterfaceLogout
         },
         {
             "info",
@@ -107,7 +92,24 @@ static Command_t RemoteInterfaceCommands[] = {
         {NULL, FALSE, 0, 0, NULL, NULL}
     };
 
-
+static Command_t ConnectionCommands[] = {
+    {
+        "auth",
+        TRUE, 2, 2,
+        "Login to control dvbstreamer.",
+        "auth <username> <password>\n"
+                "Authenticate as the user that is able to select channels etc.",
+        RemoteInterfaceAuthenticate
+    },
+    {
+        "logout",
+        FALSE, 0, 0,
+        "Close the current control connection.",
+        "Close the current control connection (only works for remote connections).",
+        RemoteInterfaceLogout
+    },
+    {NULL, FALSE, 0, 0, NULL, NULL}
+};
 
 static int activeConnections = 0;
 static pthread_mutex_t activeConnectionsMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -277,6 +279,7 @@ static void HandleConnection(Connection_t *connection)
     context.authenticated = FALSE;
     context.remote = TRUE;
     context.privatearg = connection;
+    context.commands = ConnectionCommands;
 
     PrintResponse(socketfp,COMMAND_OK, "Ready");
 
