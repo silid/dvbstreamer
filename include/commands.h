@@ -22,6 +22,7 @@ Command Processing and command functions.
 */
 #ifndef _COMMANDS_H
 #define _COMMANDS_H
+#include <stdint.h>
 #include "types.h"
 /**
  * @defgroup Commands Command Processing
@@ -55,12 +56,13 @@ typedef struct Command_t
  */
 typedef struct CommandContext_t
 {
-    char *interface;    /**< Human readable string containing the interface name,
-                             ie Console for console or an IP address if a remote connection.*/
-    bool remote;        /**< Whether this is a remote connection, ie not via the console. */
-    void *privatearg;   /**< Private pointer for use by the owner of the context. */
-    bool authenticated; /**< Whether this context has been authenticated against the admin username/password.*/
-    uint16_t errorno;   /**< Error number from the last command executed. */
+    char *interface;     /**< Human readable string containing the interface name,
+                              ie Console for console or an IP address if a remote connection.*/
+    bool remote;         /**< Whether this is a remote connection, ie not via the console. */
+    void *privatearg;    /**< Private pointer for use by the owner of the context. */
+    Command_t *commands; /**< Commands specific to this context */
+    bool authenticated;  /**< Whether this context has been authenticated against the admin username/password.*/
+    uint16_t errorno;    /**< Error number from the last command executed. */
     char errormessage[MAX_ERR_MSG]; /**< Error message text from the last command executed. */
 }CommandContext_t;
 
