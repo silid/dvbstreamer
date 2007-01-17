@@ -70,6 +70,7 @@ static void GetCommand(char **command, char **argument);
 static char **AttemptComplete (const char *text, int start, int end);
 static char *CompleteCommand(const char *text, int state);
 static bool ProcessCommand(char *command, char *argument);
+static Command_t *FindCommand(Command_t *commands, char *command);
 static char **Tokenise(char *arguments, int *argc);
 static void ParseLine(char *line, char **command, char **argument);
 static char *Trim(char *str);
@@ -143,7 +144,7 @@ static Command_t coreCommands[] = {
                                       "multiplex.",
                                       CommandSelect
                                   },
-								  {
+                                  {
                                       "current",
                                       FALSE, 0, 0,
                                       "Print out the service currently being streamed.",
@@ -312,7 +313,8 @@ static Command_t coreCommands[] = {
                               };
 static char *args[MAX_ARGS];
 static bool quit = FALSE;
-static List_t *commandsList;
+static List_t *commandslist;
+static pthread_mutex_t commandmutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* Variables used by the scan function */
 static bool scanning = FALSE;
@@ -329,13 +331,13 @@ int CommandInit(void)
 {
     rl_readline_name = "DVBStreamer";
     rl_attempted_completion_function = AttemptComplete;
-    commandsList = ListCreate();
-    if (!commandsList)
+    commandslist = ListCreate();
+    if (!commandslist)
     {
-        printlog(LOG_ERROR, "Failed to allocate commandsList!\n");
+        printlog(LOG_ERROR, "Failed to allocate commandslist!\n");
         return -1;
     }
-    ListAdd( commandsList, coreCommands);
+    ListAdd( commandslist, coreCommands);
     PATProcessorRegisterPATCallback(PATCallback);
     PMTProcessorRegisterPMTCallback(PMTCallback);
     SDTProcessorRegisterSDTCallback(SDTCallback);
@@ -344,7 +346,7 @@ int CommandInit(void)
 
 void CommandDeInit(void)
 {
-    ListFree( commandsList);
+    ListFree( commandslist);
     scanning = FALSE;
     PATProcessorUnRegisterPATCallback(PATCallback);
     PMTProcessorUnRegisterPMTCallback(PMTCallback);
@@ -353,12 +355,12 @@ void CommandDeInit(void)
 
 void CommandRegisterCommands(Command_t *commands)
 {
-    ListAdd( commandsList, commands);
+    ListAdd( commandslist, commands);
 }
 
 void CommandUnRegisterCommands(Command_t *commands)
 {
-    ListRemove( commandsList, commands);
+    ListRemove( commandslist, commands);
 }
 /**************** Command Loop/Startup file functions ************************/
 void CommandLoop(void)
@@ -372,6 +374,7 @@ void CommandLoop(void)
     context.interface = "console";
     context.authenticated = TRUE;
     context.remote = FALSE;
+    context.commands = NULL;
 
     /* Start Command loop */
     while(!quit && !ExitProgram)
@@ -420,6 +423,7 @@ int CommandProcessFile(char *file)
     context.interface = file;
     context.authenticated = TRUE;
     context.remote = FALSE;
+    context.commands = NULL;
 
     quit = FALSE;
     while(!feof(fp) && !quit)
@@ -452,6 +456,8 @@ bool CommandExecute(CommandContext_t *context, int (*cmdprintf)(char *, ...), ch
     char *command;
     char *argument;
 
+    pthread_mutex_lock(&commandmutex);
+    
     CurrentCommandContext = context;
     CommandPrintf = cmdprintf;
 
@@ -470,6 +476,9 @@ bool CommandExecute(CommandContext_t *context, int (*cmdprintf)(char *, ...), ch
             CommandError(COMMAND_ERROR_UNKNOWN_COMMAND, "Unknown command");
         }
     }
+    
+    pthread_mutex_unlock(&commandmutex);
+    
     return commandFound;
 }
 
@@ -499,7 +508,7 @@ static char *CompleteCommand(const char *text, int state)
     {
         lastIndex = -1;
         textlen = strlen(text);
-        ListIterator_Init(iterator, commandsList);
+        ListIterator_Init(iterator, commandslist);
     }
 
     while(ListIterator_MoreEntries(iterator))
@@ -528,61 +537,82 @@ static bool ProcessCommand(char *command, char *argument)
     int i;
     bool commandFound = FALSE;
     ListIterator_t iterator;
+    Command_t *commandInfo;
 
-    for ( ListIterator_Init(iterator, commandsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    for ( ListIterator_Init(iterator, commandslist); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         Command_t *commands = ListIterator_Current(iterator);
-        for (i = 0; commands[i].command; i ++)
+        commandInfo = FindCommand(commands, command);
+        if (commandInfo)
         {
-            if (strcasecmp(command,commands[i].command) == 0)
-            {
-
-                if (argument)
-                {
-                    if (commands[i].tokenise)
-                    {
-                        argv = Tokenise(argument, &argc);
-                    }
-                    else
-                    {
-                        argc = 1;
-                        argv = args;
-                        args[0] = argument;
-                    }
-                }
-                else
-                {
-                    argc = 0;
-                    argv = args;
-                    args[0] = NULL;
-                }
-
-                if ((argc >= commands[i].minargs) && (argc <= commands[i].maxargs))
-                {
-                    commands[i].commandfunc(argc, argv );
-                }
-                else
-                {
-                    CommandError(COMMAND_ERROR_WRONG_ARGS, "Incorrect number of arguments!");
-                }
-
-                if (commands[i].tokenise)
-                {
-                    int a;
-
-                    /* Free the arguments but not the array as that is a static array */
-                    for (a = 0; a < argc; a ++)
-                    {
-                        free(argv[a]);
-                    }
-                }
-
-                commandFound = TRUE;
-                break;
-            }
+            break;
         }
     }
+    
+    if (!commandInfo && CurrentCommandContext->commands)
+    {
+        commandInfo = FindCommand(CurrentCommandContext->commands, command);
+    }
+    
+    if (commandInfo)
+    {
+        if (argument)
+        {
+            if (commandInfo->tokenise)
+            {
+                argv = Tokenise(argument, &argc);
+            }
+            else
+            {
+                argc = 1;
+                argv = args;
+                args[0] = argument;
+            }
+        }
+        else
+        {
+            argc = 0;
+            argv = args;
+            args[0] = NULL;
+        }
+    
+        if ((argc >= commandInfo->minargs) && (argc <= commandInfo->maxargs))
+        {
+            commandInfo->commandfunc(argc, argv );
+        }
+        else
+        {
+            CommandError(COMMAND_ERROR_WRONG_ARGS, "Incorrect number of arguments!");
+        }
+    
+        if (commandInfo->tokenise)
+        {
+            int a;
+    
+            /* Free the arguments but not the array as that is a static array */
+            for (a = 0; a < argc; a ++)
+            {
+                free(argv[a]);
+            }
+        }
+    
+        commandFound = TRUE;
+    }
+    
     return commandFound;
+}
+
+static Command_t *FindCommand(Command_t *commands, char *command)
+{
+    int i;
+    for (i = 0; commands[i].command; i ++)
+    {
+        if (strcasecmp(command,commands[i].command) == 0)
+        {
+            return &commands[i];
+        }
+    }
+    return NULL;
 }
 
 static void ParseLine(char *line, char **command, char **argument)
@@ -1221,28 +1251,34 @@ static void CommandHelp(int argc, char **argv)
     if (argc)
     {
         int commandFound = 0;
-
-        for ( ListIterator_Init(iterator, commandsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+        Command_t *requestedcmd = NULL;
+        for ( ListIterator_Init(iterator, commandslist); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
         {
             Command_t *commands = ListIterator_Current(iterator);
-            for (i = 0; commands[i].command; i ++)
+            requestedcmd = FindCommand( commands, argv[0]);
+            if (requestedcmd)
             {
-                if (strcasecmp(commands[i].command,argv[0]) == 0)
-                {
-                    CommandPrintf("%s\n\n", commands[i].longhelp);
-                    commandFound = 1;
-                    break;
-                }
+                break;
             }
         }
-        if (!commandFound)
+        
+        if (!requestedcmd && CurrentCommandContext->commands)
+        {
+            requestedcmd = FindCommand( CurrentCommandContext->commands, argv[0]);
+        }
+        
+        if (requestedcmd)
+        {
+            CommandPrintf("%s\n\n", requestedcmd->longhelp);
+        }
+        else
         {
             CommandPrintf("No help for unknown command \"%s\"\n", argv[0]);
         }
     }
     else
     {
-        for ( ListIterator_Init(iterator, commandsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+        for ( ListIterator_Init(iterator, commandslist); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
         {
             Command_t *commands = ListIterator_Current(iterator);
             for (i = 0; commands[i].command; i ++)
@@ -1250,6 +1286,17 @@ static void CommandHelp(int argc, char **argv)
                 CommandPrintf("%12s - %s\n", commands[i].command, commands[i].shorthelp);
             }
         }
+        
+        if (CurrentCommandContext->commands)
+        {
+            for (i = 0; CurrentCommandContext->commands[i].command; i ++)
+            {
+                CommandPrintf("%12s - %s\n", CurrentCommandContext->commands[i].command,
+                              CurrentCommandContext->commands[i].shorthelp);
+            }
+        }
+        
+        
     }
 }
 
