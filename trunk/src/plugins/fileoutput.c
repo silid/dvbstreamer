@@ -32,8 +32,9 @@ File Delivery Method handler, all packets are written to the file of choosing.
 struct FileOutputInstance_t
 {
     char *mrl;
-    void (*SendPacket)(DeliveryMethodInstance_t *this, TSPacket_t *packet);
-    void (*DestroyInstance)(DeliveryMethodInstance_t *this);
+    void(*SendPacket)(DeliveryMethodInstance_t *this, TSPacket_t *packet);
+    void(*SendBlock)(DeliveryMethodInstance_t *this, void *block, unsigned long blockLen);
+    void(*DestroyInstance)(DeliveryMethodInstance_t *this);
 
     FILE *fp;
 };
@@ -41,13 +42,14 @@ struct FileOutputInstance_t
 bool FileOutputCanHandle(char *mrl);
 DeliveryMethodInstance_t *FileOutputCreate(char *arg);
 void FileOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet);
+void FileOutputSendBlock(DeliveryMethodInstance_t *this, void *block, unsigned long blockLen);
 void FileOutputDestroy(DeliveryMethodInstance_t *this);
 
 /** Plugin Interface **/
 DeliveryMethodHandler_t FileOutputHandler = {
-    FileOutputCanHandle,
-    FileOutputCreate
-};
+            FileOutputCanHandle,
+            FileOutputCreate
+        };
 
 PLUGIN_FEATURES(
     PLUGIN_FEATURE_DELIVERYMETHOD(FileOutputHandler)
@@ -71,6 +73,7 @@ DeliveryMethodInstance_t *FileOutputCreate(char *arg)
     if (instance)
     {
         instance->SendPacket = FileOutputSendPacket;
+        instance->SendBlock = FileOutputSendBlock;
         instance->DestroyInstance = FileOutputDestroy;
         instance->fp = fopen64((char*)(arg + PREFIX_LEN), "wb");
         if (!instance->fp)
@@ -84,8 +87,13 @@ DeliveryMethodInstance_t *FileOutputCreate(char *arg)
 
 void FileOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet)
 {
+    FileOutputSendBlock(this, (void *)packet, sizeof(TSPacket_t));
+}
+
+void FileOutputSendBlock(DeliveryMethodInstance_t *this, void *block, unsigned long blockLen)
+{
     struct FileOutputInstance_t *instance = (struct FileOutputInstance_t*)this;
-    fwrite(packet, sizeof(TSPacket_t), 1, instance->fp);
+    fwrite(block, blockLen, 1, instance->fp);
 }
 
 void FileOutputDestroy(DeliveryMethodInstance_t *this)

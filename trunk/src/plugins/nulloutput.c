@@ -33,6 +33,7 @@ NULL Delivery Method handler, doesn't write any output, to anywhere, period.
 bool NullOutputCanHandle(char *mrl);
 DeliveryMethodInstance_t *NullOutputCreate(char *arg);
 void NullOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet);
+void NullOutputSendBlock(DeliveryMethodInstance_t *this, void *block, unsigned long blockLen);
 void NullOutputDestroy(DeliveryMethodInstance_t *this);
 
 /** Plugin Interface **/
@@ -63,6 +64,7 @@ DeliveryMethodInstance_t *NullOutputCreate(char *arg)
     if (instance)
     {
         instance->SendPacket = NullOutputSendPacket;
+        instance->SendBlock = NullOutputSendBlock;
         instance->DestroyInstance = NullOutputDestroy;
     }
     return instance;
@@ -73,7 +75,16 @@ void NullOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet)
     /* Does nothing with the packet */
     return;
 }
+
+void NullOutputSendBlock(DeliveryMethodInstance_t *this, void *block, unsigned long blockLen)
+{
+    /* Does nothing with the packet */
+    return;
+}
+
+
 void NullOutputDestroy(DeliveryMethodInstance_t *this)
 {
     free(this);
 }
+
