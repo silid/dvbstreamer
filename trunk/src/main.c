@@ -108,15 +108,14 @@ static char PidFile[PATH_MAX];
 int main(int argc, char *argv[])
 {
     char *startupFile = NULL;
-    fe_type_t channelsFileType = FE_OFDM;
-    char *channelsFile = NULL;
     int i;
     int adapterNumber = 0;
     char *username = "dvbstreamer";
     char *password = "control";
     char *serverName = NULL;
+    char *bindAddress = NULL;
     char *primaryOutput = "null://";
-    bool remoteinterface = FALSE;
+    bool remoteInterface = FALSE;
     /* Create the data directory */
     sprintf(DataDirectory, "%s/.dvbstreamer", getenv("HOME"));
     mkdir(DataDirectory, S_IRWXU);
@@ -126,7 +125,7 @@ int main(int argc, char *argv[])
     while (!ExitProgram)
     {
         int c;
-        c = getopt(argc, argv, "vVdro:a:t:s:c:f:u:p:n:F:");
+        c = getopt(argc, argv, "vVdro:a:f:u:p:n:F:i:");
         if (c == -1)
         {
             break;
@@ -152,32 +151,19 @@ int main(int argc, char *argv[])
                 FilterReplacementChar = optarg[0];
                 printlog(LOG_INFOV, "Non-printable characters will be replaced with \'%c\'\n", FilterReplacementChar);
                 break;
-                /* Database initialisation options*/
-                case 't':
-                channelsFile = optarg;
-                channelsFileType = FE_OFDM;
-                printlog(LOG_INFOV, "Using DVB-T channels file %s\n", channelsFile);
-                break;
-                case 's':
-                channelsFile = optarg;
-                channelsFileType = FE_QPSK;
-                printlog(LOG_INFOV, "Using DVB-S channels file %s\n", channelsFile);
-                break;
-                case 'c':
-                channelsFile = optarg;
-                channelsFileType = FE_QAM;
-                printlog(LOG_INFOV, "Using DVB-C channels file %s\n", channelsFile);
-                break;
                 /* Daemon options */
                 case 'd': DaemonMode = TRUE;
                 break;
-                case 'r': remoteinterface = TRUE;
+                /* Remote Interface Options */
+                case 'r': remoteInterface = TRUE;
                 break;
                 case 'u': username = optarg;
                 break;
                 case 'p': password = optarg;
                 break;
                 case 'n': serverName = optarg;
+                break;
+                case 'i': bindAddress = optarg;
                 break;
                 default:
                 usage(argv[0]);
@@ -206,15 +192,6 @@ int main(int argc, char *argv[])
     INIT(CacheInit(), "cache");
     INIT(DeliveryMethodManagerInit(), "delivery method manager");
 
-    if (channelsFile)
-    {
-        printlog(LOG_INFO,"Importing services from %s\n", channelsFile);
-        if (!parsezapfile(channelsFile, channelsFileType))
-        {
-            exit(1);
-        }
-        printlog(LOG_DEBUGV, "Channels file imported\n");
-    }
     printlog(LOG_INFO, "%d Services available on %d Multiplexes\n", ServiceCount(), MultiplexCount());
 
     /* Initialise the DVB adapter */
@@ -260,7 +237,7 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    if (DaemonMode || remoteinterface)
+    if (DaemonMode || remoteInterface)
     {
         char serverNameBuffer[40];
         if (!serverName)
@@ -268,7 +245,7 @@ int main(int argc, char *argv[])
             sprintf(serverNameBuffer, "DVBStreamer Adapter %d", adapterNumber);
             serverName = serverNameBuffer;
         }
-        INIT(RemoteInterfaceInit(adapterNumber, serverName, username, password), "remote interface");
+        INIT(RemoteInterfaceInit(adapterNumber, serverName, bindAddress, username, password), "remote interface");
     }
 
     if (startupFile)
@@ -288,7 +265,7 @@ int main(int argc, char *argv[])
     }
     else
     {
-        if (remoteinterface)
+        if (remoteInterface)
         {
             RemoteInterfaceAsyncAcceptConnections();
         }
@@ -296,7 +273,7 @@ int main(int argc, char *argv[])
         CommandLoop();
         printlog(LOG_DEBUGV, "Command loop finished, shutting down\n");
 
-        if (remoteinterface)
+        if (remoteInterface)
         {
             RemoteInterfaceDeInit();
         }
@@ -358,12 +335,15 @@ static void usage(char *appname)
             "      -o <host:port>: Output transport stream via UDP to the given host and port\n"
             "      -a <adapter>  : Use adapter number (ie /dev/dvb/adapter<adapter>/...)\n"
             "      -f <file>     : Run startup script file before starting the command prompt\n"
-            "      -t <file>     : Terrestrial channels.conf file to import services and \n"
-            "                      multiplexes from.\n"
-            "      -s <file>     : Satellite channels.conf file to import services and \n"
-            "                      multiplexes from.(EXPERIMENTAL)\n"
-            "      -c <file>     : Cable channels.conf file to import services and \n"
-            "                      multiplexes from.(EXPERIMENTAL)\n",
+            "      -d            : Run as a daemon.\n"
+            "      -F <character>: Replace unprintable (non-ASCII) characters with <character>\n"
+            "\n"
+            "      Remote Interface Options\n"
+            "      -r            : Start remote interface as well as console (N/A when a daemon)\n"
+            "      -u <username> : Username used to login remotely to control this instance.\n"
+            "      -p <password> : Password used to login remotely to control this instance.\n"
+            "      -n <name>     : Informational name for this instance.\n"
+            "      -i <address>  : IP address to bind to.\n",
             appname
            );
 }
