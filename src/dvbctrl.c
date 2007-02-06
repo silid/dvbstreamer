@@ -61,8 +61,10 @@ static char line[MAX_LINE_LENGTH];
 int main(int argc, char *argv[])
 {
     int i, consumed, commandCount=0;
-    struct hostent *hostinfo;
-    struct sockaddr_in sockaddr;
+    socklen_t address_len;
+    struct sockaddr_storage address;
+    struct addrinfo *addrinfo, hints;
+    char portnumber[10];    
     char *filename = NULL;
     int socketfd = -1;
     FILE *socketfp;
@@ -116,30 +118,42 @@ int main(int argc, char *argv[])
         exit(1);
     }
     /* Connect to host */
-    socketfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (socketfd == -1)
+    sprintf(portnumber, "%d", REMOTEINTERFACE_PORT + adapterNumber);
+    
+    memset((void *)&hints, 0, sizeof(hints));
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_ADDRCONFIG;
+    if ((getaddrinfo(host, portnumber, &hints, &addrinfo) != 0) || (addrinfo == NULL))
+    {
+        printlog(LOG_ERROR, "Failed to get address\n");
+        exit(1);
+    }
+
+    if (addrinfo->ai_addrlen > sizeof(struct sockaddr_storage))
+    {
+        printlog(LOG_ERROR, "Failed to parse address\n");
+        freeaddrinfo(addrinfo);
+        exit(1);
+    }
+    address_len = addrinfo->ai_addrlen;
+    memcpy(&address, addrinfo->ai_addr, addrinfo->ai_addrlen);
+    freeaddrinfo(addrinfo);
+
+    socketfd = socket(address.ss_family, SOCK_STREAM, IPPROTO_TCP);
+    if (socketfd < 0)
     {
         printlog(LOG_ERROR, "Failed to create socket!\n");
         exit(1);
     }
 
-    sockaddr.sin_port = htons(REMOTEINTERFACE_PORT + adapterNumber);
-    hostinfo = gethostbyname(host);
-    if (hostinfo == NULL)
+    if (connect(socketfd, (const struct sockaddr *) &address, address_len))
     {
-        printlog(LOG_ERROR, "Failed to find address for \"%s\"\n", host);
-    }
-    sockaddr.sin_family = hostinfo->h_addrtype;
-    memcpy((char *)&(sockaddr.sin_addr), hostinfo->h_addr, hostinfo->h_length);
-
-    if (connect(socketfd, (const struct sockaddr *) &sockaddr, sizeof(sockaddr)))
-    {
-        printlog(LOG_ERROR, "Failed to connect to host %s:%d\n",
-                 inet_ntoa(sockaddr.sin_addr), REMOTEINTERFACE_PORT + adapterNumber);
+        printlog(LOG_ERROR, "Failed to connect to host %s port %d\n",
+                 host, REMOTEINTERFACE_PORT + adapterNumber);
         exit(1);
     }
-    printlog(LOG_DEBUG, "Socket connected to %s:%d\n",
-             inet_ntoa(sockaddr.sin_addr), REMOTEINTERFACE_PORT + adapterNumber);
+    printlog(LOG_DEBUG, "Socket connected to host %s port %d\n",
+             host, REMOTEINTERFACE_PORT + adapterNumber);
 
     socketfp = fdopen(socketfd, "r+");
     if (!fgets(line , MAX_LINE_LENGTH, socketfp))

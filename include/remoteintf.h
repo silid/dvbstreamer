@@ -26,7 +26,7 @@ Remote Interface functions.
 
 #define REMOTEINTERFACE_PORT 54197 // 0xd3b5 ~= DVBS
 
-int RemoteInterfaceInit(int adapter, char *streamername, char *username, char *password);
+int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char *username, char *password);
 void RemoteInterfaceDeInit(void);
 
 void RemoteInterfaceAsyncAcceptConnections(void);

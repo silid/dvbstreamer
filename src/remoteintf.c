@@ -35,6 +35,7 @@ Remote Interface functions.
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 
 #include "main.h"
 #include "logging.h"
@@ -122,9 +123,50 @@ static pthread_t acceptThread;
 static time_t serverStartTime;
 static char responselineStart[] = "DVBStreamer/" VERSION "/";
 
-int RemoteInterfaceInit(int adapter, char *streamername, char *username, char *password)
+int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char *username, char *password)
 {
+#ifndef __CYGWIN__
+    socklen_t address_len;
+    struct sockaddr_storage address;
+    struct addrinfo *addrinfo, hints;
+    char portnumber[10];
+
+    sprintf(portnumber, "%d", REMOTEINTERFACE_PORT + adapter);
+    
+    memset((void *)&hints, 0, sizeof(hints));
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_ADDRCONFIG | AI_PASSIVE;
+    if ((getaddrinfo(bindAddress, portnumber, &hints, &addrinfo) != 0) || (addrinfo == NULL))
+    {
+        printlog(LOG_DEBUG, "Failed to set bind address\n");
+        return 1;
+    }
+
+    if (addrinfo->ai_addrlen > sizeof(struct sockaddr_storage))
+    {
+        freeaddrinfo(addrinfo);
+	printlog(LOG_DEBUG, "Failed to parse bind address\n");
+        return 1;
+    }
+    address_len = addrinfo->ai_addrlen;
+    memcpy(&address, addrinfo->ai_addr, addrinfo->ai_addrlen);
+    freeaddrinfo(addrinfo);
+
+    serverSocket = socket(address.ss_family, SOCK_STREAM, IPPROTO_TCP);
+    if (serverSocket < 0)
+    {
+        printlog(LOG_ERROR, "Failed to create server socket!\n");
+        return 1;
+    }
+    if (bind(serverSocket, (struct sockaddr *) &address, address_len) < 0)
+    {
+        printlog(LOG_ERROR, "Failed to bind server to port %d\n", REMOTEINTERFACE_PORT + adapter);
+        close(serverSocket);
+        return 1;
+    }
+#else
     struct sockaddr_in serverAddress;
+
     serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (serverSocket < 0)
     {
@@ -132,19 +174,22 @@ int RemoteInterfaceInit(int adapter, char *streamername, char *username, char *p
         return 1;
     }
 
-    bzero((char *) &serverAddress, sizeof(serverAddress));
+    memset((void *) &serverAddress, 0, sizeof(serverAddress));
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_addr.s_addr = INADDR_ANY;
     serverAddress.sin_port = htons(REMOTEINTERFACE_PORT + adapter);
+
     if (bind(serverSocket, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0)
     {
         printlog(LOG_ERROR, "Failed to bind server to port %d\n", REMOTEINTERFACE_PORT + adapter);
         close(serverSocket);
         return 1;
     }
+#endif
+
     listen(serverSocket, 1);
 
-    infoStreamerName = strdup(streamername);
+    infoStreamerName = strdup(streamerName);
     authUsername = strdup(username);
     authPassword = strdup(password);
 
