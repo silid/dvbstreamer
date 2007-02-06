@@ -268,7 +268,10 @@ static int parsezapline(char * str, fe_type_t fe_type)
     NEXTFIELD();
     id = strtoul(field, NULL, 0);
     printlog(LOG_DEBUGV, "Adding service \"%s\" %d\n", name, id);
-    ServiceAdd(front_param.frequency, name, id, -1, -1, -1);
+    if (ServiceAdd(front_param.frequency, name, id, -1, -1, -1))
+    {
+        printlog(LOG_ERROR, "Failed to add service \"%s\", possible reason already in database?\n", name);
+    }
     free(name);
     return 0;
 }

@@ -9,7 +9,7 @@ INCLUDES = @INCLTDL@
 AM_CFLAGS =\
      -I$(top_srcdir)/include
 
-bin_PROGRAMS = dvbstreamer dvbctrl
+bin_PROGRAMS = dvbstreamer dvbctrl setupdvbstreamer
 
 #
 # DVBStreamer
@@ -17,7 +17,6 @@ bin_PROGRAMS = dvbstreamer dvbctrl
 dvbstreamer_SOURCES = \
 	main.c\
 	dvb.c\
-	parsezap.c\
 	multiplexes.c\
 	services.c\
 	pids.c\
@@ -58,3 +57,17 @@ dvbctrl_LDFLAGS =
 dvbctrl_LDADD =
 
 
+#
+# dvbctrl
+#
+setupdvbstreamer_SOURCES = \
+    setup.c\
+    logging.c\
+    parsezap.c\
+    multiplexes.c\
+    services.c\
+    dbase.c
+
+setupdvbstreamer_LDFLAGS =
+
+setupdvbstreamer_LDADD = -lsqlite3
