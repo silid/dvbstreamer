@@ -37,13 +37,13 @@ Delivery Method management functions.
  * struct UDPOutputDeliveryMethodInstance_t
  * {
     char *mrl;
- * 	void (*SendPacket)(DeliveryMethodInstance_t *this, TSPacket_t packet);
- * 	void (*DestroyInstance)(DeliveryMethodInstance_t *this);
- * 	int tos;
- * 	int packetsPerDatagram;
- * 	Socket socketFD;
- * 	int packetCount;
- * 	char *buffer;
+ *  void (*SendPacket)(DeliveryMethodInstance_t *this, TSPacket_t packet);
+ *  void (*DestroyInstance)(DeliveryMethodInstance_t *this);
+ *  int tos;
+ *  int packetsPerDatagram;
+ *  Socket socketFD;
+ *  int packetCount;
+ *  char *buffer;
  * }
  * @endcode
  */
@@ -54,17 +54,25 @@ typedef struct DeliveryMethodInstance_t
      */
     char *mrl;
     /**
-     * Send a packet.
-     * @param this The instance of the DeliveryMethodInstance_t to send the packet using.
-     * @param packet The packet to send.
-     */
-	void (*SendPacket)(struct DeliveryMethodInstance_t *this, TSPacket_t *packet);
-	/**
-	 * Destroy an instace of DeliveryMethodInstance_t.
-	 * @param this The instance of the DeliveryMethodInstance_t to free.
-	 */
-	void (*DestroyInstance)(struct DeliveryMethodInstance_t *this);
-}DeliveryMethodInstance_t;
+         * Send a packet.
+         * @param this The instance of the DeliveryMethodInstance_t to send the packet using.
+         * @param packet The packet to send.
+         */
+    void(*SendPacket)(struct DeliveryMethodInstance_t *this, TSPacket_t *packet);
+    /**
+         * Send an opaque block of data.
+         * @param this The instance of the DeliveryMethodInstance_t to send the packet using.
+         * @param block Pointer to the data to send.
+         * @param block_len The length of the data in bytes to send.
+         */
+    void(*SendBlock)(struct DeliveryMethodInstance_t *this, void *block, unsigned long blockLen);
+    /**
+         * Destroy an instace of DeliveryMethodInstance_t.
+         * @param this The instance of the DeliveryMethodInstance_t to free.
+         */
+    void(*DestroyInstance)(struct DeliveryMethodInstance_t *this);
+}
+DeliveryMethodInstance_t;
 
 /**
  * Structure used to describe a Delivery Method Handler.
