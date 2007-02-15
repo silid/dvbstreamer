@@ -15,33 +15,33 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 
-sectionprocessor.h
+pesprocessor.h
 
-Section Processor Code.
+PES Processor Code.
 
 */
-#ifndef _SECTIONFILTER_H
-#define _SECTIONFILTER_H
+#ifndef _PESFILTER_H
+#define _PESFILTER_H
 /**
- * Start processing the specified PID and send sections to the specified callback.
+ * Start processing the specified PID and send PES sections to the specified callback.
  * @param pid The PID to process.
  * @param callback The function to call when a new section is received.
  * @param userarg User argument to pass to the callback when a section arrives.
  */
-void SectionProcessorStartPID(uint16_t pid, PluginSectionProcessor_t callback, void *userarg);
+void PESProcessorStartPID(uint16_t pid, PluginPESProcessor_t callback, void *userarg);
 
 /**
  * Stop processing the specified PID for the specified callback.
- * Section from the PID will no longer be sent to the callback.
+ * PES sections from the PID will no longer be sent to the callback.
  * @param pid The PID to stop processing.
  * @param callback The function to remove from the list of callbacks.
  * @param userarg User argument to pass to the callback when a section arrives.
  */
-void SectionProcessorStopPID(uint16_t pid, PluginSectionProcessor_t callback, void *userarg);
+void PESProcessorStopPID(uint16_t pid, PluginPESProcessor_t callback, void *userarg);
 
 /**
- * Destroy all Section Processors.
+ * Destroy all PES Section Processors.
  * @internal
  */
-void SectionProcessorDestroyAllProcessors(void);
+void PESProcessorDestroyAllProcessors(void);
 #endif

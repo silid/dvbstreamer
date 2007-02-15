@@ -45,18 +45,24 @@ typedef struct SectionProcessor_t
 }
 SectionProcessor_t;
 
+typedef struct CallbackDetails_t
+{
+    PluginSectionProcessor_t callback;
+    void *userarg;
+}CallbackDetails_t;
+
 static PIDFilter_t *SectionProcessorFind(uint16_t pid);
 static PIDFilter_t *SectionProcessorCreate(TSFilter_t *tsfilter, uint16_t pid);
 static void SectionProcessorDestroy(PIDFilter_t *filter);
-static void SectionProcessorRegisterSectionCallback(PIDFilter_t *filter,PluginSectionProcessor_t callback);
-static void SectionProcessorUnRegisterSectionCallback(PIDFilter_t *filter,PluginSectionProcessor_t callback);
+static void SectionProcessorRegisterSectionCallback(PIDFilter_t *filter,PluginSectionProcessor_t callback, void *userarg);
+static void SectionProcessorUnRegisterSectionCallback(PIDFilter_t *filter,PluginSectionProcessor_t callback, void *userarg);
 static void SectionProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex);
 static TSPacket_t * SectionProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
 static void SectionHandler(dvbpsi_decoder_t* p_decoder, dvbpsi_psi_section_t* newSection);
 
 static List_t *SectionProcessorsList = NULL;
 
-void SectionProcessorStartPID(uint16_t pid, PluginSectionProcessor_t callback)
+void SectionProcessorStartPID(uint16_t pid, PluginSectionProcessor_t callback, void *userarg)
 {
     PIDFilter_t *processor = SectionProcessorFind(pid);
     if (processor == NULL)
@@ -65,8 +71,7 @@ void SectionProcessorStartPID(uint16_t pid, PluginSectionProcessor_t callback)
     }
     if (processor)
     {
-
-        SectionProcessorRegisterSectionCallback(processor, callback);
+        SectionProcessorRegisterSectionCallback(processor, callback, userarg);
 
         if (SectionProcessorsList == NULL)
         {
@@ -77,7 +82,7 @@ void SectionProcessorStartPID(uint16_t pid, PluginSectionProcessor_t callback)
     }
 }
 
-void SectionProcessorStopPID(uint16_t pid, PluginSectionProcessor_t callback)
+void SectionProcessorStopPID(uint16_t pid, PluginSectionProcessor_t callback, void *userarg)
 {
     PIDFilter_t *processor = SectionProcessorFind(pid);
     if (processor == NULL)
@@ -85,7 +90,7 @@ void SectionProcessorStopPID(uint16_t pid, PluginSectionProcessor_t callback)
         return;
     }
 
-    SectionProcessorUnRegisterSectionCallback(processor, callback);
+    SectionProcessorUnRegisterSectionCallback(processor, callback, userarg);
 }
 
 
@@ -153,6 +158,7 @@ static PIDFilter_t *SectionProcessorCreate(TSFilter_t *tsfilter, uint16_t pid)
 static void SectionProcessorDestroy(PIDFilter_t *filter)
 {
     SectionProcessor_t *state = (SectionProcessor_t *)filter->pparg;
+    ListIterator_t iterator;
     assert(filter->processpacket == SectionProcessorProcessPacket);
     PIDFilterFree(filter);
 
@@ -160,24 +166,51 @@ static void SectionProcessorDestroy(PIDFilter_t *filter)
     {
         free(state->handle);
     }
+    
+    for (ListIterator_Init(iterator, state->sectioncallbackslist);
+         ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    {
+        CallbackDetails_t *details = ListIterator_Current(iterator);
+        ListRemoveCurrent( &iterator);
+        free(details);
+    }
     ListFree(state->sectioncallbackslist);
     free(state);
 }
 
-static void SectionProcessorRegisterSectionCallback(PIDFilter_t *filter,PluginSectionProcessor_t callback)
+static void SectionProcessorRegisterSectionCallback(PIDFilter_t *filter,PluginSectionProcessor_t callback, void *userarg)
 {
     SectionProcessor_t *state = (SectionProcessor_t *)filter->pparg;
+    CallbackDetails_t *details;
+    
     assert(filter->processpacket == SectionProcessorProcessPacket);
-
-    ListAdd(state->sectioncallbackslist, callback);
+    
+    details = malloc(sizeof(CallbackDetails_t));
+    if (details)
+    {
+        details->callback = callback;
+        details->userarg = userarg;
+        ListAdd(state->sectioncallbackslist, details);
+    }
 }
 
-static void SectionProcessorUnRegisterSectionCallback(PIDFilter_t *filter,PluginSectionProcessor_t callback)
+static void SectionProcessorUnRegisterSectionCallback(PIDFilter_t *filter,PluginSectionProcessor_t callback, void *userarg)
 {
     SectionProcessor_t *state = (SectionProcessor_t *)filter->pparg;
+    ListIterator_t iterator;
     assert(filter->processpacket == SectionProcessorProcessPacket);
 
-    ListRemove(state->sectioncallbackslist, callback);
+    for (ListIterator_Init(iterator, state->sectioncallbackslist);
+         ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    {
+        CallbackDetails_t *details = ListIterator_Current(iterator);
+        if ((details->callback == callback) && (details->userarg == userarg))
+        {
+            ListRemoveCurrent( &iterator);
+            free(details);
+            break;
+        }
+    }
 }
 
 static bool SectionProcessorHasCallbacks(PIDFilter_t *filter)
@@ -250,8 +283,8 @@ static void SectionHandler(dvbpsi_decoder_t* decoder, dvbpsi_psi_section_t* newS
     for (ListIterator_Init(iterator, state->sectioncallbackslist);
             ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
-        PluginSectionProcessor_t callback = ListIterator_Current(iterator);
-        callback(newSection);
+        CallbackDetails_t *details = ListIterator_Current(iterator);
+        details->callback(details->userarg, newSection);
     }
     dvbpsi_ReleasePSISections(newSection);
 }

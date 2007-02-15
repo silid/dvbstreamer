@@ -15,19 +15,19 @@ bin_PROGRAMS = dvbstreamer dvbctrl setupdvbstreamer
 # DVBStreamer
 #
 dvbstreamer_SOURCES = \
-	main.c\
-	dvb.c\
-	multiplexes.c\
-	services.c\
-	pids.c\
-	ts.c\
-	patprocessor.c\
-	pmtprocessor.c\
-	sdtprocessor.c\
+    main.c\
+    dvb.c\
+    multiplexes.c\
+    services.c\
+    pids.c\
+    ts.c\
+    patprocessor.c\
+    pmtprocessor.c\
+    sdtprocessor.c\
     servicefilter.c\
-	dbase.c\
-	cache.c\
-	logging.c\
+    dbase.c\
+    cache.c\
+    logging.c\
     commands.c\
     remoteintf.c\
     outputs.c\
@@ -38,7 +38,8 @@ dvbstreamer_SOURCES = \
     tdtprocessor.c \
     dvbpsi/nit.c \
     dvbpsi/tdttot.c \
-    sectionprocessor.c
+    sectionprocessor.c \
+    pesprocessor.c
 
 dvbstreamer_LDFLAGS = -rdynamic
 

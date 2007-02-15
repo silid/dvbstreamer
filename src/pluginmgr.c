@@ -29,6 +29,8 @@ Plugin Manager functions.
 #include "deliverymethod.h"
 #include "patprocessor.h"
 #include "pmtprocessor.h"
+#include "sectionprocessor.h"
+#include "pesprocessor.h"
 #include "pluginmgr.h"
 #include "plugin.h"
 #include "logging.h"
@@ -227,6 +229,20 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
                 printlog(LOG_DEBUGV, "plugin %s: Installed TDT processor.\n", pluginInterface->name);
                 TDTProcessorRegisterTDTCallback(pluginInterface->features[i].details);
                 break;
+                case PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR:
+                {
+                    PluginSectionProcessorDetails_t *details = pluginInterface->features[i].details;
+                    printlog(LOG_DEBUGV, "plugin %s: Installed section processor.\n", pluginInterface->name);
+                    SectionProcessorStartPID(details->pid, details->processor, details->userarg);
+                }
+                break;
+                case PLUGIN_FEATURE_TYPE_PESPROCESSOR:
+                {
+                    PluginSectionProcessorDetails_t *details = pluginInterface->features[i].details;
+                    printlog(LOG_DEBUGV, "plugin %s: Installed PES processor.\n", pluginInterface->name);
+                    PESProcessorStartPID(details->pid, details->processor, details->userarg);
+                }
+                break;
             }
 
         }
@@ -284,6 +300,20 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface)
                 case PLUGIN_FEATURE_TYPE_TDTPROCESSOR:
                 printlog(LOG_DEBUGV, "plugin %s: Uninstalled TDT processor.\n", pluginInterface->name);
                 TDTProcessorUnRegisterTDTCallback(pluginInterface->features[i].details);
+                break;
+                case PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR:
+                {
+                    PluginSectionProcessorDetails_t *details = pluginInterface->features[i].details;
+                    printlog(LOG_DEBUGV, "plugin %s: Uninstalled section processor.\n", pluginInterface->name);
+                    SectionProcessorStopPID(details->pid, details->processor, details->userarg);
+                }
+                break;
+                case PLUGIN_FEATURE_TYPE_PESPROCESSOR:
+                {
+                    PluginSectionProcessorDetails_t *details = pluginInterface->features[i].details;
+                    printlog(LOG_DEBUGV, "plugin %s: Uninstalled PES processor.\n", pluginInterface->name);
+                    PESProcessorStopPID(details->pid, details->processor, details->userarg);
+                }
                 break;
             }
         }

@@ -97,6 +97,10 @@ Plugin Interface structures and macros.
  * Constant for a generic section processor plugin feature.
  */
 #define PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR 0x09
+/**
+ * Constant for a generic PES section processor plugin feature.
+ */
+#define PLUGIN_FEATURE_TYPE_PESPROCESSOR     0x0A
 
 
 /**
@@ -247,6 +251,14 @@ typedef struct Plugin_t
 #define PLUGIN_FEATURE_SECTIONPROCESSOR(_details) {PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR, (void*)_details}
 
 /**
+ * Simple macro to define a generic PES Processor feature.
+ * @param _details A PluginPESProcessorDetails_t containing the pid to
+ *                 process and the callback to call when a new PES section arrives.
+ */
+#define PLUGIN_FEATURE_PESPROCESSOR(_details) {PLUGIN_FEATURE_TYPE_PESPROCESSOR, (void*)_details}
+
+
+/**
  * Structure used to describe a Filter Feature.
  * Multiple filter features per plugin is allowed, but developers should try and
  * keep the number to a minimum to keep the overheads of maintaining and calling
@@ -299,7 +311,7 @@ typedef void (*PluginTDTProcessor_t)(dvbpsi_tdt_tot_t* newtdttot);
  * Function pointer to function to call when a new section arrives on the specified PID.
  * For use with the PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR feature type.
  */
-typedef void (*PluginSectionProcessor_t)(dvbpsi_psi_section_t* newsection);
+typedef void (*PluginSectionProcessor_t)(void *userarg, dvbpsi_psi_section_t* newsection);
 
 /**
  * Structure used to describe the pid to process and the function to call when
@@ -309,7 +321,25 @@ typedef struct PluginSectionProcessorDetails_t
 {
     uint16_t pid;                       /**< PID to process. */
     PluginSectionProcessor_t processor; /**< Function to call when a new section is received. */
+    void *userarg;                      /**< User Argument to pass to the callback function */ 
 }PluginSectionProcessorDetails_t;
+
+/**
+ * Function pointer to function to call when a new section arrives on the specified PID.
+ * For use with the PLUGIN_FEATURE_TYPE_PESPROCESSOR feature type.
+ */
+typedef void (*PluginPESProcessor_t)(void *userarg, uint8_t *packet, uint16_t length);
+
+/**
+ * Structure used to describe the pid to process and the function to call when
+ * a new PES section arrives.
+ */
+typedef struct PluginPESProcessorDetails_t
+{
+    uint16_t pid;                   /**< PID to process. */
+    PluginPESProcessor_t processor; /**< Function to call when a new section is received. */
+    void *userarg;                  /**< User Argument to pass to the callback function */ 
+}PluginPESProcessorDetails_t;
 
 /**
  * Function pointer to function to call after the primary service
