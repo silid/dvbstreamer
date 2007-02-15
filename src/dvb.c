@@ -95,10 +95,8 @@ void DVBDispose(DVBAdapter_t *adapter)
 
 int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *frontend)
 {
-    fe_status_t status = 0;
     /*  fe_status_t festatus; */
     struct dvb_frontend_event event;
-    unsigned int strength;
     struct pollfd pfd[1];
 
     if (ioctl(adapter->frontendfd, FE_SET_FRONTEND, frontend) < 0)
@@ -125,59 +123,6 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
             }
         }
     }
-#if 0
-    do
-    {
-        status = 0;
-        if (ioctl(adapter->frontendfd, FE_READ_STATUS, &status) < 0)
-        {
-            printlog(LOG_ERROR,"fe get event: %s\n", strerror(errno));
-            return 0;
-        }
-
-        printlog(LOG_DEBUGV,"status: %x\n", status);
-        if (status & FE_HAS_LOCK)
-        {
-            break;
-        }
-        usleep(500000);
-        printlog(LOG_DEBUGV,"Trying to get lock...");
-    }
-    while (!(status & FE_TIMEDOUT));
-
-    /* inform the user of frontend status */
-    printlog(LOG_INFO,"Tuner status:  %c%c%c%c%c%c\n",
-             (status & FE_HAS_SIGNAL)?'S':' ',
-             (status & FE_TIMEDOUT)?'T':' ',
-             (status & FE_HAS_LOCK)?'L':' ',
-             (status & FE_HAS_CARRIER)?'C':' ',
-             (status & FE_HAS_VITERBI)?'V':' ',
-             (status & FE_HAS_SYNC)?'s':' '
-            );
-
-    strength=0;
-    if(ioctl(adapter->frontendfd,FE_READ_BER,&strength) >= 0)
-        printlog(LOG_INFO," Bit error rate: %i\n",strength);
-
-    strength=0;
-    if(ioctl(adapter->frontendfd,FE_READ_SIGNAL_STRENGTH,&strength) >= 0)
-        printlog(LOG_INFO," Signal strength: %i\n",strength);
-
-    strength=0;
-    if(ioctl(adapter->frontendfd,FE_READ_SNR,&strength) >= 0)
-        printlog(LOG_INFO," Signal/Noise Ratio: %i\n",strength);
-
-    if (status & FE_HAS_LOCK && !(status & FE_TIMEDOUT))
-    {
-        printlog(LOG_DEBUGV," Lock achieved at %lu Hz\n",(unsigned long)frontend->frequency);
-        return 1;
-    }
-    else
-    {
-        printlog(LOG_DEBUGV,"Unable to achieve lock at %lu Hz\n",(unsigned long)frontend->frequency);
-        return 0;
-    }
-#endif
     return 1;
 }
 

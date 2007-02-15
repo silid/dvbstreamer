@@ -66,5 +66,5 @@ extern int verbosity;
  * @param level The level at which to output this text.
  * @param foramt String in printf format to output.
  */
-extern void printlog(int level, char *format, ...);
+extern void printlog(int level, const char *format, ...);
 #endif

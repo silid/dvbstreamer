@@ -34,7 +34,7 @@ int verbosity = 0;
 /*
  * Print out a log message to stderr depending on verbosity
  */
-void printlog(int level, char *format, ...)
+void printlog(int level, const char *format, ...)
 {
     if (level <= verbosity)
     {
