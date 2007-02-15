@@ -30,8 +30,6 @@ Transport stream processing and filter management.
 #include <dvbpsi/dvbpsi.h>
 #include <dvbpsi/descriptor.h>
 #include <dvbpsi/psi.h>
-#include <dvbpsi/pat.h>
-#include <dvbpsi/pmt.h>
 #include "multiplexes.h"
 #include "services.h"
 #include "ts.h"
