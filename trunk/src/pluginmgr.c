@@ -238,7 +238,7 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
                 break;
                 case PLUGIN_FEATURE_TYPE_PESPROCESSOR:
                 {
-                    PluginSectionProcessorDetails_t *details = pluginInterface->features[i].details;
+                    PluginPESProcessorDetails_t *details = pluginInterface->features[i].details;
                     printlog(LOG_DEBUGV, "plugin %s: Installed PES processor.\n", pluginInterface->name);
                     PESProcessorStartPID(details->pid, details->processor, details->userarg);
                 }
@@ -310,7 +310,7 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface)
                 break;
                 case PLUGIN_FEATURE_TYPE_PESPROCESSOR:
                 {
-                    PluginSectionProcessorDetails_t *details = pluginInterface->features[i].details;
+                    PluginPESProcessorDetails_t *details = pluginInterface->features[i].details;
                     printlog(LOG_DEBUGV, "plugin %s: Uninstalled PES processor.\n", pluginInterface->name);
                     PESProcessorStopPID(details->pid, details->processor, details->userarg);
                 }
