@@ -38,6 +38,7 @@ dvbstreamer_SOURCES = \
     tdtprocessor.c \
     dvbpsi/nit.c \
     dvbpsi/tdttot.c \
+    dvbpsi/dr_83.c \
     sectionprocessor.c \
     pesprocessor.c
 

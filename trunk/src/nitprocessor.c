@@ -42,6 +42,7 @@ Process Network Information Tables.
 #include "list.h"
 #include "nitprocessor.h"
 #include "dvbpsi/nit.h"
+#include "dvbpsi/dr_83.h"
 
 
 #define TABLE_ID_NIT_ACTUAL 0x40
@@ -179,8 +180,27 @@ static void NITHandler(void* arg, dvbpsi_nit_t* newNIT)
 
     while (transport)
     {
+    	dvbpsi_descriptor_t *descriptor = transport->p_first_descriptor;
+			
         printlog(LOG_DEBUG, "Transport Stream ID = 0x%04x\n", transport->i_ts_id);
         printlog(LOG_DEBUG, "Original Network ID = 0x%04x\n", transport->i_original_network_id);
+
+	while (descriptor)
+	{
+		if (descriptor->i_tag == 0x83)
+		{
+			int i;
+			dvbpsi_lcn_dr_t * lcndescriptor = dvbpsi_DecodeLCNDr(descriptor);
+
+			printlog(LOG_DEBUG, "Logical Channel Numbers\n");
+			for (i = 0; i < lcndescriptor->i_number_of_entries; i ++)
+			{
+				printlog(LOG_DEBUG, "%d : %04x (Visible? %s)\n", lcndescriptor->p_entries[i].i_logical_channel_number,
+					lcndescriptor->p_entries[i].i_service_id, lcndescriptor->p_entries[i].b_visible_service_flag?"Yes":"No");
+			}
+		}
+		descriptor = descriptor->p_next;
+	}
         transport = transport->p_next;
     }
 
