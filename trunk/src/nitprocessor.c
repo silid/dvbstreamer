@@ -173,36 +173,7 @@ static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t table
 static void NITHandler(void* arg, dvbpsi_nit_t* newNIT)
 {
     ListIterator_t iterator;
-    dvbpsi_nit_transport_t *transport = newNIT->p_first_transport;
-    printlog(LOG_DEBUG, "Network ID = 0x%04x\n", newNIT->i_network_id);
-    printlog(LOG_DEBUG, "Version    = %d\n", newNIT->i_version);
-
-
-    while (transport)
-    {
-    	dvbpsi_descriptor_t *descriptor = transport->p_first_descriptor;
-			
-        printlog(LOG_DEBUG, "Transport Stream ID = 0x%04x\n", transport->i_ts_id);
-        printlog(LOG_DEBUG, "Original Network ID = 0x%04x\n", transport->i_original_network_id);
-
-	while (descriptor)
-	{
-		if (descriptor->i_tag == 0x83)
-		{
-			int i;
-			dvbpsi_lcn_dr_t * lcndescriptor = dvbpsi_DecodeLCNDr(descriptor);
-
-			printlog(LOG_DEBUG, "Logical Channel Numbers\n");
-			for (i = 0; i < lcndescriptor->i_number_of_entries; i ++)
-			{
-				printlog(LOG_DEBUG, "%d : %04x (Visible? %s)\n", lcndescriptor->p_entries[i].i_logical_channel_number,
-					lcndescriptor->p_entries[i].i_service_id, lcndescriptor->p_entries[i].b_visible_service_flag?"Yes":"No");
-			}
-		}
-		descriptor = descriptor->p_next;
-	}
-        transport = transport->p_next;
-    }
+    dvbpsi_nit_transport_t *transport = newNIT->p_first_transport;}
 
     for (ListIterator_Init(iterator, NewNITCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
