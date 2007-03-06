@@ -22,20 +22,55 @@ Decode Logical Channel Number Descriptor.
 */
 #ifndef _DR_83_H
 #define _DR_83_H
-
+/*****************************************************************************
+ * dvbpsi_lcn_entry_t
+ *****************************************************************************/
+/*!
+ * \struct dvbpsi_lcn_entry_s
+ * \brief Logical Channel Number Entry
+ *
+ * This structure is used to store a decoded Logical Channel Number entry.
+ */
+/*!
+ * \typedef struct dvbpsi_lcn_entry_s dvbpsi_lcn_entry_t
+ * \brief dvbpsi_lcn_entry_t type definition.
+ */
 typedef struct dvbpsi_lcn_entry_s
 {
-    uint16_t i_service_id;
-    int      b_visible_service_flag;
-    uint16_t i_logical_channel_number;
+    uint16_t i_service_id;             /*!< Service ID this logical channel number refers to */
+    int      b_visible_service_flag;   /*!< Whether this LCN should be visible to the user. */
+    uint16_t i_logical_channel_number; /*!<The logical channel number for this service. */
 }dvbpsi_lcn_entry_t;
 
+/*****************************************************************************
+ * dvbpsi_lcn_dr_s
+ *****************************************************************************/
+/*!
+ * \struct dvbpsi_lcn_dr_s
+ * \brief Logical Channel Number Descriptor
+ *
+ * This structure is used to store a decoded Logical Channel Number descriptor.
+ */
+/*!
+ * \typedef struct dvbpsi_lcn_dr_s dvbpsi_lcn_dr_t
+ * \brief dvbpsi_lcn_dr_t type definition.
+ */
 typedef struct dvbpsi_lcn_dr_s
 {
-    uint8_t i_number_of_entries;
-    dvbpsi_lcn_entry_t p_entries[64];
+    uint8_t i_number_of_entries;     /*!< Number of LCN entries present. */
+    dvbpsi_lcn_entry_t p_entries[64];/*!< Array of LCN entries. */
 }dvbpsi_lcn_dr_t;
 
+/*****************************************************************************
+ * dvbpsi_DecodeLCNDr
+ *****************************************************************************/
+/*!
+ * \fn dvbpsi_lcn_dr_t dvbpsi_DecodeLCNDr(dvbpsi_descriptor_t *p_descriptor)
+ * \brief Decode a Logical Channel Number descriptor (tag 0x83)
+ * \param p_descriptor Raw descriptor to decode.
+ * \return NULL if the descriptor could not be decoded or a pointer to a 
+ *         dvbpsi_lcn_dr_t structure.
+ */
 dvbpsi_lcn_dr_t *dvbpsi_DecodeLCNDr(dvbpsi_descriptor_t *p_descriptor);
 
 #endif

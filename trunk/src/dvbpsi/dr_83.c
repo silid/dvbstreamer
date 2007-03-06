@@ -30,7 +30,9 @@ Decode Logical Channel Number Descriptor.
 #include <dvbpsi/descriptor.h>
 #include "dvbpsi/dr_83.h"
 
-
+/*****************************************************************************
+ * dvbpsi_DecodeLCNDr
+ *****************************************************************************/
 dvbpsi_lcn_dr_t *dvbpsi_DecodeLCNDr(dvbpsi_descriptor_t *p_descriptor)
 {
     dvbpsi_lcn_dr_t *p_decoded;
@@ -63,14 +65,13 @@ dvbpsi_lcn_dr_t *dvbpsi_DecodeLCNDr(dvbpsi_descriptor_t *p_descriptor)
 
     for (i = 0; i < p_decoded->i_number_of_entries; i ++)
     {
-		
         p_decoded->p_entries[i].i_service_id = (p_descriptor->p_data[i * 4] << 8) |
                                                 p_descriptor->p_data[(i * 4) + 1];
 
         p_decoded->p_entries[i].b_visible_service_flag = (p_descriptor->p_data[(i * 4) + 2] >> 7) & 1;
 
         p_decoded->p_entries[i].i_logical_channel_number = ((p_descriptor->p_data[(i * 4) + 2] << 8) |
-                                                p_descriptor->p_data[(i * 4) + 3]) & 0x3ff;
+                                                             p_descriptor->p_data[(i * 4) + 3]) & 0x3ff;
         
     }
 
