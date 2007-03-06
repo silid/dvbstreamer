@@ -162,9 +162,6 @@ static void TDTHandler(void* arg, dvbpsi_tdt_tot_t* newTDT)
 {
     ListIterator_t iterator;
 
-    printlog(LOG_DEBUG, "%s: %2d/%2d/%4d %02d:%02d:%02d\n", newTDT->p_first_descriptor ? "TOT":"TDT",
-        newTDT->i_day, newTDT->i_month, newTDT->i_year, newTDT->i_hour, newTDT->i_minute, newTDT->i_second);
-
     for (ListIterator_Init(iterator, NewTDTCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         PluginTDTProcessor_t callback = ListIterator_Current(iterator);
