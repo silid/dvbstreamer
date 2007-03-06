@@ -124,5 +124,13 @@ int MultiplexTSIdSet(Multiplex_t *multiplex, int tsid);
  */
 int MultiplexNetworkIdSet(Multiplex_t *multiplex, int netid);
 
+/**
+ * Retrieve the Multiplex_t structure for the network and TS id.
+ * The returned structured should be free'd using free().
+ * @param netid Network id to find.
+ * @param tsid Transport stream id to find.
+ * @return A Mulitplex_t or NULL if the frequency could not be found.
+ */
+Multiplex_t *MultiplexFindId(int netid, int tsid);
 /** @} */
 #endif
