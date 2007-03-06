@@ -180,6 +180,11 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
             {
                 CacheUpdateService(service, patentry->i_pid);
             }
+
+            if (service)
+            {
+                ServiceRefDec(service);
+            }
         }
         patentry = patentry->p_next;
     }

@@ -160,6 +160,7 @@ static void PMTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Mult
             dvbpsi_DetachPMT(state->pmthandles[i]);
             state->pmtpids[i]    = 0;
             state->pmthandles[i] = NULL;
+            ServiceRefDec(state->services[i]);
             state->services[i]   = NULL;
         }
     }
@@ -173,6 +174,7 @@ static void PMTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Mult
     for (i = 0; i < count; i ++)
     {
         state->pmtpids[i] = services[i]->pmtpid;
+        ServiceRefInc(services[i]);
         state->services[i] = services[i];
         state->pmthandles[i] = dvbpsi_AttachPMT(services[i]->id, PMTHandler, (void*)services[i]);
         state->payloadstartonly[i] = TRUE;

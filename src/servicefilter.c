@@ -97,6 +97,7 @@ void ServiceFilterServiceSet(PIDFilter_t *filter, Service_t *service)
 {
     ServiceFilter_t *state = (ServiceFilter_t *)filter->fparg;
     assert(filter->filterpacket == ServiceFilterFilterPacket);
+    ServiceRefInc(service);
     state->nextservice = service;
 }
 
@@ -129,6 +130,10 @@ static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t
 
     if (state->service != state->nextservice)
     {
+        if (state->service)
+        {
+            ServiceRefDec(state->service);
+        }
         state->service = state->nextservice;
         state->multiplex = (Multiplex_t *)CurrentMultiplex;
         state->rewritepat = TRUE;

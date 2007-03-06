@@ -778,7 +778,7 @@ static void CommandListServices(int argc, char **argv)
             if (service)
             {
                 CommandPrintf("%s\n", service->name);
-                ServiceFree(service);
+                ServiceRefDec(service);
             }
         }
         while(service && !ExitProgram);
@@ -859,7 +859,7 @@ static void CommandServiceInfo(int argc, char **argv)
         else
         {
             CommandPrintf("Not in current multiplex, no further information available.\n");
-            ServiceFree(service);
+            ServiceRefDec(service);
         }
     }
 }
@@ -898,7 +898,7 @@ static void CommandPids(int argc, char **argv)
         {
             CommandPrintf("0 PIDs for \"%s\"\n",argv[0]);
         }
-        ServiceFree(service);
+        ServiceRefDec(service);
     }
     else
     {
@@ -1110,7 +1110,7 @@ static void CommandRemoveSSF(int argc, char **argv)
     OutputFree(output);
     if (oldService)
     {
-        ServiceFree(oldService);
+        ServiceRefDec(oldService);
     }
 
 }
@@ -1177,7 +1177,7 @@ static void CommandSetSSF(int argc, char **argv)
 
     if (oldService)
     {
-        ServiceFree(oldService);
+        ServiceRefDec(oldService);
     }
 }
 
@@ -1313,7 +1313,7 @@ static void CommandScan(int argc, char **argv)
     if (multiplex)
     {
         struct timespec timeout;
-        char *currservice = NULL;
+        char currservice[SERVICE_MAX_NAME_LEN];
         bool patreceivedstate = FALSE;
         bool allpmtsreceivedstate = FALSE;
         bool sdtreceivedstate = FALSE;
@@ -1321,7 +1321,7 @@ static void CommandScan(int argc, char **argv)
 
         if (CurrentService)
         {
-            currservice = strdup(CurrentService->name);
+            strcpy(currservice, CurrentService->name);
         }
         SetMultiplex(multiplex);
 

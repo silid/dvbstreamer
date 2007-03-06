@@ -214,6 +214,8 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
             service->runningstatus = sdtservice->i_running_status;
             service->eitpresentfollowing = sdtservice->b_eit_present;
             service->eitschedule = sdtservice->b_eit_schedule;
+
+            ServiceRefDec(service);
         }
         sdtservice =sdtservice->p_next;
     }
