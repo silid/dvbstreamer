@@ -101,7 +101,10 @@ Plugin Interface structures and macros.
  * Constant for a generic PES section processor plugin feature.
  */
 #define PLUGIN_FEATURE_TYPE_PESPROCESSOR     0x0A
-
+/**
+ * Constant for the plugin installed feature.
+ */
+#define PLUGIN_FEATURE_TYPE_INSTALL          0xFF
 
 /**
  * Structure used to describe a single 'feature' of a plugin.
@@ -180,7 +183,7 @@ typedef struct Plugin_t
 #define PLUGIN_COMMANDS(_commands...) \
     static Command_t PluginCommands[] = {\
         _commands,\
-        {NULL, FALSE, 0, 0, NULL, NULL}\
+        {NULL, FALSE, 0, 0, NULL, NULL, NULL}\
     }
 
 /**
@@ -257,6 +260,11 @@ typedef struct Plugin_t
  */
 #define PLUGIN_FEATURE_PESPROCESSOR(_details) {PLUGIN_FEATURE_TYPE_PESPROCESSOR, (void*)_details}
 
+/**
+ * Simple macro to define an install callback.
+ * @param _callback A PluginInstallCallback_t to call when the plugin is (un)installed.
+ */
+#define PLUGIN_FEATURE_INSTALL(_callback) {PLUGIN_FEATURE_TYPE_INSTALL, (void*)_callback}
 
 /**
  * Structure used to describe a Filter Feature.
@@ -350,6 +358,11 @@ typedef struct PluginPESProcessorDetails_t
  */
 typedef void (*PluginChannelChanged_t)(Multiplex_t *newMultiplex, Service_t *newService);
 
+/**
+ * Function pointer to a function to call when the plugin is (un)installed.
+ * installed is TRUE when the plugin is installed and FALSE when being uninstalled.
+ */
+typedef void (*PluginInstallCallback_t)(bool installed);
 
 /** @} */
 #endif
