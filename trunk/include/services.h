@@ -47,12 +47,14 @@ typedef enum RunningStatus_e
     RunningStatus_Running         = 4,
 }RunningStatus_e;
 
+#define SERVICE_MAX_NAME_LEN (256)
 /**
  * Structure desribing a digital TV service.
  */
 typedef struct Service_t
 {
-    char *name;        /**< Name of the service. */
+    unsigned long refcount; /**< Number of references to this service */
+    char name[SERVICE_MAX_NAME_LEN]; /**< Name of the service. */
     int multiplexfreq; /**< Multiplex frequency this service is broadcast on. */
     int id;            /**< Service/Program ID of the service. */
     int pmtversion;    /**< Last processed version of the PMT. */
@@ -175,15 +177,45 @@ void ServiceEnumeratorDestroy(ServiceEnumerator_t enumerator);
 /**
  * Retrieve the next service from an enumerator.
  * @param enumerator The enumerator to retrieve the next service from.
- * @return A Service_t structure or NULL if there are no more services.
+ * @return A Service_t structure or NULL if there are no more services (with 
+ * the reference count set to 1)
  */
 Service_t *ServiceGetNext(ServiceEnumerator_t enumerator);
 
 /**
- * Free the memory used by a Service_t instance.
- * @param service The structure instance to free.
- * @return 0 on success, otherwise an SQLite error code.
+ * Increment the references to the specified service object.
+ * @param service The service instance to increment the reference count of.
  */
-void ServiceFree(Service_t *service);
+#if 0
+void ServiceRefInc(Service_t *service);
+#else
+#define ServiceRefInc(__service) \
+        do{ \
+            (__service)->refcount ++;\
+            printlog(LOG_DIARRHEA, "Service %p (%s) ref incremented (%s:%d), count now %d\n", (__service), (__service)->name, __func__, __LINE__, (__service)->refcount);\
+        }while(0)
+#endif
+/**
+ * Decrement the references of the specified service object. If the reference 
+ * count reaches 0 the instance is free'd.
+ * @param service The service instance to decrement the reference count of.
+ */
+#if 0
+void ServiceRefDec(Service_t *service);
+#else
+#define ServiceRefDec(__service) \
+        do{ \
+            if ((__service)->refcount > 0)\
+            {\
+                (__service)->refcount --;\
+            }\
+            printlog(LOG_DIARRHEA, "Service %p (%s) ref decremented (%s:%d), count now %d\n", (__service), (__service)->name,  __func__, __LINE__, (__service)->refcount);\
+            if ((__service)->refcount == 0)\
+            {\
+                printlog(LOG_DIARRHEA, "Service %p (%s) free'd\n", (__service), (__service)->name);\
+                free((__service));\
+            }\
+        }while(0)
+#endif
 /** @} */
 #endif

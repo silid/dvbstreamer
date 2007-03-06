@@ -54,8 +54,8 @@ static Service_t*      cachedServices[SERVICES_MAX];
 static Service_t*      cachedDeletedServices[SERVICES_MAX];
 static PIDList_t*      cachedPIDs[SERVICES_MAX];
 
-static void CacheServicesFree();
-static void CachePIDsFree();
+static void CacheServicesFree(void);
+static void CachePIDsFree(void);
 static int CachePIDsLoad(Service_t *service, int index);
 
 int CacheInit()
@@ -85,7 +85,7 @@ int CacheLoad(Multiplex_t *multiplex)
     if (count > 0)
     {
         int i;
-        ServiceEnumerator_t *enumerator;
+        ServiceEnumerator_t enumerator;
 
         enumerator = ServiceEnumeratorForMultiplex(multiplex->freq);
         for (i=0; i < count; i++)
@@ -112,17 +112,17 @@ Service_t *CacheServiceFindId(int id)
 {
     Service_t *result = NULL;
     int i;
-    if (cachedServices)
+
+    for (i = 0; i < cachedServicesCount; i ++)
     {
-        for (i = 0; i < cachedServicesCount; i ++)
+        if (cachedServices[i]->id == id)
         {
-            if (cachedServices[i]->id == id)
-            {
-                result = cachedServices[i];
-                break;
-            }
+            result = cachedServices[i];
+            ServiceRefInc(result);
+            break;
         }
     }
+
     return result;
 }
 
@@ -130,27 +130,23 @@ Service_t *CacheServiceFindName(char *name, Multiplex_t **multiplex)
 {
     Service_t *result = NULL;
     int i;
-    if (cachedServices)
+    printlog(LOG_DEBUGV,"Checking cached services for \"%s\"\n", name);
+    for (i = 0; i < cachedServicesCount; i ++)
     {
-        printlog(LOG_DEBUGV,"Checking cached services for \"%s\"\n", name);
-        for (i = 0; i < cachedServicesCount; i ++)
+        printlog(LOG_DEBUGV, "cachedServices[%d]->name = %s\n", i, cachedServices[i]->name);
+        if (strcmp(cachedServices[i]->name, name) == 0)
         {
-            printlog(LOG_DEBUGV, "cachedServices[%d]->name = %s\n", i, cachedServices[i]->name);
-            if (strcmp(cachedServices[i]->name, name) == 0)
-            {
-                result = cachedServices[i];
-                *multiplex = cachedServicesMultiplex;
-                printlog(LOG_DEBUGV,"Found in cached services!\n");
-                break;
-            }
+            result = cachedServices[i];
+            ServiceRefInc(result);
+            *multiplex = cachedServicesMultiplex;
+            printlog(LOG_DEBUGV,"Found in cached services!\n");
+            break;
         }
     }
+
     if (result == NULL)
     {
-        if (cachedServices)
-        {
-            printlog(LOG_DEBUGV,"Not found in cached services\n");
-        }
+        printlog(LOG_DEBUGV,"Not found in cached services\n");
         result = ServiceFindName(name);
         if (result)
         {
@@ -235,8 +231,7 @@ void CacheUpdateServiceName(Service_t *service, char *name)
     {
         if ((cachedServices[i]) && ServiceAreEqual(service, cachedServices[i]))
         {
-            free(cachedServices[i]->name);
-            cachedServices[i]->name = strdup(name);
+            strncpy(cachedServices[i]->name, name, SERVICE_MAX_NAME_LEN);
             cacheFlags[i] |= CacheFlag_Dirty_Name;
             break;
         }
@@ -277,10 +272,10 @@ Service_t *CacheServiceAdd(int id)
         result->id = id;
         result->pmtversion = -1;
         result->pmtpid = 8192;
-        result->name = malloc(5);
         sprintf(result->name, "%04x", id);
         result->multiplexfreq = cachedServicesMultiplex->freq;
-
+        ServiceRefInc(result);
+        
         pthread_mutex_lock(&cacheUpdateMutex);
 
         cachedServices[cachedServicesCount] = result;
@@ -348,7 +343,7 @@ void CacheWriteback()
         printlog(LOG_DEBUG, "Deleting service %s (0x%04x)\n", cachedDeletedServices[i]->name, cachedDeletedServices[i]->id);
         ServiceDelete(cachedDeletedServices[i]);
         PIDListRemove(cachedDeletedServices[i]);
-        ServiceFree(cachedDeletedServices[i]);
+        ServiceRefDec(cachedDeletedServices[i]);
     }
     cachedDeletedServicesCount = 0;
 
@@ -391,8 +386,6 @@ void CacheWriteback()
         }
         if (cacheFlags[i] & CacheFlag_Dirty_PIDs)
         {
-            int p;
-            PIDList_t *pids = cachedPIDs[i];
             printlog(LOG_DEBUG, "Updating PIDs for %s\n", cachedServices[i]->name);
             PIDListRemove(cachedServices[i]);
             PIDListSet(cachedServices[i], cachedPIDs[i]);
@@ -416,24 +409,21 @@ void CacheWriteback()
 
 static void CacheServicesFree()
 {
-    if (cachedServices)
+    int i;
+    for (i = 0; i < cachedServicesCount; i ++)
     {
-        int i;
-        for (i = 0; i < cachedServicesCount; i ++)
+        if (cachedServices[i])
         {
-            if (cachedServices[i])
-            {
-                ServiceFree(cachedServices[i]);
-                cachedServices[i] = NULL;
-            }
-            if (cachedPIDs[i])
-            {
-                PIDListFree(cachedPIDs[i]);
-                cachedPIDs[i] = NULL;
-            }
+            ServiceRefDec(cachedServices[i]);
+            cachedServices[i] = NULL;
         }
-        cachedServicesCount = 0;
-        cachedServicesMultiplex = NULL;
+        if (cachedPIDs[i])
+        {
+            PIDListFree(cachedPIDs[i]);
+            cachedPIDs[i] = NULL;
+        }
     }
+    cachedServicesCount = 0;
+    cachedServicesMultiplex = NULL;
 }
 

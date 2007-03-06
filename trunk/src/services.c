@@ -178,9 +178,7 @@ int ServiceNameSet(Service_t  *service, char *name)
     STATEMENT_STEP();
     if (rc == SQLITE_DONE)
     {
-        char *oldname = service->name;
-		service->name = strdup(name);
-		free(oldname);
+        strncpy(service->name, name, SERVICE_MAX_NAME_LEN);
         rc = SQLITE_OK;
     }
     else
@@ -225,7 +223,7 @@ Service_t *ServiceFindId(Multiplex_t *multiplex, int id)
 ServiceEnumerator_t ServiceEnumeratorGet()
 {
     STATEMENT_INIT;
-    STATEMENT_PREPARE("SELECT "	SERVICE_FIELDS
+    STATEMENT_PREPARE("SELECT " SERVICE_FIELDS
                       "FROM " SERVICES_TABLE ";");
     RETURN_ON_ERROR(NULL);
     return stmt;
@@ -288,12 +286,13 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
         name = STATEMENT_COLUMN_TEXT( 2);
         if (name)
         {
-            service->name = strdup(name);
+            strncpy(service->name,name, SERVICE_MAX_NAME_LEN);
         }
         service->pmtversion = STATEMENT_COLUMN_INT( 3);
         service->pmtpid = STATEMENT_COLUMN_INT( 4);
         service->pcrpid = STATEMENT_COLUMN_INT( 5);
 
+        ServiceRefInc(service);
         return service;
     }
 
@@ -303,13 +302,27 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
     }
     return NULL;
 }
-
-void ServiceFree(Service_t *service)
+#if 0
+void ServiceRefInc(Service_t *service)
 {
-    if (service->name)
-    {
-        free(service->name);
-    }
-    free(service);
+    service->refcount ++;
+    printlog(LOG_DEBUGV, "Service %p (%s) ref incremented, count now %d\n", service, service->name, service->refcount);
 }
 
+void ServiceRefDec(Service_t *service)
+{
+
+    if (service->refcount > 0)
+    {
+        service->refcount --;
+    }
+    printlog(LOG_DEBUGV, "Service %p (%s) ref decremented, count now %d\n", service, service->name, service->refcount);
+    
+    if (service->refcount == 0)
+    {
+        printlog(LOG_DEBUGV, "Service %p (%s) free'd\n", service, service->name);
+        free(service);
+    }   
+}
+
+#endif
