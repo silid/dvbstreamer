@@ -6,7 +6,7 @@ AM_CFLAGS =\
 
 pluginsdir = @DVBSTREAMER_PLUGINDIR@
 
-plugins_LTLIBRARIES = udpoutput.la nulloutput.la fileoutput.la
+plugins_LTLIBRARIES = udpoutput.la nulloutput.la fileoutput.la lcnquery.la
 
 udpoutput_la_SOURCES = \
     udp.c \
@@ -23,3 +23,8 @@ fileoutput_la_SOURCES = \
     fileoutput.c
 
 fileoutput_la_LDFLAGS = -module -no-undefined -avoid-version
+lcnquery_la_SOURCES = \
+    lcnquery.c
+
+lcnquery_la_LDFLAGS = -module -no-undefined -avoid-version
+
