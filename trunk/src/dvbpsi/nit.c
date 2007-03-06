@@ -175,7 +175,7 @@ void dvbpsi_DetachNIT(dvbpsi_demux_t * p_demux, uint8_t i_table_id,
   for(i = 0; i <= 255; i++)
   {
     if(p_nit_decoder->ap_sections[i])
-      dvbpsi_ReleasePSISections(p_nit_decoder->ap_sections[i]);
+      dvbpsi_DeletePSISections(p_nit_decoder->ap_sections[i]);
   }
 
   free(p_subdec->p_cb_data);
@@ -337,7 +337,7 @@ void dvbpsi_GatherNITSections(dvbpsi_decoder_t * p_psi_decoder,
     {
       if(p_nit_decoder->ap_sections[i] != NULL)
       {
-        dvbpsi_ReleasePSISections(p_nit_decoder->ap_sections[i]);
+        dvbpsi_ReleasePSISections(p_psi_decoder, p_nit_decoder->ap_sections[i]);
         p_nit_decoder->ap_sections[i] = NULL;
       }
     }
@@ -365,7 +365,7 @@ void dvbpsi_GatherNITSections(dvbpsi_decoder_t * p_psi_decoder,
     {
       printlog(LOG_ERROR, "NIT decoder: overwrite section number %d",
                        p_section->i_number);
-      dvbpsi_ReleasePSISections(p_nit_decoder->ap_sections[p_section->i_number]);
+      dvbpsi_ReleasePSISections(p_psi_decoder, p_nit_decoder->ap_sections[p_section->i_number]);
     }
     p_nit_decoder->ap_sections[p_section->i_number] = p_section;
 
@@ -396,7 +396,7 @@ void dvbpsi_GatherNITSections(dvbpsi_decoder_t * p_psi_decoder,
       dvbpsi_DecodeNITSections(p_nit_decoder->p_building_nit,
                                p_nit_decoder->ap_sections[0]);
       /* Delete the sections */
-      dvbpsi_ReleasePSISections(p_nit_decoder->ap_sections[0]);
+      dvbpsi_ReleasePSISections(p_psi_decoder, p_nit_decoder->ap_sections[0]);
       /* signal the new NIT */
       p_nit_decoder->pf_callback(p_nit_decoder->p_cb_data,
                                  p_nit_decoder->p_building_nit);
@@ -408,7 +408,7 @@ void dvbpsi_GatherNITSections(dvbpsi_decoder_t * p_psi_decoder,
   }
   else
   {
-    dvbpsi_ReleasePSISections(p_section);
+    dvbpsi_ReleasePSISections(p_psi_decoder, p_section);
   }
 }
 
