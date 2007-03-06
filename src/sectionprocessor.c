@@ -224,6 +224,14 @@ static void SectionProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, 
     SectionProcessor_t *state = (SectionProcessor_t *)arg;
     if (state->handle)
     {
+        if (state->handle->p_current_section)
+        {
+            dvbpsi_DeletePSISections(state->handle->p_current_section);
+        }
+        if (state->handle->p_free_sections)
+        {
+            dvbpsi_DeletePSISections(state->handle->p_free_sections);
+        }
         free(state->handle);
         state->handle = NULL;
     }
@@ -286,7 +294,7 @@ static void SectionHandler(dvbpsi_decoder_t* decoder, dvbpsi_psi_section_t* newS
         CallbackDetails_t *details = ListIterator_Current(iterator);
         details->callback(details->userarg, newSection);
     }
-    dvbpsi_ReleasePSISections(newSection);
+    dvbpsi_ReleasePSISections(decoder, newSection);
 }
 
 

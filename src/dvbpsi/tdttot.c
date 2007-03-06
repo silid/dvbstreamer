@@ -62,7 +62,6 @@ void dvbpsi_DecodeTDTSection(dvbpsi_tdt_tot_t* p_tdt,
 void dvbpsi_DecodeTOTSection(dvbpsi_tdt_tot_t* p_tot,
                              dvbpsi_psi_section_t* p_section);
 
-void dvbpsi_DecodeMJDUTC(char *p_mjdutc, dvbpsi_tdt_tot_t* p_table);
 
 /*****************************************************************************
  * dvbpsi_AttachTDTTOT
@@ -95,6 +94,7 @@ dvbpsi_handle dvbpsi_AttachTDTTOT(dvbpsi_tdt_tot_callback pf_callback,
   h_dvbpsi->i_continuity_counter = 31;
   h_dvbpsi->b_discontinuity = 1;
   h_dvbpsi->p_current_section = NULL;
+  h_dvbpsi->p_free_sections = NULL;
 
   /* TDT/TOT decoder information */
   p_tdt_tot_decoder->pf_callback = pf_callback;
@@ -112,6 +112,10 @@ dvbpsi_handle dvbpsi_AttachTDTTOT(dvbpsi_tdt_tot_callback pf_callback,
 void dvbpsi_DetachTDTTOT(dvbpsi_handle h_dvbpsi)
 {
   free(h_dvbpsi->p_private_decoder);
+  if(h_dvbpsi->p_current_section)
+    dvbpsi_DeletePSISections(h_dvbpsi->p_current_section);
+  if(h_dvbpsi->p_free_sections)
+    dvbpsi_DeletePSISections(h_dvbpsi->p_free_sections);
   free(h_dvbpsi);
 }
 
@@ -171,7 +175,7 @@ void dvbpsi_GatherTDTTOTSections(dvbpsi_decoder_t* p_decoder,
     p_tdt_tot_decoder->pf_callback(p_tdt_tot_decoder->p_cb_data, p_tot);
   }
 
-  dvbpsi_ReleasePSISections(p_section);
+  dvbpsi_ReleasePSISections(p_decoder, p_section);
 }
 
 
@@ -184,7 +188,8 @@ void dvbpsi_DecodeTDTSection(dvbpsi_tdt_tot_t* p_tdt,
                              dvbpsi_psi_section_t* p_section)
 {
     // Decode UTC Time
-    dvbpsi_DecodeMJDUTC(p_section->p_payload_start, p_tdt);
+    dvbpsi_DecodeMJDUTC(p_section->p_payload_start, &p_tdt->i_year, &p_tdt->i_month, &p_tdt->i_day, 
+        &p_tdt->i_hour, &p_tdt->i_minute, &p_tdt->i_second);
     p_tdt->p_first_descriptor = NULL;
 }
 
@@ -201,7 +206,8 @@ void dvbpsi_DecodeTOTSection(dvbpsi_tdt_tot_t* p_tot,
 
     // Decode UTC Time
     p_byte = p_section->p_payload_start;
-    dvbpsi_DecodeMJDUTC(p_byte, p_tot);
+    dvbpsi_DecodeMJDUTC(p_byte, &p_tot->i_year, &p_tot->i_month, &p_tot->i_day, 
+        &p_tot->i_hour, &p_tot->i_minute, &p_tot->i_second);
     p_byte += 5;
     i_length = ((p_byte[0] & 0xf) << 8) | p_byte[1];
     p_byte += 2;
@@ -220,7 +226,7 @@ void dvbpsi_DecodeTOTSection(dvbpsi_tdt_tot_t* p_tot,
 }
 
 
-void dvbpsi_DecodeMJDUTC(char *p_mjdutc, dvbpsi_tdt_tot_t* p_table)
+void dvbpsi_DecodeMJDUTC(char *p_mjdutc, int *p_year, int *p_month, int *p_day, int *p_hour, int *p_minute, int *p_second)
 {
     #define BCD_CHAR_TO_INT(_bcd) (((_bcd >> 4) * 10) + (_bcd & 0x0f))
 
@@ -243,12 +249,12 @@ void dvbpsi_DecodeMJDUTC(char *p_mjdutc, dvbpsi_tdt_tot_t* p_table)
         i_k = 1;
     }
 
-    p_table->i_year = i_temp_y + i_k + 1900;
-    p_table->i_month = (i_temp_m - 1) - (i_k * 12);
-    p_table->i_day = (((i_mjd - 14956) - (int)((double)i_temp_y * 365.25)) - (int)((double)i_temp_m * 30.6001));
-    p_table->i_hour = BCD_CHAR_TO_INT(p_mjdutc[2]);
-    p_table->i_minute = BCD_CHAR_TO_INT(p_mjdutc[3]);
-    p_table->i_second = BCD_CHAR_TO_INT(p_mjdutc[4]);
+    *p_year = i_temp_y + i_k + 1900;
+    *p_month = (i_temp_m - 1) - (i_k * 12);
+    *p_day = (((i_mjd - 14956) - (int)((double)i_temp_y * 365.25)) - (int)((double)i_temp_m * 30.6001));
+    *p_hour = BCD_CHAR_TO_INT(p_mjdutc[2]);
+    *p_minute = BCD_CHAR_TO_INT(p_mjdutc[3]);
+    *p_second = BCD_CHAR_TO_INT(p_mjdutc[4]);
 }
 
 /*****************************************************************************
