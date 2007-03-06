@@ -98,7 +98,7 @@ void PluginManagerDeInit(void)
     ListIterator_t iterator;
     printlog(LOG_DEBUG, "Plugin Manager Deinitialising...\n");
     CommandUnRegisterCommands(PluginManagerCommands);
-    for ( ListIterator_Init(iterator, PluginsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    for ( ListIterator_Init(iterator, PluginsList); ListIterator_MoreEntries(iterator); )
     {
         struct PluginEntry_t *entry = ListIterator_Current(iterator);
         printlog(LOG_DEBUG, "Uninstalling %s\n", entry->pluginInterface->name);
@@ -243,6 +243,12 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
                     PESProcessorStartPID(details->pid, details->processor, details->userarg);
                 }
                 break;
+                case PLUGIN_FEATURE_TYPE_INSTALL:
+                {
+                    PluginInstallCallback_t callback = pluginInterface->features[i].details;
+                    callback(TRUE);
+                    break;
+                }
             }
 
         }
@@ -315,6 +321,12 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface)
                     PESProcessorStopPID(details->pid, details->processor, details->userarg);
                 }
                 break;
+                case PLUGIN_FEATURE_TYPE_INSTALL:
+                {
+                    PluginInstallCallback_t callback = pluginInterface->features[i].details;
+                    callback(FALSE);
+                    break;
+                }
             }
         }
     }
