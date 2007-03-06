@@ -48,6 +48,8 @@ Entry point to the application.
 #include "sdtprocessor.h"
 #include "nitprocessor.h"
 #include "tdtprocessor.h"
+#include "sectionprocessor.h"
+#include "pesprocessor.h"
 #include "servicefilter.h"
 #include "cache.h"
 #include "logging.h"
@@ -304,6 +306,9 @@ int main(int argc, char *argv[])
     NITProcessorDestroy( PIDFilters[PIDFilterIndex_NIT]);
     TDTProcessorDestroy( PIDFilters[PIDFilterIndex_TDT]);
 
+    SectionProcessorDestroyAllProcessors();
+    PESProcessorDestroyAllProcessors();
+    
     printlog(LOG_DEBUGV, "Processors destroyed\n");
     /* Close the adapter and shutdown the filter etc*/
     DEINIT(DVBDispose(DVBAdapter), "DVB adapter");
@@ -545,6 +550,11 @@ Service_t *SetCurrentService(char *name)
             printlog(LOG_DEBUG,"No new Multiplex!\n");
         }
 
+        if (CurrentService)
+        {
+            ServiceRefDec(CurrentService);
+        }
+
         if ((CurrentMultiplex!= NULL) && MultiplexAreEqual(multiplex, CurrentMultiplex))
         {
             printlog(LOG_DEBUGV,"Same multiplex\n");
@@ -555,7 +565,7 @@ Service_t *SetCurrentService(char *name)
             TuneMultiplex(multiplex);
 
             CurrentService = CacheServiceFindId(service->id);
-            ServiceFree(service);
+            ServiceRefDec(service);
         }
 
         TSFilterZeroStats(TSFilter);
