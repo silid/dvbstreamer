@@ -97,7 +97,10 @@ void ServiceFilterServiceSet(PIDFilter_t *filter, Service_t *service)
 {
     ServiceFilter_t *state = (ServiceFilter_t *)filter->fparg;
     assert(filter->filterpacket == ServiceFilterFilterPacket);
-    ServiceRefInc(service);
+    if (service)
+    {
+        ServiceRefInc(service);
+    }
     state->nextservice = service;
 }
 
