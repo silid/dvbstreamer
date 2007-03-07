@@ -40,7 +40,8 @@ dvbstreamer_SOURCES = \
     dvbpsi/tdttot.c \
     dvbpsi/dr_83.c \
     sectionprocessor.c \
-    pesprocessor.c
+    pesprocessor.c \
+    subtableprocessor.c
 
 dvbstreamer_LDFLAGS = -rdynamic
 
