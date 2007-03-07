@@ -41,44 +41,35 @@ Process Service Description Tables and update the services information.
 #include "main.h"
 #include "cache.h"
 #include "logging.h"
+#include "sdtprocessor.h"
+#include "subtableprocessor.h"
 
 #define TABLE_ID_SDT_ACTUAL 0x42
 #define TABLE_ID_SDT_OTHER  0x46
 
 #define DESCRIPTOR_SERVICE  0x48
 
-typedef struct SDTProcessor_t
-{
-    PIDFilterSimpleFilter_t simplefilter;
-    Multiplex_t *multiplex;
-    dvbpsi_handle demuxhandle;
-    bool payloadstartonly;
-}
-SDTProcessor_t;
-static void SDTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex);
-static TSPacket_t * SDTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
 static void SubTableHandler(void * state, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension);
 static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT);
+
 static List_t *NewSDTCallbacksList = NULL;
 
 PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter)
 {
-    PIDFilter_t *result = NULL;
-    SDTProcessor_t *state = calloc(1, sizeof(SDTProcessor_t));
-    if (state)
+    PIDFilter_t *result = SubTableProcessorCreate(tsfilter, 0x11, SubTableHandler, NULL, NULL, NULL);
+
+    if (result)
     {
-        state->simplefilter.pidcount = 1;
-        state->simplefilter.pids[0] = 0x11;
-        result = PIDFilterSetup(tsfilter,
-                    PIDFilterSimpleFilter, &state->simplefilter,
-                    SDTProcessorProcessPacket, state,
-                    NULL,NULL);
-        if (result == NULL)
-        {
-            free(state);
-        }
         result->name = "SDT";
-        PIDFilterMultiplexChangeSet(result,SDTProcessorMultiplexChanged, state);
+        /* If the PAT changes we want to pick up the SDT again as otherwise we 
+           may have services with no names.
+           Seen this with the UK multiplexes where there have been PAT changes 
+           in quick succesion but there has been no change to the SDT. This 
+           resulted in the services being available but losing there names
+           as the first changed to the PAT removed all services and then the 
+           next one added them all back (?!)
+        */
+        PIDFilterTSStructureChangeSet(result, result->multiplexchanged, result->mcarg);
     }
 
     if (!NewSDTCallbacksList)
@@ -91,15 +82,7 @@ PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter)
 
 void SDTProcessorDestroy(PIDFilter_t *filter)
 {
-    SDTProcessor_t *state = (SDTProcessor_t *)filter->pparg;
-    assert(filter->processpacket == SDTProcessorProcessPacket);
-    PIDFilterFree(filter);
-
-    if (state->multiplex)
-    {
-        dvbpsi_DetachDemux(state->demuxhandle);
-    }
-    free(state);
+    SubTableProcessorDestroy(filter);
 }
 
 void SDTProcessorRegisterSDTCallback(PluginSDTProcessor_t callback)
@@ -118,54 +101,11 @@ void SDTProcessorUnRegisterSDTCallback(PluginSDTProcessor_t callback)
     }
 }
 
-static void SDTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex)
-{
-    SDTProcessor_t *state = (SDTProcessor_t *)arg;
-    if (state->multiplex)
-    {
-        dvbpsi_DetachDemux(state->demuxhandle);
-    }
-    if (newmultiplex)
-    {
-        state->demuxhandle = dvbpsi_AttachDemux(SubTableHandler, (void*)state);
-        state->payloadstartonly = TRUE;
-    }
-    state->multiplex = newmultiplex;
-}
-
-static TSPacket_t * SDTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet)
-{
-    SDTProcessor_t *state = (SDTProcessor_t *)arg;
-
-    if (state->multiplex == NULL)
-    {
-        return 0;
-    }
-
-    if (state->payloadstartonly)
-    {
-        if (TSPACKET_ISPAYLOADUNITSTART(*packet))
-        {
-            state->demuxhandle->i_continuity_counter = (TSPACKET_GETCOUNT(*packet) - 1) & 0xf;
-            dvbpsi_PushPacket(state->demuxhandle, (uint8_t*)packet);
-            state->payloadstartonly = FALSE;
-        }
-    }
-    else
-    {
-        dvbpsi_PushPacket(state->demuxhandle, (uint8_t*)packet);
-    }
-
-    return 0;
-}
-
 static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension)
 {
-    SDTProcessor_t *state = (SDTProcessor_t *)arg;
-
     if(tableId == TABLE_ID_SDT_ACTUAL)
     {
-        dvbpsi_AttachSDT(demuxHandle, tableId, extension, SDTHandler, state);
+        dvbpsi_AttachSDT(demuxHandle, tableId, extension, SDTHandler, arg);
     }
 }
 
