@@ -124,12 +124,16 @@ int main(int argc, char *argv[])
         usage(argv[0]);
         exit(1);
     }
+
+    sqlite3_exec(DBaseInstance, "BEGIN TRANSACTION;", NULL, NULL, NULL);
     
     printlog(LOG_INFO,"Importing services from %s\n", channelsFile);
     if (!parsezapfile(channelsFile, channelsFileType))
     {
         exit(1);
     }
+
+    sqlite3_exec(DBaseInstance, "COMMIT TRANSACTION;", NULL, NULL, NULL);    
     
     printf("%d Services available on %d Multiplexes\n", ServiceCount(), MultiplexCount());
 
