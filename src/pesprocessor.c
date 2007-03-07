@@ -68,6 +68,12 @@ static List_t *SectionProcessorsList = NULL;
 void PESProcessorStartPID(uint16_t pid, PluginPESProcessor_t callback, void *userarg)
 {
     PIDFilter_t *processor = PESProcessorFind(pid);
+
+    if (SectionProcessorsList == NULL)
+    {
+        SectionProcessorsList = ListCreate();
+    }
+    
     if (processor == NULL)
     {
         processor = PESProcessorCreate(TSFilter, pid);
@@ -154,6 +160,8 @@ static PIDFilter_t *PESProcessorCreate(TSFilter_t *tsfilter, uint16_t pid)
         }
         asprintf(&result->name, "PES(PID 0x%04x)", pid);
         PIDFilterMultiplexChangeSet(result,PESProcessorMultiplexChanged, state);
+
+        state->callbacksList = ListCreate();
     }
 
     return result;
