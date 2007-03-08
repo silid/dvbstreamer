@@ -78,7 +78,7 @@ static void LCNQueryInstalled(bool installed );
 static void CommandListLCN(int argc, char **argv);
 static void CommandFindLCN(int argc, char **argv);
 static LCNEntry_t *GetEntry(int lcn);
-Service_t *FindService(uint16_t networkId , uint16_t tsId , uint16_t serviceId);
+static Service_t *FindService(uint16_t networkId , uint16_t tsId , uint16_t serviceId);
 
 
 /*******************************************************************************
@@ -298,7 +298,7 @@ static LCNEntry_t *GetEntry(int lcn)
     return &entries[lcn - 1];
 }
 
-Service_t *FindService(uint16_t networkId, uint16_t tsId, uint16_t serviceId)
+static Service_t *FindService(uint16_t networkId, uint16_t tsId, uint16_t serviceId)
 {
     Multiplex_t *multiplex;
     Service_t *service;
