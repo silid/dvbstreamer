@@ -29,6 +29,9 @@ File Delivery Method handler, all packets are written to the file of choosing.
 #include "ts.h"
 #include "deliverymethod.h"
 
+/*******************************************************************************
+* Typedefs                                                                     *
+*******************************************************************************/
 struct FileOutputInstance_t
 {
     char *mrl;
@@ -39,11 +42,22 @@ struct FileOutputInstance_t
     FILE *fp;
 };
 
+
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
 bool FileOutputCanHandle(char *mrl);
 DeliveryMethodInstance_t *FileOutputCreate(char *arg);
 void FileOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet);
 void FileOutputSendBlock(DeliveryMethodInstance_t *this, void *block, unsigned long blockLen);
 void FileOutputDestroy(DeliveryMethodInstance_t *this);
+
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
+/** Constants for the start of the MRL **/
+#define PREFIX_LEN (sizeof(FilePrefix) - 1)
+const char FilePrefix[] = "file://";
 
 /** Plugin Interface **/
 DeliveryMethodHandler_t FileOutputHandler = {
@@ -51,15 +65,27 @@ DeliveryMethodHandler_t FileOutputHandler = {
             FileOutputCreate
         };
 
+
+/*******************************************************************************
+* Plugin Setup                                                                 *
+*******************************************************************************/
 PLUGIN_FEATURES(
     PLUGIN_FEATURE_DELIVERYMETHOD(FileOutputHandler)
 );
 
-PLUGIN_INTERFACE_F("FileOutput", "0.1", "File Delivery method.\nUse file://<file name>\nFile name can be in absolute or relative.\nFor an absolute file name use file:///home/user/myts.ts.\nFor a relative file name use file://myts.ts.", "charrea6@users.sourceforge.net");
+PLUGIN_INTERFACE_F(
+    "FileOutput", 
+    "0.1", 
+    "File Delivery method.\nUse file://<file name>\n"
+    "File name can be in absolute or relative.\n"
+    "For an absolute file name use file:///home/user/myts.ts.\n"
+    "For a relative file name use file://myts.ts.", 
+    "charrea6@users.sourceforge.net"
+);
 
-/** Constants for the start of the MRL **/
-#define PREFIX_LEN (sizeof(FilePrefix) - 1)
-char FilePrefix[] = "file://";
+/*******************************************************************************
+* Delivery Method Functions                                                    *
+*******************************************************************************/
 
 bool FileOutputCanHandle(char *mrl)
 {
@@ -75,7 +101,11 @@ DeliveryMethodInstance_t *FileOutputCreate(char *arg)
         instance->SendPacket = FileOutputSendPacket;
         instance->SendBlock = FileOutputSendBlock;
         instance->DestroyInstance = FileOutputDestroy;
+        #ifdef __CYGWIN__
+        instance->fp = fopen((char*)(arg + PREFIX_LEN), "wb");
+        #else
         instance->fp = fopen64((char*)(arg + PREFIX_LEN), "wb");
+        #endif
         if (!instance->fp)
         {
             free(instance);

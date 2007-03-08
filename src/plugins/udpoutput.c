@@ -33,6 +33,9 @@ UDP Output Delivery Method handler.
 #include "deliverymethod.h"
 #include "logging.h"
 
+/*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
 #define MTU 1400 /* Conservative estimate */
 #define IP_HEADER (5*4)
 #define UDP_HEADER (2*4)
@@ -42,6 +45,10 @@ UDP Output Delivery Method handler.
 #define DEFAULT_HOST "localhost"
 #define DEFAULT_PORT "1234"
 
+
+/*******************************************************************************
+* Typedefs                                                                     *
+*******************************************************************************/
 struct UDPOutputState_t
 {
     char *mrl;
@@ -49,18 +56,30 @@ struct UDPOutputState_t
     void(*SendBlock)(DeliveryMethodInstance_t *this, void *block, unsigned long blockLen);
     void(*DestroyInstance)(DeliveryMethodInstance_t *this);
     int socket;
-    socklen_t address_len;
+    socklen_t addressLen;
     struct sockaddr_storage address;
-    int datagramfullcount;
-    int tspacketcount;
-    TSPacket_t outputbuffer[MAX_TS_PACKETS_PER_DATAGRAM];
+    int datagramFullCount;
+    int tsPacketCount;
+    TSPacket_t outputBuffer[MAX_TS_PACKETS_PER_DATAGRAM];
 };
 
+
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
 bool UDPOutputCanHandle(char *mrl);
 DeliveryMethodInstance_t *UDPOutputCreate(char *arg);
 void UDPOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet);
 void UDPOutputSendBlock(DeliveryMethodInstance_t *this, void *block, unsigned long blockLen);
 void UDPOutputDestroy(DeliveryMethodInstance_t *this);
+
+
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
+/** Constants for the start of the MRL **/
+#define PREFIX_LEN (sizeof(UDPPrefix) - 1)
+const char UDPPrefix[] = "udp://";
 
 /** Plugin Interface **/
 DeliveryMethodHandler_t UDPOutputHandler = {
@@ -68,16 +87,26 @@ DeliveryMethodHandler_t UDPOutputHandler = {
             UDPOutputCreate
         };
 
+
+/*******************************************************************************
+* Plugin Setup                                                                 *
+*******************************************************************************/
+
 PLUGIN_FEATURES(
     PLUGIN_FEATURE_DELIVERYMETHOD(UDPOutputHandler)
 );
 
-PLUGIN_INTERFACE_F("UDPOutput", "0.1", "Simple UDP Delivery method.\nUse udp://<host>:<port>", "charrea6@users.sourceforge.net");
+PLUGIN_INTERFACE_F(
+    "UDPOutput", 
+    "0.1", 
+    "Simple UDP Delivery method.\nUse udp://<host>:<port>", 
+    "charrea6@users.sourceforge.net"
+);
 
-/** Constants for the start of the MRL **/
-#define PREFIX_LEN (sizeof(UDPPrefix) - 1)
-char UDPPrefix[] = "udp://";
 
+/*******************************************************************************
+* Delivery Method Functions                                                    *
+*******************************************************************************/
 bool UDPOutputCanHandle(char *mrl)
 {
     return (strncmp(UDPPrefix, mrl, PREFIX_LEN) == 0);
@@ -192,7 +221,7 @@ DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
         free(state);
         return NULL;
     }
-    state->address_len = addrinfo->ai_addrlen;
+    state->addressLen = addrinfo->ai_addrlen;
     memcpy(&state->address, addrinfo->ai_addr, addrinfo->ai_addrlen);
     freeaddrinfo(addrinfo);
 
@@ -204,7 +233,7 @@ DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
         return NULL;
     }
 #endif
-    state->datagramfullcount = MAX_TS_PACKETS_PER_DATAGRAM;
+    state->datagramFullCount = MAX_TS_PACKETS_PER_DATAGRAM;
     return (DeliveryMethodInstance_t *)state;
 }
 
@@ -220,13 +249,13 @@ void UDPOutputDestroy(DeliveryMethodInstance_t *this)
 void UDPOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet)
 {
     struct UDPOutputState_t *state = (struct UDPOutputState_t*)this;
-    state->outputbuffer[state->tspacketcount++] = *packet;
-    if (state->tspacketcount >= state->datagramfullcount)
+    state->outputBuffer[state->tsPacketCount++] = *packet;
+    if (state->tsPacketCount >= state->datagramFullCount)
     {
-        UDPSendTo(state->socket, (char*)state->outputbuffer,
+        UDPSendTo(state->socket, (char*)state->outputBuffer,
                   MAX_TS_PACKETS_PER_DATAGRAM * TSPACKET_SIZE,
-                  (struct sockaddr *)(&state->address), state->address_len);
-        state->tspacketcount = 0;
+                  (struct sockaddr *)(&state->address), state->addressLen);
+        state->tsPacketCount = 0;
     }
 }
 
@@ -235,6 +264,6 @@ void UDPOutputSendBlock(DeliveryMethodInstance_t *this, void *block, unsigned lo
     struct UDPOutputState_t *state = (struct UDPOutputState_t*)this;
     UDPSendTo(state->socket, (char*)block,
               blockLen,
-              (struct sockaddr *)(&state->address), state->address_len);
+              (struct sockaddr *)(&state->address), state->addressLen);
 }
 

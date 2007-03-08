@@ -29,12 +29,21 @@ NULL Delivery Method handler, doesn't write any output, to anywhere, period.
 #include "ts.h"
 #include "deliverymethod.h"
 
-
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
 bool NullOutputCanHandle(char *mrl);
 DeliveryMethodInstance_t *NullOutputCreate(char *arg);
 void NullOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet);
 void NullOutputSendBlock(DeliveryMethodInstance_t *this, void *block, unsigned long blockLen);
 void NullOutputDestroy(DeliveryMethodInstance_t *this);
+
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
+/** Constants for the start of the MRL **/
+#define PREFIX_LEN (sizeof(NullPrefix) - 1)
+const char NullPrefix[] = "null://";
 
 /** Plugin Interface **/
 DeliveryMethodHandler_t NullOutputHandler = {
@@ -42,16 +51,24 @@ DeliveryMethodHandler_t NullOutputHandler = {
     NullOutputCreate
 };
 
+/*******************************************************************************
+* Plugin Setup                                                                 *
+*******************************************************************************/
 PLUGIN_FEATURES(
     PLUGIN_FEATURE_DELIVERYMETHOD(NullOutputHandler)
 );
 
-PLUGIN_INTERFACE_F("NullOutput", "0.1", "Null Delivery method, all packets are dropped.", "charrea6@users.sourceforge.net");
+PLUGIN_INTERFACE_F(
+    "NullOutput", 
+    "0.1", 
+    "Null Delivery method, all packets are dropped.", 
+    "charrea6@users.sourceforge.net"
+);
 
-/** Constants for the start of the MRL **/
-#define PREFIX_LEN (sizeof(NullPrefix) - 1)
-char NullPrefix[] = "null://";
 
+/*******************************************************************************
+* Delivery Method Functions                                                    *
+*******************************************************************************/
 bool NullOutputCanHandle(char *mrl)
 {
     return (strncmp(NullPrefix, mrl, PREFIX_LEN) == 0);
