@@ -32,11 +32,23 @@ Example use of the PES Filter Feature.
 #include "pesprocessor.h"
 #include "deliverymethod.h"
 
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
 static void CommandStartExtractingPes(int argc, char **argv);
 static void CommandStopExtractingPes(int argc, char **argv);
 static void CommandCurrentExtractingPes(int argc, char **argv);
 static void ProcessPESPacket(void *userarg, uint8_t *packet, uint16_t length);
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
+static PIDFilter_t pesOutput;
+static uint16_t pid;
+static bool started = FALSE;
 
+/*******************************************************************************
+* Plugin Setup                                                                 *
+*******************************************************************************/
 PLUGIN_COMMANDS(
     {
         "startxpes",
@@ -62,12 +74,17 @@ PLUGIN_COMMANDS(
     }
 );
 
-PLUGIN_INTERFACE_C("ExtractPES", "0.1", "Example usage of the PES Filter.", "charrea6@users.sourceforge.net");
+PLUGIN_INTERFACE_C(
+    "ExtractPES", 
+    "0.1", 
+    "Example usage of the PES Filter.", 
+    "charrea6@users.sourceforge.net"
+);
 
-static PIDFilter_t pesOutput;
-static uint16_t pid;
-static bool started = FALSE;
 
+/*******************************************************************************
+* Command functions                                                            *
+*******************************************************************************/
 static void CommandStartExtractingPes(int argc, char **argv)
 {
 
@@ -118,6 +135,9 @@ static void CommandCurrentExtractingPes(int argc, char **argv)
     CommandPrintf("PID          : %d\n", pid);
     CommandPrintf("Packet Count : %d\n", pesOutput.packetsoutput);
 }
+/*******************************************************************************
+* Packet processing                                                            *
+*******************************************************************************/
 static void ProcessPESPacket(void *userarg, uint8_t *packet, uint16_t length)
 {
     DeliveryMethodInstance_t *dmInstance;

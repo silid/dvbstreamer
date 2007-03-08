@@ -34,12 +34,16 @@ Logical Channel Number Query Plugin.
 #include "dvbpsi/nit.h"
 #include "dvbpsi/dr_83.h"
 
+
+/*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
 /* Database entry names */
 #define LCNENTRIES_TABLE   "LCNEntries"
 #define LCNENTRY_NUMBER    "number"
-#define LCNENTRY_ONETID    "onetid"
-#define LCNENTRY_TSID      "tsid"
-#define LCNENTRY_SERVICEID "serviceid"
+#define LCNENTRY_ONETID    "networkId"
+#define LCNENTRY_TSID      "tsId"
+#define LCNENTRY_SERVICEID "serviceId"
 #define LCNENTRY_VISIBLE   "visible"
 
 #define LCNENTRY_FIELDS LCNENTRY_NUMBER "," \
@@ -48,24 +52,43 @@ Logical Channel Number Query Plugin.
                         LCNENTRY_SERVICEID "," \
                         LCNENTRY_VISIBLE
 
+#define MAX_ENTRIES 999
+
+
+/*******************************************************************************
+* Typedefs                                                                     *
+*******************************************************************************/
 /* LCN Entry structure */
 #define ONETID_INVALID 0
 
 typedef struct LCNEntry_s
 {
-    uint16_t onetid;
-    uint16_t tsid;
-    uint16_t serviceid;
+    uint16_t networkId;
+    uint16_t tsId;
+    uint16_t serviceId;
     bool     visible;
 }LCNEntry_t;
 
+
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
 static void ProcessNIT(dvbpsi_nit_t *nit);
 static void LCNQueryInstalled(bool installed );
 static void CommandListLCN(int argc, char **argv);
 static void CommandFindLCN(int argc, char **argv);
 static LCNEntry_t *GetEntry(int lcn);
-Service_t *FindService(uint16_t onetid , uint16_t tsid , uint16_t serviceid);
+Service_t *FindService(uint16_t networkId , uint16_t tsId , uint16_t serviceId);
 
+
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
+static LCNEntry_t entries[MAX_ENTRIES];
+
+/*******************************************************************************
+* Plugin Setup                                                                 *
+*******************************************************************************/
 PLUGIN_FEATURES(
     PLUGIN_FEATURE_NITPROCESSOR(ProcessNIT),
     PLUGIN_FEATURE_INSTALL(LCNQueryInstalled)
@@ -73,7 +96,7 @@ PLUGIN_FEATURES(
 
 PLUGIN_COMMANDS(
     {
-        "listlcn",
+        "lslcn",
         FALSE, 0, 0,
         "List the logical channel numbers to services.",
         "List all the logical channel numbers and the services they refer to.",
@@ -88,11 +111,17 @@ PLUGIN_COMMANDS(
     }
 );
 
-PLUGIN_INTERFACE_CF("LCNQuery", "0.1", "Logical Channel Number look-up/list", "charrea6@users.sourceforge.net");
+PLUGIN_INTERFACE_CF(
+    "LCNQuery", 
+    "0.1", 
+    "Logical Channel Number look-up/list", 
+    "charrea6@users.sourceforge.net"
+);
 
-#define MAX_ENTRIES 999
-static LCNEntry_t entries[MAX_ENTRIES];
 
+/*******************************************************************************
+* Plugin Install Function                                                      *
+*******************************************************************************/
 static void LCNQueryInstalled(bool installed)
 {
     STATEMENT_INIT;
@@ -102,7 +131,7 @@ static void LCNQueryInstalled(bool installed)
         int i;
         for (i = 0; i < MAX_ENTRIES; i++)
         {
-            entries[i].onetid = ONETID_INVALID;
+            entries[i].networkId = ONETID_INVALID;
             entries[i].visible = FALSE;
         }
         // Load from the database
@@ -129,9 +158,9 @@ static void LCNQueryInstalled(bool installed)
 
                     if (entry)
                     {
-                        entry->onetid   = STATEMENT_COLUMN_INT(1);
-                        entry->tsid     = STATEMENT_COLUMN_INT(2);
-                        entry->serviceid= STATEMENT_COLUMN_INT(3);
+                        entry->networkId   = STATEMENT_COLUMN_INT(1);
+                        entry->tsId     = STATEMENT_COLUMN_INT(2);
+                        entry->serviceId= STATEMENT_COLUMN_INT(3);
                         entry->visible  = STATEMENT_COLUMN_INT(4);
                     }
                 }
@@ -154,10 +183,10 @@ static void LCNQueryInstalled(bool installed)
 
         for (i = 0; i < MAX_ENTRIES; i ++)
         {
-            if (entries[i].onetid != ONETID_INVALID)
+            if (entries[i].networkId != ONETID_INVALID)
             {
                 STATEMENT_PREPAREVA("INSERT INTO " LCNENTRIES_TABLE " VALUES (%d,%d,%d,%d,%d);", i + 1, 
-                    entries[i].onetid, entries[i].tsid, entries[i].serviceid, entries[i].visible);
+                    entries[i].networkId, entries[i].tsId, entries[i].serviceId, entries[i].visible);
                 STATEMENT_STEP();
                 STATEMENT_FINALIZE();
             }
@@ -168,7 +197,9 @@ static void LCNQueryInstalled(bool installed)
     
 }
 
-
+/*******************************************************************************
+* NIT Processing Function                                                      *
+*******************************************************************************/
 static void ProcessNIT(dvbpsi_nit_t *nit)
 {
     dvbpsi_nit_transport_t *transport = nit->p_first_transport;
@@ -194,9 +225,9 @@ static void ProcessNIT(dvbpsi_nit_t *nit)
                         {
                             if (!entry->visible || lcn_descriptor->p_entries[i].b_visible_service_flag)
                             {
-                                entry->onetid = transport->i_original_network_id;
-                                entry->tsid = transport->i_ts_id;
-                                entry->serviceid = lcn_descriptor->p_entries[i].i_service_id;
+                                entry->networkId = transport->i_original_network_id;
+                                entry->tsId = transport->i_ts_id;
+                                entry->serviceId = lcn_descriptor->p_entries[i].i_service_id;
                                 entry->visible = lcn_descriptor->p_entries[i].b_visible_service_flag;
                             }
                         }
@@ -208,6 +239,9 @@ static void ProcessNIT(dvbpsi_nit_t *nit)
     }
 }
 
+/*******************************************************************************
+* Command Functions                                                            *
+*******************************************************************************/
 static void CommandListLCN(int argc, char **argv)
 {
     int i;
@@ -215,9 +249,9 @@ static void CommandListLCN(int argc, char **argv)
     LCNEntry_t *entry;
     for ( i = 0; i < MAX_ENTRIES; i ++)
     {
-        if (entries[i].onetid != ONETID_INVALID)
+        if (entries[i].networkId != ONETID_INVALID)
         {
-            Service_t *service = FindService(entries[i].onetid, entries[i].tsid, entries[i].serviceid);
+            Service_t *service = FindService(entries[i].networkId, entries[i].tsId, entries[i].serviceId);
             if (service)
             {
                 if (entries[i].visible)
@@ -244,13 +278,13 @@ static void CommandFindLCN(int argc, char **argv)
         return;
     }
     entry = GetEntry(lcn);
-    if (entry->onetid == ONETID_INVALID)
+    if (entry->networkId == ONETID_INVALID)
     {
         CommandError(COMMAND_ERROR_GENERIC, "No such Logical Channel Number.");
         return;
     }
 
-    service = FindService(entry->onetid, entry->tsid, entry->serviceid);
+    service = FindService(entry->networkId, entry->tsId, entry->serviceId);
     if (service)
     {
         CommandPrintf("%s\n", service->name);
@@ -264,16 +298,16 @@ static LCNEntry_t *GetEntry(int lcn)
     return &entries[lcn - 1];
 }
 
-Service_t *FindService(uint16_t onetid, uint16_t tsid, uint16_t serviceid)
+Service_t *FindService(uint16_t networkId, uint16_t tsId, uint16_t serviceId)
 {
     Multiplex_t *multiplex;
     Service_t *service;
-    multiplex = MultiplexFindId((int) onetid, (int) tsid);
+    multiplex = MultiplexFindId((int) networkId, (int) tsId);
     if (!multiplex)
     {
         return NULL;
     }
-    service = ServiceFindId(multiplex, (int)serviceid);
+    service = ServiceFindId(multiplex, (int)serviceId);
     free(multiplex);
     return service;
 }
