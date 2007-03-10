@@ -68,14 +68,14 @@ bool DeliveryMethodManagerFind(char *mrl, PIDFilter_t *filter)
             {
                 if (filter->enabled)
                 {
-                    TSFilterLock(filter->tsfilter);
+                    TSFilterLock(filter->tsFilter);
                 }
-                if (filter->outputpacket)
+                if (filter->outputPacket)
                 {
                     DeliveryMethodManagerFree(filter);
                 }
-                filter->outputpacket = DeliveryMethodOutputPacket;
-                filter->oparg = instance;
+                filter->outputPacket = DeliveryMethodOutputPacket;
+                filter->opArg = instance;
                 if (instance->mrl == NULL)
                 {
                     instance->mrl = strdup(mrl);
@@ -83,7 +83,7 @@ bool DeliveryMethodManagerFind(char *mrl, PIDFilter_t *filter)
                 printlog(LOG_DEBUG, "Created DeliveryMethodInstance(%p) for %s\n",instance, instance->mrl);
                 if (filter->enabled)
                 {
-                    TSFilterUnLock(filter->tsfilter);
+                    TSFilterUnLock(filter->tsFilter);
                 }
                 return TRUE;
             }
@@ -94,12 +94,12 @@ bool DeliveryMethodManagerFind(char *mrl, PIDFilter_t *filter)
 
 void DeliveryMethodManagerFree(PIDFilter_t *filter)
 {
-    DeliveryMethodInstance_t *instance = filter->oparg;
+    DeliveryMethodInstance_t *instance = filter->opArg;
     if (instance)
     {
         char *mrl = instance->mrl;
         instance->DestroyInstance(instance);
-        filter->oparg = NULL;
+        filter->opArg = NULL;
         printlog(LOG_DEBUG, "Released DeliveryMethodInstance(%p) for %s\n" ,instance, mrl);
         free(mrl);
     }
@@ -107,7 +107,7 @@ void DeliveryMethodManagerFree(PIDFilter_t *filter)
 
 char* DeliveryMethodGetMRL(PIDFilter_t *filter)
 {
-    DeliveryMethodInstance_t *instance = filter->oparg;
+    DeliveryMethodInstance_t *instance = filter->opArg;
     return instance->mrl;
 }
 

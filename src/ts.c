@@ -46,7 +46,7 @@ TSFilter_t* TSFilterCreate(DVBAdapter_t *adapter)
     if (result)
     {
         result->adapter = adapter;
-        result->pidfilters = ListCreate();
+        result->pidFilters = ListCreate();
         pthread_mutex_init(&result->mutex, NULL);
         pthread_create(&result->thread, NULL, FilterTS, result);
     }
@@ -60,13 +60,13 @@ void TSFilterDestroy(TSFilter_t* tsfilter)
     pthread_join(tsfilter->thread, NULL);
     pthread_mutex_destroy(&tsfilter->mutex);
 
-    for ( ListIterator_Init(iterator, tsfilter->pidfilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    for ( ListIterator_Init(iterator, tsfilter->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         PIDFilter_t *filter =(PIDFilter_t *)ListIterator_Current(iterator);
         free(filter);
         ListRemoveCurrent(&iterator);
     }
-    ListFree( tsfilter->pidfilters);
+    ListFree( tsfilter->pidFilters);
     free(tsfilter);
 }
 
@@ -82,15 +82,15 @@ void TSFilterZeroStats(TSFilter_t* tsfilter)
     ListIterator_t iterator;
     pthread_mutex_lock(&tsfilter->mutex);
     /* Clear all filter stats */
-    tsfilter->totalpackets = 0;
+    tsfilter->totalPackets = 0;
     tsfilter->bitrate = 0;
 
-    for ( ListIterator_Init(iterator, tsfilter->pidfilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    for ( ListIterator_Init(iterator, tsfilter->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         PIDFilter_t *filter = (PIDFilter_t *)ListIterator_Current(iterator);
-        filter->packetsfiltered  = 0;
-        filter->packetsprocessed = 0;
-        filter->packetsoutput    = 0;
+        filter->packetsFiltered  = 0;
+        filter->packetsProcessed = 0;
+        filter->packetsOutput    = 0;
     }
     pthread_mutex_unlock(&tsfilter->mutex);
 }
@@ -98,7 +98,7 @@ void TSFilterZeroStats(TSFilter_t* tsfilter)
 void TSFilterMultiplexChanged(TSFilter_t *tsfilter, Multiplex_t *newmultiplex)
 {
     pthread_mutex_lock(&tsfilter->mutex);
-    tsfilter->multiplexchanged = TRUE;
+    tsfilter->multiplexChanged = TRUE;
     tsfilter->multiplex = newmultiplex;
     pthread_mutex_unlock(&tsfilter->mutex);
 }
@@ -109,8 +109,8 @@ PIDFilter_t* PIDFilterAllocate(TSFilter_t* tsfilter)
     PIDFilter_t *result = calloc(1, sizeof(PIDFilter_t));
     if (result)
     {
-        ListAdd(tsfilter->pidfilters, result);
-        result->tsfilter = tsfilter;
+        ListAdd(tsfilter->pidFilters, result);
+        result->tsFilter = tsfilter;
     }
     pthread_mutex_unlock(&tsfilter->mutex);
     return result;
@@ -118,9 +118,9 @@ PIDFilter_t* PIDFilterAllocate(TSFilter_t* tsfilter)
 
 void PIDFilterFree(PIDFilter_t * pidfilter)
 {
-    TSFilter_t *tsfilter = pidfilter->tsfilter;
+    TSFilter_t *tsfilter = pidfilter->tsFilter;
     pthread_mutex_lock(&tsfilter->mutex);
-    ListRemove(pidfilter->tsfilter->pidfilters, pidfilter);
+    ListRemove(pidfilter->tsFilter->pidFilters, pidfilter);
     free(pidfilter);
     pthread_mutex_unlock(&tsfilter->mutex);
 }
@@ -135,14 +135,14 @@ PIDFilter_t *PIDFilterSetup(TSFilter_t *tsfilter,
     filter = PIDFilterAllocate(tsfilter);
     if (filter)
     {
-        filter->filterpacket = filterpacket;
-        filter->fparg = fparg;
+        filter->filterPacket = filterpacket;
+        filter->fpArg = fparg;
 
-        filter->processpacket = processpacket;
-        filter->pparg = pparg;
+        filter->processPacket = processpacket;
+        filter->ppArg = pparg;
 
-        filter->outputpacket = outputpacket;
-        filter->oparg = oparg;
+        filter->outputPacket = outputpacket;
+        filter->opArg = oparg;
     }
     return filter;
 }
@@ -169,6 +169,7 @@ static void *FilterTS(void *arg)
 	struct timeval now, last;
 	int diff;
 	int prevpackets = 0;
+    bool locked = FALSE;
 
     TSFilter_t *state = (TSFilter_t*)arg;
     DVBAdapter_t *adapter = state->adapter;
@@ -180,33 +181,47 @@ static void *FilterTS(void *arg)
     {
         int p;
         /* Read in packet */
-        count = DVBDVRRead(adapter, (char*)state->readbuffer, sizeof(state->readbuffer), 100);
+        count = DVBDVRRead(adapter, (char*)state->readBuffer, sizeof(state->readBuffer), 100);
         if (state->quit)
         {
             break;
         }
 
-        if (state->multiplexchanged)
+        if (state->multiplexChanged)
         {
             InformMultiplexChanged(state);
-            state->multiplexchanged = FALSE;
+            state->multiplexChanged = FALSE;
+            locked = FALSE;
             /* Thow away these packets as they could be a mix of packets from the old TS and the new TS */
             continue;
         }
 
+        if (!locked)
+        {
+            fe_status_t status;
+            unsigned int ber, strength, snr;
+            DVBFrontEndStatus(adapter, &status, &ber, &strength, &snr);
+
+            if (status & FE_HAS_LOCK)
+            {
+                locked = TRUE;
+            }
+            continue;
+        }
+        
         pthread_mutex_lock(&state->mutex);
         for (p = 0; (p < (count / TSPACKET_SIZE)) && state->enabled; p ++)
         {
-            ProcessPacket(state, &state->readbuffer[p]);
-            state->totalpackets ++;
+            ProcessPacket(state, &state->readBuffer[p]);
+            state->totalPackets ++;
             /* The structure of the transport stream has changed in a major way,
                 (ie new services, services removed) so inform all of the filters
                 that are interested.
               */
-            if (state->tsstructurechanged)
+            if (state->tsStructureChanged)
             {
                 InformTSStructureChanged(state);
-                state->tsstructurechanged = FALSE;
+                state->tsStructureChanged = FALSE;
             }
         }
 
@@ -215,8 +230,8 @@ static void *FilterTS(void *arg)
 		if (diff > 1000)
 		{
 			// Work out bit rates
-			state->bitrate = ((state->totalpackets - prevpackets) * (188 * 8));
-			prevpackets = state->totalpackets;
+			state->bitrate = ((state->totalPackets - prevpackets) * (188 * 8));
+			prevpackets = state->totalPackets;
 			last = now;
 		}
 		pthread_mutex_unlock(&state->mutex);
@@ -229,27 +244,27 @@ static void ProcessPacket(TSFilter_t *state, TSPacket_t *packet)
     uint16_t pid = TSPACKET_GETPID(*packet);
 
     ListIterator_t iterator;
-    for ( ListIterator_Init(iterator, state->pidfilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    for ( ListIterator_Init(iterator, state->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         PIDFilter_t *filter =(PIDFilter_t *)ListIterator_Current(iterator);
-        if (filter->filterpacket && filter->filterpacket(filter, filter->fparg, pid, packet))
+        if (filter->filterPacket && filter->filterPacket(filter, filter->fpArg, pid, packet))
         {
             bool output = TRUE;
             TSPacket_t *outputPacket = packet;
 
-            filter->packetsfiltered ++;
+            filter->packetsFiltered ++;
 
-            if (filter->processpacket)
+            if (filter->processPacket)
             {
-                outputPacket = filter->processpacket(filter, filter->pparg, packet);
+                outputPacket = filter->processPacket(filter, filter->ppArg, packet);
                 output = (outputPacket) ? TRUE:FALSE;
-                filter->packetsprocessed ++;
+                filter->packetsProcessed ++;
             }
 
-            if (output && filter->outputpacket)
+            if (output && filter->outputPacket)
             {
-                filter->outputpacket(filter, filter->oparg, outputPacket);
-                filter->packetsoutput ++;
+                filter->outputPacket(filter, filter->opArg, outputPacket);
+                filter->packetsOutput ++;
             }
         }
     }
@@ -258,12 +273,12 @@ static void ProcessPacket(TSFilter_t *state, TSPacket_t *packet)
 static void InformTSStructureChanged(TSFilter_t *state)
 {
     ListIterator_t iterator;
-    for ( ListIterator_Init(iterator, state->pidfilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    for ( ListIterator_Init(iterator, state->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         PIDFilter_t *filter =(PIDFilter_t *)ListIterator_Current(iterator);
-        if (filter->enabled && filter->tsstructurechanged)
+        if (filter->enabled && filter->tsStructureChanged)
         {
-            filter->tsstructurechanged(filter, filter->tscarg);
+            filter->tsStructureChanged(filter, filter->tscArg);
         }
     }
 }
@@ -271,12 +286,12 @@ static void InformTSStructureChanged(TSFilter_t *state)
 static void InformMultiplexChanged(TSFilter_t *state)
 {
     ListIterator_t iterator;
-    for ( ListIterator_Init(iterator, state->pidfilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    for ( ListIterator_Init(iterator, state->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         PIDFilter_t *filter =(PIDFilter_t *)ListIterator_Current(iterator);
-        if (filter->enabled && filter->multiplexchanged)
+        if (filter->enabled && filter->multiplexChanged)
         {
-            filter->multiplexchanged(filter, filter->mcarg, state->multiplex);
+            filter->multiplexChanged(filter, filter->mcArg, state->multiplex);
         }
     }
 }

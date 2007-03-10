@@ -36,10 +36,10 @@ Manage multiplexes and tuning parameters.
 typedef struct Multiplex_t
 {
     int freq;       /**< Frequency the multiplex is broadcast on. */
-    int tsid;       /**< Transport Stream ID. */
-    int netid;      /**< Network ID */
+    int tsId;       /**< Transport Stream ID. */
+    int networkId;      /**< Network ID */
     fe_type_t type; /**< The type of frontend used to receive this transport stream. */
-    int patversion; /**< Last processed version of the PAT */
+    int patVersion; /**< Last processed version of the PAT */
 }
 Multiplex_t;
 

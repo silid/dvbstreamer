@@ -81,8 +81,8 @@ PIDFilter_t *PATProcessorCreate(TSFilter_t *tsfilter)
 
 void PATProcessorDestroy(PIDFilter_t *filter)
 {
-    PATProcessor_t *state= (PATProcessor_t*)filter->pparg;
-    assert(filter->processpacket == PATProcessorProcessPacket);
+    PATProcessor_t *state= (PATProcessor_t*)filter->ppArg;
+    assert(filter->processPacket == PATProcessorProcessPacket);
     PIDFilterFree(filter);
     if (state->multiplex)
     {
@@ -160,7 +160,7 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
     int count,i;
     Service_t **services;
 
-    printlog(LOG_DEBUG,"PAT recieved, version %d (old version %d)\n", newpat->i_version, multiplex->patversion);
+    printlog(LOG_DEBUG,"PAT recieved, version %d (old version %d)\n", newpat->i_version, multiplex->patVersion);
     /* Version has changed update the services */
     dvbpsi_pat_program_t *patentry = newpat->p_first_program;
     while(patentry)
@@ -173,10 +173,10 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
                 printlog(LOG_DEBUG, "Service not found in cache while processing PAT, adding 0x%04x\n", patentry->i_number);
                 service = CacheServiceAdd(patentry->i_number);
                 /* Cause a TS Structure change call back*/
-                state->tsfilter->tsstructurechanged = TRUE;
+                state->tsfilter->tsStructureChanged = TRUE;
             }
 
-            if (service && (service->pmtpid != patentry->i_pid))
+            if (service && (service->pmtPid != patentry->i_pid))
             {
                 CacheUpdateService(service, patentry->i_pid);
             }
@@ -210,7 +210,7 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
             services = CacheServicesGet(&count);
             i --;
             /* Cause a TS Structure change call back*/
-            state->tsfilter->tsstructurechanged = TRUE;
+            state->tsfilter->tsStructureChanged = TRUE;
         }
     }
 

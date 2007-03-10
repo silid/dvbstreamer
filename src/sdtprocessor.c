@@ -69,7 +69,7 @@ PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter)
            as the first changed to the PAT removed all services and then the 
            next one added them all back (?!)
         */
-        PIDFilterTSStructureChangeSet(result, result->multiplexchanged, result->mcarg);
+        PIDFilterTSStructureChangeSet(result, result->multiplexChanged, result->mcArg);
     }
 
     if (!NewSDTCallbacksList)
@@ -150,17 +150,17 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
                 }
                 descriptor = descriptor->p_next;
             }
-            service->conditionalaccess = sdtservice->b_free_ca;
-            service->runningstatus = sdtservice->i_running_status;
-            service->eitpresentfollowing = sdtservice->b_eit_present;
-            service->eitschedule = sdtservice->b_eit_schedule;
+            service->conditionalAccess = sdtservice->b_free_ca;
+            service->runningStatus = sdtservice->i_running_status;
+            service->eitPresentFollowing = sdtservice->b_eit_present;
+            service->eitSchedule = sdtservice->b_eit_schedule;
 
             ServiceRefDec(service);
         }
         sdtservice =sdtservice->p_next;
     }
     /* Set the Original Network id, this is a hack should really get and decode the NIT */
-    if (CurrentMultiplex->netid != newSDT->i_network_id)
+    if (CurrentMultiplex->networkId != newSDT->i_network_id)
     {
         CacheUpdateNetworkId((Multiplex_t *)CurrentMultiplex, newSDT->i_network_id);
     }

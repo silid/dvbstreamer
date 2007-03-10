@@ -125,7 +125,7 @@ static int PluginManagerLoadPlugin(const char *filename, void *userarg)
             ListIterator_t iterator;
             struct PluginEntry_t *entry = NULL;
             bool addPlugin = TRUE;
-            if (pluginInterface->RequiredVersion !=  DVBSTREAMER_VERSION)
+            if (pluginInterface->requiredVersion !=  DVBSTREAMER_VERSION)
             {
                 addPlugin = FALSE;
             }

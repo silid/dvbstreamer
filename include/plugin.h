@@ -143,7 +143,7 @@ typedef struct PluginFeature_t
  */
 typedef struct Plugin_t
 {
-    unsigned int RequiredVersion; /**< Version of DVBStreamer required to run this plugin */
+    unsigned int requiredVersion; /**< Version of DVBStreamer required to run this plugin */
 	char *name;                   /**< Name of the plugin */
 	char *version;                /**< String describing the version of the plugin */
 	char *description;            /**< Description of the plugin */

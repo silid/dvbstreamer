@@ -111,8 +111,8 @@ bool SubTableProcessorInit(PIDFilter_t *filter, uint16_t pid,
 
 void SubTableProcessorDeinit(PIDFilter_t *filter)
 {
-    SubTableProcessor_t *state = (SubTableProcessor_t *)filter->pparg;
-    assert(filter->processpacket == SubTableProcessorProcessPacket);
+    SubTableProcessor_t *state = (SubTableProcessor_t *)filter->ppArg;
+    assert(filter->processPacket == SubTableProcessorProcessPacket);
 
     if (state->multiplex)
     {
@@ -123,8 +123,8 @@ void SubTableProcessorDeinit(PIDFilter_t *filter)
 
 void *SubTableProcessorGetSubTableHandlerArg(PIDFilter_t *filter)
 {
-    SubTableProcessor_t *state = (SubTableProcessor_t *)filter->pparg;
-    assert(filter->processpacket == SubTableProcessorProcessPacket);
+    SubTableProcessor_t *state = (SubTableProcessor_t *)filter->ppArg;
+    assert(filter->processPacket == SubTableProcessorProcessPacket);
     return state->stharg;
 }
 

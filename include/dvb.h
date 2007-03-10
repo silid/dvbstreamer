@@ -40,14 +40,14 @@ typedef struct DVBAdapter_t
 {
     int adapter;           /**< The adapter number ie /dev/dvb/adapter<#adapter> */
     // /dev/dvb/adapter#/frontend0
-    char frontendPath[30]; /**< Path to the frontend device */
-    int frontendfd;        /**< File descriptor for the frontend device */
+    char frontEndPath[30]; /**< Path to the frontend device */
+    int frontEndFd;        /**< File descriptor for the frontend device */
     // /dev/dvb/adapter#/demux0
     char demuxPath[30];    /**< Path to the demux device */
-    int demuxfd;           /**< File descriptor for the demux device */
+    int demuxFd;           /**< File descriptor for the demux device */
     // /dev/dvb/adapter#/dvr0
     char dvrPath[30];      /**< Path to the dvr device */
-    int dvrfd;             /**< File descriptor for the dvr device */
+    int dvrFd;             /**< File descriptor for the dvr device */
 }
 DVBAdapter_t;
 

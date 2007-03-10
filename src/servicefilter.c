@@ -87,16 +87,16 @@ PIDFilter_t *ServiceFilterCreate(TSFilter_t *tsfilter, PacketOutput outputpacket
 
 void ServiceFilterDestroy(PIDFilter_t *filter)
 {
-    ServiceFilter_t *state = (ServiceFilter_t *)filter->pparg;
-    assert(filter->filterpacket == ServiceFilterFilterPacket);
+    ServiceFilter_t *state = (ServiceFilter_t *)filter->ppArg;
+    assert(filter->filterPacket == ServiceFilterFilterPacket);
     PIDFilterFree(filter);
     free(state);
 }
 
 void ServiceFilterServiceSet(PIDFilter_t *filter, Service_t *service)
 {
-    ServiceFilter_t *state = (ServiceFilter_t *)filter->fparg;
-    assert(filter->filterpacket == ServiceFilterFilterPacket);
+    ServiceFilter_t *state = (ServiceFilter_t *)filter->fpArg;
+    assert(filter->filterPacket == ServiceFilterFilterPacket);
     if (service)
     {
         ServiceRefInc(service);
@@ -106,23 +106,23 @@ void ServiceFilterServiceSet(PIDFilter_t *filter, Service_t *service)
 
 Service_t *ServiceFilterServiceGet(PIDFilter_t *filter)
 {
-    ServiceFilter_t *state = (ServiceFilter_t *)filter->fparg;
-    assert(filter->filterpacket == ServiceFilterFilterPacket);
+    ServiceFilter_t *state = (ServiceFilter_t *)filter->fpArg;
+    assert(filter->filterPacket == ServiceFilterFilterPacket);
     return state->service;
 }
 
 void ServiceFilterAVSOnlySet(PIDFilter_t *filter, bool enable)
 {
-    ServiceFilter_t *state = (ServiceFilter_t *)filter->fparg;
-    assert(filter->filterpacket == ServiceFilterFilterPacket);
+    ServiceFilter_t *state = (ServiceFilter_t *)filter->fpArg;
+    assert(filter->filterPacket == ServiceFilterFilterPacket);
     state->rewritepmt = enable;
     state->avsonly = enable;
 }
 
 bool ServiceFilterAVSOnlyGet(PIDFilter_t *filter)
 {
-    ServiceFilter_t *state = (ServiceFilter_t *)filter->fparg;
-    assert(filter->filterpacket == ServiceFilterFilterPacket);
+    ServiceFilter_t *state = (ServiceFilter_t *)filter->fpArg;
+    assert(filter->filterPacket == ServiceFilterFilterPacket);
     return state->avsonly;
 }
 
@@ -149,7 +149,7 @@ static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t
         PIDList_t *pids;
 
         /* Handle PAT and PMT pids */
-        if ((pid == 0) || (pid == state->service->pmtpid) || (pid == state->service->pcrpid))
+        if ((pid == 0) || (pid == state->service->pmtPid) || (pid == state->service->pcrPid))
         {
             return 1;
         }
@@ -198,14 +198,14 @@ static TSPacket_t *ServiceFilterProcessPacket(PIDFilter_t *pidfilter, void *arg,
         packet = &state->patpacket;
     }
 
-    if (state->avsonly && (pid == state->service->pmtpid))
+    if (state->avsonly && (pid == state->service->pmtPid))
     {
-        if (state->rewritepmt || (state->serviceversion != state->service->pmtversion))
+        if (state->rewritepmt || (state->serviceversion != state->service->pmtVersion))
         {
             state->pmtversion ++;
             ServiceFilterPMTRewrite(state);
             state->rewritepmt = FALSE;
-            state->serviceversion = state->service->pmtversion;
+            state->serviceversion = state->service->pmtVersion;
         }
 
         TSPACKET_SETCOUNT(state->pmtpacket, state->pmtpacketcounter ++);
@@ -220,8 +220,8 @@ static void ServiceFilterPATRewrite(ServiceFilter_t *state)
     dvbpsi_pat_t pat;
     dvbpsi_psi_section_t* section;
 
-    dvbpsi_InitPAT(&pat, state->multiplex->tsid, state->patversion, 1);
-    dvbpsi_PATAddProgram(&pat, state->service->id, state->service->pmtpid);
+    dvbpsi_InitPAT(&pat, state->multiplex->tsId, state->patversion, 1);
+    dvbpsi_PATAddProgram(&pat, state->service->id, state->service->pmtPid);
 
     section = dvbpsi_GenPATSections(&pat, 1);
     ServiceFilterInitPacket(&state->patpacket, section, "PAT");
@@ -241,17 +241,17 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t *state)
     dvbpsi_pmt_es_t *es;
     dvbpsi_psi_section_t* section;
 
-    dvbpsi_InitPMT(&pmt, state->service->id, state->pmtversion, 1, state->service->pcrpid);
+    dvbpsi_InitPMT(&pmt, state->service->id, state->pmtversion, 1, state->service->pcrPid);
 
     state->videopid = 0xffff;
     state->audiopid = 0xffff;
     state->subpid = 0xffff;
     printlog(LOG_DEBUG, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-    printlog(LOG_DEBUG, "Rewriting PMT on PID %x\n", state->service->pmtpid);
+    printlog(LOG_DEBUG, "Rewriting PMT on PID %x\n", state->service->pmtPid);
     pids = CachePIDsGet(state->service);
     for (i = 0; (pids != NULL) && (i < pids->count) && (!vfound || !afound || !sfound); i ++)
     {
-        printlog(LOG_DEBUG, "\tpid = %x type =%d subtype = %d\n", pids->pids[i].pid, pids->pids[i].type, pids->pids[i].subtype);
+        printlog(LOG_DEBUG, "\tpid = %x type =%d subtype = %d\n", pids->pids[i].pid, pids->pids[i].type, pids->pids[i].subType);
         if (!vfound && ((pids->pids[i].type == 1) || (pids->pids[i].type == 2)))
         {
             vfound = TRUE;
@@ -298,7 +298,7 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t *state)
 
     section = dvbpsi_GenPMTSections(&pmt);
     ServiceFilterInitPacket(&state->pmtpacket, section, "PMT");
-    TSPACKET_SETPID(state->pmtpacket, state->service->pmtpid);
+    TSPACKET_SETPID(state->pmtpacket, state->service->pmtPid);
     printlog(LOG_DEBUG, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     dvbpsi_DeletePSISections(section);
     dvbpsi_EmptyPMT(&pmt);

@@ -132,7 +132,7 @@ static PIDFilter_t *PESProcessorFind(uint16_t pid)
          ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         PIDFilter_t * filter = (PIDFilter_t*)ListIterator_Current(iterator);
-        PESProcessor_t *processor = (PESProcessor_t *)filter->pparg;
+        PESProcessor_t *processor = (PESProcessor_t *)filter->ppArg;
 
         if (processor->simplefilter.pids[0] == pid)
         {
@@ -169,9 +169,9 @@ static PIDFilter_t *PESProcessorCreate(TSFilter_t *tsfilter, uint16_t pid)
 
 static void PESProcessorDestroy(PIDFilter_t *filter)
 {
-    PESProcessor_t *state = (PESProcessor_t *)filter->pparg;
+    PESProcessor_t *state = (PESProcessor_t *)filter->ppArg;
     ListIterator_t iterator;
-    assert(filter->processpacket == PESProcessorProcessPacket);
+    assert(filter->processPacket == PESProcessorProcessPacket);
     PIDFilterFree(filter);
 
     for (ListIterator_Init(iterator, state->callbacksList);
@@ -188,10 +188,10 @@ static void PESProcessorDestroy(PIDFilter_t *filter)
 
 static void PESProcessorRegisterCallback(PIDFilter_t *filter,PluginPESProcessor_t callback, void *userarg)
 {
-    PESProcessor_t *state = (PESProcessor_t *)filter->pparg;
+    PESProcessor_t *state = (PESProcessor_t *)filter->ppArg;
     CallbackDetails_t *details;
 
-    assert(filter->processpacket == PESProcessorProcessPacket);
+    assert(filter->processPacket == PESProcessorProcessPacket);
 
     details = malloc(sizeof(CallbackDetails_t));
     if (details)
@@ -204,10 +204,10 @@ static void PESProcessorRegisterCallback(PIDFilter_t *filter,PluginPESProcessor_
 
 static void PESProcessorUnRegisterCallback(PIDFilter_t *filter,PluginPESProcessor_t callback, void *userarg)
 {
-    PESProcessor_t *state = (PESProcessor_t *)filter->pparg;
+    PESProcessor_t *state = (PESProcessor_t *)filter->ppArg;
     ListIterator_t iterator;
 
-    assert(filter->processpacket == PESProcessorProcessPacket);
+    assert(filter->processPacket == PESProcessorProcessPacket);
 
     for (ListIterator_Init(iterator, state->callbacksList);
          ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
@@ -224,7 +224,7 @@ static void PESProcessorUnRegisterCallback(PIDFilter_t *filter,PluginPESProcesso
 
 static bool PESProcessorHasCallbacks(PIDFilter_t *filter)
 {
-    PESProcessor_t *state = (PESProcessor_t *)filter->pparg;
+    PESProcessor_t *state = (PESProcessor_t *)filter->ppArg;
     return (ListCount(state->callbacksList) > 0);
 }
 

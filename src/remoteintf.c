@@ -321,7 +321,7 @@ static void HandleConnection(Connection_t *connection)
         inet_ntoa(connection->clientAddress.sin_addr), connection->clientAddress.sin_port);
     context.authenticated = FALSE;
     context.remote = TRUE;
-    context.privatearg = connection;
+    context.privateArg = connection;
     context.commands = ConnectionCommands;
 
     PrintResponse(socketfp,COMMAND_OK, "Ready");
@@ -349,7 +349,7 @@ static void HandleConnection(Connection_t *connection)
                 }
                 printlog(LOG_DEBUG, "%s: Received Line: \"%s\"\n", context.interface, line);
                 CommandExecute(&context, RemoteInterfacePrintfImpl, line);
-                PrintResponse(socketfp,context.errorno, context.errormessage);
+                PrintResponse(socketfp,context.errorNumber, context.errorMessage);
             }
             else
             {
@@ -382,7 +382,7 @@ static bool PrintResponse(FILE *fp, uint16_t errno, char * msg)
 static int RemoteInterfacePrintfImpl(char *format, ...)
 {
     int result = 0;
-    Connection_t *connection = (Connection_t*)CurrentCommandContext->privatearg;
+    Connection_t *connection = (Connection_t*)CurrentCommandContext->privateArg;
     va_list valist;
 
     va_start(valist, format);
@@ -425,7 +425,7 @@ static void RemoteInterfaceLogout(int argc, char **argv)
 {
     if (CurrentCommandContext->remote)
     {
-        Connection_t *connection = (Connection_t*)CurrentCommandContext->privatearg;
+        Connection_t *connection = (Connection_t*)CurrentCommandContext->privateArg;
         connection->connected = FALSE;
         CommandError(COMMAND_OK, "Bye!");
     }

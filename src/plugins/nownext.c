@@ -253,14 +253,14 @@ static void UpdateEvent(Event_t *event, dvbpsi_eit_event_t *eitevent)
 {
     dvbpsi_descriptor_t *descriptor;
     dvbpsi_short_event_dr_t * sedescriptor;
-    
+
     dvbpsi_DecodeMJDUTC((char *)&eitevent->i_start_time, 
                         &event->startTime.year, &event->startTime.month, &event->startTime.day,
                         &event->startTime.hour,&event->startTime.minute, &event->startTime.second);
     event->duration.hour   = (((eitevent->i_duration >> 20 )& 0xf) * 10) + ((eitevent->i_duration >> 16 )& 0xf);
     event->duration.minute = (((eitevent->i_duration >> 12 )& 0xf) * 10) + ((eitevent->i_duration >>  8 )& 0xf);
     event->duration.second = (((eitevent->i_duration >>  4 )& 0xf) * 10) + ((eitevent->i_duration >>  0 )& 0xf);
-
+                        
     for (descriptor = eitevent->p_first_descriptor; descriptor; descriptor = descriptor->p_next)
     {
         if (descriptor->i_tag == 0x4d)
@@ -288,7 +288,7 @@ static ServiceNowNextInfo_t *FindServiceName(char *name)
         return NULL;
     }
 
-    multiplex = MultiplexFind(service->multiplexfreq);
+    multiplex = MultiplexFind(service->multiplexFreq);
     if (!multiplex)
     {
         CommandError(COMMAND_ERROR_GENERIC, "Failed to find multiplex!");
@@ -296,7 +296,7 @@ static ServiceNowNextInfo_t *FindServiceName(char *name)
         return NULL;
     }
 
-    info = FindService(multiplex->netid, multiplex->tsid, service->id);
+    info = FindService(multiplex->networkId, multiplex->tsId, service->id);
     ServiceRefDec(service);
     free(multiplex);
     return info;

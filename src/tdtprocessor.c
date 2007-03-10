@@ -90,8 +90,8 @@ PIDFilter_t *TDTProcessorCreate(TSFilter_t *tsfilter)
 
 void TDTProcessorDestroy(PIDFilter_t *filter)
 {
-    TDTProcessor_t *state = (TDTProcessor_t *)filter->pparg;
-    assert(filter->processpacket == TDTProcessorProcessPacket);
+    TDTProcessor_t *state = (TDTProcessor_t *)filter->ppArg;
+    assert(filter->processPacket == TDTProcessorProcessPacket);
     PIDFilterFree(filter);
 
     if (state->multiplex)

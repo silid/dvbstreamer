@@ -526,7 +526,7 @@ Service_t *SetCurrentService(char *name)
         return NULL;
     }
 
-    printlog(LOG_DEBUG, "Service found id:0x%04x Multiplex:%d\n", service->id, service->multiplexfreq);
+    printlog(LOG_DEBUG, "Service found id:0x%04x Multiplex:%d\n", service->id, service->multiplexFreq);
     if ((CurrentService == NULL) || (!ServiceAreEqual(service,CurrentService)))
     {
         printlog(LOG_DEBUGV,"Disabling filters\n");
@@ -534,7 +534,7 @@ Service_t *SetCurrentService(char *name)
 
         if (CurrentMultiplex)
         {
-            printlog(LOG_DEBUG,"Current Multiplex frequency = %d TS id = %d\n",CurrentMultiplex->freq, CurrentMultiplex->tsid);
+            printlog(LOG_DEBUG,"Current Multiplex frequency = %d TS id = %d\n",CurrentMultiplex->freq, CurrentMultiplex->tsId);
         }
         else
         {
@@ -543,7 +543,7 @@ Service_t *SetCurrentService(char *name)
 
         if (multiplex)
         {
-            printlog(LOG_DEBUG,"New Multiplex frequency =%d TS id = %d\n",multiplex->freq, multiplex->tsid);
+            printlog(LOG_DEBUG,"New Multiplex frequency =%d TS id = %d\n",multiplex->freq, multiplex->tsId);
         }
         else
         {

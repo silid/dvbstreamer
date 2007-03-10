@@ -87,9 +87,9 @@ PIDFilter_t *PMTProcessorCreate(TSFilter_t *tsfilter)
 
 void PMTProcessorDestroy(PIDFilter_t *filter)
 {
-    PMTProcessor_t *state = (PMTProcessor_t *)filter->fparg;
+    PMTProcessor_t *state = (PMTProcessor_t *)filter->fpArg;
     int i;
-    assert(filter->filterpacket == PMTProcessorFilterPacket);
+    assert(filter->filterPacket == PMTProcessorFilterPacket);
     PIDFilterFree(filter);
 
     for (i = 0; i < MAX_HANDLES; i ++)
@@ -137,7 +137,7 @@ static int PMTProcessorFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t 
         services = CacheServicesGet(&count);
         for (i = 0; i < count; i ++)
         {
-            if (pid == services[i]->pmtpid)
+            if (pid == services[i]->pmtPid)
             {
                 return 1;
             }
@@ -173,7 +173,7 @@ static void PMTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Mult
     }
     for (i = 0; i < count; i ++)
     {
-        state->pmtpids[i] = services[i]->pmtpid;
+        state->pmtpids[i] = services[i]->pmtPid;
         ServiceRefInc(services[i]);
         state->services[i] = services[i];
         state->pmthandles[i] = dvbpsi_AttachPMT(services[i]->id, PMTHandler, (void*)services[i]);
@@ -296,7 +296,7 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
     dvbpsi_pmt_es_t *esentry = newpmt->p_first_es;
     int count = 0;
 
-    printlog(LOG_DEBUG,"PMT recieved, version %d on PID %d (old version %d)\n", newpmt->i_version, service->pmtpid, service->pmtversion);
+    printlog(LOG_DEBUG,"PMT recieved, version %d on PID %d (old version %d)\n", newpmt->i_version, service->pmtPid, service->pmtVersion);
 
     while(esentry)
     {
@@ -327,14 +327,14 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
                     if (desc->i_tag == 10) /* ISO 639 Language Descriptor */
                     {
                         dvbpsi_iso639_dr_t *iso639 = dvbpsi_DecodeISO639Dr(desc);
-                        pids->pids[i].subtype = iso639->i_audio_type;
+                        pids->pids[i].subType = iso639->i_audio_type;
                     }
                     desc = desc->p_next;
                 }
             }
             else
             {
-                pids->pids[i].subtype = 0;
+                pids->pids[i].subType = 0;
             }
             esentry = esentry->p_next;
         }
