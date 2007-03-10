@@ -101,8 +101,8 @@ TSPacket_t;
  * @defgroup PIDFilter PID Filter functions and datatypes
  * @{
  */
-/* forward define of type to solve compile warnings */
-typedef struct PIDFilter_t PIDFilter_t;
+
+struct PIDFilter_s;
 
 /*---- Filter function pointer type----*/
 /**
@@ -111,7 +111,7 @@ typedef struct PIDFilter_t PIDFilter_t;
  * @param pidfilter The PID Filter this callback belongs to.
  * @param userarg   A user defined argument.
  */
-typedef void (*MultiplexChanged)(PIDFilter_t *pidfilter, void *userarg, Multiplex_t *multiplex);
+typedef void (*MultiplexChanged)(struct PIDFilter_s *pidfilter, void *userarg, Multiplex_t *multiplex);
 
 /**
  * Callback used to signal that a change has occured to the underlying structure
@@ -119,7 +119,7 @@ typedef void (*MultiplexChanged)(PIDFilter_t *pidfilter, void *userarg, Multiple
  * @param pidfilter The PID Filter this callback belongs to.
  * @param userarg   A user defined argument.
  */
-typedef void (*TSStructureChanged)(PIDFilter_t *pidfilter, void *userarg);
+typedef void (*TSStructureChanged)(struct PIDFilter_s *pidfilter, void *userarg);
 
 /**
  * Callback used to determine if a packet should be passed to the packet processor
@@ -132,7 +132,7 @@ typedef void (*TSStructureChanged)(PIDFilter_t *pidfilter, void *userarg);
  * packet should be passed on to the Packet processor callback if one exists, or
  * to the output callback.
  */
-typedef int (*PacketFilter)(PIDFilter_t *pidfilter, void *userarg, uint16_t pid, TSPacket_t* packet);
+typedef int (*PacketFilter)(struct PIDFilter_s *pidfilter, void *userarg, uint16_t pid, TSPacket_t* packet);
 
 /**
  * Callback used to process a packet, this is intended to be a function which
@@ -144,7 +144,7 @@ typedef int (*PacketFilter)(PIDFilter_t *pidfilter, void *userarg, uint16_t pid,
  * packet should be output. Returning the packet allows the processor to either
  * return the original pointer or to insert a packet of its own creation.
  */
-typedef TSPacket_t* (*PacketProcessor)(PIDFilter_t *pidfilter, void *userarg, TSPacket_t* packet);
+typedef TSPacket_t* (*PacketProcessor)(struct PIDFilter_s *pidfilter, void *userarg, TSPacket_t* packet);
 
 /**
  * Callback used to send a packet to an output destination.
@@ -152,38 +152,39 @@ typedef TSPacket_t* (*PacketProcessor)(PIDFilter_t *pidfilter, void *userarg, TS
  * @param userarg   A user defined argument.
  * @param packet    The packet to output.
  */
-typedef void (*PacketOutput)(PIDFilter_t *pidfilter, void *userarg, TSPacket_t* packet);
+typedef void (*PacketOutput)(struct PIDFilter_s *pidfilter, void *userarg, TSPacket_t* packet);
 
 /*---- PID Filter Structures ----*/
 /**
  * Structure representing a PID Filter that belongs to a TS Filter.
  */
-struct PIDFilter_t
+typedef struct PIDFilter_s
 {
     char *name;                            /**< Name of this instance */
-    struct TSFilter_t *tsfilter;           /**< TS Filter instance this filter belongs to. */
+    struct TSFilter_t *tsFilter;           /**< TS Filter instance this filter belongs to. */
     volatile bool enabled;                 /**< Boolean indicating whether this filter is enabled and should process packets */
 
-    MultiplexChanged multiplexchanged;     /**< Callback to call when the Multiplex is changed. */
-    void *mcarg;                           /**< User defined argument to pass to the multiplexchanged callback */
+    MultiplexChanged multiplexChanged;     /**< Callback to call when the Multiplex is changed. */
+    void *mcArg;                           /**< User defined argument to pass to the multiplexChanged callback */
 
-    TSStructureChanged tsstructurechanged; /**< Callback to call when the underlying TS structure changes */
-    void *tscarg;                          /**< User defined argument to pass to the tsstructurechanged callback */
+    TSStructureChanged tsStructureChanged; /**< Callback to call when the underlying TS structure changes */
+    void *tscArg;                          /**< User defined argument to pass to the tsStructureChanged callback */
 
-    PacketFilter filterpacket;             /**< Callback to call when a new packet arrives */
-    void *fparg;                           /**<User defined argument to pass to the filterpacket callback */
+    PacketFilter filterPacket;             /**< Callback to call when a new packet arrives */
+    void *fpArg;                           /**<User defined argument to pass to the filterPacket callback */
 
-    PacketProcessor processpacket;         /**< Callback to call if filterpacket returns non-zero */
-    void *pparg;                           /**<User defined argument to pass to the processpacket callback */
+    PacketProcessor processPacket;         /**< Callback to call if filterPacket returns non-zero */
+    void *ppArg;                           /**<User defined argument to pass to the processPacket callback */
 
-    PacketOutput outputpacket;             /**< Callback to call when a packet has passed filterpacket and processpacket callbacks tests */
-    void *oparg;                           /**<User defined argument to pass to the outputpacket callback */
+    PacketOutput outputPacket;             /**< Callback to call when a packet has passed filterPacket and processPacket callbacks tests */
+    void *opArg;                           /**<User defined argument to pass to the outputPacket callback */
 
     /* Variables for statistics */
-    volatile int packetsfiltered;          /**< Number of packets that filterpacket has returned non-zero for. */
-    volatile int packetsprocessed;         /**< Number of packets that processpacket has returned non-NULL for. */
-    volatile int packetsoutput;            /**< Number of packets sent to the output callback */
-};
+    volatile int packetsFiltered;          /**< Number of packets that filterPacket has returned non-zero for. */
+    volatile int packetsProcessed;         /**< Number of packets that processPacket has returned non-NULL for. */
+    volatile int packetsOutput;            /**< Number of packets sent to the output callback */
+}PIDFilter_t;
+
 /**@}*/
 
 /**
@@ -231,19 +232,19 @@ PIDFilterSimpleFilter_t;
 typedef struct TSFilter_t
 {
     bool quit;                          /**< Whether the filters thread should finish. */
-    TSPacket_t readbuffer[MAX_PACKETS]; /**< Buffer used to read packets into from the DVB Adapter */
+    TSPacket_t readBuffer[MAX_PACKETS]; /**< Buffer used to read packets into from the DVB Adapter */
     DVBAdapter_t *adapter;              /**< DVBAdapter packets should be read from */
     pthread_t thread;                   /**< Thread used to read and process TS packets */
     bool enabled;                       /**< Whether packets should be read/processed */
     pthread_mutex_t mutex;              /**< Mutex used to protect access to this structure */
-    bool multiplexchanged;              /**< Whether the multiplex has been changed. */
+    bool multiplexChanged;              /**< Whether the multiplex has been changed. */
     Multiplex_t *multiplex;             /**< The multiplex the transport stream is coming from. */
-    bool tsstructurechanged;            /**< Whether the underlying TS structure has changed. */
+    bool tsStructureChanged;            /**< Whether the underlying TS structure has changed. */
 
-    volatile int totalpackets;          /**< Total number of packets processed by this instance. */
+    volatile int totalPackets;          /**< Total number of packets processed by this instance. */
 	volatile int bitrate;               /**< Approximate bit rate of the transport stream being processed. */
 
-    List_t *pidfilters;
+    List_t *pidFilters;
 }
 TSFilter_t;
 
@@ -328,7 +329,7 @@ PIDFilter_t *PIDFilterSetup(TSFilter_t *tsfilter,
  * @param _arg       The user argument to pass to the callback.
  */
 #define PIDFilterFilterPacketSet(_pidfilter, _callback, _arg) \
-    do{ (_pidfilter)->fparg = _arg; (_pidfilter)->filterpacket = _callback; } while(0)
+    do{ (_pidfilter)->fpArg = _arg; (_pidfilter)->filterPacket = _callback; } while(0)
 /**
  * Sets the processpacket callback and user argument.
  * @param _pidfilter The PIDFilter_t instance to set.
@@ -336,7 +337,7 @@ PIDFilter_t *PIDFilterSetup(TSFilter_t *tsfilter,
  * @param _arg       The user argument to pass to the callback.
  */
 #define PIDFilterProcessPacketSet(_pidfilter, _callback, _arg) \
-    do{ (_pidfilter)->pparg = _arg; (_pidfilter)->processpacket = _callback; } while(0)
+    do{ (_pidfilter)->ppArg = _arg; (_pidfilter)->processPacket = _callback; } while(0)
 /**
  * Sets the outputpacket callback and user argument.
  * @param _pidfilter The PIDFilter_t instance to set.
@@ -344,7 +345,7 @@ PIDFilter_t *PIDFilterSetup(TSFilter_t *tsfilter,
  * @param _arg       The user argument to pass to the callback.
  */
 #define PIDFilterOutputPacketSet(_pidfilter, _callback, _arg) \
-    do{ (_pidfilter)->oparg = _arg; (_pidfilter)->outputpacket = _callback; } while(0)
+    do{ (_pidfilter)->opArg = _arg; (_pidfilter)->outputPacket = _callback; } while(0)
 /**
  * Sets the tsstructurechanged callback and user argument.
  * @param _pidfilter The PIDFilter_t instance to set.
@@ -352,7 +353,7 @@ PIDFilter_t *PIDFilterSetup(TSFilter_t *tsfilter,
  * @param _arg       The user argument to pass to the callback.
  */
 #define PIDFilterTSStructureChangeSet(_pidfilter, _callback, _arg) \
-    do{ (_pidfilter)->tscarg = _arg; (_pidfilter)->tsstructurechanged = _callback; } while(0)
+    do{ (_pidfilter)->tscArg = _arg; (_pidfilter)->tsStructureChanged = _callback; } while(0)
 /**
  * Sets the multiplexchanged callback and user argument.
  * @param _pidfilter The PIDFilter_t instance to set.
@@ -360,7 +361,7 @@ PIDFilter_t *PIDFilterSetup(TSFilter_t *tsfilter,
  * @param _arg       The user argument to pass to the callback.
  */
 #define PIDFilterMultiplexChangeSet(_pidfilter, _callback, _arg) \
-    do{ (_pidfilter)->mcarg = _arg; (_pidfilter)->multiplexchanged = _callback; } while(0)
+    do{ (_pidfilter)->mcArg = _arg; (_pidfilter)->multiplexChanged = _callback; } while(0)
 /**@}*/
 
 

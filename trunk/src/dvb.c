@@ -42,29 +42,29 @@ DVBAdapter_t *DVBInit(int adapter)
     result = (DVBAdapter_t*)calloc(sizeof(DVBAdapter_t), 1);
     if (result)
     {
-        result->frontendfd = -1;
-        result->demuxfd = -1;
-        result->dvrfd = -1;
+        result->frontEndFd = -1;
+        result->demuxFd = -1;
+        result->dvrFd = -1;
         result->adapter = adapter;
-        sprintf(result->frontendPath, "/dev/dvb/adapter%d/frontend0", adapter);
+        sprintf(result->frontEndPath, "/dev/dvb/adapter%d/frontend0", adapter);
         sprintf(result->demuxPath, "/dev/dvb/adapter%d/demux0", adapter);
         sprintf(result->dvrPath, "/dev/dvb/adapter%d/dvr0", adapter);
-        result->frontendfd = open(result->frontendPath, O_RDWR);
-        if (result->frontendfd == -1)
+        result->frontEndFd = open(result->frontEndPath, O_RDWR);
+        if (result->frontEndFd == -1)
         {
-            printlog(LOG_ERROR,"Failed to open %s : %s\n",result->frontendPath, strerror(errno));
+            printlog(LOG_ERROR,"Failed to open %s : %s\n",result->frontEndPath, strerror(errno));
             DVBDispose(result);
             return NULL;
         }
-        result->demuxfd = open(result->demuxPath, O_RDWR);
-        if (result->demuxfd == -1)
+        result->demuxFd = open(result->demuxPath, O_RDWR);
+        if (result->demuxFd == -1)
         {
             printlog(LOG_ERROR,"Failed to open %s : %s\n",result->demuxPath, strerror(errno));
             DVBDispose(result);
             return NULL;
         }
-        result->dvrfd = open(result->dvrPath, O_RDONLY | O_NONBLOCK);
-        if (result->dvrfd == -1)
+        result->dvrFd = open(result->dvrPath, O_RDONLY | O_NONBLOCK);
+        if (result->dvrFd == -1)
         {
             printlog(LOG_ERROR,"Failed to open %s : %s\n",result->dvrPath, strerror(errno));
             DVBDispose(result);
@@ -75,44 +75,45 @@ DVBAdapter_t *DVBInit(int adapter)
 }
 void DVBDispose(DVBAdapter_t *adapter)
 {
-    if (adapter->dvrfd > -1)
+    if (adapter->dvrFd > -1)
     {
         printlog(LOG_DEBUGV,"Closing DVR file descriptor\n");
-        close(adapter->dvrfd);
+        close(adapter->dvrFd);
     }
-    if (adapter->demuxfd > -1)
+    if (adapter->demuxFd > -1)
     {
         printlog(LOG_DEBUGV,"Closing Demux file descriptor\n");
-        close(adapter->demuxfd);
+        close(adapter->demuxFd);
     }
-    if (adapter->frontendfd > -1)
+    if (adapter->frontEndFd > -1)
     {
         printlog(LOG_DEBUGV,"Closing Frontend file descriptor\n");
-        close(adapter->frontendfd);
+        close(adapter->frontEndFd);
     }
     free(adapter);
 }
 
 int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *frontend)
 {
+#ifndef __CYGWIN__
     /*  fe_status_t festatus; */
     struct dvb_frontend_event event;
     struct pollfd pfd[1];
 
-    if (ioctl(adapter->frontendfd, FE_SET_FRONTEND, frontend) < 0)
+    if (ioctl(adapter->frontEndFd, FE_SET_FRONTEND, frontend) < 0)
     {
         printlog(LOG_ERROR,"setfront front: %s\n", strerror(errno));
         return 0;
     }
 
-    pfd[0].fd = adapter->frontendfd;
+    pfd[0].fd = adapter->frontEndFd;
     pfd[0].events = POLLIN;
 
     if (poll(pfd,1,3000))
     {
         if (pfd[0].revents & POLLIN)
         {
-            if (ioctl(adapter->frontendfd, FE_GET_EVENT, &event) == -EOVERFLOW)
+            if (ioctl(adapter->frontEndFd, FE_GET_EVENT, &event) == -EOVERFLOW)
             {
                 printlog(LOG_ERROR,"EOVERFLOW");
                 return 0;
@@ -123,35 +124,38 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
             }
         }
     }
+#endif    
     return 1;
 }
 
 int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status, unsigned int *ber, unsigned int *strength, unsigned int *snr)
 {
-    if (ioctl(adapter->frontendfd, FE_READ_STATUS, status) < 0)
+    #ifndef __CYGWIN__
+    if (ioctl(adapter->frontEndFd, FE_READ_STATUS, status) < 0)
     {
         printlog(LOG_ERROR,"FE_READ_STATUS: %s\n", strerror(errno));
         return 0;
     }
 
-    if(ioctl(adapter->frontendfd,FE_READ_BER, ber) < 0)
+    if(ioctl(adapter->frontEndFd,FE_READ_BER, ber) < 0)
     {
         printlog(LOG_ERROR,"FE_READ_BER: %s\n", strerror(errno));
         return 0;
     }
 
-    if(ioctl(adapter->frontendfd,FE_READ_SIGNAL_STRENGTH,strength) < 0)
+    if(ioctl(adapter->frontEndFd,FE_READ_SIGNAL_STRENGTH,strength) < 0)
     {
         printlog(LOG_ERROR,"FE_READ_SIGNAL_STRENGTH: %s\n", strerror(errno));
         return 0;
     }
 
 
-    if(ioctl(adapter->frontendfd,FE_READ_SNR,snr) < 0)
+    if(ioctl(adapter->frontEndFd,FE_READ_SNR,snr) < 0)
     {
         printlog(LOG_ERROR,"FE_READ_SNR: %s\n", strerror(errno));
         return 0;
     }
+    #endif
     return 1;
 }
 
@@ -169,11 +173,13 @@ int DVBDemuxSetPESFilter(DVBAdapter_t *adapter, ushort pid, int pidtype, int tap
     pesFilterParam.output = taptype;
     pesFilterParam.pes_type = pidtype;
     pesFilterParam.flags = DMX_IMMEDIATE_START;
-    if (ioctl(adapter->demuxfd, DMX_SET_PES_FILTER, &pesFilterParam) < 0)
+    #ifndef __CYGWIN__
+    if (ioctl(adapter->demuxFd, DMX_SET_PES_FILTER, &pesFilterParam) < 0)
     {
         printlog(LOG_ERROR,"set_pid: %s\n", strerror(errno));
         return 0;
     }
+    #endif
     return 1;
 }
 
@@ -182,14 +188,14 @@ int DVBDVRRead(DVBAdapter_t *adapter, char *data, int max, int timeout)
     int result = -1;
     struct pollfd pfd[1];
 
-    pfd[0].fd = adapter->dvrfd;
+    pfd[0].fd = adapter->dvrFd;
     pfd[0].events = POLLIN;
 
     if (poll(pfd,1,timeout))
     {
         if (pfd[0].revents & POLLIN)
         {
-            result = read(adapter->dvrfd, data, max);
+            result = read(adapter->dvrFd, data, max);
         }
     }
     return result;

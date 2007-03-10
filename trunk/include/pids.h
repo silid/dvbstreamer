@@ -40,8 +40,8 @@ typedef struct PID_t
 {
     int pid;        /**< PID in question. */
     int type;       /**< Type of data this PID is used to transmit. */
-    int subtype;    /**< Additional information on the type (ie language code for audio) */
-    int pmtversion; /**< Version of the services PMT that this PID appears in */
+    int subType;    /**< Additional information on the type (ie language code for audio) */
+    int pmtVersion; /**< Version of the services PMT that this PID appears in */
     dvbpsi_descriptor_t *descriptors; /**< Linked list of descriptors for this PID */
 }
 PID_t;

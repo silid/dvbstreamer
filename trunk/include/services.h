@@ -53,19 +53,19 @@ typedef enum RunningStatus_e
  */
 typedef struct Service_t
 {
-    unsigned long refcount; /**< Number of references to this service */
+    unsigned long refCount; /**< Number of references to this service */
     char name[SERVICE_MAX_NAME_LEN]; /**< Name of the service. */
-    int multiplexfreq; /**< Multiplex frequency this service is broadcast on. */
+    int multiplexFreq; /**< Multiplex frequency this service is broadcast on. */
     int id;            /**< Service/Program ID of the service. */
-    int pmtversion;    /**< Last processed version of the PMT. */
-    int pmtpid;        /**< PID the PMT for this service is sent on. */
-    int pcrpid;        /**< PID the PCR for this service is sent on. */
+    int pmtVersion;    /**< Last processed version of the PMT. */
+    int pmtPid;        /**< PID the PMT for this service is sent on. */
+    int pcrPid;        /**< PID the PCR for this service is sent on. */
 
     /* Transient Fields - not stored in the database */
-    bool conditionalaccess;        /**< Whether 1 or more streams in for this service are controlled by CA */
-    RunningStatus_e runningstatus; /**< Running status of the service */
-    bool eitpresentfollowing;      /**< Indicates whether EIT Present/Following information is available. */
-    bool eitschedule;              /**< Indicates whether EIT schedule information is available. */
+    bool conditionalAccess;        /**< Whether 1 or more streams in for this service are controlled by CA */
+    RunningStatus_e runningStatus; /**< Running status of the service */
+    bool eitPresentFollowing;      /**< Indicates whether EIT Present/Following information is available. */
+    bool eitSchedule;              /**< Indicates whether EIT schedule information is available. */
 }
 Service_t;
 
@@ -75,7 +75,7 @@ typedef void *ServiceEnumerator_t;
  * Macro to compare 2 service structures.
  */
 #define ServiceAreEqual(_service1, _service2) \
-    (((_service1)->multiplexfreq == (_service2)->multiplexfreq) && \
+    (((_service1)->multiplexFreq == (_service2)->multiplexFreq) && \
     ((_service1)->id == (_service2)->id))
 
 /**
@@ -191,8 +191,8 @@ void ServiceRefInc(Service_t *service);
 #else
 #define ServiceRefInc(__service) \
         do{ \
-            (__service)->refcount ++;\
-            printlog(LOG_DIARRHEA, "Service %p (%s) ref incremented (%s:%d), count now %d\n", (__service), (__service)->name, __func__, __LINE__, (__service)->refcount);\
+            (__service)->refCount ++;\
+            printlog(LOG_DIARRHEA, "Service %p (%s) ref incremented (%s:%d), count now %d\n", (__service), (__service)->name, __func__, __LINE__, (__service)->refCount);\
         }while(0)
 #endif
 /**
@@ -205,12 +205,12 @@ void ServiceRefDec(Service_t *service);
 #else
 #define ServiceRefDec(__service) \
         do{ \
-            if ((__service)->refcount > 0)\
+            if ((__service)->refCount > 0)\
             {\
-                (__service)->refcount --;\
+                (__service)->refCount --;\
             }\
-            printlog(LOG_DIARRHEA, "Service %p (%s) ref decremented (%s:%d), count now %d\n", (__service), (__service)->name,  __func__, __LINE__, (__service)->refcount);\
-            if ((__service)->refcount == 0)\
+            printlog(LOG_DIARRHEA, "Service %p (%s) ref decremented (%s:%d), count now %d\n", (__service), (__service)->name,  __func__, __LINE__, (__service)->refCount);\
+            if ((__service)->refCount == 0)\
             {\
                 printlog(LOG_DIARRHEA, "Service %p (%s) free'd\n", (__service), (__service)->name);\
                 free((__service));\

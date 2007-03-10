@@ -27,7 +27,6 @@ Additional output management functions.
 #include "ts.h"
 #include "services.h"
 #include "servicefilter.h"
-#include "udpoutput.h"
 #include "outputs.h"
 #include "main.h"
 #include "deliverymethod.h"
@@ -96,9 +95,9 @@ Output_t *OutputAllocate(char *name, OutputType type, char *destination)
                 free(output);
                 return NULL;
             }
-            output->filter->filterpacket = PIDFilterSimpleFilter;
-            output->filter->fparg = calloc(1, sizeof(PIDFilterSimpleFilter_t));
-            if (!output->filter->fparg)
+            output->filter->filterPacket = PIDFilterSimpleFilter;
+            output->filter->fpArg = calloc(1, sizeof(PIDFilterSimpleFilter_t));
+            if (!output->filter->fpArg)
             {
                 OutputErrorStr = "Failed to allocated PIDFilterSimpleFilter_t structure!";
                 PIDFilterFree(output->filter);
@@ -129,7 +128,7 @@ Output_t *OutputAllocate(char *name, OutputType type, char *destination)
         switch (type)
         {
             case OutputType_Manual:
-                free(output->filter->fparg);
+                free(output->filter->fpArg);
                 PIDFilterFree(output->filter);
                 break;
             case OutputType_Service:
@@ -154,7 +153,7 @@ void OutputFree(Output_t *output)
     {
         case OutputType_Manual:
             list = ManualOutputsList;
-            free(output->filter->fparg);
+            free(output->filter->fpArg);
             PIDFilterFree(output->filter);
             break;
         case OutputType_Service:
@@ -200,7 +199,7 @@ int OutputAddPID(Output_t *output, uint16_t pid)
         return 1;
     }
 
-    pids = (PIDFilterSimpleFilter_t *)output->filter->fparg;
+    pids = (PIDFilterSimpleFilter_t *)output->filter->fpArg;
     if (pids->pidcount == MAX_PIDS)
     {
         OutputErrorStr = "No more available PID entries!";
@@ -222,7 +221,7 @@ int OutputRemovePID(Output_t *output, uint16_t pid)
         return 1;
     }
 
-    pids = (PIDFilterSimpleFilter_t *)output->filter->fparg;
+    pids = (PIDFilterSimpleFilter_t *)output->filter->fpArg;
     for ( i = 0; i < pids->pidcount; i ++)
     {
         if (pids->pids[i] == pid)
@@ -246,7 +245,7 @@ int OutputGetPIDs(Output_t *output, int *pidcount, uint16_t **pids)
         return 1;
     }
 
-    pidfilter = (PIDFilterSimpleFilter_t *)output->filter->fparg;
+    pidfilter = (PIDFilterSimpleFilter_t *)output->filter->fpArg;
     *pidcount = pidfilter->pidcount;
     *pids = pidfilter->pids;
     return 0;

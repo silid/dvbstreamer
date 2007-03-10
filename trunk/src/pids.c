@@ -94,7 +94,7 @@ PIDList_t *PIDListGet(Service_t *service)
                         PID_PMTVERSION ","
                         PID_DESCRIPTORS " "
                         "FROM " PIDS_TABLE " WHERE " PID_MPLEXFREQ "=%d AND " PID_SERVICEID "=%d;",
-                        service->multiplexfreq, service->id);
+                        service->multiplexFreq, service->id);
             if (rc == SQLITE_OK)
             {
 
@@ -105,8 +105,8 @@ PIDList_t *PIDListGet(Service_t *service)
                     {
                         result->pids[i].pid = STATEMENT_COLUMN_INT( 0);
                         result->pids[i].type = STATEMENT_COLUMN_INT( 1);
-                        result->pids[i].subtype = STATEMENT_COLUMN_INT( 2);
-                        result->pids[i].pmtversion = STATEMENT_COLUMN_INT( 3);
+                        result->pids[i].subType = STATEMENT_COLUMN_INT( 2);
+                        result->pids[i].pmtVersion = STATEMENT_COLUMN_INT( 3);
                         result->pids[i].descriptors = UnRollDescriptors((char *)sqlite3_column_blob(stmt, 4),sqlite3_column_bytes(stmt, 4));
                     }
                     else
@@ -133,7 +133,7 @@ int PIDListCount(Service_t *service)
 
     STATEMENT_PREPAREVA("SELECT count () FROM " PIDS_TABLE " "
                         "WHERE " PID_MPLEXFREQ "=%d AND " PID_SERVICEID "=%d;",
-                        service->multiplexfreq, service->id);
+                        service->multiplexFreq, service->id);
     RETURN_ON_ERROR(-1);
 
     STATEMENT_STEP();
@@ -152,7 +152,7 @@ int PIDListRemove(Service_t *service)
 
     STATEMENT_PREPAREVA("DELETE FROM " PIDS_TABLE " "
                         "WHERE " PID_MPLEXFREQ "=%d AND " PID_SERVICEID "=%d;",
-                        service->multiplexfreq, service->id);
+                        service->multiplexFreq, service->id);
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
@@ -170,8 +170,8 @@ static int PIDAdd(Service_t *service, PID_t *pid)
 
     STATEMENT_PREPAREVA("INSERT INTO " PIDS_TABLE " "
                         "VALUES (%d,%d,%d,%d,%d,%d,?);",
-                        service->multiplexfreq, service->id,
-                        pid->pid, pid->type, pid->subtype, service->pmtversion);
+                        service->multiplexFreq, service->id,
+                        pid->pid, pid->type, pid->subType, service->pmtVersion);
     RETURN_RC_ON_ERROR;
 
     descriptorblob = RollUpDescriptors(pid->descriptors, &size);

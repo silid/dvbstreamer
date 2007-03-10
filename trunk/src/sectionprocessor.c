@@ -122,7 +122,7 @@ static PIDFilter_t *SectionProcessorFind(uint16_t pid)
             ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         PIDFilter_t * filter = (PIDFilter_t*)ListIterator_Current(iterator);
-        SectionProcessor_t *processor = (SectionProcessor_t *)filter->pparg;
+        SectionProcessor_t *processor = (SectionProcessor_t *)filter->ppArg;
 
         if (processor->simplefilter.pids[0] == pid)
         {
@@ -157,9 +157,9 @@ static PIDFilter_t *SectionProcessorCreate(TSFilter_t *tsfilter, uint16_t pid)
 
 static void SectionProcessorDestroy(PIDFilter_t *filter)
 {
-    SectionProcessor_t *state = (SectionProcessor_t *)filter->pparg;
+    SectionProcessor_t *state = (SectionProcessor_t *)filter->ppArg;
     ListIterator_t iterator;
-    assert(filter->processpacket == SectionProcessorProcessPacket);
+    assert(filter->processPacket == SectionProcessorProcessPacket);
     PIDFilterFree(filter);
 
     if (state->handle)
@@ -180,10 +180,10 @@ static void SectionProcessorDestroy(PIDFilter_t *filter)
 
 static void SectionProcessorRegisterSectionCallback(PIDFilter_t *filter,PluginSectionProcessor_t callback, void *userarg)
 {
-    SectionProcessor_t *state = (SectionProcessor_t *)filter->pparg;
+    SectionProcessor_t *state = (SectionProcessor_t *)filter->ppArg;
     CallbackDetails_t *details;
     
-    assert(filter->processpacket == SectionProcessorProcessPacket);
+    assert(filter->processPacket == SectionProcessorProcessPacket);
     
     details = malloc(sizeof(CallbackDetails_t));
     if (details)
@@ -196,9 +196,9 @@ static void SectionProcessorRegisterSectionCallback(PIDFilter_t *filter,PluginSe
 
 static void SectionProcessorUnRegisterSectionCallback(PIDFilter_t *filter,PluginSectionProcessor_t callback, void *userarg)
 {
-    SectionProcessor_t *state = (SectionProcessor_t *)filter->pparg;
+    SectionProcessor_t *state = (SectionProcessor_t *)filter->ppArg;
     ListIterator_t iterator;
-    assert(filter->processpacket == SectionProcessorProcessPacket);
+    assert(filter->processPacket == SectionProcessorProcessPacket);
 
     for (ListIterator_Init(iterator, state->sectioncallbackslist);
          ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
@@ -215,7 +215,7 @@ static void SectionProcessorUnRegisterSectionCallback(PIDFilter_t *filter,Plugin
 
 static bool SectionProcessorHasCallbacks(PIDFilter_t *filter)
 {
-    SectionProcessor_t *state = (SectionProcessor_t *)filter->pparg;
+    SectionProcessor_t *state = (SectionProcessor_t *)filter->ppArg;
     return (ListCount(state->sectioncallbackslist) > 0);
 }
 
@@ -284,7 +284,7 @@ static TSPacket_t * SectionProcessorProcessPacket(PIDFilter_t *pidfilter, void *
 static void SectionHandler(dvbpsi_decoder_t* decoder, dvbpsi_psi_section_t* newSection)
 {
     PIDFilter_t * filter = (PIDFilter_t*)decoder->p_private_decoder;
-    SectionProcessor_t *state = (SectionProcessor_t *)filter->pparg;
+    SectionProcessor_t *state = (SectionProcessor_t *)filter->ppArg;
 
     ListIterator_t iterator;
 

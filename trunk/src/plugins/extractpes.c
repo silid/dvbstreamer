@@ -108,7 +108,7 @@ static void CommandStartExtractingPes(int argc, char **argv)
         CommandError(COMMAND_ERROR_GENERIC, "Failed to create output!");
         return;
     }
-    pesOutput.packetsoutput = 0;
+    pesOutput.packetsOutput = 0;
     PESProcessorStartPID(pid, ProcessPESPacket, NULL);
     started = TRUE;
 
@@ -133,7 +133,7 @@ static void CommandCurrentExtractingPes(int argc, char **argv)
         return;
     }
     CommandPrintf("PID          : %d\n", pid);
-    CommandPrintf("Packet Count : %d\n", pesOutput.packetsoutput);
+    CommandPrintf("Packet Count : %d\n", pesOutput.packetsOutput);
 }
 /*******************************************************************************
 * Packet processing                                                            *
@@ -146,8 +146,8 @@ static void ProcessPESPacket(void *userarg, uint8_t *packet, uint16_t length)
         return;
     }
     printlog(LOG_DEBUGV, "Extracted a packet from pid %d length %d\n", pid, length);
-    dmInstance = pesOutput.oparg;
+    dmInstance = pesOutput.opArg;
     dmInstance->SendBlock(dmInstance, packet, length);
-    pesOutput.packetsoutput ++;
+    pesOutput.packetsOutput ++;
 }
 

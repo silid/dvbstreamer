@@ -150,7 +150,7 @@ Service_t *CacheServiceFindName(char *name, Multiplex_t **multiplex)
         result = ServiceFindName(name);
         if (result)
         {
-            *multiplex = MultiplexFind(result->multiplexfreq);
+            *multiplex = MultiplexFind(result->multiplexFreq);
         }
     }
     return result;
@@ -183,8 +183,8 @@ void CacheUpdateMultiplex(Multiplex_t *multiplex, int patversion, int tsid)
 
     if (cachedServicesMultiplex && MultiplexAreEqual(multiplex, cachedServicesMultiplex))
     {
-        cachedServicesMultiplex->patversion = patversion;
-        cachedServicesMultiplex->tsid = tsid;
+        cachedServicesMultiplex->patVersion = patversion;
+        cachedServicesMultiplex->tsId = tsid;
         cachedServicesMultiplexDirty = 1;
     }
 
@@ -197,7 +197,7 @@ void CacheUpdateNetworkId(Multiplex_t *multiplex, int netid)
 
     if (cachedServicesMultiplex && MultiplexAreEqual(multiplex, cachedServicesMultiplex))
     {
-        cachedServicesMultiplex->netid = netid;
+        cachedServicesMultiplex->networkId = netid;
         cachedServicesMultiplexDirty = 1;
     }
 
@@ -213,7 +213,7 @@ void CacheUpdateService(Service_t *service, int pmtpid)
     {
         if ((cachedServices[i]) && ServiceAreEqual(service, cachedServices[i]))
         {
-            cachedServices[i]->pmtpid = pmtpid;
+            cachedServices[i]->pmtPid = pmtpid;
             cacheFlags[i] |= CacheFlag_Dirty_PMTPID;
             break;
         }
@@ -254,8 +254,8 @@ void CacheUpdatePIDs(Service_t *service, int pcrpid, PIDList_t *pids, int pmtver
                 PIDListFree(cachedPIDs[i]);
             }
             cachedPIDs[i] = pids;
-            cachedServices[i]->pcrpid = pcrpid;
-            cachedServices[i]->pmtversion = pmtversion;
+            cachedServices[i]->pcrPid = pcrpid;
+            cachedServices[i]->pmtVersion = pmtversion;
             cacheFlags[i] |= CacheFlag_Dirty_PIDs;
             break;
         }
@@ -270,14 +270,15 @@ Service_t *CacheServiceAdd(int id)
     if (result)
     {
         result->id = id;
-        result->pmtversion = -1;
-        result->pmtpid = 8192;
+        result->pmtVersion = -1;
+        result->pmtPid = 8192;
         sprintf(result->name, "%04x", id);
-        result->multiplexfreq = cachedServicesMultiplex->freq;
+        result->multiplexFreq = cachedServicesMultiplex->freq;
         ServiceRefInc(result);
         
         pthread_mutex_lock(&cacheUpdateMutex);
 
+        printlog(LOG_DEBUG, "Added service %04x at %d\n", result->id, cachedServicesCount);
         cachedServices[cachedServicesCount] = result;
         cachedPIDs[cachedServicesCount] = NULL;
         cacheFlags[cachedServicesCount]  = CacheFlag_Dirty_Added;
@@ -307,14 +308,17 @@ void CacheServiceDelete(Service_t *service)
     {
         /* Get rid of the pids as we don't need them any more! */
         PIDListFree(cachedPIDs[deletedIndex]);
+
+        cachedServicesCount --;
         /* Remove the deleted service from the list */
         for (i = deletedIndex; i < cachedServicesCount; i ++)
         {
+            printlog(LOG_DEBUG, "Moving %s (%x) to %d\n", cachedServices[i + 1]->name, cachedServices[i + 1]->id, i);
             cachedPIDs[i] = cachedPIDs[i + 1];
             cachedServices[i] = cachedServices[i + 1];
             cacheFlags[i] = cacheFlags [i + 1];
         }
-        cachedServicesCount --;
+        
         /* Add the deleted service to the list of deleted services for removal
             when we writeback the cache.
          */
@@ -351,17 +355,17 @@ void CacheWriteback()
     {
         int rc;
         printlog(LOG_DEBUG, "Updating Multiplex PAT version\n");
-        rc =MultiplexPATVersionSet(cachedServicesMultiplex, cachedServicesMultiplex->patversion);
+        rc =MultiplexPATVersionSet(cachedServicesMultiplex, cachedServicesMultiplex->patVersion);
         if (rc)
         {
             printlog(LOG_ERROR, "Failed to update Multiplex PAT version (0x%x)\n", rc);
         }
-        rc = MultiplexTSIdSet(cachedServicesMultiplex, cachedServicesMultiplex->tsid);
+        rc = MultiplexTSIdSet(cachedServicesMultiplex, cachedServicesMultiplex->tsId);
         if (rc)
         {
             printlog(LOG_ERROR, "Failed to update Multiplex TS ID (0x%x)\n", rc);
         }
-        rc = MultiplexNetworkIdSet(cachedServicesMultiplex, cachedServicesMultiplex->netid);
+        rc = MultiplexNetworkIdSet(cachedServicesMultiplex, cachedServicesMultiplex->networkId);
         if (rc)
         {
             printlog(LOG_ERROR, "Failed to update Multiplex Original Network ID (0x%x)\n", rc);
@@ -374,23 +378,23 @@ void CacheWriteback()
         if (cacheFlags[i] & CacheFlag_Dirty_Added)
         {
             printlog(LOG_DEBUG, "Adding service %s (0x%04x)\n", cachedServices[i]->name, cachedServices[i]->id);
-            ServiceAdd(cachedServices[i]->multiplexfreq, cachedServices[i]->name, cachedServices[i]->id,
-                cachedServices[i]->pmtversion, cachedServices[i]->pmtpid, cachedServices[i]->pcrpid);
+            ServiceAdd(cachedServices[i]->multiplexFreq, cachedServices[i]->name, cachedServices[i]->id,
+                cachedServices[i]->pmtVersion, cachedServices[i]->pmtPid, cachedServices[i]->pcrPid);
             cacheFlags[i] &= ~CacheFlag_Dirty_Name;
         }
 
         if (cacheFlags[i] & CacheFlag_Dirty_PMTPID)
         {
             printlog(LOG_DEBUG, "Updating PMT PID for %s\n", cachedServices[i]->name);
-            ServicePMTPIDSet(cachedServices[i], cachedServices[i]->pmtpid);
+            ServicePMTPIDSet(cachedServices[i], cachedServices[i]->pmtPid);
         }
         if (cacheFlags[i] & CacheFlag_Dirty_PIDs)
         {
             printlog(LOG_DEBUG, "Updating PIDs for %s\n", cachedServices[i]->name);
             PIDListRemove(cachedServices[i]);
             PIDListSet(cachedServices[i], cachedPIDs[i]);
-            ServicePMTVersionSet(cachedServices[i], cachedServices[i]->pmtversion);
-            ServicePCRPIDSet(cachedServices[i], cachedServices[i]->pcrpid);
+            ServicePMTVersionSet(cachedServices[i], cachedServices[i]->pmtVersion);
+            ServicePCRPIDSet(cachedServices[i], cachedServices[i]->pcrPid);
         }
 
         if (cacheFlags[i] & CacheFlag_Dirty_Name)

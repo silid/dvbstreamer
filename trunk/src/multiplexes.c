@@ -102,16 +102,16 @@ Multiplex_t *MultiplexGetNext(MultiplexEnumerator_t enumerator)
         Multiplex_t *multiplex;
         multiplex = calloc(1, sizeof(Multiplex_t));
         multiplex->freq = STATEMENT_COLUMN_INT(0);
-        multiplex->tsid = STATEMENT_COLUMN_INT(1);
-        multiplex->netid = STATEMENT_COLUMN_INT(2);
+        multiplex->tsId = STATEMENT_COLUMN_INT(1);
+        multiplex->networkId = STATEMENT_COLUMN_INT(2);
         multiplex->type = STATEMENT_COLUMN_INT(3);
-        multiplex->patversion = STATEMENT_COLUMN_INT(4);
+        multiplex->patVersion = STATEMENT_COLUMN_INT(4);
 
         printlog(LOG_DIARRHEA,"Multiplex: %d, 0x%04x 0x%04x, %d %d\n", multiplex->freq ,
-                 multiplex->tsid,
-                 multiplex->netid,
+                 multiplex->tsId,
+                 multiplex->networkId,
                  multiplex->type,
-                 multiplex->patversion);
+                 multiplex->patVersion);
 
         return multiplex;
     }
@@ -179,7 +179,7 @@ int MultiplexPATVersionSet(Multiplex_t *multiplex, int patversion)
     STATEMENT_PREPAREVA("UPDATE " MULTIPLEXES_TABLE " "
                         "SET " MULTIPLEX_PATVERSION "=%d "
                         "WHERE " MULTIPLEX_FREQ "=%d;", patversion, multiplex->freq);
-    multiplex->patversion = patversion;
+    multiplex->patVersion = patversion;
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
@@ -194,7 +194,7 @@ int MultiplexTSIdSet(Multiplex_t *multiplex, int tsid)
     STATEMENT_PREPAREVA("UPDATE " MULTIPLEXES_TABLE " "
                         "SET " MULTIPLEX_ID "=%d "
                         "WHERE " MULTIPLEX_FREQ "=%d;", tsid, multiplex->freq);
-    multiplex->tsid = tsid;
+    multiplex->tsId = tsid;
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
@@ -209,7 +209,7 @@ int MultiplexNetworkIdSet(Multiplex_t *multiplex, int netid)
     STATEMENT_PREPAREVA("UPDATE " MULTIPLEXES_TABLE " "
                         "SET " MULTIPLEX_NETID "=%d "
                         "WHERE " MULTIPLEX_FREQ "=%d;", netid, multiplex->freq);
-    multiplex->netid = netid;
+    multiplex->networkId = netid;
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();

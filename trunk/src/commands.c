@@ -38,7 +38,6 @@ Command Processing and command functions.
 #include "services.h"
 #include "dvb.h"
 #include "ts.h"
-#include "udpoutput.h"
 #include "logging.h"
 #include "cache.h"
 #include "outputs.h"
@@ -386,15 +385,15 @@ void CommandLoop(void)
         {
             if (CommandExecute(&context, CommandPrintfImpl, line))
             {
-                if (context.errorno != COMMAND_OK)
+                if (context.errorNumber != COMMAND_OK)
                 {
-                    printf("%s\n", context.errormessage);
+                    printf("%s\n", context.errorMessage);
                 }
                 add_history(line);
             }
             else
             {
-                if (context.errorno == COMMAND_ERROR_UNKNOWN_COMMAND)
+                if (context.errorNumber == COMMAND_ERROR_UNKNOWN_COMMAND)
                 {
                     printf("Unknown command \"%s\"\n", command);
                 }
@@ -578,7 +577,7 @@ static bool ProcessCommand(char *command, char *argument)
             args[0] = NULL;
         }
     
-        if ((argc >= commandInfo->minargs) && (argc <= commandInfo->maxargs))
+        if ((argc >= commandInfo->minArgs) && (argc <= commandInfo->maxArgs))
         {
             commandInfo->commandfunc(argc, argv );
         }
@@ -853,10 +852,10 @@ static void CommandServiceInfo(int argc, char **argv)
                 "Pausing",
                 "Running",
             };
-            CommandPrintf("Free to Air/CA       : %s\n", service->conditionalaccess ? "CA":"Free to Air");
-            CommandPrintf("EPG Present/Following: %s\n", service->eitpresentfollowing ? "Yes":"No");
-            CommandPrintf("EPG Schedule         : %s\n", service->eitschedule ? "Yes":"No");
-            CommandPrintf("Running Status       : %s\n", runningstatus[service->runningstatus]);
+            CommandPrintf("Free to Air/CA       : %s\n", service->conditionalAccess ? "CA":"Free to Air");
+            CommandPrintf("EPG Present/Following: %s\n", service->eitPresentFollowing ? "Yes":"No");
+            CommandPrintf("EPG Schedule         : %s\n", service->eitSchedule ? "Yes":"No");
+            CommandPrintf("Running Status       : %s\n", runningstatus[service->runningStatus]);
         }
         else
         {
@@ -888,7 +887,7 @@ static void CommandPids(int argc, char **argv)
             CommandPrintf("%d PIDs for \"%s\" %s\n", pids->count, argv[0], cached ? "(Cached)":"");
             for (i = 0; i < pids->count; i ++)
             {
-                CommandPrintf("%2d: %d %d %d\n", i, pids->pids[i].pid, pids->pids[i].type, pids->pids[i].subtype);
+                CommandPrintf("%2d: %d %d %d\n", i, pids->pids[i].pid, pids->pids[i].type, pids->pids[i].subType);
             }
 
             if (!cached)
@@ -917,7 +916,7 @@ static void CommandStats(int argc, char **argv)
 
     for (i = 0; i < PIDFilterIndex_Count; i ++)
     {
-        CommandPrintf("\t%-15s : %d\n", PIDFilters[i]->name, PIDFilters[i]->packetsprocessed);
+        CommandPrintf("\t%-15s : %d\n", PIDFilters[i]->name, PIDFilters[i]->packetsProcessed);
     }
     CommandPrintf("\n");
 
@@ -926,7 +925,7 @@ static void CommandStats(int argc, char **argv)
     for ( ListIterator_Init(iterator, ServiceOutputsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         Output_t *output = ListIterator_Current(iterator);
-        CommandPrintf("\t%-15s : %d\n", output->name, output->filter->packetsoutput);
+        CommandPrintf("\t%-15s : %d\n", output->name, output->filter->packetsOutput);
     }
     CommandPrintf("\n");
 
@@ -935,13 +934,13 @@ static void CommandStats(int argc, char **argv)
      for ( ListIterator_Init(iterator, ManualOutputsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         Output_t *output = ListIterator_Current(iterator);
-        CommandPrintf("\t%-15s : %d\n", output->name, output->filter->packetsoutput);
+        CommandPrintf("\t%-15s : %d\n", output->name, output->filter->packetsOutput);
     }
     CommandPrintf("\n");
 
 
 
-    CommandPrintf("Total packets processed: %d\n", TSFilter->totalpackets);
+    CommandPrintf("Total packets processed: %d\n", TSFilter->totalPackets);
     CommandPrintf("Approximate TS bitrate : %gMbs\n", ((double)TSFilter->bitrate / (1024.0 * 1024.0)));
 }
 
@@ -1271,7 +1270,7 @@ static void CommandHelp(int argc, char **argv)
         
         if (requestedcmd)
         {
-            CommandPrintf("%s\n\n", requestedcmd->longhelp);
+            CommandPrintf("%s\n\n", requestedcmd->longHelp);
         }
         else
         {
@@ -1285,7 +1284,7 @@ static void CommandHelp(int argc, char **argv)
             Command_t *commands = ListIterator_Current(iterator);
             for (i = 0; commands[i].command; i ++)
             {
-                CommandPrintf("%12s - %s\n", commands[i].command, commands[i].shorthelp);
+                CommandPrintf("%12s - %s\n", commands[i].command, commands[i].shortHelp);
             }
         }
         
@@ -1294,7 +1293,7 @@ static void CommandHelp(int argc, char **argv)
             for (i = 0; CurrentCommandContext->commands[i].command; i ++)
             {
                 CommandPrintf("%12s - %s\n", CurrentCommandContext->commands[i].command,
-                              CurrentCommandContext->commands[i].shorthelp);
+                              CurrentCommandContext->commands[i].shortHelp);
             }
         }
         
@@ -1434,7 +1433,7 @@ static void PATCallback(dvbpsi_pat_t* newpat)
             patentry = patentry->p_next;
         }
         patreceived = TRUE;
-        TSFilter->tsstructurechanged = TRUE; /* Force all PMTs to be received again incase we are scanning a mux we have pids for */
+        TSFilter->tsStructureChanged = TRUE; /* Force all PMTs to be received again incase we are scanning a mux we have pids for */
         if (patreceived)
         {
             pthread_mutex_lock(&scanningmutex);

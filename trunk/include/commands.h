@@ -44,10 +44,10 @@ typedef struct Command_t
 {
     char *command;  /**< Command name */
     bool  tokenise; /**< Should the argument string be split on spaces? */
-    int   minargs;  /**< Minimum number of args this command accepts. */
-    int   maxargs;  /**< Maximum number of args this command accepts. */
-    char *shorthelp;/**< Short description of the command, displayed by help */
-    char *longhelp; /**< Long description of the command, displayed by help <command> */
+    int   minArgs;  /**< Minimum number of args this command accepts. */
+    int   maxArgs;  /**< Maximum number of args this command accepts. */
+    char *shortHelp;/**< Short description of the command, displayed by help */
+    char *longHelp; /**< Long description of the command, displayed by help <command> */
     void (*commandfunc)(int argc, char **argv); /**< Function to call to execute command */
 }Command_t;
 
@@ -59,11 +59,11 @@ typedef struct CommandContext_t
     char *interface;     /**< Human readable string containing the interface name,
                               ie Console for console or an IP address if a remote connection.*/
     bool remote;         /**< Whether this is a remote connection, ie not via the console. */
-    void *privatearg;    /**< Private pointer for use by the owner of the context. */
+    void *privateArg;    /**< Private pointer for use by the owner of the context. */
     Command_t *commands; /**< Commands specific to this context */
     bool authenticated;  /**< Whether this context has been authenticated against the admin username/password.*/
-    uint16_t errorno;    /**< Error number from the last command executed. */
-    char errormessage[MAX_ERR_MSG]; /**< Error message text from the last command executed. */
+    uint16_t errorNumber;    /**< Error number from the last command executed. */
+    char errorMessage[MAX_ERR_MSG]; /**< Error message text from the last command executed. */
 }CommandContext_t;
 
 /**
@@ -71,8 +71,8 @@ typedef struct CommandContext_t
  */
 #define CommandError(_errcode, _msgformat...) \
     do{\
-        CurrentCommandContext->errorno = _errcode;\
-        snprintf(CurrentCommandContext->errormessage, MAX_ERR_MSG,_msgformat);\
+        CurrentCommandContext->errorNumber = _errcode;\
+        snprintf(CurrentCommandContext->errorMessage, MAX_ERR_MSG,_msgformat);\
     }while(0)
 
 

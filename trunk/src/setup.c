@@ -59,7 +59,6 @@ static void usage(char *appname);
 static void version(void);
 
 
-bool DaemonMode = FALSE;
 char DataDirectory[PATH_MAX];
 
 int main(int argc, char *argv[])

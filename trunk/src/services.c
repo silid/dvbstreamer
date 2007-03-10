@@ -61,7 +61,7 @@ int ServiceDelete(Service_t  *service)
 
     STATEMENT_PREPAREVA("DELETE FROM " SERVICES_TABLE " "
                         "WHERE " SERVICE_MPLEXFREQ "=%d AND " SERVICE_ID "=%d;",
-                        service->multiplexfreq, service->id);
+                        service->multiplexFreq, service->id);
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
@@ -99,13 +99,13 @@ int ServicePMTVersionSet(Service_t  *service, int pmtversion)
     STATEMENT_PREPAREVA("UPDATE " SERVICES_TABLE " "
                         "SET " SERVICE_PMTVERSION "=%d "
                         "WHERE " SERVICE_MPLEXFREQ "=%d AND " SERVICE_ID "=%d;",
-                        pmtversion, service->multiplexfreq,  service->id);
+                        pmtversion, service->multiplexFreq,  service->id);
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
     if (rc == SQLITE_DONE)
     {
-        service->pmtversion = pmtversion;
+        service->pmtVersion = pmtversion;
         rc = SQLITE_OK;
     }
     else
@@ -124,13 +124,13 @@ int ServicePMTPIDSet(Service_t  *service, int pmtpid)
     STATEMENT_PREPAREVA("UPDATE " SERVICES_TABLE " "
                         "SET " SERVICE_PMTPID "=%d "
                         "WHERE " SERVICE_MPLEXFREQ "=%d AND " SERVICE_ID "=%d;",
-                        pmtpid, service->multiplexfreq,  service->id);
+                        pmtpid, service->multiplexFreq,  service->id);
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
     if (rc == SQLITE_DONE)
     {
-        service->pmtpid = pmtpid;
+        service->pmtPid = pmtpid;
         rc = SQLITE_OK;
     }
     else
@@ -148,13 +148,13 @@ int ServicePCRPIDSet(Service_t  *service, int pcrpid)
     STATEMENT_PREPAREVA("UPDATE " SERVICES_TABLE " "
                         "SET " SERVICE_PCRPID "=%d "
                         "WHERE " SERVICE_MPLEXFREQ "=%d AND " SERVICE_ID "=%d;",
-                        pcrpid, service->multiplexfreq,  service->id);
+                        pcrpid, service->multiplexFreq,  service->id);
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
     if (rc == SQLITE_DONE)
     {
-        service->pcrpid = pcrpid;
+        service->pcrPid = pcrpid;
         rc = SQLITE_OK;
     }
     else
@@ -172,7 +172,7 @@ int ServiceNameSet(Service_t  *service, char *name)
     STATEMENT_PREPAREVA("UPDATE " SERVICES_TABLE " "
                         "SET " SERVICE_NAME "='%q' "
                         "WHERE " SERVICE_MPLEXFREQ "=%d AND " SERVICE_ID "=%d;",
-                        name, service->multiplexfreq,  service->id);
+                        name, service->multiplexFreq,  service->id);
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
@@ -223,7 +223,7 @@ Service_t *ServiceFindId(Multiplex_t *multiplex, int id)
 ServiceEnumerator_t ServiceEnumeratorGet()
 {
     STATEMENT_INIT;
-    STATEMENT_PREPARE("SELECT " SERVICE_FIELDS
+    STATEMENT_PREPARE("SELECT "	SERVICE_FIELDS
                       "FROM " SERVICES_TABLE ";");
     RETURN_ON_ERROR(NULL);
     return stmt;
@@ -281,16 +281,16 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
         char *name;
 
         service = calloc(1, sizeof(Service_t));
-        service->multiplexfreq = STATEMENT_COLUMN_INT( 0);
+        service->multiplexFreq = STATEMENT_COLUMN_INT( 0);
         service->id = STATEMENT_COLUMN_INT( 1);
         name = STATEMENT_COLUMN_TEXT( 2);
         if (name)
         {
             strncpy(service->name,name, SERVICE_MAX_NAME_LEN);
         }
-        service->pmtversion = STATEMENT_COLUMN_INT( 3);
-        service->pmtpid = STATEMENT_COLUMN_INT( 4);
-        service->pcrpid = STATEMENT_COLUMN_INT( 5);
+        service->pmtVersion = STATEMENT_COLUMN_INT( 3);
+        service->pmtPid = STATEMENT_COLUMN_INT( 4);
+        service->pcrPid = STATEMENT_COLUMN_INT( 5);
 
         ServiceRefInc(service);
         return service;
