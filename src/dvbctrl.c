@@ -48,9 +48,6 @@ static void ProcessResponseLine(char *line, char **ver, int *errno, char **errms
 
 static bool SendCommand(FILE *socketfp, char *line, char **version, int *errno, char **errmsg);
 
-/* Used by logging to determine whether to include date/time info */
-int DaemonMode = FALSE;
-
 static char responselineStart[] = "DVBStreamer/";
 static char *host = "localhost";
 static int adapterNumber = 0;
@@ -62,8 +59,13 @@ int main(int argc, char *argv[])
 {
     int i, consumed, commandCount=0;
     socklen_t address_len;
+#ifdef __CYGWIN__
+    struct hostent *hostinfo;
+    struct sockaddr_in address;
+#else
     struct sockaddr_storage address;
     struct addrinfo *addrinfo, hints;
+#endif    
     char portnumber[10];    
     char *filename = NULL;
     int socketfd = -1;
@@ -118,6 +120,18 @@ int main(int argc, char *argv[])
         exit(1);
     }
     /* Connect to host */
+#ifdef __CYGWIN__
+    address.sin_port = htons(REMOTEINTERFACE_PORT + adapterNumber);
+    hostinfo = gethostbyname(host);
+    if (hostinfo == NULL)
+    {
+        printlog(LOG_ERROR, "Failed to find address for \"%s\"\n", host);
+    }
+    address.sin_family = hostinfo->h_addrtype;
+    memcpy((char *)&(address.sin_addr), hostinfo->h_addr, hostinfo->h_length);
+    address_len = sizeof(address);
+    socketfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+#else
     sprintf(portnumber, "%d", REMOTEINTERFACE_PORT + adapterNumber);
     
     memset((void *)&hints, 0, sizeof(hints));
@@ -138,8 +152,8 @@ int main(int argc, char *argv[])
     address_len = addrinfo->ai_addrlen;
     memcpy(&address, addrinfo->ai_addr, addrinfo->ai_addrlen);
     freeaddrinfo(addrinfo);
-
     socketfd = socket(address.ss_family, SOCK_STREAM, IPPROTO_TCP);
+#endif
     if (socketfd < 0)
     {
         printlog(LOG_ERROR, "Failed to create socket!\n");

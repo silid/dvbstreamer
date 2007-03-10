@@ -41,7 +41,8 @@ void printlog(int level, const char *format, ...)
         va_list valist;
         char *logline;
         int len;
-
+        
+#ifdef LOGGING_CHECK_DAEMON
         if (DaemonMode)
         {
             char buffer[24]; /* "YYYY-MM-DD HH:MM:SS" */
@@ -55,13 +56,17 @@ void printlog(int level, const char *format, ...)
             strftime (buffer, sizeof(buffer), "%F %T : ", loctime);
             fputs(buffer, stderr);
         }
-
+#endif
         va_start(valist, format);
         vfprintf(stderr, format, valist);
+
+#ifdef LOGGING_CHECK_DAEMON        
         if (DaemonMode)
         {
             fflush(stderr);
         }
+#endif        
+
         va_end(valist);
     }
 }
