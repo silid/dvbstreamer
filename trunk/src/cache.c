@@ -311,7 +311,7 @@ void CacheServiceDelete(Service_t *service)
         for (i = deletedIndex; i < cachedServicesCount; i ++)
         {
             cachedPIDs[i] = cachedPIDs[i + 1];
-            cachedServices[i] = cachedServices[i +1];
+            cachedServices[i] = cachedServices[i + 1];
             cacheFlags[i] = cacheFlags [i + 1];
         }
         cachedServicesCount --;
@@ -354,17 +354,17 @@ void CacheWriteback()
         rc =MultiplexPATVersionSet(cachedServicesMultiplex, cachedServicesMultiplex->patversion);
         if (rc)
         {
-            printlog(LOG_ERROR, "Failed to update Multiplex PAT version (0x%x)", rc);
+            printlog(LOG_ERROR, "Failed to update Multiplex PAT version (0x%x)\n", rc);
         }
         rc = MultiplexTSIdSet(cachedServicesMultiplex, cachedServicesMultiplex->tsid);
         if (rc)
         {
-            printlog(LOG_ERROR, "Failed to update Multiplex TS ID (0x%x)", rc);
+            printlog(LOG_ERROR, "Failed to update Multiplex TS ID (0x%x)\n", rc);
         }
         rc = MultiplexNetworkIdSet(cachedServicesMultiplex, cachedServicesMultiplex->netid);
         if (rc)
         {
-            printlog(LOG_ERROR, "Failed to update Multiplex Original Network ID (0x%x)", rc);
+            printlog(LOG_ERROR, "Failed to update Multiplex Original Network ID (0x%x)\n", rc);
         }
         cachedServicesMultiplexDirty = 0;
     }
