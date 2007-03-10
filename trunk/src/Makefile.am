@@ -43,6 +43,8 @@ dvbstreamer_SOURCES = \
     pesprocessor.c \
     subtableprocessor.c
 
+dvbstreamer_CFLAGS = -I$(top_srcdir)/include -DLOGGING_CHECK_DAEMON 
+
 dvbstreamer_LDFLAGS = -rdynamic
 
 dvbstreamer_LDADD = \
