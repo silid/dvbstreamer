@@ -230,7 +230,8 @@ void dvbpsi_DecodeMJDUTC(char *p_mjdutc, int *p_year, int *p_month, int *p_day, 
 {
     #define BCD_CHAR_TO_INT(_bcd) (((_bcd >> 4) * 10) + (_bcd & 0x0f))
 
-    uint16_t i_mjd = (((uint16_t)p_mjdutc[0] << 8) | (uint16_t)p_mjdutc[1]);
+    uint16_t i_mjd = (((uint16_t)p_mjdutc[0] << 8) | (uint16_t)(p_mjdutc[1] & 0xff));
+    double d_mjd = (double)i_mjd;
     /*
         To find Y, M, D from MJD
         Y' = int [ (MJD - 15 078,2) / 365,25 ]
@@ -241,8 +242,8 @@ void dvbpsi_DecodeMJDUTC(char *p_mjdutc, int *p_year, int *p_month, int *p_day, 
         M = M' - 1 - K × 12
     */
     int i_temp_y, i_temp_m, i_k = 0;
-    i_temp_y = (int) (((double)i_mjd - 15078.2)/ 365.25);
-    i_temp_m = (int) ((((double)i_mjd - 14956.1) - ((double)i_temp_y * 365.25)) / 30.6001);
+    i_temp_y = (int) ((d_mjd - 15078.2)/ 365.25);
+    i_temp_m = (int) (((d_mjd - 14956.1) - ((double)i_temp_y * 365.25)) / 30.6001);
 
     if ((i_temp_m == 14) || (i_temp_m == 15))
     {
