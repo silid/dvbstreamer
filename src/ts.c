@@ -40,6 +40,9 @@ static void ProcessPacket(TSFilter_t *state, TSPacket_t *packet);
 static void InformTSStructureChanged(TSFilter_t *state);
 static void InformMultiplexChanged(TSFilter_t *state);
 
+/*******************************************************************************
+* Transport Stream Filter Functions                                            *
+*******************************************************************************/
 TSFilter_t* TSFilterCreate(DVBAdapter_t *adapter)
 {
     TSFilter_t *result = calloc(1, sizeof(TSFilter_t));
@@ -60,13 +63,13 @@ void TSFilterDestroy(TSFilter_t* tsfilter)
     pthread_join(tsfilter->thread, NULL);
     pthread_mutex_destroy(&tsfilter->mutex);
 
-    for ( ListIterator_Init(iterator, tsfilter->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    for (ListIterator_Init(iterator, tsfilter->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         PIDFilter_t *filter =(PIDFilter_t *)ListIterator_Current(iterator);
         free(filter);
         ListRemoveCurrent(&iterator);
     }
-    ListFree( tsfilter->pidFilters);
+    ListFree(tsfilter->pidFilters);
     free(tsfilter);
 }
 
@@ -85,7 +88,7 @@ void TSFilterZeroStats(TSFilter_t* tsfilter)
     tsfilter->totalPackets = 0;
     tsfilter->bitrate = 0;
 
-    for ( ListIterator_Init(iterator, tsfilter->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    for (ListIterator_Init(iterator, tsfilter->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         PIDFilter_t *filter = (PIDFilter_t *)ListIterator_Current(iterator);
         filter->packetsFiltered  = 0;
@@ -103,6 +106,9 @@ void TSFilterMultiplexChanged(TSFilter_t *tsfilter, Multiplex_t *newmultiplex)
     pthread_mutex_unlock(&tsfilter->mutex);
 }
 
+/*******************************************************************************
+* PID Filter Functions                                                         *
+*******************************************************************************/
 PIDFilter_t* PIDFilterAllocate(TSFilter_t* tsfilter)
 {
     pthread_mutex_lock(&tsfilter->mutex);
@@ -161,21 +167,25 @@ int PIDFilterSimpleFilter(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPac
     }
     return 0;
 }
-/******************************************************************************
-* Internal Functions                                                          *
-******************************************************************************/
+
+
+/*******************************************************************************
+* Internal Functions                                                           *
+*******************************************************************************/
 static void *FilterTS(void *arg)
 {
-	struct timeval now, last;
-	int diff;
-	int prevpackets = 0;
+    struct timeval now, last;
+    int diff;
+    int prevpackets = 0;
     bool locked = FALSE;
 
     TSFilter_t *state = (TSFilter_t*)arg;
     DVBAdapter_t *adapter = state->adapter;
     int count = 0;
 
-	gettimeofday(&last, 0);
+    DVBDemuxSetBufferSize(adapter, sizeof(state->readBuffer) * 2);
+
+    gettimeofday(&last, 0);
 
     while (!state->quit)
     {
@@ -208,7 +218,7 @@ static void *FilterTS(void *arg)
             }
             continue;
         }
-        
+
         pthread_mutex_lock(&state->mutex);
         for (p = 0; (p < (count / TSPACKET_SIZE)) && state->enabled; p ++)
         {
@@ -225,16 +235,16 @@ static void *FilterTS(void *arg)
             }
         }
 
-		gettimeofday(&now, 0);
-		diff =(now.tv_sec - last.tv_sec) * 1000 + (now.tv_usec - last.tv_usec) / 1000;
-		if (diff > 1000)
-		{
-			// Work out bit rates
-			state->bitrate = ((state->totalPackets - prevpackets) * (188 * 8));
-			prevpackets = state->totalPackets;
-			last = now;
-		}
-		pthread_mutex_unlock(&state->mutex);
+        gettimeofday(&now, 0);
+        diff =(now.tv_sec - last.tv_sec) * 1000 + (now.tv_usec - last.tv_usec) / 1000;
+        if (diff > 1000)
+        {
+            // Work out bit rates
+            state->bitrate = ((state->totalPackets - prevpackets) * (188 * 8));
+            prevpackets = state->totalPackets;
+            last = now;
+        }
+        pthread_mutex_unlock(&state->mutex);
     }
     return NULL;
 }
@@ -244,7 +254,7 @@ static void ProcessPacket(TSFilter_t *state, TSPacket_t *packet)
     uint16_t pid = TSPACKET_GETPID(*packet);
 
     ListIterator_t iterator;
-    for ( ListIterator_Init(iterator, state->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    for (ListIterator_Init(iterator, state->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         PIDFilter_t *filter =(PIDFilter_t *)ListIterator_Current(iterator);
         if (filter->filterPacket && filter->filterPacket(filter, filter->fpArg, pid, packet))
@@ -273,7 +283,7 @@ static void ProcessPacket(TSFilter_t *state, TSPacket_t *packet)
 static void InformTSStructureChanged(TSFilter_t *state)
 {
     ListIterator_t iterator;
-    for ( ListIterator_Init(iterator, state->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    for (ListIterator_Init(iterator, state->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         PIDFilter_t *filter =(PIDFilter_t *)ListIterator_Current(iterator);
         if (filter->enabled && filter->tsStructureChanged)
@@ -286,7 +296,7 @@ static void InformTSStructureChanged(TSFilter_t *state)
 static void InformMultiplexChanged(TSFilter_t *state)
 {
     ListIterator_t iterator;
-    for ( ListIterator_Init(iterator, state->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    for (ListIterator_Init(iterator, state->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         PIDFilter_t *filter =(PIDFilter_t *)ListIterator_Current(iterator);
         if (filter->enabled && filter->multiplexChanged)

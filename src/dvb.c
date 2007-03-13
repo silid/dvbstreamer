@@ -36,6 +36,8 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 #include "dvb.h"
 #include "logging.h"
 
+static int DVBDemuxSetPESFilter(DVBAdapter_t *adapter, ushort pid, int pidtype, int taptype);
+
 DVBAdapter_t *DVBInit(int adapter)
 {
     DVBAdapter_t *result = NULL;
@@ -70,6 +72,9 @@ DVBAdapter_t *DVBInit(int adapter)
             DVBDispose(result);
             return NULL;
         }
+
+        /* Stream the entire TS to the DVR device */
+        DVBDemuxSetPESFilter(result, 8192, DMX_PES_OTHER, DMX_OUT_TS_TAP);
     }
     return result;
 }
@@ -159,12 +164,7 @@ int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status, unsigned int *
     return 1;
 }
 
-int DVBDemuxStreamEntireTSToDVR(DVBAdapter_t *adapter)
-{
-    return DVBDemuxSetPESFilter(adapter, 8192, DMX_PES_OTHER, DMX_OUT_TS_TAP);
-}
-
-int DVBDemuxSetPESFilter(DVBAdapter_t *adapter, ushort pid, int pidtype, int taptype)
+static int DVBDemuxSetPESFilter(DVBAdapter_t *adapter, ushort pid, int pidtype, int taptype)
 {
     struct dmx_pes_filter_params pesFilterParam;
 
@@ -177,6 +177,28 @@ int DVBDemuxSetPESFilter(DVBAdapter_t *adapter, ushort pid, int pidtype, int tap
     if (ioctl(adapter->demuxFd, DMX_SET_PES_FILTER, &pesFilterParam) < 0)
     {
         printlog(LOG_ERROR,"set_pid: %s\n", strerror(errno));
+        return 0;
+    }
+    #endif
+    return 1;
+}
+
+int DVBDemuxSetBufferSize(DVBAdapter_t *adapter, unsigned long size)
+{
+    #ifndef __CYGWIN__
+    if (ioctl(adapter->demuxFd, DMX_STOP, 0)< 0)
+    {
+        printlog(LOG_ERROR,"DMX_STOP: %s\n", strerror(errno));
+        return 0;
+    }
+    if (ioctl(adapter->demuxFd, DMX_SET_BUFFER_SIZE, size) < 0)
+    {
+        printlog(LOG_ERROR,"DMX_SET_BUFFER_SIZE: %s\n", strerror(errno));
+        return 0;
+    }
+    if (ioctl(adapter->demuxFd, DMX_START, 0)< 0)
+    {
+        printlog(LOG_ERROR,"DMX_STOP: %s\n", strerror(errno));
         return 0;
     }
     #endif
