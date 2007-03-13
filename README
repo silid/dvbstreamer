@@ -39,21 +39,20 @@ Setup
 -----
 Before you can actually start to use dvbstreamer you need to initialise it's database of service to do this you'll need a channels.conf file produces by the linuxtv.org utility scan. Go here if you need help with scan.
 
-When you have a channels.conf file you then need to start dvbstreamer with the -t option specifying the file you've just created. The information in the channels.conf file is expected to be for a terrestrial tuner.
+When you have a channels.conf file you then need to run setupdvbstreamer with the file you've just created.
+To setup dvbstreamer to use a terrestrial tuner on adapter 0 use the following command:
 
-To start dvbstream sending packets to UDP port 1234 on the local machine and initialise the database using channels.conf file in the current directory use the following
+setupdvbstreamer -t channels.conf
 
-dvbstreamer -t channels.conf
+To setup dvbstreamer to use a satellite tuner on adapter 0 use the following command:
 
-To find out what services have been imported use the services command which will list all the available service
+setupdvbstreamer -s channels.conf
 
-dvbstream> service
+To setup dvbstreamer to use a cable tuner on adapter 0 use the following command:
 
-To quit out of dvbstreamer type quit
-
-dvbstream> quit
-
-One point to note is that each dvb adapter has its own database, thus meaning that once dvbstreamer supports cable and satellite cards you could use dvbstreamer on 2 or more different cards with out problems
+setupdvbstreamer -c channels.conf
+        
+If you are setting up an adapter other than 0 add the -a <adapter number> option to the commands above.
 
 If you have 2 or more cards of the same type in your system you can link the first cards database to the second cards database by simply creating a hard link in the dvbstreamer directory in your home directory ~/.dvbstreamer
 
@@ -339,6 +338,7 @@ Nicholas Humfrey - Power PC testing and patch.
 
 History
 -------
+0.7 Remote interface Release
 0.6 Stability Release
 0.5 Plugin Release
 0.4 Daemon mode
