@@ -199,9 +199,6 @@ int main(int argc, char *argv[])
     /* Initialise the DVB adapter */
     INIT(!(DVBAdapter = DVBInit(adapterNumber)), "DVB adapter");
 
-    DVBDemuxStreamEntireTSToDVR(DVBAdapter);
-    printlog(LOG_DEBUGV, "Streaming complete TS to DVR done\n");
-
     /* Create Transport stream filter thread */
     INIT(!(TSFilter = TSFilterCreate(DVBAdapter)), "TS filter");
 
@@ -311,8 +308,8 @@ int main(int argc, char *argv[])
     
     printlog(LOG_DEBUGV, "Processors destroyed\n");
     /* Close the adapter and shutdown the filter etc*/
-    DEINIT(DVBDispose(DVBAdapter), "DVB adapter");
     DEINIT(TSFilterDestroy(TSFilter), "TS filter");
+    DEINIT(DVBDispose(DVBAdapter), "DVB adapter");
     DEINIT(DeliveryMethodManagerDeInit(), "delivery method manager");
     DEINIT(CacheDeInit(), "cache");
     DEINIT(DBaseDeInit(), "database");

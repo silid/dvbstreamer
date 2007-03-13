@@ -86,20 +86,12 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
 int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status, unsigned int *ber, unsigned int *strength, unsigned int *snr);
 
 /**
- * Streams the entire TS to the dvr device.
- * @param adapter The dvr belonging to this adapter to stream the entire TS to.
+ * Set the size of the circular buffer used by the demux.
+ * @param adapter The adapter to set size of the buffer on.
+ * @param size Size of the buffer to set.
  * @return 0 on success, non-zero otherwise.
  */
-int DVBDemuxStreamEntireTSToDVR(DVBAdapter_t *adapter);
-
-/**
- * @param adapter The adapter to set the PES filter on.
- * @param pid     The pid to filter.
- * @param pidtype The type of the pid to filter.
- * @param taptype Where to send the packets.
- * @return 0 on success, non-zero otherwise.
- */
-int DVBDemuxSetPESFilter(DVBAdapter_t *adapter, ushort pid, int pidtype, int taptype);
+int DVBDemuxSetBufferSize(DVBAdapter_t *adapter, unsigned long size);
 
 /**
  * Read upto max bytes from the dvr device belonging to the specified adapter.
