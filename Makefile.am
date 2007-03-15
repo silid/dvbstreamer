@@ -1,6 +1,6 @@
 ## DVBStreamer main Makefile
 
-SUBDIRS = libltdl include src src/plugins
+SUBDIRS = libltdl include src/dvbpsi src src/plugins
 
 dvbstreamerdocdir = ${prefix}/doc/DVBStreamer
 dvbstreamerdoc_DATA = \
