@@ -253,8 +253,13 @@ static void UpdateEvent(Event_t *event, dvbpsi_eit_event_t *eitevent)
 {
     dvbpsi_descriptor_t *descriptor;
     dvbpsi_short_event_dr_t * sedescriptor;
-
-    dvbpsi_DecodeMJDUTC((char *)&eitevent->i_start_time, 
+    char startTime[5];
+    startTime[0] = (eitevent->i_start_time >> 32) & 0xff;
+    startTime[1] = (eitevent->i_start_time >> 24) & 0xff;    
+    startTime[2] = (eitevent->i_start_time >> 16) & 0xff;        
+    startTime[3] = (eitevent->i_start_time >>  8) & 0xff;            
+    startTime[4] = (eitevent->i_start_time >>  0) & 0xff;                
+    dvbpsi_DecodeMJDUTC(startTime, 
                         &event->startTime.year, &event->startTime.month, &event->startTime.day,
                         &event->startTime.hour,&event->startTime.minute, &event->startTime.second);
     event->duration.hour   = (((eitevent->i_duration >> 20 )& 0xf) * 10) + ((eitevent->i_duration >> 16 )& 0xf);
@@ -298,7 +303,7 @@ static ServiceNowNextInfo_t *FindServiceName(char *name)
 
     info = FindService(multiplex->networkId, multiplex->tsId, service->id);
     ServiceRefDec(service);
-    free(multiplex);
+    MultiplexRefDec(multiplex);
     return info;
 }
 

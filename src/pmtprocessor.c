@@ -179,7 +179,11 @@ static void PMTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Mult
         state->pmthandles[i] = dvbpsi_AttachPMT(services[i]->id, PMTHandler, (void*)services[i]);
         state->payloadstartonly[i] = TRUE;
     }
+    
+    MultiplexRefDec(state->multiplex);
     state->multiplex = (Multiplex_t*)newmultiplex;
+    MultiplexRefInc(state->multiplex);
+
 }
 
 static TSPacket_t * PMTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet)

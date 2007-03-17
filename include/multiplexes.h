@@ -35,9 +35,11 @@ Manage multiplexes and tuning parameters.
  */
 typedef struct Multiplex_t
 {
+    unsigned long refCount; /**< Number of references to this multiplex */
+    
     int freq;       /**< Frequency the multiplex is broadcast on. */
     int tsId;       /**< Transport Stream ID. */
-    int networkId;      /**< Network ID */
+    int networkId;  /**< Network ID */
     fe_type_t type; /**< The type of frontend used to receive this transport stream. */
     int patVersion; /**< Last processed version of the PAT */
 }
@@ -132,5 +134,41 @@ int MultiplexNetworkIdSet(Multiplex_t *multiplex, int netid);
  * @return A Mulitplex_t or NULL if the frequency could not be found.
  */
 Multiplex_t *MultiplexFindId(int netid, int tsid);
+
+/**
+ * Increment the references to the specified multiplex object.
+ * @param multiplex The multiplex instance to increment the reference count of. (Multiplex can be NULL.)
+ */
+#define MultiplexRefInc(__multiplex) \
+        do{ \
+            if ((__multiplex)) \
+            { \
+                (__multiplex)->refCount ++;\
+                printlog(LOG_DIARRHEA, "Multiplex %p (%d) ref incremented (%s:%d), count now %d\n", (__multiplex), (__multiplex)->freq, __func__, __LINE__, (__multiplex)->refCount);\
+            } \
+        }while(0)
+
+/**
+ * Decrement the references of the specified multiplex object. If the reference 
+ * count reaches 0 the instance is free'd.
+ * @param multiplex The multiplex instance to decrement the reference count of. (Multiplex can be NULL.)
+ */
+#define MultiplexRefDec(__multiplex) \
+        do{ \
+            if ((__multiplex)) \
+            { \
+                if ((__multiplex)->refCount > 0)\
+                {\
+                    (__multiplex)->refCount --;\
+                }\
+                printlog(LOG_DIARRHEA, "Multiplex %p (%d) ref decremented (%s:%d), count now %d\n", (__multiplex), (__multiplex)->freq,  __func__, __LINE__, (__multiplex)->refCount);\
+                if ((__multiplex)->refCount == 0)\
+                {\
+                    printlog(LOG_DIARRHEA, "Multiplex %p (%d) free'd\n", (__multiplex), (__multiplex)->freq);\
+                    free((__multiplex));\
+                }\
+            } \
+        }while(0)
+
 /** @} */
 #endif

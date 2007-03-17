@@ -46,7 +46,6 @@ Generic Processor for PSI/SI tables that have several subtables on the same PID.
 typedef struct SubTableProcessor_t
 {
     PIDFilterSimpleFilter_t simplefilter;
-    Multiplex_t *multiplex;
     dvbpsi_handle demuxhandle;
     bool payloadstartonly;
     MultiplexChanged multiplexchanged;
@@ -114,7 +113,7 @@ void SubTableProcessorDeinit(PIDFilter_t *filter)
     SubTableProcessor_t *state = (SubTableProcessor_t *)filter->ppArg;
     assert(filter->processPacket == SubTableProcessorProcessPacket);
 
-    if (state->multiplex)
+    if (state->demuxhandle)
     {
         dvbpsi_DetachDemux(state->demuxhandle);
     }
@@ -131,27 +130,32 @@ void *SubTableProcessorGetSubTableHandlerArg(PIDFilter_t *filter)
 static void SubTableProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex)
 {
     SubTableProcessor_t *state = (SubTableProcessor_t *)arg;
-    if (state->multiplex)
+    if (state->demuxhandle)
     {
         dvbpsi_DetachDemux(state->demuxhandle);
     }
+
     if (newmultiplex)
     {
         state->demuxhandle = dvbpsi_AttachDemux(state->subtablehandler, state->stharg);
         state->payloadstartonly = TRUE;
     }
+    else
+    {
+        state->demuxhandle = NULL;
+    }
+    
     if (state->multiplexchanged)
     {
         state->multiplexchanged(pidfilter, state->mcarg, newmultiplex);
     }
-    state->multiplex = newmultiplex;
 }
 
 static TSPacket_t * SubTableProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet)
 {
     SubTableProcessor_t *state = (SubTableProcessor_t *)arg;
 
-    if (state->multiplex == NULL)
+    if (state->demuxhandle == NULL)
     {
         return 0;
     }
