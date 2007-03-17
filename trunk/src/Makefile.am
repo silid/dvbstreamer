@@ -36,19 +36,16 @@ dvbstreamer_SOURCES = \
     pluginmgr.c \
     nitprocessor.c \
     tdtprocessor.c \
-    dvbpsi/nit.c \
-    dvbpsi/tdttot.c \
-    dvbpsi/dr_83.c \
     sectionprocessor.c \
     pesprocessor.c \
     subtableprocessor.c
 
 dvbstreamer_CFLAGS = -I$(top_srcdir)/include -DLOGGING_CHECK_DAEMON 
 
-dvbstreamer_LDFLAGS = -rdynamic
+dvbstreamer_LDFLAGS = -rdynamic -Wl,-whole-archive -Wl,dvbpsi/libdvbpsi.a -Wl,-no-whole-archive 
 
 dvbstreamer_LDADD = \
-	 -ldvbpsi -lpthread -lsqlite3 -lreadline @GETTIME_LIB@ @READLINE_TERMCAP@ @LIBLTDL@
+	  -lpthread -lsqlite3 -lreadline @GETTIME_LIB@ @READLINE_TERMCAP@ @LIBLTDL@
 
 #
 # dvbctrl
