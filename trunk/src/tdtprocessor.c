@@ -51,7 +51,6 @@ typedef struct TDTProcessor_t
 {
     PIDFilterSimpleFilter_t simplefilter;
     dvbpsi_handle handle;
-    Multiplex_t *multiplex;
     bool payloadstartonly;
 }
 TDTProcessor_t;
@@ -94,7 +93,7 @@ void TDTProcessorDestroy(PIDFilter_t *filter)
     assert(filter->processPacket == TDTProcessorProcessPacket);
     PIDFilterFree(filter);
 
-    if (state->multiplex)
+    if (state->handle)
     {
         dvbpsi_DetachTDTTOT(state->handle);
     }
@@ -120,7 +119,7 @@ void TDTProcessorUnRegisterTDTCallback(PluginTDTProcessor_t callback)
 static void TDTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex)
 {
     TDTProcessor_t *state = (TDTProcessor_t *)arg;
-    if (state->multiplex)
+    if (state->handle)
     {
         dvbpsi_DetachTDTTOT(state->handle);
     }
@@ -129,14 +128,17 @@ static void TDTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Mult
         state->handle = dvbpsi_AttachTDTTOT(TDTHandler, (void*)state);
         state->payloadstartonly = TRUE;
     }
-    state->multiplex = newmultiplex;
+    else
+    {
+        state->handle = NULL;
+    }
 }
 
 static TSPacket_t * TDTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet)
 {
     TDTProcessor_t *state = (TDTProcessor_t *)arg;
 
-    if (state->multiplex == NULL)
+    if (state->handle == NULL)
     {
         return 0;
     }

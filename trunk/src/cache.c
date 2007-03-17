@@ -99,6 +99,10 @@ int CacheLoad(Multiplex_t *multiplex)
     }
     
     cachedServicesCount = count;
+
+    MultiplexRefDec(cachedServicesMultiplex);
+
+    MultiplexRefInc(multiplex);
     cachedServicesMultiplex = multiplex;
     cachedServicesMultiplexDirty = 0;
     result = 0;

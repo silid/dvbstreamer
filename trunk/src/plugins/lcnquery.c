@@ -308,6 +308,6 @@ static Service_t *FindService(uint16_t networkId, uint16_t tsId, uint16_t servic
         return NULL;
     }
     service = ServiceFindId(multiplex, (int)serviceId);
-    free(multiplex);
+    MultiplexRefDec(multiplex);
     return service;
 }

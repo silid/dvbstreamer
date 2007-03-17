@@ -257,7 +257,7 @@ static int parsezapline(char * str, fe_type_t fe_type)
     }
     else
     {
-        free(multiplex);
+        MultiplexRefDec(multiplex);
     }
 
     /* Video PID - not used but we'll take it anyway */

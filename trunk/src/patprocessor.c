@@ -117,11 +117,13 @@ static void PATProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Mult
     PATProcessor_t *state= (PATProcessor_t*)arg;
     if (state->multiplex)
     {
+        MultiplexRefDec(state->multiplex);
         dvbpsi_DetachPAT(state->pathandle);
     }
     state->multiplex = newmultiplex;
     if (newmultiplex)
     {
+        MultiplexRefInc(state->multiplex);
         state->pathandle = dvbpsi_AttachPAT(PATHandler, (void*)state);
         state->payloadstartonly = TRUE;
     }

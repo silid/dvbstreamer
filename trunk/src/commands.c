@@ -797,7 +797,7 @@ static void CommandListMuxes(int argc, char **argv)
         if (multiplex)
         {
             CommandPrintf("%d\n", multiplex->freq);
-            free(multiplex);
+            MultiplexRefDec(multiplex);
         }
     }while(multiplex && ! ExitProgram);
     MultiplexEnumeratorDestroy(enumerator);
@@ -862,6 +862,9 @@ static void CommandServiceInfo(int argc, char **argv)
             CommandPrintf("Not in current multiplex, no further information available.\n");
             ServiceRefDec(service);
         }
+        
+        MultiplexRefDec(multiplex);
+
     }
 }
 
@@ -1337,8 +1340,10 @@ static void CommandScan(int argc, char **argv)
             for (i = 0; (i < count) && ! ExitProgram; i ++)
             {
                 ScanMultiplex(multiplexes[i]);
-                /* Free'd by SetMultiplex */
+                MultiplexRefDec(multiplexes[i]);
             }
+
+            free(multiplexes);
         }
     }
     else
@@ -1348,7 +1353,7 @@ static void CommandScan(int argc, char **argv)
         if (multiplex)
         {
             ScanMultiplex(multiplex);
-            /* Free'd by SetMultiplex */
+            MultiplexRefDec(multiplex);
         }
     }
 

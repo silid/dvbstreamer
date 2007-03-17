@@ -609,13 +609,14 @@ void SetMultiplex(Multiplex_t *multiplex)
 static void TuneMultiplex(Multiplex_t *multiplex)
 {
     struct dvb_frontend_parameters feparams;
-    if (CurrentMultiplex)
-    {
-        free((void*)CurrentMultiplex);
-    }
+
+    MultiplexRefDec(CurrentMultiplex);
+
 
     printlog(LOG_DEBUGV,"Caching Services\n");
     CacheLoad(multiplex);
+    
+    MultiplexRefInc(multiplex);
     CurrentMultiplex = multiplex;
 
     printlog(LOG_DEBUGV,"Getting Frondend parameters\n");

@@ -138,7 +138,11 @@ static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t
             ServiceRefDec(state->service);
         }
         state->service = state->nextservice;
+
+        MultiplexRefDec(state->multiplex);
         state->multiplex = (Multiplex_t *)CurrentMultiplex;
+        MultiplexRefInc(state->multiplex);
+
         state->rewritepat = TRUE;
         state->rewritepmt = TRUE;
     }
