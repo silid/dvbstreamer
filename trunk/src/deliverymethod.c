@@ -42,7 +42,7 @@ int DeliveryMethodManagerInit(void)
 
 void DeliveryMethodManagerDeInit(void)
 {
-    ListFree(DeliveryMethodsList);
+    ListFree(DeliveryMethodsList, NULL);
 }
 
 void DeliveryMethodManagerRegister(DeliveryMethodHandler_t *handler)

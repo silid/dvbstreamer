@@ -7,6 +7,7 @@
 
 pkginclude_DATA = \
     cache.h \
+    objects.h \
     services.h \
     multiplexes.h \
     dvb.h \

@@ -63,7 +63,9 @@ static List_t *NewPMTCallbacksList = NULL;
 PIDFilter_t *PMTProcessorCreate(TSFilter_t *tsfilter)
 {
     PIDFilter_t *result = NULL;
-    PMTProcessor_t *state = calloc(1, sizeof(PMTProcessor_t));
+    PMTProcessor_t *state;
+    ObjectRegisterType(PMTProcessor_t);
+    state = ObjectCreateType(PMTProcessor_t);
     if (state)
     {
         result =  PIDFilterSetup(tsfilter,
@@ -72,7 +74,7 @@ PIDFilter_t *PMTProcessorCreate(TSFilter_t *tsfilter)
                     NULL,NULL);
         if (!result)
         {
-            free(state);
+            ObjectRefDec(state);
         }
         result->name = "PMT";
         PIDFilterTSStructureChangeSet(result, PMTProcessorTSStructureChanged, state);
@@ -99,13 +101,15 @@ void PMTProcessorDestroy(PIDFilter_t *filter)
             dvbpsi_DetachPMT(state->pmthandles[i]);
             state->pmtpids[i]    = 0;
             state->pmthandles[i] = NULL;
+            ServiceRefDec(state->services[i]);
             state->services[i]   = NULL;
         }
     }
-    free(state);
+    MultiplexRefDec(state->multiplex);
+    ObjectRefDec(state);
     if (NewPMTCallbacksList)
     {
-        ListFree(NewPMTCallbacksList);
+        ListFree(NewPMTCallbacksList, NULL);
     }
 }
 

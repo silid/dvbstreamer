@@ -34,6 +34,16 @@ int QPSKParametersAdd(struct dvb_frontend_parameters *feparams);
 int QAMParametersGet(int freq, struct dvb_frontend_parameters *feparams);
 int QAMParametersAdd(struct dvb_frontend_parameters *feparams);
 
+int MultiplexInit(void)
+{
+    return  ObjectRegisterType(Multiplex_t);
+}
+
+int MultiplexDeinit(void)
+{
+    return 0;
+}
+
 int MultiplexCount()
 {
     STATEMENT_INIT;
@@ -100,7 +110,7 @@ Multiplex_t *MultiplexGetNext(MultiplexEnumerator_t enumerator)
     if (rc == SQLITE_ROW)
     {
         Multiplex_t *multiplex;
-        multiplex = calloc(1, sizeof(Multiplex_t));
+        multiplex = MultiplexNew();
         multiplex->freq = STATEMENT_COLUMN_INT(0);
         multiplex->tsId = STATEMENT_COLUMN_INT(1);
         multiplex->networkId = STATEMENT_COLUMN_INT(2);

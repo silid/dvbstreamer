@@ -34,7 +34,7 @@ static int PIDAdd(Service_t *service, PID_t *pid);
 
 PIDList_t *PIDListNew(int count)
 {
-    PIDList_t *result = malloc(sizeof(PIDList_t) + (sizeof(PID_t) * count));
+    PIDList_t *result = ObjectAlloc(sizeof(PIDList_t) + (sizeof(PID_t) * count));
     if (result)
     {
         memset(result, 0, count);
@@ -55,7 +55,7 @@ void PIDListFree(PIDList_t *pids)
                 dvbpsi_DeleteDescriptors(pids->pids[i].descriptors);
             }
         }
-        free(pids);
+        ObjectFree(pids);
     }
 }
 

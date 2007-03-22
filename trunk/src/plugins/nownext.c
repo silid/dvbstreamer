@@ -191,13 +191,7 @@ static void Deinit0x12Filter(PIDFilter_t *filter)
     ListIterator_t iterator;
     filter->enabled = FALSE;
     SubTableProcessorDeinit(filter);
-    for (ListIterator_Init(iterator, serviceNowNextInfoList); 
-         ListIterator_MoreEntries(iterator); 
-         ListIterator_Next(iterator))
-    {
-        free(ListIterator_Current(iterator));
-    }
-    ListFree(serviceNowNextInfoList);
+    ListFree(serviceNowNextInfoList, free);
 }
 
 static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension)

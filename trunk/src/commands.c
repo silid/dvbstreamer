@@ -347,7 +347,7 @@ int CommandInit(void)
 
 void CommandDeInit(void)
 {
-    ListFree( commandslist);
+    ListFree( commandslist, NULL);
     scanning = FALSE;
     PATProcessorUnRegisterPATCallback(PATCallback);
     PMTProcessorUnRegisterPMTCallback(PMTCallback);
@@ -1321,7 +1321,7 @@ static void CommandScan(int argc, char **argv)
     {
         int count = MultiplexCount();
         
-        Multiplex_t **multiplexes = calloc(count, sizeof(Multiplex_t *));
+        Multiplex_t **multiplexes = ObjectAlloc(count * sizeof(Multiplex_t *));
         if (multiplexes)
         {
             int i =0;
@@ -1343,7 +1343,7 @@ static void CommandScan(int argc, char **argv)
                 MultiplexRefDec(multiplexes[i]);
             }
 
-            free(multiplexes);
+            ObjectFree(multiplexes);
         }
     }
     else
@@ -1405,7 +1405,7 @@ static void ScanMultiplex(Multiplex_t *multiplex)
 
     if (pmtsreceived)
     {
-        free(pmtsreceived);
+        ObjectFree(pmtsreceived);
     }
 
 
@@ -1425,7 +1425,7 @@ static void PATCallback(dvbpsi_pat_t* newpat)
             }
             patentry = patentry->p_next;
         }
-        pmtsreceived = calloc(sizeof(struct PMTReceived_t), pmtcount);
+        pmtsreceived = ObjectAlloc(sizeof(struct PMTReceived_t) * pmtcount);
         patentry = newpat->p_first_program;
         i = 0;
         while(patentry)

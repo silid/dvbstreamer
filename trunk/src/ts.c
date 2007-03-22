@@ -45,7 +45,9 @@ static void InformMultiplexChanged(TSFilter_t *state);
 *******************************************************************************/
 TSFilter_t* TSFilterCreate(DVBAdapter_t *adapter)
 {
-    TSFilter_t *result = calloc(1, sizeof(TSFilter_t));
+    TSFilter_t *result;
+    ObjectRegisterType(TSFilter_t);
+    result = ObjectCreateType(TSFilter_t);
     if (result)
     {
         result->adapter = adapter;
@@ -63,14 +65,8 @@ void TSFilterDestroy(TSFilter_t* tsfilter)
     pthread_join(tsfilter->thread, NULL);
     pthread_mutex_destroy(&tsfilter->mutex);
 
-    for (ListIterator_Init(iterator, tsfilter->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
-    {
-        PIDFilter_t *filter =(PIDFilter_t *)ListIterator_Current(iterator);
-        free(filter);
-        ListRemoveCurrent(&iterator);
-    }
-    ListFree(tsfilter->pidFilters);
-    free(tsfilter);
+    ListFree(tsfilter->pidFilters, free);
+    ObjectRefDec(tsfilter);
 }
 
 void TSFilterEnable(TSFilter_t* tsfilter, bool enable)

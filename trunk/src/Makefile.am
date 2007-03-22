@@ -17,6 +17,7 @@ bin_PROGRAMS = dvbstreamer dvbctrl setupdvbstreamer
 dvbstreamer_SOURCES = \
     main.c\
     dvb.c\
+    objects.c \
     multiplexes.c\
     services.c\
     pids.c\
@@ -68,7 +69,8 @@ setupdvbstreamer_SOURCES = \
     parsezap.c\
     multiplexes.c\
     services.c\
-    dbase.c
+    dbase.c \
+    objects.c 
 
 setupdvbstreamer_LDFLAGS =
 

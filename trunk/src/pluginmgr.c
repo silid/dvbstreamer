@@ -36,20 +36,21 @@ Plugin Manager functions.
 #include "logging.h"
 #include "main.h"
 
-static int PluginManagerLoadPlugin(const char *filename, void *userarg);
-static void PluginManagerInstallPlugin(Plugin_t *pluginInterface);
-static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface);
-
-static void PluginManagerLsPlugins(int argc, char **argv);
-static void PluginManagerPluginInfo(int argc, char **argv);
-
 struct PluginEntry_t
 {
     lt_dlhandle handle;
     Plugin_t *pluginInterface;
 };
 
-List_t *PluginsList;
+static int PluginManagerLoadPlugin(const char *filename, void *userarg);
+static void PluginManagerUnloadPlugin(struct PluginEntry_t *entry);
+static void PluginManagerInstallPlugin(Plugin_t *pluginInterface);
+static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface);
+
+static void PluginManagerLsPlugins(int argc, char **argv);
+static void PluginManagerPluginInfo(int argc, char **argv);
+
+static List_t *PluginsList;
 
 static Command_t PluginManagerCommands[] = {
         {
@@ -98,16 +99,7 @@ void PluginManagerDeInit(void)
     ListIterator_t iterator;
     printlog(LOG_DEBUG, "Plugin Manager Deinitialising...\n");
     CommandUnRegisterCommands(PluginManagerCommands);
-    for ( ListIterator_Init(iterator, PluginsList); ListIterator_MoreEntries(iterator); )
-    {
-        struct PluginEntry_t *entry = ListIterator_Current(iterator);
-        printlog(LOG_DEBUG, "Uninstalling %s\n", entry->pluginInterface->name);
-        PluginManagerUninstallPlugin(entry->pluginInterface);
-        ListRemoveCurrent(&iterator);
-        lt_dlclose(entry->handle);
-        free(entry);
-    }
-    ListFree(PluginsList);
+    ListFree(PluginsList, (ListDataDestructor_t)PluginManagerUnloadPlugin);
     lt_dlexit();
     printlog(LOG_DEBUG, "Plugin Manager Deinitialised\n");
 }
@@ -174,6 +166,14 @@ static int PluginManagerLoadPlugin(const char *filename, void *userarg)
         printlog(LOG_DEBUGV, "Failed to open plugin %s - reason %s\n", filename, lt_dlerror());
     }
     return 0;
+}
+
+static void PluginManagerUnloadPlugin(struct PluginEntry_t *entry)
+{
+    printlog(LOG_DEBUG, "Uninstalling %s\n", entry->pluginInterface->name);
+    PluginManagerUninstallPlugin(entry->pluginInterface);
+    lt_dlclose(entry->handle);
+    free(entry);
 }
 
 static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)

@@ -63,7 +63,9 @@ static List_t *NewTDTCallbacksList = NULL;
 PIDFilter_t *TDTProcessorCreate(TSFilter_t *tsfilter)
 {
     PIDFilter_t *result = NULL;
-    TDTProcessor_t *state = calloc(1, sizeof(TDTProcessor_t));
+    TDTProcessor_t *state;
+    ObjectRegisterType(TDTProcessor_t);
+    state = ObjectCreateType(TDTProcessor_t);
     if (state)
     {
         state->simplefilter.pidcount = 1;
@@ -74,7 +76,7 @@ PIDFilter_t *TDTProcessorCreate(TSFilter_t *tsfilter)
                     NULL,NULL);
         if (result == NULL)
         {
-            free(state);
+            ObjectRefDec(state);
         }
         result->name = "TDT/TOT";
         PIDFilterMultiplexChangeSet(result,TDTProcessorMultiplexChanged, state);
@@ -97,7 +99,7 @@ void TDTProcessorDestroy(PIDFilter_t *filter)
     {
         dvbpsi_DetachTDTTOT(state->handle);
     }
-    free(state);
+    ObjectRefDec(state);
 }
 
 void TDTProcessorRegisterTDTCallback(PluginTDTProcessor_t callback)

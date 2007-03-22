@@ -270,7 +270,7 @@ void CacheUpdatePIDs(Service_t *service, int pcrpid, PIDList_t *pids, int pmtver
 
 Service_t *CacheServiceAdd(int id)
 {
-    Service_t *result = calloc(1, sizeof(Service_t));
+    Service_t *result = ServiceNew();
     if (result)
     {
         result->id = id;
@@ -278,7 +278,6 @@ Service_t *CacheServiceAdd(int id)
         result->pmtPid = 8192;
         sprintf(result->name, "%04x", id);
         result->multiplexFreq = cachedServicesMultiplex->freq;
-        ServiceRefInc(result);
         
         pthread_mutex_lock(&cacheUpdateMutex);
 
@@ -432,6 +431,7 @@ static void CacheServicesFree()
         }
     }
     cachedServicesCount = 0;
+    MultiplexRefDec(cachedServicesMultiplex);
     cachedServicesMultiplex = NULL;
 }
 
