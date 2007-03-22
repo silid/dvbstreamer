@@ -20,15 +20,18 @@ dr_83.c
 Decode Logical Channel Number Descriptor.
 
 */
+#include "config.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 
-#include <dvbpsi/dvbpsi.h>
-#include <dvbpsi/psi.h>
-#include <dvbpsi/descriptor.h>
-#include "dvbpsi/dr_83.h"
+#include "dvbpsi.h"
+#include "../dvbpsi_private.h"
+#include "descriptor.h"
+
+#include "dr_83.h"
 
 /*****************************************************************************
  * dvbpsi_DecodeLCNDr

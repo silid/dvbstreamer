@@ -20,15 +20,17 @@ nit.c
 Decode Network Information Tables.
 
 */
+#include "config.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 
-#include <dvbpsi/dvbpsi.h>
-#include <dvbpsi/psi.h>
-#include <dvbpsi/descriptor.h>
-#include <dvbpsi/demux.h>
+#include "dvbpsi.h"
+#include "psi.h"
+#include "descriptor.h"
+#include "demux.h"
 #include "dvbpsi/nit.h"
 #include "logging.h"
 
