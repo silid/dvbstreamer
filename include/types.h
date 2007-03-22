@@ -27,6 +27,10 @@ Generic type definitions.
  * @defgroup Types Global types
  *@{
  */
+
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
 /**
  * True value.
  */

@@ -32,6 +32,8 @@ Additional output management functions.
 #include "deliverymethod.h"
 #include "list.h"
 
+static void OutputFreeImpl(Output_t *output);
+
 char *OutputErrorStr;
 
 List_t *ManualOutputsList;
@@ -39,6 +41,7 @@ List_t *ServiceOutputsList;
 
 int OutputsInit()
 {
+    ObjectRegisterType(Output_t);
     ManualOutputsList = ListCreate();
     ServiceOutputsList = ListCreate();
     return 0;
@@ -46,16 +49,8 @@ int OutputsInit()
 
 void OutputsDeInit()
 {
-    while(ManualOutputsList->head)
-    {
-        OutputFree((Output_t*)ManualOutputsList->head->data);
-    }
-    while(ServiceOutputsList->head)
-    {
-        OutputFree((Output_t*)ServiceOutputsList->head->data);
-    }
-    ListFree( ManualOutputsList);
-    ListFree( ServiceOutputsList);
+    ListFree( ManualOutputsList, (ListDataDestructor_t)OutputFreeImpl);
+    ListFree( ServiceOutputsList, (ListDataDestructor_t)OutputFreeImpl);
 }
 
 Output_t *OutputAllocate(char *name, OutputType type, char *destination)
@@ -72,7 +67,7 @@ Output_t *OutputAllocate(char *name, OutputType type, char *destination)
             return NULL;
         }
     }
-    output = calloc(1, sizeof(Output_t));
+    output =ObjectCreateType(Output_t);
     if (!output)
     {
         OutputErrorStr = "Not enough memory!";
@@ -80,7 +75,7 @@ Output_t *OutputAllocate(char *name, OutputType type, char *destination)
     }
     if (!ListAdd( list, output))
     {
-        free(output);
+        ObjectRefDec(output);
         OutputErrorStr = "Failed to add to list!";
         return NULL;
     }
@@ -92,17 +87,17 @@ Output_t *OutputAllocate(char *name, OutputType type, char *destination)
             {
                 OutputErrorStr = "Failed to allocate PID filter!";
                 ListRemove( list, output);
-                free(output);
+                ObjectRefDec(output);
                 return NULL;
             }
             output->filter->filterPacket = PIDFilterSimpleFilter;
-            output->filter->fpArg = calloc(1, sizeof(PIDFilterSimpleFilter_t));
+            output->filter->fpArg = ObjectAlloc(sizeof(PIDFilterSimpleFilter_t));
             if (!output->filter->fpArg)
             {
                 OutputErrorStr = "Failed to allocated PIDFilterSimpleFilter_t structure!";
                 PIDFilterFree(output->filter);
                 ListRemove( list, output);
-                free(output);
+                ObjectRefDec(output);
                 return NULL;
             }
             break;
@@ -112,7 +107,7 @@ Output_t *OutputAllocate(char *name, OutputType type, char *destination)
             {
                 OutputErrorStr = "Failed to allocate Service filter!";
                 ListRemove( list, output);
-                free(output);
+                ObjectRefDec(output);
                 return NULL;
             }
             break;
@@ -128,7 +123,7 @@ Output_t *OutputAllocate(char *name, OutputType type, char *destination)
         switch (type)
         {
             case OutputType_Manual:
-                free(output->filter->fpArg);
+                ObjectFree(output->filter->fpArg);
                 PIDFilterFree(output->filter);
                 break;
             case OutputType_Service:
@@ -136,7 +131,7 @@ Output_t *OutputAllocate(char *name, OutputType type, char *destination)
                 break;
         }
         ListRemove( list, output);
-        free(output);
+        ObjectRefDec(output);
         return NULL;
     }
     output->filter->enabled = 1;
@@ -148,31 +143,44 @@ Output_t *OutputAllocate(char *name, OutputType type, char *destination)
 void OutputFree(Output_t *output)
 {
     List_t *list;
-    output->filter->enabled = 0;
     switch (output->type)
     {
         case OutputType_Manual:
             list = ManualOutputsList;
-            free(output->filter->fpArg);
-            PIDFilterFree(output->filter);
             break;
         case OutputType_Service:
             list = ServiceOutputsList;
-            ServiceFilterDestroy(output->filter);
             break;
         default:
             OutputErrorStr = "Unknown output type!";
             return;
     }
 
+    OutputFreeImpl(output);
+    ListRemove( list, output);
+}
+
+static void OutputFreeImpl(Output_t *output)
+{
+    output->filter->enabled = 0;
+    switch (output->type)
+    {
+        case OutputType_Manual:
+            free(output->filter->fpArg);
+            PIDFilterFree(output->filter);
+            break;
+        case OutputType_Service:
+            ServiceFilterDestroy(output->filter);
+            break;
+        default:
+            OutputErrorStr = "Unknown output type!";
+            return;
+    }
     free(output->name);
 
     DeliveryMethodManagerFree(output->filter);
-
-    ListRemove( list, output);
-    free(output);
+    ObjectRefDec(output);
 }
-
 Output_t *OutputFind(char *name, OutputType type)
 {
     Output_t *result = NULL;

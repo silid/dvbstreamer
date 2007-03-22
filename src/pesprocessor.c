@@ -111,13 +111,8 @@ void PESProcessorDestroyAllProcessors(void)
     {
         return;
     }
-    for (ListIterator_Init(iterator, SectionProcessorsList);
-         ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
-    {
-        PIDFilter_t * filter = (PIDFilter_t*)ListIterator_Current(iterator);
-        PESProcessorDestroy(filter);
-    }
-    ListFree(SectionProcessorsList);
+
+    ListFree(SectionProcessorsList, (ListDataDestructor_t)PESProcessorDestroy);
     SectionProcessorsList = NULL;
 }
 
@@ -145,7 +140,10 @@ static PIDFilter_t *PESProcessorFind(uint16_t pid)
 static PIDFilter_t *PESProcessorCreate(TSFilter_t *tsfilter, uint16_t pid)
 {
     PIDFilter_t *result = NULL;
-    PESProcessor_t *state = calloc(1, sizeof(PESProcessor_t));
+    PESProcessor_t *state;
+
+    ObjectRegisterType(PESProcessor_t);
+    state = ObjectCreateType(PESProcessor_t);
     if (state)
     {
         state->simplefilter.pidcount = 1;
@@ -156,7 +154,7 @@ static PIDFilter_t *PESProcessorCreate(TSFilter_t *tsfilter, uint16_t pid)
                                 NULL,NULL);
         if (result == NULL)
         {
-            free(state);
+            ObjectRefDec(state);
         }
         asprintf(&result->name, "PES(PID 0x%04x)", pid);
         PIDFilterMultiplexChangeSet(result,PESProcessorMultiplexChanged, state);
@@ -170,20 +168,10 @@ static PIDFilter_t *PESProcessorCreate(TSFilter_t *tsfilter, uint16_t pid)
 static void PESProcessorDestroy(PIDFilter_t *filter)
 {
     PESProcessor_t *state = (PESProcessor_t *)filter->ppArg;
-    ListIterator_t iterator;
     assert(filter->processPacket == PESProcessorProcessPacket);
     PIDFilterFree(filter);
-
-    for (ListIterator_Init(iterator, state->callbacksList);
-         ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
-    {
-        CallbackDetails_t *details = ListIterator_Current(iterator);
-        ListRemoveCurrent( &iterator);
-        free(details);
-    }
-    
-    ListFree(state->callbacksList);
-    free(state);
+    ListFree(state->callbacksList, free);
+    ObjectRefDec(state);
 }
 
 static void PESProcessorRegisterCallback(PIDFilter_t *filter,PluginPESProcessor_t callback, void *userarg)

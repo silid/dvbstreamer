@@ -101,13 +101,8 @@ void SectionProcessorDestroyAllProcessors(void)
     {
         return;
     }
-    for (ListIterator_Init(iterator, SectionProcessorsList);
-            ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
-    {
-        PIDFilter_t * filter = (PIDFilter_t*)ListIterator_Current(iterator);
-        SectionProcessorDestroy(filter);
-    }
-    ListFree(SectionProcessorsList);
+
+    ListFree(SectionProcessorsList, (ListDataDestructor_t)SectionProcessorDestroy);
     SectionProcessorsList = NULL;
 }
 
@@ -135,7 +130,10 @@ static PIDFilter_t *SectionProcessorFind(uint16_t pid)
 static PIDFilter_t *SectionProcessorCreate(TSFilter_t *tsfilter, uint16_t pid)
 {
     PIDFilter_t *result = NULL;
-    SectionProcessor_t *state = calloc(1, sizeof(SectionProcessor_t));
+    SectionProcessor_t *state;
+    
+    ObjectRegisterType(SectionProcessor_t);
+    state = ObjectCreateType(SectionProcessor_t);
     if (state)
     {
         state->simplefilter.pidcount = 1;
@@ -146,7 +144,7 @@ static PIDFilter_t *SectionProcessorCreate(TSFilter_t *tsfilter, uint16_t pid)
                     NULL,NULL);
         if (result == NULL)
         {
-            free(state);
+            ObjectRefDec(state);
         }
         asprintf( &result->name, "Section(PID 0x%04x)", pid);
         PIDFilterMultiplexChangeSet(result,SectionProcessorMultiplexChanged, state);
@@ -166,16 +164,9 @@ static void SectionProcessorDestroy(PIDFilter_t *filter)
     {
         free(state->handle);
     }
-    
-    for (ListIterator_Init(iterator, state->sectioncallbackslist);
-         ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
-    {
-        CallbackDetails_t *details = ListIterator_Current(iterator);
-        ListRemoveCurrent( &iterator);
-        free(details);
-    }
-    ListFree(state->sectioncallbackslist);
-    free(state);
+
+    ListFree(state->sectioncallbackslist, free);
+    ObjectRefDec(state);
 }
 
 static void SectionProcessorRegisterSectionCallback(PIDFilter_t *filter,PluginSectionProcessor_t callback, void *userarg)

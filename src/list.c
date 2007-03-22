@@ -23,22 +23,31 @@ Generic list management functions.
 #include <stdlib.h>
 #include "logging.h"
 #include "list.h"
+#include "objects.h"
 
 List_t *ListCreate()
 {
-    return calloc(1, sizeof(List_t));
+    ObjectRegisterType(List_t);
+    return ObjectCreateType(List_t);
 }
 
-void ListFree(List_t *list)
+void ListFree(List_t *list, void (*destructor)(void *data))
 {
     ListEntry_t *entry;
     ListEntry_t *next;
     for (entry = list->head; entry != NULL; entry = next)
     {
         next = entry->next;
+        if (destructor)
+        {
+            destructor(entry->data);
+        }
         free(entry);
     }
-    free(list);
+    list->count = 0;
+    list->head = NULL;
+    list->tail = NULL;
+    ObjectRefDec(list);
 }
 
 bool ListAdd(List_t *list, void *data)

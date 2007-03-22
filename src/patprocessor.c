@@ -55,7 +55,9 @@ static List_t *NewPATCallbacksList = NULL;
 PIDFilter_t *PATProcessorCreate(TSFilter_t *tsfilter)
 {
     PIDFilter_t *result = NULL;
-    PATProcessor_t *state = calloc(1, sizeof(PATProcessor_t));
+    PATProcessor_t *state;
+    ObjectRegisterType(PATProcessor_t);
+    state = ObjectCreateType(PATProcessor_t);
     if (state)
     {
         state->simplefilter.pidcount = 1;
@@ -87,12 +89,13 @@ void PATProcessorDestroy(PIDFilter_t *filter)
     if (state->multiplex)
     {
         dvbpsi_DetachPAT(state->pathandle);
+        MultiplexRefDec(state->multiplex);
     }
-    free(state);
+    ObjectRefDec(state);
 
     if (NewPATCallbacksList)
     {
-        ListFree(NewPATCallbacksList);
+        ListFree(NewPATCallbacksList, NULL);
     }
 }
 

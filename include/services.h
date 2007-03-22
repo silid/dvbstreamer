@@ -30,6 +30,7 @@ Manage services and PIDs.
 #endif
 
 #include "types.h"
+#include "objects.h"
 #include "multiplexes.h"
 
 
@@ -53,7 +54,6 @@ typedef enum RunningStatus_e
  */
 typedef struct Service_t
 {
-    unsigned long refCount; /**< Number of references to this service */
     char name[SERVICE_MAX_NAME_LEN]; /**< Name of the service. */
     int multiplexFreq; /**< Multiplex frequency this service is broadcast on. */
     int id;            /**< Service/Program ID of the service. */
@@ -77,6 +77,19 @@ typedef void *ServiceEnumerator_t;
 #define ServiceAreEqual(_service1, _service2) \
     (((_service1)->multiplexFreq == (_service2)->multiplexFreq) && \
     ((_service1)->id == (_service2)->id))
+
+/**
+ * Initialise the service module for use.
+ * @return 0 on success.
+ */
+int ServiceInit(void);
+
+/**
+ * Release resources used by the service module.
+ * @return 0 on success.
+ */
+int ServiceDeinit(void);
+
 
 /**
  * Return the number of services in the database.
@@ -183,39 +196,34 @@ void ServiceEnumeratorDestroy(ServiceEnumerator_t enumerator);
 Service_t *ServiceGetNext(ServiceEnumerator_t enumerator);
 
 /**
+ * Create a new service object.
+ */
+#define ServiceNew() (Service_t*)ObjectCreateType(Service_t)
+
+/**
  * Increment the references to the specified service object.
  * @param service The service instance to increment the reference count of.
  */
-#if 0
-void ServiceRefInc(Service_t *service);
-#else
 #define ServiceRefInc(__service) \
         do{ \
-            (__service)->refCount ++;\
-            printlog(LOG_DIARRHEA, "Service %p (%s) ref incremented (%s:%d), count now %d\n", (__service), (__service)->name, __func__, __LINE__, (__service)->refCount);\
+            if ((__service)) \
+            { \
+                ObjectRefInc(__service); \
+            } \
         }while(0)
-#endif
+
 /**
  * Decrement the references of the specified service object. If the reference 
  * count reaches 0 the instance is free'd.
  * @param service The service instance to decrement the reference count of.
  */
-#if 0
-void ServiceRefDec(Service_t *service);
-#else
 #define ServiceRefDec(__service) \
         do{ \
-            if ((__service)->refCount > 0)\
-            {\
-                (__service)->refCount --;\
-            }\
-            printlog(LOG_DIARRHEA, "Service %p (%s) ref decremented (%s:%d), count now %d\n", (__service), (__service)->name,  __func__, __LINE__, (__service)->refCount);\
-            if ((__service)->refCount == 0)\
-            {\
-                printlog(LOG_DIARRHEA, "Service %p (%s) free'd\n", (__service), (__service)->name);\
-                free((__service));\
-            }\
+            if ((__service)) \
+            { \
+                ObjectRefDec(__service); \
+            } \
         }while(0)
-#endif
+
 /** @} */
 #endif

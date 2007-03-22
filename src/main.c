@@ -178,6 +178,8 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+    INIT(ObjectInit(), "objects");
+
     if (DaemonMode)
     {
         InitDaemon( adapterNumber);
@@ -191,6 +193,8 @@ int main(int argc, char *argv[])
     }
 
     INIT(DBaseInit(adapterNumber), "database");
+    INIT(MultiplexInit(), "multiplex");
+    INIT(ServiceInit(), "service");
     INIT(CacheInit(), "cache");
     INIT(DeliveryMethodManagerInit(), "delivery method manager");
 
@@ -286,7 +290,7 @@ int main(int argc, char *argv[])
      */
     DEINIT(PluginManagerDeInit(), "plugin manager");
 
-    ListFree(ChannelChangedCallbacksList);
+    ListFree(ChannelChangedCallbacksList, NULL);
 
     DEINIT(CommandDeInit(), "commands");
 
@@ -312,15 +316,22 @@ int main(int argc, char *argv[])
     DEINIT(DVBDispose(DVBAdapter), "DVB adapter");
     DEINIT(DeliveryMethodManagerDeInit(), "delivery method manager");
     DEINIT(CacheDeInit(), "cache");
+
+    ServiceRefDec(CurrentService);
+    MultiplexRefDec(CurrentMultiplex);
+    
+
+    DEINIT(ServiceDeinit(), "service");
+    DEINIT(MultiplexDeinit(), "multiplex");
     DEINIT(DBaseDeInit(), "database");
-    if (CurrentMultiplex)
-    {
-        free((void *)CurrentMultiplex);
-    }
+
     if (DaemonMode)
     {
         DeinitDaemon();
     }
+
+    printf("CurrentService %p CurrentMultiplex %p\n",CurrentService, CurrentMultiplex);
+    DEINIT(ObjectDeinit(), "objects");
     return 0;
 }
 
@@ -577,7 +588,11 @@ Service_t *SetCurrentService(char *name)
         printlog(LOG_DEBUGV,"Enabling filters\n");
         TSFilterEnable(TSFilter, TRUE);
     }
-
+    else
+    {
+        ServiceRefDec(service);
+    }
+    MultiplexRefDec(multiplex);
     return (Service_t*)CurrentService;
 }
 

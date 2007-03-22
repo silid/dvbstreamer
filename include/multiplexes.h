@@ -25,6 +25,7 @@ Manage multiplexes and tuning parameters.
 #include <sys/types.h>
 #include <linux/dvb/dmx.h>
 #include <linux/dvb/frontend.h>
+#include "objects.h"
 /**
  * @defgroup Multiplex Multiplex information
  * {@
@@ -34,9 +35,7 @@ Manage multiplexes and tuning parameters.
  * Structure describing a multiplex.
  */
 typedef struct Multiplex_t
-{
-    unsigned long refCount; /**< Number of references to this multiplex */
-    
+{    
     int freq;       /**< Frequency the multiplex is broadcast on. */
     int tsId;       /**< Transport Stream ID. */
     int networkId;  /**< Network ID */
@@ -52,6 +51,18 @@ typedef void * MultiplexEnumerator_t;
  */
 #define MultiplexAreEqual(_multiplex1, _multiplex2) \
     ((_multiplex1)->freq == (_multiplex2)->freq)
+
+/**
+ * Initialise the multiplex module for use.
+ * @return 0 on success.
+ */
+int MultiplexInit(void);
+
+/**
+ * Release resources used by the multiplex module.
+ * @return 0 on success.
+ */
+int MultiplexDeinit(void);
 
 /**
  * Number of multiplexes stored in the database.
@@ -136,6 +147,11 @@ int MultiplexNetworkIdSet(Multiplex_t *multiplex, int netid);
 Multiplex_t *MultiplexFindId(int netid, int tsid);
 
 /**
+ * Create a new multiplex object.
+ */
+#define MultiplexNew() (Multiplex_t*)ObjectCreateType(Multiplex_t)
+
+/**
  * Increment the references to the specified multiplex object.
  * @param multiplex The multiplex instance to increment the reference count of. (Multiplex can be NULL.)
  */
@@ -143,8 +159,7 @@ Multiplex_t *MultiplexFindId(int netid, int tsid);
         do{ \
             if ((__multiplex)) \
             { \
-                (__multiplex)->refCount ++;\
-                printlog(LOG_DIARRHEA, "Multiplex %p (%d) ref incremented (%s:%d), count now %d\n", (__multiplex), (__multiplex)->freq, __func__, __LINE__, (__multiplex)->refCount);\
+                ObjectRefInc((__multiplex)); \
             } \
         }while(0)
 
@@ -157,16 +172,7 @@ Multiplex_t *MultiplexFindId(int netid, int tsid);
         do{ \
             if ((__multiplex)) \
             { \
-                if ((__multiplex)->refCount > 0)\
-                {\
-                    (__multiplex)->refCount --;\
-                }\
-                printlog(LOG_DIARRHEA, "Multiplex %p (%d) ref decremented (%s:%d), count now %d\n", (__multiplex), (__multiplex)->freq,  __func__, __LINE__, (__multiplex)->refCount);\
-                if ((__multiplex)->refCount == 0)\
-                {\
-                    printlog(LOG_DIARRHEA, "Multiplex %p (%d) free'd\n", (__multiplex), (__multiplex)->freq);\
-                    free((__multiplex));\
-                }\
+                ObjectRefDec((__multiplex)); \
             } \
         }while(0)
 

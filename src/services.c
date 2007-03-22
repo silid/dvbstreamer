@@ -37,6 +37,16 @@ Manage services and PIDs.
 static void *RollUpDescriptors(dvbpsi_descriptor_t *descriptors, int *datasize);
 static dvbpsi_descriptor_t *UnRollDescriptors(char *descriptors, int size);
 
+int ServiceInit(void)
+{
+    return  ObjectRegisterType(Service_t);
+}
+
+int ServiceDeinit(void)
+{
+    return 0;
+}
+
 int ServiceCount()
 {
     int result = -1;
@@ -280,7 +290,7 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
         Service_t *service = NULL;
         char *name;
 
-        service = calloc(1, sizeof(Service_t));
+        service = ServiceNew();
         service->multiplexFreq = STATEMENT_COLUMN_INT( 0);
         service->id = STATEMENT_COLUMN_INT( 1);
         name = STATEMENT_COLUMN_TEXT( 2);
@@ -291,8 +301,6 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
         service->pmtVersion = STATEMENT_COLUMN_INT( 3);
         service->pmtPid = STATEMENT_COLUMN_INT( 4);
         service->pcrPid = STATEMENT_COLUMN_INT( 5);
-
-        ServiceRefInc(service);
         return service;
     }
 
@@ -302,27 +310,3 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
     }
     return NULL;
 }
-#if 0
-void ServiceRefInc(Service_t *service)
-{
-    service->refcount ++;
-    printlog(LOG_DEBUGV, "Service %p (%s) ref incremented, count now %d\n", service, service->name, service->refcount);
-}
-
-void ServiceRefDec(Service_t *service)
-{
-
-    if (service->refcount > 0)
-    {
-        service->refcount --;
-    }
-    printlog(LOG_DEBUGV, "Service %p (%s) ref decremented, count now %d\n", service, service->name, service->refcount);
-    
-    if (service->refcount == 0)
-    {
-        printlog(LOG_DEBUGV, "Service %p (%s) free'd\n", service, service->name);
-        free(service);
-    }   
-}
-
-#endif

@@ -41,7 +41,7 @@ static int DVBDemuxSetPESFilter(DVBAdapter_t *adapter, ushort pid, int pidtype, 
 DVBAdapter_t *DVBInit(int adapter)
 {
     DVBAdapter_t *result = NULL;
-    result = (DVBAdapter_t*)calloc(sizeof(DVBAdapter_t), 1);
+    result = (DVBAdapter_t*)ObjectAlloc(sizeof(DVBAdapter_t));
     if (result)
     {
         result->frontEndFd = -1;
@@ -95,7 +95,7 @@ void DVBDispose(DVBAdapter_t *adapter)
         printlog(LOG_DEBUGV,"Closing Frontend file descriptor\n");
         close(adapter->frontEndFd);
     }
-    free(adapter);
+    ObjectFree(adapter);
 }
 
 int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *frontend)

@@ -89,7 +89,9 @@ bool SubTableProcessorInit(PIDFilter_t *filter, uint16_t pid,
                                    dvbpsi_demux_new_cb_t subtablehandler, void *stharg, 
                                    MultiplexChanged multiplexchanged, void *mcarg)
 {
-    SubTableProcessor_t *state = calloc(1, sizeof(SubTableProcessor_t));
+    SubTableProcessor_t *state;
+    ObjectRegisterType(SubTableProcessor_t);
+    state = ObjectCreateType(SubTableProcessor_t);
     if (state)
     {
         state->simplefilter.pidcount = 1;
@@ -117,7 +119,7 @@ void SubTableProcessorDeinit(PIDFilter_t *filter)
     {
         dvbpsi_DetachDemux(state->demuxhandle);
     }
-    free(state);
+    ObjectRefDec(state);
 }
 
 void *SubTableProcessorGetSubTableHandlerArg(PIDFilter_t *filter)

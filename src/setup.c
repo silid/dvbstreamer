@@ -115,7 +115,9 @@ int main(int argc, char *argv[])
                 exit(1);
         }
     }
-
+    INIT(ObjectInit(), "objects");
+    INIT(MultiplexInit(), "multiplex");
+    INIT(ServiceInit(), "service");
     INIT(DBaseInit(adapterNumber), "database");
 
     if (!channelsFile)
@@ -136,7 +138,10 @@ int main(int argc, char *argv[])
     
     printf("%d Services available on %d Multiplexes\n", ServiceCount(), MultiplexCount());
 
+    DEINIT(ServiceDeinit(), "service");
+    DEINIT(MultiplexDeinit(), "multiplex");
     DEINIT(DBaseDeInit(), "database");
+    DEINIT(ObjectDeinit(), "objects");
 
     return 0;
 }

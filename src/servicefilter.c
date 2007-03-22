@@ -70,7 +70,9 @@ static void ServiceFilterInitPacket(TSPacket_t *packet, dvbpsi_psi_section_t* se
 PIDFilter_t *ServiceFilterCreate(TSFilter_t *tsfilter, PacketOutput outputpacket,void *oparg)
 {
     PIDFilter_t *result = NULL;
-    ServiceFilter_t *state = calloc(1, sizeof(ServiceFilter_t));
+    ServiceFilter_t *state;
+    ObjectRegisterType(ServiceFilter_t);
+    state = ObjectCreateType(ServiceFilter_t);
     if (state)
     {
         result = PIDFilterSetup(tsfilter,
@@ -79,7 +81,7 @@ PIDFilter_t *ServiceFilterCreate(TSFilter_t *tsfilter, PacketOutput outputpacket
                     outputpacket, oparg);
         if (result == NULL)
         {
-            free(state);
+            ObjectRefDec(state);
         }
     }
     return result;
@@ -90,17 +92,18 @@ void ServiceFilterDestroy(PIDFilter_t *filter)
     ServiceFilter_t *state = (ServiceFilter_t *)filter->ppArg;
     assert(filter->filterPacket == ServiceFilterFilterPacket);
     PIDFilterFree(filter);
-    free(state);
+    ServiceRefDec(state->nextservice);
+    ServiceRefDec(state->service);
+    MultiplexRefDec(state->multiplex);
+    ObjectRefDec(state);
 }
 
 void ServiceFilterServiceSet(PIDFilter_t *filter, Service_t *service)
 {
     ServiceFilter_t *state = (ServiceFilter_t *)filter->fpArg;
     assert(filter->filterPacket == ServiceFilterFilterPacket);
-    if (service)
-    {
-        ServiceRefInc(service);
-    }
+    ServiceRefInc(service);
+    ServiceRefDec(state->nextservice);
     state->nextservice = service;
 }
 
@@ -133,11 +136,9 @@ static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t
 
     if (state->service != state->nextservice)
     {
-        if (state->service)
-        {
-            ServiceRefDec(state->service);
-        }
+        ServiceRefDec(state->service);
         state->service = state->nextservice;
+        state->nextservice = NULL;
 
         MultiplexRefDec(state->multiplex);
         state->multiplex = (Multiplex_t *)CurrentMultiplex;

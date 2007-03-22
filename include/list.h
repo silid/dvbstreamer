@@ -50,6 +50,11 @@ typedef struct sListIterator_t
     ListEntry_t *current;
 }ListIterator_t;
 
+/**
+ * Function pointer to a function to call with each entry->data in a list when 
+ * the list is being freed.
+ */
+typedef void (*ListDataDestructor_t)(void *);
 
 /**
  * Initialise a ListIterator_t instance to point to the first entry in the list.
@@ -90,11 +95,12 @@ typedef struct sListIterator_t
  *@return A new List_t instance or NULL if there is not enough memory.
  */
 List_t *ListCreate();
+
 /**
- * Free a list and all the entries (not the data!).
+ * Free a list and all the entries calling the destructor function for each entry.
  * @param list The list to free.
  */
-void ListFree(List_t *list);
+void ListFree(List_t *list, void (*destructor)(void *data));
 
 /**
  * Add an entry to the end of the list.

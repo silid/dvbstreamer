@@ -22,7 +22,7 @@ Logging levels and functions.
 */
 #ifndef _LOGGING_H
 #define _LOGGING_H
-
+#include <stdarg.h>
 /**
  * Error logging level, always printed used for fatal error messages.
  */
@@ -67,4 +67,13 @@ extern int verbosity;
  * @param foramt String in printf format to output.
  */
 extern void printlog(int level, const char *format, ...);
+
+/**
+ * Write the text describe by format to the log output, if the current verbosity
+ * level is greater or equal to level.
+ * @param level The level at which to output this text.
+ * @param foramt String in printf format to output.
+ * @param valist Variable Argument list to use with the format string.
+ */
+extern void printlogva(int level, const char * format, va_list valist);
 #endif

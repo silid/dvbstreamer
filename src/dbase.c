@@ -27,11 +27,9 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 #include <sys/types.h>
 
 #include "dbase.h"
+#include "types.h"
 #include "main.h"
 #include "logging.h"
-
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
 
 /* This is the version of the database not the application!*/
 #define DBASE_VERSION 0.4
