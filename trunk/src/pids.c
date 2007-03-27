@@ -37,7 +37,6 @@ PIDList_t *PIDListNew(int count)
     PIDList_t *result = ObjectAlloc(sizeof(PIDList_t) + (sizeof(PID_t) * count));
     if (result)
     {
-        memset(result, 0, count);
         result->count = count;
     }
     return result;
