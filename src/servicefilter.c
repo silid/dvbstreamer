@@ -92,7 +92,10 @@ void ServiceFilterDestroy(PIDFilter_t *filter)
     ServiceFilter_t *state = (ServiceFilter_t *)filter->ppArg;
     assert(filter->filterPacket == ServiceFilterFilterPacket);
     PIDFilterFree(filter);
-    ServiceRefDec(state->nextservice);
+    if (state->nextservice != state->service)
+    {
+        ServiceRefDec(state->nextservice);
+    }
     ServiceRefDec(state->service);
     MultiplexRefDec(state->multiplex);
     ObjectRefDec(state);
@@ -138,7 +141,6 @@ static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t
     {
         ServiceRefDec(state->service);
         state->service = state->nextservice;
-        state->nextservice = NULL;
 
         MultiplexRefDec(state->multiplex);
         state->multiplex = (Multiplex_t *)CurrentMultiplex;
