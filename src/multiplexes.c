@@ -123,7 +123,6 @@ Multiplex_t *MultiplexGetNext(MultiplexEnumerator_t enumerator)
                  multiplex->type,
                  multiplex->patVersion);
 
-        MultiplexRefInc(multiplex);
         return multiplex;
     }
     if (rc != SQLITE_DONE)
