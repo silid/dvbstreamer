@@ -368,8 +368,10 @@ void CommandLoop(void)
 {
     char *command;
     char *argument;
-    quit = FALSE;
     CommandContext_t context;
+    char historyLine[256];
+    quit = FALSE;
+
 
     /* Setup context */
     context.interface = "console";
@@ -383,13 +385,14 @@ void CommandLoop(void)
         char *line = readline(PROMPT);
         if (line)
         {
+            strcpy(historyLine, line);
             if (CommandExecute(&context, CommandPrintfImpl, line))
             {
                 if (context.errorNumber != COMMAND_OK)
                 {
                     printf("%s\n", context.errorMessage);
                 }
-                add_history(line);
+                add_history(historyLine);
             }
             else
             {
@@ -1317,6 +1320,11 @@ static void CommandScan(int argc, char **argv)
     {
         strcpy(currservice, CurrentService->name);
     }
+    else
+    {
+        currservice[0] = 0;
+    }
+    
     if (strcmp(argv[0], "all") == 0)
     {
         int count = MultiplexCount();
@@ -1357,7 +1365,7 @@ static void CommandScan(int argc, char **argv)
         }
     }
 
-    if (currservice)
+    if (currservice[0])
     {
         SetCurrentService(currservice);
     }
