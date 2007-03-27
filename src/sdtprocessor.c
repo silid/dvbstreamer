@@ -49,14 +49,25 @@ Process Service Description Tables and update the services information.
 
 #define DESCRIPTOR_SERVICE  0x48
 
+typedef struct SDTProcessorState_s
+{
+    Multiplex_t *multiplex;
+}SDTProcessorState_t;
+
 static void SubTableHandler(void * state, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension);
 static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT);
+static void SDTMultiplexChanged(PIDFilter_t *filter, void *arg, Multiplex_t *multiplex);
+static void SDTTSStructureChanged(PIDFilter_t *filter, void *arg);
 
 static List_t *NewSDTCallbacksList = NULL;
 
 PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter)
 {
-    PIDFilter_t *result = SubTableProcessorCreate(tsfilter, 0x11, SubTableHandler, NULL, NULL, NULL);
+    SDTProcessorState_t *state;
+    PIDFilter_t *result;
+    ObjectRegisterType(SDTProcessorState_t);
+    state = ObjectCreateType(SDTProcessorState_t);
+    result = SubTableProcessorCreate(tsfilter, 0x11, SubTableHandler, state, SDTMultiplexChanged, state);
 
     if (result)
     {
@@ -69,7 +80,7 @@ PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter)
            as the first changed to the PAT removed all services and then the 
            next one added them all back (?!)
         */
-        PIDFilterTSStructureChangeSet(result, result->multiplexChanged, result->mcArg);
+        PIDFilterTSStructureChangeSet(result, SDTTSStructureChanged, state);
     }
 
     if (!NewSDTCallbacksList)
@@ -82,7 +93,10 @@ PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter)
 
 void SDTProcessorDestroy(PIDFilter_t *filter)
 {
+    SDTProcessorState_t *state = filter->tscArg;
     SubTableProcessorDestroy(filter);
+    MultiplexRefDec(state->multiplex);
+    ObjectRefDec(state);
 }
 
 void SDTProcessorRegisterSDTCallback(PluginSDTProcessor_t callback)
@@ -111,6 +125,7 @@ static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t table
 
 static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
 {
+    SDTProcessorState_t *state = arg;
     ListIterator_t iterator;
     dvbpsi_sdt_service_t* sdtservice = newSDT->p_first_service;
     printlog(LOG_DEBUG,"SDT recieved, version %d\n", newSDT->i_version);
@@ -160,9 +175,9 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
         sdtservice =sdtservice->p_next;
     }
     /* Set the Original Network id, this is a hack should really get and decode the NIT */
-    if (CurrentMultiplex->networkId != newSDT->i_network_id)
+    if (state->multiplex->networkId != newSDT->i_network_id)
     {
-        CacheUpdateNetworkId((Multiplex_t *)CurrentMultiplex, newSDT->i_network_id);
+        CacheUpdateNetworkId(state->multiplex, newSDT->i_network_id);
     }
 
     for (ListIterator_Init(iterator, NewSDTCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
@@ -172,4 +187,18 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
     }
 
     dvbpsi_DeleteSDT(newSDT);
+}
+
+static void SDTMultiplexChanged(PIDFilter_t *filter, void *arg, Multiplex_t *multiplex)
+{
+    SDTProcessorState_t *state = arg;
+    MultiplexRefDec(state->multiplex);
+    state->multiplex = multiplex;
+    MultiplexRefInc(state->multiplex);
+}
+
+static void SDTTSStructureChanged(PIDFilter_t *filter, void *arg)
+{
+    SDTProcessorState_t *state = arg;
+    filter->multiplexChanged(filter, filter->mcArg, state->multiplex);
 }
