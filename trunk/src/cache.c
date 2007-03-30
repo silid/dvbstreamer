@@ -77,6 +77,7 @@ int CacheLoad(Multiplex_t *multiplex)
     int count = ServiceForMultiplexCount(multiplex->freq);
 
     pthread_mutex_lock(&cacheUpdateMutex);
+    printlog(LOG_DEBUG,"Freeing services\n");
 
     /* Free the services and PIDs from the previous multiplex */
     CacheServicesFree();
@@ -99,8 +100,6 @@ int CacheLoad(Multiplex_t *multiplex)
     }
     
     cachedServicesCount = count;
-
-    MultiplexRefDec(cachedServicesMultiplex);
 
     MultiplexRefInc(multiplex);
     cachedServicesMultiplex = multiplex;
@@ -143,6 +142,7 @@ Service_t *CacheServiceFindName(char *name, Multiplex_t **multiplex)
             result = cachedServices[i];
             ServiceRefInc(result);
             *multiplex = cachedServicesMultiplex;
+            MultiplexRefInc(*multiplex);
             printlog(LOG_DEBUGV,"Found in cached services!\n");
             break;
         }
@@ -162,14 +162,21 @@ Service_t *CacheServiceFindName(char *name, Multiplex_t **multiplex)
 
 Service_t **CacheServicesGet(int *count)
 {
+    pthread_mutex_lock(&cacheUpdateMutex);
     *count = cachedServicesCount;
     return cachedServices;
+}
+
+void CacheServicesRelease(void)
+{
+    pthread_mutex_unlock(&cacheUpdateMutex);
 }
 
 PIDList_t *CachePIDsGet(Service_t *service)
 {
     PIDList_t *result = NULL;
     int i;
+    pthread_mutex_lock(&cacheUpdateMutex);
     for (i = 0; i < cachedServicesCount; i ++)
     {
         if ((cachedServices[i]) && ServiceAreEqual(service, cachedServices[i]))
@@ -179,6 +186,11 @@ PIDList_t *CachePIDsGet(Service_t *service)
         }
     }
     return result;
+}
+
+void CachePIDsRelease(void)
+{
+    pthread_mutex_unlock(&cacheUpdateMutex);
 }
 
 void CacheUpdateMultiplex(Multiplex_t *multiplex, int patversion, int tsid)
@@ -282,6 +294,7 @@ Service_t *CacheServiceAdd(int id)
         pthread_mutex_lock(&cacheUpdateMutex);
 
         printlog(LOG_DEBUG, "Added service %04x at %d\n", result->id, cachedServicesCount);
+        ServiceRefInc(result);
         cachedServices[cachedServicesCount] = result;
         cachedPIDs[cachedServicesCount] = NULL;
         cacheFlags[cachedServicesCount]  = CacheFlag_Dirty_Added;
@@ -309,6 +322,7 @@ void CacheServiceDelete(Service_t *service)
 
     if (deletedIndex != -1)
     {
+        printlog(LOG_DEBUG, "Removing service at index %d\n", deletedIndex);
         /* Get rid of the pids as we don't need them any more! */
         PIDListFree(cachedPIDs[deletedIndex]);
 

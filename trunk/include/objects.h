@@ -74,8 +74,9 @@ int ObjectRegisterClass(char *classname, unsigned int size, ObjectDestructor_t d
  * @param classname Class of object to create.
  * @return A pointer to the new object or NULL.
  */
-void *ObjectCreate(char *classname);
-
+void *ObjectCreateImpl(char *classname, char *file, int line);
+ #define ObjectCreate(_classname) ObjectCreateImpl(_classname, __FILE__, __LINE__)
+ 
 /**
  * Helper macro to create a new object of the specfied type.
  * @param _type The new type of the object to create.
@@ -86,14 +87,17 @@ void *ObjectCreate(char *classname);
  * Increment the reference count for the specified object.
  * @param ptr Pointer to the object to increment the ref. count of.
  */
-void ObjectRefInc(void *ptr);
+void ObjectRefIncImpl(void *ptr, char *file, int line);
+#define ObjectRefInc(_ptr) ObjectRefIncImpl(_ptr, __FILE__, __LINE__)
+
 /**
  * Decrement the reference count for the specified object. If the reference count
  * reaches zero the object's class's destructor will be called and the memory freed.
  * @param ptr Pointer to the object to decrement the ref. count of.
  * @return True if there are more references to the object, false if not.
  */
-bool ObjectRefDec(void *ptr);
+bool ObjectRefDecImpl(void *ptr, char *file, int line);
+#define ObjectRefDec(_ptr) ObjectRefDecImpl(_ptr, __FILE__, __LINE__)
 
 /**
  * Replacement for malloc, with the addition that it also clears the memory to zero.

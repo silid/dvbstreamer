@@ -34,6 +34,8 @@ Object memory management.
 *******************************************************************************/
 #define MAX_CLASSES 50
 
+#define USE_MALLOC_FOR_ALLOC
+
 #define OBJECTS_ASSERT(_pred, _msg...) \
     do { \
         if (!(_pred)) \
@@ -46,7 +48,6 @@ Object memory management.
 #define ObjectToData(_ptr) (void *)(((char*)(_ptr)) + sizeof(Object_t))
 #define DataToObject(_ptr) (Object_t *)(((char*)(_ptr)) - sizeof(Object_t))
 
-
 /*******************************************************************************
 * Typedefs                                                                     *
 *******************************************************************************/
@@ -58,7 +59,7 @@ typedef struct Class_s {
 
 typedef struct Object_s {
     Class_t *clazz;
-    uint32_t refCount;
+    int32_t refCount;
     uint32_t size;
     struct Object_s *next;
 }Object_t;
@@ -68,7 +69,9 @@ typedef struct Object_s {
 * Prototypes                                                                   *
 *******************************************************************************/
 static Class_t *FindClass(char *classname);
+void *ObjectAllocImpl(int size, Class_t *clazz);
 static void RemoveReferencedObject(Object_t *toRemove);
+
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -77,12 +80,15 @@ static Class_t classes[MAX_CLASSES];
 static unsigned int classesCount = 0;
 static Object_t *referencedObjects = NULL;
 
+static pthread_mutex_t objectMutex;
+
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
 int ObjectInit(void)
 {
     memset(classes, 0, sizeof(classes));
+    pthread_mutex_init(&objectMutex, NULL);
     classesCount = 0;
     referencedObjects = NULL;
 
@@ -100,7 +106,7 @@ int ObjectDeinit(void)
          {
             if (current->clazz)
             {
-                printlog(LOG_DEBUG, "\t%p (class %s) (refCount %u)\n", 
+                printlog(LOG_DEBUG, "\t%p (class %s) (refCount %d)\n", 
                          ObjectToData(current), current->clazz->name, current->refCount);
             }
             else
@@ -121,21 +127,25 @@ int ObjectDeinit(void)
             printlog(LOG_DEBUG, "\t%s size %d destructor? %s\n", classes[i].name, classes[i].size, classes[i].destructor ? "Yes":"No");
         }
     }
+    pthread_mutex_destroy(&objectMutex);
 
     return OBJECT_OK;
 }
 
 int ObjectRegisterClass(char *classname, unsigned int size, ObjectDestructor_t destructor)
 {
-    Class_t *clazz = FindClass(classname);
-
+    Class_t *clazz;
+    pthread_mutex_lock(&objectMutex);
+    clazz = FindClass(classname);
     if (clazz)
     {
+        pthread_mutex_unlock(&objectMutex);
         return OBJECT_ERR_CLASS_REGISTERED;
     }
     
     if (classesCount >= MAX_CLASSES)
     {
+        pthread_mutex_unlock(&objectMutex);
         return OBJECT_ERR_OUT_OF_MEMORY;
     }
     
@@ -143,75 +153,109 @@ int ObjectRegisterClass(char *classname, unsigned int size, ObjectDestructor_t d
     classes[classesCount].size = size;
     classes[classesCount].destructor = destructor;
     classesCount ++;
-    printlog(LOG_DIARRHEA, "Registered class \"%s\" size %d destructor? %s\n", classname, size, destructor? "Yes":"No");
+    printlog(LOG_DEBUGV, "Registered class \"%s\" size %d destructor? %s\n", classname, size, destructor? "Yes":"No");
+    pthread_mutex_unlock(&objectMutex);
     return OBJECT_OK;
 }
 
-void *ObjectCreate(char *classname)
+void *ObjectCreateImpl(char *classname, char *file, int line)
 {
-    Class_t *clazz = FindClass(classname);
-    Object_t *object;
+    Class_t *clazz;
     void *result;
+    pthread_mutex_lock(&objectMutex);
+    clazz = FindClass(classname);
 
     if (clazz == NULL)
     {
+        pthread_mutex_unlock(&objectMutex);
         return NULL;
     }
-    
 
-    result = ObjectAlloc(clazz->size);
-    if (result == NULL)
+    result = ObjectAllocImpl(clazz->size, clazz);
+    if (result != NULL)
     {
-        return NULL;
+        printlog(LOG_DEBUGV, "OBJECT(%p): Created object of class \"%s\" app ptr %p (%s:%d)\n", DataToObject(result), classname, result, file, line);
     }
-    object = DataToObject(result);
-    object->clazz = clazz;
-    printlog(LOG_DIARRHEA, "Created object(%p) of class \"%s\" app ptr %p\n", object, classname, result);
+    pthread_mutex_unlock(&objectMutex);
     return result;
 }
 
-void ObjectRefInc(void *ptr)
+void ObjectRefIncImpl(void *ptr, char *file, int line)
 {
-    Object_t *object = DataToObject(ptr);
+    Object_t *object;
+    pthread_mutex_lock(&objectMutex);
+    object = DataToObject(ptr);
     object->refCount ++;
+    printlog(LOG_DEBUGV, "OBJECT(%p): Incrementing ref count, now %d (%s:%d)\n", object, object->refCount, file, line);
+    pthread_mutex_unlock(&objectMutex);
 }
 
-bool ObjectRefDec(void *ptr)
+bool ObjectRefDecImpl(void *ptr, char *file, int line)
 {
-    Object_t *object = DataToObject(ptr);
-
+    bool result = TRUE;
+    Object_t *object;
+    pthread_mutex_lock(&objectMutex);
+    object = DataToObject(ptr);
     if (object->refCount > 0)
     {
         object->refCount --;
+        printlog(LOG_DEBUGV, "OBJECT(%p): Decrementing ref count, now %d (%s:%d)\n", object, object->refCount, file, line);        
     }
 
     if (object->refCount == 0)
     {
         if (object->clazz)
         {
-            printlog(LOG_DIARRHEA, "Releasing object(%p) of class \"%s\" app ptr %p\n",object, object->clazz->name, ptr);
+            printlog(LOG_DEBUGV, "OBJECT(%p): Releasing object of class \"%s\" app ptr %p\n",object, object->clazz->name, ptr);
         }
         else
         {
-            printlog(LOG_DIARRHEA, "Releasing malloc'ed(%p) size %u app ptr %p\n",object, object->size, ptr);
+            printlog(LOG_DEBUGV, "OBJECT(%p): Releasing malloc'ed size %u app ptr %p\n",object, object->size, ptr);
         }
         /* Call class destructor */
         if (object->clazz && object->clazz->destructor)
         {
             object->clazz->destructor(ptr);            
         }
-        
+
+        if (object->clazz && (object->clazz->size != object->size))
+        {
+            printlog(LOG_ERROR, "OBJECT(%p): Class size != Object size! (class %u object %u)\n", object, object->clazz->size, object->size);
+        }
         /* Remove from referenced list */
         RemoveReferencedObject(object);
-        memset(object, 0 , object->size);
+        memset(ObjectToData(object), 0 , object->size);
         free(object);
-        return FALSE;
-    }
 
-    return TRUE;
+        result = FALSE;
+    }
+    pthread_mutex_unlock(&objectMutex);
+    return result;
 }
 
 void *ObjectAlloc(int size)
+{
+    void *result;
+#ifdef USE_MALLOC_FOR_ALLOC
+    result = malloc(size);
+    if (size)
+    {
+        memset(result, 0, size);
+    }
+#else
+    pthread_mutex_lock(&objectMutex);
+
+    result = ObjectAllocImpl(size, NULL);
+    if (result != NULL)
+    {
+        printlog(LOG_DEBUGV, "OBJECT(%p): Malloc'ed memory size %d app ptr %p\n", DataToObject(result), size, result);
+    }
+    pthread_mutex_unlock(&objectMutex);
+#endif
+    return result;
+}
+
+void *ObjectAllocImpl(int size, Class_t *clazz)
 {
     Object_t *result = NULL;
 
@@ -223,17 +267,20 @@ void *ObjectAlloc(int size)
 
     memset(ObjectToData(result), 0, size);
 
-    result->clazz = NULL;
+    result->clazz = clazz;
     result->size = size;
     result->refCount = 1;
     result->next = referencedObjects;
     referencedObjects = result;
-
+    
     return ObjectToData(result);
 }
 
 void ObjectFree(void *ptr)
 {
+#ifdef USE_MALLOC_FOR_ALLOC
+    free(ptr);
+#else
     Object_t *object = DataToObject(ptr);
 
     OBJECTS_ASSERT(object->clazz == NULL, "Attempt to free a class based object! (%p class %s)\n", ptr, object->clazz->name);
@@ -241,6 +288,7 @@ void ObjectFree(void *ptr)
     OBJECTS_ASSERT(object->refCount == 1, "Attempt to free a memory area with a reference count > 1 (%d)\n", object->refCount);
     
     ObjectRefDec(ptr);
+#endif    
 }
 
 void ObjectDump(void *ptr)
@@ -294,4 +342,3 @@ static void RemoveReferencedObject(Object_t *toRemove)
         current = current->next;
     }
 }
-
