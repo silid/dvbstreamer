@@ -117,12 +117,6 @@ Multiplex_t *MultiplexGetNext(MultiplexEnumerator_t enumerator)
         multiplex->type = STATEMENT_COLUMN_INT(3);
         multiplex->patVersion = STATEMENT_COLUMN_INT(4);
 
-        printlog(LOG_DIARRHEA,"Multiplex: %d, 0x%04x 0x%04x, %d %d\n", multiplex->freq ,
-                 multiplex->tsId,
-                 multiplex->networkId,
-                 multiplex->type,
-                 multiplex->patVersion);
-
         return multiplex;
     }
     if (rc != SQLITE_DONE)

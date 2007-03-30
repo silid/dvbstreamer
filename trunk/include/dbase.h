@@ -287,7 +287,7 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
  */
 #define PRINTLOG_SQLITE3ERROR() \
     do{\
-        printlog(LOG_ERROR, "%s(%d): Failed with error code 0x%x = %s\n",__FUNCTION__,__LINE__, rc, sqlite3_errmsg(DBaseInstance));\
+        LogModule(LOG_INFO, "dbase", "%s(%d): Failed with error code 0x%x = %s\n",__FUNCTION__,__LINE__, rc, sqlite3_errmsg(DBaseInstance));\
     }while(0)
 
 /**

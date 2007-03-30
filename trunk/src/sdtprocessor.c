@@ -44,23 +44,41 @@ Process Service Description Tables and update the services information.
 #include "sdtprocessor.h"
 #include "subtableprocessor.h"
 
+/*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
+
 #define TABLE_ID_SDT_ACTUAL 0x42
 #define TABLE_ID_SDT_OTHER  0x46
 
 #define DESCRIPTOR_SERVICE  0x48
+
+/*******************************************************************************
+* Typedefs                                                                     *
+*******************************************************************************/
 
 typedef struct SDTProcessorState_s
 {
     Multiplex_t *multiplex;
 }SDTProcessorState_t;
 
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
 static void SubTableHandler(void * state, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension);
 static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT);
 static void SDTMultiplexChanged(PIDFilter_t *filter, void *arg, Multiplex_t *multiplex);
 static void SDTTSStructureChanged(PIDFilter_t *filter, void *arg);
 
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
+static char SDTPROCESSOR[] = "SDTProcessor";
 static List_t *NewSDTCallbacksList = NULL;
 
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
 PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter)
 {
     SDTProcessorState_t *state;
@@ -115,6 +133,9 @@ void SDTProcessorUnRegisterSDTCallback(PluginSDTProcessor_t callback)
     }
 }
 
+/*******************************************************************************
+* Local Functions                                                              *
+*******************************************************************************/
 static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension)
 {
     if(tableId == TABLE_ID_SDT_ACTUAL)
@@ -128,7 +149,7 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
     SDTProcessorState_t *state = arg;
     ListIterator_t iterator;
     dvbpsi_sdt_service_t* sdtservice = newSDT->p_first_service;
-    printlog(LOG_DEBUG,"SDT recieved, version %d\n", newSDT->i_version);
+    LogModule(LOG_DEBUG, SDTPROCESSOR, "SDT recieved, version %d\n", newSDT->i_version);
     while(sdtservice)
     {
         Service_t *service = CacheServiceFindId(sdtservice->i_service_id);
@@ -157,7 +178,7 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
                         /* Only update the name if it has changed */
                         if (strcmp(name, service->name))
                         {
-                            printlog(LOG_DEBUG,"Updating service 0x%04x = %s\n", sdtservice->i_service_id, name);
+                            LogModule(LOG_DEBUG, SDTPROCESSOR, "Updating service 0x%04x = %s\n", sdtservice->i_service_id, name);
                             CacheUpdateServiceName(service, name);
                         }
                     }

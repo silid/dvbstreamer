@@ -27,9 +27,20 @@ Delivery Method management functions.
 #include "list.h"
 #include "deliverymethod.h"
 
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
 static void DeliveryMethodOutputPacket(PIDFilter_t *pidfilter, void *userarg, TSPacket_t* packet);
 
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
+static char DELIVERYMETHOD[] = "DeliveryMethod";
 static List_t *DeliveryMethodsList;
+
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
 int DeliveryMethodManagerInit(void)
 {
     DeliveryMethodsList = ListCreate();
@@ -80,7 +91,7 @@ bool DeliveryMethodManagerFind(char *mrl, PIDFilter_t *filter)
                 {
                     instance->mrl = strdup(mrl);
                 }
-                printlog(LOG_DEBUG, "Created DeliveryMethodInstance(%p) for %s\n",instance, instance->mrl);
+                LogModule(LOG_DEBUG, DELIVERYMETHOD, "Created DeliveryMethodInstance(%p) for %s\n",instance, instance->mrl);
                 if (filter->enabled)
                 {
                     TSFilterUnLock(filter->tsFilter);
@@ -100,7 +111,7 @@ void DeliveryMethodManagerFree(PIDFilter_t *filter)
         char *mrl = instance->mrl;
         instance->DestroyInstance(instance);
         filter->opArg = NULL;
-        printlog(LOG_DEBUG, "Released DeliveryMethodInstance(%p) for %s\n" ,instance, mrl);
+        LogModule(LOG_DEBUG, DELIVERYMETHOD, "Released DeliveryMethodInstance(%p) for %s\n" ,instance, mrl);
         free(mrl);
     }
 }
@@ -111,6 +122,9 @@ char* DeliveryMethodGetMRL(PIDFilter_t *filter)
     return instance->mrl;
 }
 
+/*******************************************************************************
+* Local Functions                                                              *
+*******************************************************************************/
 static void DeliveryMethodOutputPacket(PIDFilter_t *pidfilter, void *userarg, TSPacket_t* packet)
 {
     DeliveryMethodInstance_t *instance = userarg;

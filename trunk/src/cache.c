@@ -42,7 +42,7 @@ enum CacheFlags
     CacheFlag_Dirty_Name    = 0x04,
     CacheFlag_Dirty_Added   = 0x10,
 };
-
+static char CACHE[] = "Cache";
 static int cachedServicesMultiplexDirty = 0;
 static Multiplex_t *cachedServicesMultiplex = NULL;
 static int cachedServicesCount = 0;
@@ -77,12 +77,12 @@ int CacheLoad(Multiplex_t *multiplex)
     int count = ServiceForMultiplexCount(multiplex->freq);
 
     pthread_mutex_lock(&cacheUpdateMutex);
-    printlog(LOG_DEBUG,"Freeing services\n");
+    LogModule(LOG_DEBUG, CACHE, "Freeing services\n");
 
     /* Free the services and PIDs from the previous multiplex */
     CacheServicesFree();
 
-    printlog(LOG_DEBUG,"Loading %d services for %d\n", count, multiplex->freq);
+    LogModule(LOG_DEBUG, CACHE, "Loading %d services for %d\n", count, multiplex->freq);
     if (count > 0)
     {
         int i;
@@ -92,7 +92,7 @@ int CacheLoad(Multiplex_t *multiplex)
         for (i=0; i < count; i++)
         {
             cachedServices[i] = ServiceGetNext(enumerator);
-            printlog(LOG_DEBUG,"Loaded 0x%04x %s\n", cachedServices[i]->id, cachedServices[i]->name);
+            LogModule(LOG_DEBUG,CACHE, "Loaded 0x%04x %s\n", cachedServices[i]->id, cachedServices[i]->name);
             cachedPIDs[i] = PIDListGet(cachedServices[i]);
             cacheFlags[i] = CacheFlag_Clean;
         }
@@ -133,24 +133,24 @@ Service_t *CacheServiceFindName(char *name, Multiplex_t **multiplex)
 {
     Service_t *result = NULL;
     int i;
-    printlog(LOG_DEBUGV,"Checking cached services for \"%s\"\n", name);
+    LogModule(LOG_DEBUGV,CACHE, "Checking cached services for \"%s\"\n", name);
     for (i = 0; i < cachedServicesCount; i ++)
     {
-        printlog(LOG_DEBUGV, "cachedServices[%d]->name = %s\n", i, cachedServices[i]->name);
+        LogModule(LOG_DEBUGV, CACHE, "cachedServices[%d]->name = %s\n", i, cachedServices[i]->name);
         if (strcmp(cachedServices[i]->name, name) == 0)
         {
             result = cachedServices[i];
             ServiceRefInc(result);
             *multiplex = cachedServicesMultiplex;
             MultiplexRefInc(*multiplex);
-            printlog(LOG_DEBUGV,"Found in cached services!\n");
+            LogModule(LOG_DEBUGV, CACHE, "Found in cached services!\n");
             break;
         }
     }
 
     if (result == NULL)
     {
-        printlog(LOG_DEBUGV,"Not found in cached services\n");
+        LogModule(LOG_DEBUGV, CACHE, "Not found in cached services\n");
         result = ServiceFindName(name);
         if (result)
         {
@@ -293,7 +293,7 @@ Service_t *CacheServiceAdd(int id)
         
         pthread_mutex_lock(&cacheUpdateMutex);
 
-        printlog(LOG_DEBUG, "Added service %04x at %d\n", result->id, cachedServicesCount);
+        LogModule(LOG_DEBUG, CACHE, "Added service %04x at %d\n", result->id, cachedServicesCount);
         ServiceRefInc(result);
         cachedServices[cachedServicesCount] = result;
         cachedPIDs[cachedServicesCount] = NULL;
@@ -322,7 +322,7 @@ void CacheServiceDelete(Service_t *service)
 
     if (deletedIndex != -1)
     {
-        printlog(LOG_DEBUG, "Removing service at index %d\n", deletedIndex);
+        LogModule(LOG_DEBUG, CACHE, "Removing service at index %d\n", deletedIndex);
         /* Get rid of the pids as we don't need them any more! */
         PIDListFree(cachedPIDs[deletedIndex]);
 
@@ -330,7 +330,7 @@ void CacheServiceDelete(Service_t *service)
         /* Remove the deleted service from the list */
         for (i = deletedIndex; i < cachedServicesCount; i ++)
         {
-            printlog(LOG_DEBUG, "Moving %s (%x) to %d\n", cachedServices[i + 1]->name, cachedServices[i + 1]->id, i);
+            LogModule(LOG_DEBUG, CACHE, "Moving %s (%x) to %d\n", cachedServices[i + 1]->name, cachedServices[i + 1]->id, i);
             cachedPIDs[i] = cachedPIDs[i + 1];
             cachedServices[i] = cachedServices[i + 1];
             cacheFlags[i] = cacheFlags [i + 1];
@@ -351,7 +351,7 @@ void CacheWriteback()
     int i;
 
     pthread_mutex_lock(&cacheUpdateMutex);
-    printlog(LOG_DEBUG, "Writing changes to cache back to database\n");
+    LogModule(LOG_DEBUG, CACHE, "Writing changes to cache back to database\n");
 
     sqlite3_exec(DBaseInstance, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 
@@ -361,7 +361,7 @@ void CacheWriteback()
     */
     for (i = 0; i < cachedDeletedServicesCount; i ++)
     {
-        printlog(LOG_DEBUG, "Deleting service %s (0x%04x)\n", cachedDeletedServices[i]->name, cachedDeletedServices[i]->id);
+        LogModule(LOG_DEBUG, CACHE, "Deleting service %s (0x%04x)\n", cachedDeletedServices[i]->name, cachedDeletedServices[i]->id);
         ServiceDelete(cachedDeletedServices[i]);
         PIDListRemove(cachedDeletedServices[i]);
         ServiceRefDec(cachedDeletedServices[i]);
@@ -371,21 +371,21 @@ void CacheWriteback()
     if (cachedServicesMultiplexDirty)
     {
         int rc;
-        printlog(LOG_DEBUG, "Updating Multiplex PAT version\n");
+        LogModule(LOG_DEBUG, CACHE, "Updating Multiplex PAT version\n");
         rc =MultiplexPATVersionSet(cachedServicesMultiplex, cachedServicesMultiplex->patVersion);
         if (rc)
         {
-            printlog(LOG_ERROR, "Failed to update Multiplex PAT version (0x%x)\n", rc);
+            LogModule(LOG_ERROR, CACHE, "Failed to update Multiplex PAT version (0x%x)\n", rc);
         }
         rc = MultiplexTSIdSet(cachedServicesMultiplex, cachedServicesMultiplex->tsId);
         if (rc)
         {
-            printlog(LOG_ERROR, "Failed to update Multiplex TS ID (0x%x)\n", rc);
+            LogModule(LOG_ERROR, CACHE, "Failed to update Multiplex TS ID (0x%x)\n", rc);
         }
         rc = MultiplexNetworkIdSet(cachedServicesMultiplex, cachedServicesMultiplex->networkId);
         if (rc)
         {
-            printlog(LOG_ERROR, "Failed to update Multiplex Original Network ID (0x%x)\n", rc);
+            LogModule(LOG_ERROR, CACHE, "Failed to update Multiplex Original Network ID (0x%x)\n", rc);
         }
         cachedServicesMultiplexDirty = 0;
     }
@@ -394,7 +394,7 @@ void CacheWriteback()
     {
         if (cacheFlags[i] & CacheFlag_Dirty_Added)
         {
-            printlog(LOG_DEBUG, "Adding service %s (0x%04x)\n", cachedServices[i]->name, cachedServices[i]->id);
+            LogModule(LOG_DEBUG, CACHE, "Adding service %s (0x%04x)\n", cachedServices[i]->name, cachedServices[i]->id);
             ServiceAdd(cachedServices[i]->multiplexFreq, cachedServices[i]->name, cachedServices[i]->id,
                 cachedServices[i]->pmtVersion, cachedServices[i]->pmtPid, cachedServices[i]->pcrPid);
             cacheFlags[i] &= ~CacheFlag_Dirty_Name;
@@ -402,12 +402,12 @@ void CacheWriteback()
 
         if (cacheFlags[i] & CacheFlag_Dirty_PMTPID)
         {
-            printlog(LOG_DEBUG, "Updating PMT PID for %s\n", cachedServices[i]->name);
+            LogModule(LOG_DEBUG, CACHE, "Updating PMT PID for %s\n", cachedServices[i]->name);
             ServicePMTPIDSet(cachedServices[i], cachedServices[i]->pmtPid);
         }
         if (cacheFlags[i] & CacheFlag_Dirty_PIDs)
         {
-            printlog(LOG_DEBUG, "Updating PIDs for %s\n", cachedServices[i]->name);
+            LogModule(LOG_DEBUG, CACHE, "Updating PIDs for %s\n", cachedServices[i]->name);
             PIDListRemove(cachedServices[i]);
             PIDListSet(cachedServices[i], cachedPIDs[i]);
             ServicePMTVersionSet(cachedServices[i], cachedServices[i]->pmtVersion);
@@ -416,7 +416,7 @@ void CacheWriteback()
 
         if (cacheFlags[i] & CacheFlag_Dirty_Name)
         {
-            printlog(LOG_DEBUG, "Updating name for 0x%04x new name %s\n", cachedServices[i]->id, cachedServices[i]->name);
+            LogModule(LOG_DEBUG, CACHE, "Updating name for 0x%04x new name %s\n", cachedServices[i]->id, cachedServices[i]->name);
             ServiceNameSet(cachedServices[i], cachedServices[i]->name);
         }
         cacheFlags[i] = 0;

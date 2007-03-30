@@ -203,7 +203,7 @@ static void *RollUpDescriptors(dvbpsi_descriptor_t *descriptors, int *datasize)
     result = malloc(size);
     if (!result)
     {
-        printlog(LOG_ERROR, "Failed to allocate memory to roll up descriptors! (size %d)\n", size );
+        LogModule(LOG_ERROR, "pids", "Failed to allocate memory to roll up descriptors! (size %d)\n", size );
         *datasize = 0;
         return NULL;
     }

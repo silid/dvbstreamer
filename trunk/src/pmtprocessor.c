@@ -39,7 +39,15 @@ Process Program Map Tables and update the services information and PIDs.
 
 #include <dvbpsi/dr_0a.h>
 
+/*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
+
 #define MAX_HANDLES 256
+
+/*******************************************************************************
+* Typedefs                                                                     *
+*******************************************************************************/
 
 typedef struct PMTProcessor_t
 {
@@ -51,14 +59,26 @@ typedef struct PMTProcessor_t
 }
 PMTProcessor_t;
 
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
+
 static int PMTProcessorFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet);
 static void PMTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex);
 static TSPacket_t *PMTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
 static void PMTProcessorTSStructureChanged(PIDFilter_t *pidfilter, void *arg);
 static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt);
 
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
 
+static char PMTPROCESSOR[] = "PMTProcessor";
 static List_t *NewPMTCallbacksList = NULL;
+
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
 
 PIDFilter_t *PMTProcessorCreate(TSFilter_t *tsfilter)
 {
@@ -129,6 +149,9 @@ void PMTProcessorUnRegisterPMTCallback(PluginPMTProcessor_t callback)
     }
 }
 
+/*******************************************************************************
+* Local Functions                                                              *
+*******************************************************************************/
 
 static int PMTProcessorFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet)
 {
@@ -159,6 +182,7 @@ static void PMTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Mult
     int count;
     int i;
     Service_t **services;
+
     for (i = 0; i < MAX_HANDLES; i ++)
     {
         if (state->pmthandles[i])
@@ -173,7 +197,7 @@ static void PMTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Mult
     services = CacheServicesGet(&count);
     if (count > MAX_HANDLES)
     {
-        printlog(LOG_ERROR,"Too many services in TS, cannot monitor them all only monitoring %d out of %d\n", MAX_HANDLES, count);
+        LogModule(LOG_ERROR, PMTPROCESSOR, "Too many services in TS, cannot monitor them all only monitoring %d out of %d\n", MAX_HANDLES, count);
         count = MAX_HANDLES;
     }
     for (i = 0; i < count; i ++)
@@ -233,69 +257,8 @@ static TSPacket_t * PMTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg,
 static void PMTProcessorTSStructureChanged(PIDFilter_t *pidfilter, void *arg)
 {
     PMTProcessor_t *state = (PMTProcessor_t *)arg;
-#if 0
-    int i,count;
-    Service_t **services;
-    services = CacheServicesGet(&count);
-
-    for (i = 0; i < MAX_HANDLES; i ++)
-    {
-
-        if (state->pmthandles[i])
-        {
-            int found = 0;
-            int s;
-            for (s = 0; s < count; s ++)
-            {
-                if (ServiceAreEqual(state->services[i], services[s]))
-                {
-                    found = 1;
-                    break;
-                }
-            }
-            if (!found)
-            {
-                dvbpsi_DetachPMT(state->pmthandles[i]);
-                state->pmtpids[i]    = 0;
-                state->pmthandles[i] = NULL;
-                state->services[i]   = NULL;
-            }
-        }
-    }
-
-    /* Look for services that we are currently not monitoring ie 'new' services */
-    for (i = 0; i < count; i ++)
-    {
-        int found = 0;
-        int emptyIndex = -1;
-        int index;
-        for (index = 0; index < MAX_HANDLES; index++)
-        {
-            if (state->pmthandles[index] == NULL)
-            {
-                if (emptyIndex == -1)
-                {
-                    emptyIndex = i;
-                }
-                continue;
-            }
-            if ((state->pmthandles[index] != NULL) && ServiceAreEqual(state->services[index], services[i]))
-            {
-                found = 1;
-                break;
-            }
-        }
-        if (!found && (emptyIndex != -1))
-        {
-            state->pmtpids[emptyIndex] = services[i]->pmtpid;
-            state->services[emptyIndex] = services[i];
-            state->pmthandles[emptyIndex] = dvbpsi_AttachPMT(services[i]->id, PMTHandler, (void*)services[i]);
-        }
-    }
-#else
-    printlog(LOG_DEBUG,"PMTProcessor: TS Structure changed!\n");
+    LogModule(LOG_DEBUG, PMTPROCESSOR, "PMTProcessor: TS Structure changed!\n");
     PMTProcessorMultiplexChanged(pidfilter, state, state->multiplex);
-#endif
 }
 
 static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
@@ -306,14 +269,14 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
     dvbpsi_pmt_es_t *esentry = newpmt->p_first_es;
     int count = 0;
 
-    printlog(LOG_DEBUG,"PMT recieved, version %d on PID %d (old version %d)\n", newpmt->i_version, service->pmtPid, service->pmtVersion);
+    LogModule(LOG_DEBUG, PMTPROCESSOR, "PMT recieved, version %d on PID %d (old version %d)\n", newpmt->i_version, service->pmtPid, service->pmtVersion);
 
     while(esentry)
     {
         esentry = esentry->p_next;
         count ++;
     }
-    printlog(LOG_DEBUGV,"%d PIDs in PMT\n", count);
+    LogModule(LOG_DEBUGV, PMTPROCESSOR, "%d PIDs in PMT\n", count);
     pids = PIDListNew(count);
 
     if (pids)
@@ -323,7 +286,7 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
 
         for (i = 0; i < count; i ++)
         {
-            printlog(LOG_DEBUGV, "0x%04x %d\n", esentry->i_pid, esentry->i_type);
+            LogModule(LOG_DEBUGV, PMTPROCESSOR, "    0x%04x %d\n", esentry->i_pid, esentry->i_type);
             pids->pids[i].pid = esentry->i_pid;
             pids->pids[i].type = esentry->i_type;
             pids->pids[i].descriptors = esentry->p_first_descriptor;
@@ -333,7 +296,7 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
                 dvbpsi_descriptor_t *desc = esentry->p_first_descriptor;
                 while(desc)
                 {
-                    printlog(LOG_DEBUGV,"Descriptor %d\n", desc->i_tag);
+                    LogModule(LOG_DEBUGV, PMTPROCESSOR, "        Descriptor %d\n", desc->i_tag);
                     if (desc->i_tag == 10) /* ISO 639 Language Descriptor */
                     {
                         dvbpsi_iso639_dr_t *iso639 = dvbpsi_DecodeISO639Dr(desc);
@@ -348,7 +311,7 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
             }
             esentry = esentry->p_next;
         }
-        printlog(LOG_DEBUGV,"About to update cache\n");
+        LogModule(LOG_DEBUGV,PMTPROCESSOR, "About to update cache\n");
         CacheUpdatePIDs(service, newpmt->i_pcr_pid, pids, newpmt->i_version);
     }
 

@@ -157,11 +157,12 @@ void ListRemoveCurrent(ListIterator_t *iterator)
 void ListDump(List_t *list)
 {
     ListIterator_t iterator;
-    printlog(LOG_DEBUG, "Dumping list %p (%d entries)\n", list, list->count);
+    char LIST[] = "list";
+    LogModule(LOG_DEBUG, LIST, "Dumping list %p (%d entries)\n", list, list->count);
     for ( ListIterator_Init(iterator, list); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
-        printlog(LOG_DEBUG, "Current = %010p prev = %010p  next = %010p data = %010p\n",
+        LogModule(LOG_DEBUG, LIST, "Current = %010p prev = %010p  next = %010p data = %010p\n",
         iterator.current, iterator.current->prev, iterator.current->next, iterator.current->data);
     }
-    printlog(LOG_DEBUG, "End of dump\n");
+    LogModule(LOG_DEBUG, LIST, "End of dump\n");
 }

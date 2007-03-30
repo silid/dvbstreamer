@@ -35,6 +35,9 @@ Plugin Manager functions.
 #include "plugin.h"
 #include "logging.h"
 #include "main.h"
+/*******************************************************************************
+* Typedefs                                                                     *
+*******************************************************************************/
 
 struct PluginEntry_t
 {
@@ -42,6 +45,9 @@ struct PluginEntry_t
     Plugin_t *pluginInterface;
 };
 
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
 static int PluginManagerLoadPlugin(const char *filename, void *userarg);
 static void PluginManagerUnloadPlugin(struct PluginEntry_t *entry);
 static void PluginManagerInstallPlugin(Plugin_t *pluginInterface);
@@ -50,6 +56,9 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface);
 static void PluginManagerLsPlugins(int argc, char **argv);
 static void PluginManagerPluginInfo(int argc, char **argv);
 
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
 static List_t *PluginsList;
 
 static Command_t PluginManagerCommands[] = {
@@ -71,12 +80,17 @@ static Command_t PluginManagerCommands[] = {
         {NULL, FALSE, 0, 0, NULL, NULL}
     };
 
+static char PLUGINMANAGER[] = "PluginManager";
+
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
 int PluginManagerInit(void)
 {
     ListIterator_t iterator;
     lt_dlinit();
     PluginsList = ListCreate();
-    printlog(LOG_DEBUG, "Plugin Manager Initialising...\n");
+    LogModule(LOG_DEBUG, PLUGINMANAGER, "Plugin Manager Initialising...\n");
     lt_dlsetsearchpath(DVBSTREAMER_PLUGINDIR);
 
     /* Load all the plugins */
@@ -86,28 +100,31 @@ int PluginManagerInit(void)
     for ( ListIterator_Init(iterator, PluginsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         struct PluginEntry_t *entry = ListIterator_Current(iterator);
-        printlog(LOG_DEBUG, "Installing %s\n", entry->pluginInterface->name);
+        LogModule(LOG_DEBUG, PLUGINMANAGER,"Installing %s\n", entry->pluginInterface->name);
         PluginManagerInstallPlugin(entry->pluginInterface);
     }
     CommandRegisterCommands(PluginManagerCommands);
-    printlog(LOG_DEBUG, "Plugin Manager Initialised\n");
+    LogModule(LOG_DEBUG, PLUGINMANAGER, "Plugin Manager Initialised\n");
     return 0;
 }
 
 void PluginManagerDeInit(void)
 {
     ListIterator_t iterator;
-    printlog(LOG_DEBUG, "Plugin Manager Deinitialising...\n");
+    LogModule(LOG_DEBUG, PLUGINMANAGER,"Plugin Manager Deinitialising...\n");
     CommandUnRegisterCommands(PluginManagerCommands);
     ListFree(PluginsList, (ListDataDestructor_t)PluginManagerUnloadPlugin);
     lt_dlexit();
-    printlog(LOG_DEBUG, "Plugin Manager Deinitialised\n");
+    LogModule(LOG_DEBUG, PLUGINMANAGER,"Plugin Manager Deinitialised\n");
 }
 
+/*******************************************************************************
+* Local Functions                                                              *
+*******************************************************************************/
 static int PluginManagerLoadPlugin(const char *filename, void *userarg)
 {
     lt_dlhandle handle = lt_dlopenext(filename);
-    printlog(LOG_DEBUGV, "Attempting to load %s\n", filename);
+    LogModule(LOG_DEBUGV, PLUGINMANAGER,"Attempting to load %s\n", filename);
     if (handle)
     {
         Plugin_t *pluginInterface = lt_dlsym(handle, "PluginInterface");
@@ -133,7 +150,7 @@ static int PluginManagerLoadPlugin(const char *filename, void *userarg)
                     struct PluginEntry_t *entry = ListIterator_Current(iterator);
                     if (strcmp(pluginInterface->name, entry->pluginInterface->name) == 0)
                     {
-                        printlog(LOG_DEBUGV, "Plugin already loaded, igoring this instance.\n");
+                        LogModule(LOG_DEBUGV, PLUGINMANAGER,"Plugin already loaded, igoring this instance.\n");
                         addPlugin = FALSE;
                         break;
                     }
@@ -148,7 +165,7 @@ static int PluginManagerLoadPlugin(const char *filename, void *userarg)
                     entry->pluginInterface = pluginInterface;
                     if (ListAdd(PluginsList, entry))
                     {
-                        printlog(LOG_INFOV, "Loaded plugin %s\n", pluginInterface->name);
+                        LogModule(LOG_INFOV, PLUGINMANAGER, "Loaded plugin %s\n", pluginInterface->name);
                         return 0;
                     }
                     free(entry);
@@ -157,20 +174,20 @@ static int PluginManagerLoadPlugin(const char *filename, void *userarg)
         }
         else
         {
-            printlog(LOG_DEBUGV, "PluginInterface not found for %s.\n", filename);
+            LogModule(LOG_DEBUGV, PLUGINMANAGER,"PluginInterface not found for %s.\n", filename);
         }
         lt_dlclose(handle);
     }
     else
     {
-        printlog(LOG_DEBUGV, "Failed to open plugin %s - reason %s\n", filename, lt_dlerror());
+        LogModule(LOG_DEBUGV, PLUGINMANAGER,"Failed to open plugin %s - reason %s\n", filename, lt_dlerror());
     }
     return 0;
 }
 
 static void PluginManagerUnloadPlugin(struct PluginEntry_t *entry)
 {
-    printlog(LOG_DEBUG, "Uninstalling %s\n", entry->pluginInterface->name);
+    LogModule(LOG_DEBUG, PLUGINMANAGER, "Uninstalling %s\n", entry->pluginInterface->name);
     PluginManagerUninstallPlugin(entry->pluginInterface);
     lt_dlclose(entry->handle);
     free(entry);
@@ -195,51 +212,51 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
                     pluginFilter->filter = PIDFilterAllocate(TSFilter);
                     if (pluginFilter->filter)
                     {
-                        printlog(LOG_DEBUGV, "plugin %s: Installed filter.\n", pluginInterface->name);
+                        LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed filter.\n", pluginInterface->name);
                         pluginFilter->InitFilter(pluginFilter->filter);
                     }
                 }
                 break;
 
                 case PLUGIN_FEATURE_TYPE_PATPROCESSOR:
-                printlog(LOG_DEBUGV, "plugin %s: Installed PAT processor.\n", pluginInterface->name);
+                LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed PAT processor.\n", pluginInterface->name);
                 PATProcessorRegisterPATCallback(pluginInterface->features[i].details);
                 break;
                 case PLUGIN_FEATURE_TYPE_PMTPROCESSOR:
-                printlog(LOG_DEBUGV, "plugin %s: Installed PMT processor.\n", pluginInterface->name);
+                LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed PMT processor.\n", pluginInterface->name);
                 PMTProcessorRegisterPMTCallback(pluginInterface->features[i].details);
                 break;
                 case PLUGIN_FEATURE_TYPE_DELIVERYMETHOD:
-                printlog(LOG_DEBUGV, "plugin %s: Installed Delivery method.\n", pluginInterface->name);
+                LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed Delivery method.\n", pluginInterface->name);
                 DeliveryMethodManagerRegister(pluginInterface->features[i].details);
                 break;
                 case PLUGIN_FEATURE_TYPE_CHANNELCHANGED:
-                printlog(LOG_DEBUGV, "plugin %s: Installed channel changed callback.\n", pluginInterface->name);
+                LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed channel changed callback.\n", pluginInterface->name);
                 ChannelChangedRegisterCallback(pluginInterface->features[i].details);
                 break;
                 case PLUGIN_FEATURE_TYPE_SDTPROCESSOR:
-                printlog(LOG_DEBUGV, "plugin %s: Installed SDT processor.\n", pluginInterface->name);
+                LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed SDT processor.\n", pluginInterface->name);
                 SDTProcessorRegisterSDTCallback(pluginInterface->features[i].details);
                 break;
                 case PLUGIN_FEATURE_TYPE_NITPROCESSOR:
-                printlog(LOG_DEBUGV, "plugin %s: Installed NIT processor.\n", pluginInterface->name);
+                LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed NIT processor.\n", pluginInterface->name);
                 NITProcessorRegisterNITCallback(pluginInterface->features[i].details);
                 break;
                 case PLUGIN_FEATURE_TYPE_TDTPROCESSOR:
-                printlog(LOG_DEBUGV, "plugin %s: Installed TDT processor.\n", pluginInterface->name);
+                LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed TDT processor.\n", pluginInterface->name);
                 TDTProcessorRegisterTDTCallback(pluginInterface->features[i].details);
                 break;
                 case PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR:
                 {
                     PluginSectionProcessorDetails_t *details = pluginInterface->features[i].details;
-                    printlog(LOG_DEBUGV, "plugin %s: Installed section processor.\n", pluginInterface->name);
+                    LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed section processor.\n", pluginInterface->name);
                     SectionProcessorStartPID(details->pid, details->processor, details->userarg);
                 }
                 break;
                 case PLUGIN_FEATURE_TYPE_PESPROCESSOR:
                 {
                     PluginPESProcessorDetails_t *details = pluginInterface->features[i].details;
-                    printlog(LOG_DEBUGV, "plugin %s: Installed PES processor.\n", pluginInterface->name);
+                    LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed PES processor.\n", pluginInterface->name);
                     PESProcessorStartPID(details->pid, details->processor, details->userarg);
                 }
                 break;
@@ -273,51 +290,51 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface)
                     PluginFilter_t *pluginFilter = pluginInterface->features[i].details;
                     if (pluginFilter->filter)
                     {
-                        printlog(LOG_DEBUGV, "plugin %s: Uninstalled filter.\n", pluginInterface->name);
+                        LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled filter.\n", pluginInterface->name);
                         pluginFilter->DeinitFilter(pluginFilter->filter);
                         PIDFilterFree(pluginFilter->filter);
                     }
                 }
                 break;
                 case PLUGIN_FEATURE_TYPE_PATPROCESSOR:
-                printlog(LOG_DEBUGV, "plugin %s: Uninstalled PAT processor.\n", pluginInterface->name);
+                LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled PAT processor.\n", pluginInterface->name);
                 PATProcessorUnRegisterPATCallback(pluginInterface->features[i].details);
                 break;
                 case PLUGIN_FEATURE_TYPE_PMTPROCESSOR:
-                printlog(LOG_DEBUGV, "plugin %s: Uninstalled PMT processor.\n", pluginInterface->name);
+                LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled PMT processor.\n", pluginInterface->name);
                 PMTProcessorUnRegisterPMTCallback(pluginInterface->features[i].details);
                 break;
                 case PLUGIN_FEATURE_TYPE_DELIVERYMETHOD:
-                printlog(LOG_DEBUG, "plugin %s: Uninstalled Delivery method.\n", pluginInterface->name);
+                LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled Delivery method.\n", pluginInterface->name);
                 DeliveryMethodManagerUnRegister(pluginInterface->features[i].details);
                 break;
                 case PLUGIN_FEATURE_TYPE_CHANNELCHANGED:
-                printlog(LOG_DEBUGV, "plugin %s: Uninstalled channel changed callback.\n", pluginInterface->name);
+                LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled channel changed callback.\n", pluginInterface->name);
                 ChannelChangedUnRegisterCallback(pluginInterface->features[i].details);
                 break;
                 case PLUGIN_FEATURE_TYPE_SDTPROCESSOR:
-                printlog(LOG_DEBUGV, "plugin %s: Uninstalled SDT processor.\n", pluginInterface->name);
+                LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled SDT processor.\n", pluginInterface->name);
                 SDTProcessorUnRegisterSDTCallback(pluginInterface->features[i].details);
                 break;
                 case PLUGIN_FEATURE_TYPE_NITPROCESSOR:
-                printlog(LOG_DEBUGV, "plugin %s: Uninstalled NIT processor.\n", pluginInterface->name);
+                LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled NIT processor.\n", pluginInterface->name);
                 NITProcessorUnRegisterNITCallback(pluginInterface->features[i].details);
                 break;
                 case PLUGIN_FEATURE_TYPE_TDTPROCESSOR:
-                printlog(LOG_DEBUGV, "plugin %s: Uninstalled TDT processor.\n", pluginInterface->name);
+                LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled TDT processor.\n", pluginInterface->name);
                 TDTProcessorUnRegisterTDTCallback(pluginInterface->features[i].details);
                 break;
                 case PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR:
                 {
                     PluginSectionProcessorDetails_t *details = pluginInterface->features[i].details;
-                    printlog(LOG_DEBUGV, "plugin %s: Uninstalled section processor.\n", pluginInterface->name);
+                    LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled section processor.\n", pluginInterface->name);
                     SectionProcessorStopPID(details->pid, details->processor, details->userarg);
                 }
                 break;
                 case PLUGIN_FEATURE_TYPE_PESPROCESSOR:
                 {
                     PluginPESProcessorDetails_t *details = pluginInterface->features[i].details;
-                    printlog(LOG_DEBUGV, "plugin %s: Uninstalled PES processor.\n", pluginInterface->name);
+                    LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled PES processor.\n", pluginInterface->name);
                     PESProcessorStopPID(details->pid, details->processor, details->userarg);
                 }
                 break;
