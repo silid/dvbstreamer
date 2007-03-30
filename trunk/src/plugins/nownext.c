@@ -304,14 +304,13 @@ static ServiceNowNextInfo_t *FindServiceName(char *name)
 static ServiceNowNextInfo_t *FindService(uint16_t networkId, uint16_t tsId, uint16_t serviceId)
 {
     ListIterator_t iterator;
-    printlog(LOG_DEBUG, "Looking for net id %x ts id %x service id %x\n", networkId, tsId, serviceId);
+
     for (ListIterator_Init(iterator, serviceNowNextInfoList); 
          ListIterator_MoreEntries(iterator); 
          ListIterator_Next(iterator))
     {
         ServiceNowNextInfo_t *info = ListIterator_Current(iterator);
-        printlog(LOG_DEBUG, "ServiceNowNextInfo net id %x ts id %x service id %x\n",
-            info->networkId, info->tsId, info->serviceId);
+
         if ((info->networkId == networkId) && (info->tsId == tsId) && (info->serviceId == serviceId))
         {
             return info;
