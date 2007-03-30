@@ -37,6 +37,10 @@ Process Program Association Tables and update the services information.
 #include "main.h"
 #include "list.h"
 
+
+/*******************************************************************************
+* Typedefs                                                                     *
+*******************************************************************************/
 typedef struct PATProcessor_t
 {
     TSFilter_t *tsfilter;
@@ -47,11 +51,22 @@ typedef struct PATProcessor_t
 }
 PATProcessor_t;
 
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
 static void PATProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex);
 static TSPacket_t *PATProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
 static void PATHandler(void* arg, dvbpsi_pat_t* newpat);
 
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
+static char PATPROCESSOR[] = "PATProcessor";
 static List_t *NewPATCallbacksList = NULL;
+
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
 PIDFilter_t *PATProcessorCreate(TSFilter_t *tsfilter)
 {
     PIDFilter_t *result = NULL;
@@ -115,6 +130,9 @@ void PATProcessorUnRegisterPATCallback(PluginPATProcessor_t callback)
     }
 }
 
+/*******************************************************************************
+* Local Functions                                                              *
+*******************************************************************************/
 static void PATProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex)
 {
     PATProcessor_t *state= (PATProcessor_t*)arg;
@@ -165,7 +183,7 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
     int count,i;
     Service_t **services;
 
-    printlog(LOG_DEBUG,"PAT recieved, version %d (old version %d)\n", newpat->i_version, multiplex->patVersion);
+    LogModule(LOG_DEBUG, PATPROCESSOR, "PAT recieved, version %d (old version %d)\n", newpat->i_version, multiplex->patVersion);
     /* Version has changed update the services */
     dvbpsi_pat_program_t *patentry = newpat->p_first_program;
     while(patentry)
@@ -175,7 +193,7 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
             Service_t *service = CacheServiceFindId(patentry->i_number);
             if (!service)
             {
-                printlog(LOG_DEBUG, "Service not found in cache while processing PAT, adding 0x%04x\n", patentry->i_number);
+                LogModule(LOG_DEBUG, PATPROCESSOR, "Service not found in cache while processing PAT, adding 0x%04x\n", patentry->i_number);
                 service = CacheServiceAdd(patentry->i_number);
                 /* Cause a TS Structure change call back*/
                 state->tsfilter->tsStructureChanged = TRUE;
@@ -209,7 +227,7 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
         }
         if (!found)
         {
-            printlog(LOG_DEBUG, "Service not found in PAT while checking cache, deleting 0x%04x (%s)\n",
+            LogModule(LOG_DEBUG, PATPROCESSOR, "Service not found in PAT while checking cache, deleting 0x%04x (%s)\n",
                 services[i]->id, services[i]->name);
             CacheServicesRelease();
             CacheServiceDelete(services[i]);

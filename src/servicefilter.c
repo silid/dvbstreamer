@@ -39,6 +39,9 @@ the output to only include this service.
 #include "cache.h"
 #include "logging.h"
 
+/*******************************************************************************
+* Typedefs                                                                     *
+*******************************************************************************/
 typedef struct ServiceFilter_t
 {
     Service_t    *service;
@@ -62,12 +65,23 @@ typedef struct ServiceFilter_t
     TSPacket_t    pmtPacket;
 }ServiceFilter_t;
 
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
 static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet);
 static TSPacket_t *ServiceFilterProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
 static void ServiceFilterPATRewrite(ServiceFilter_t *state);
 static void ServiceFilterPMTRewrite(ServiceFilter_t *state);
 static void ServiceFilterInitPacket(TSPacket_t *packet, dvbpsi_psi_section_t* section, char *sectionname);
 
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
+static char SERVICEFILTER[] = "ServiceFilter";
+
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
 PIDFilter_t *ServiceFilterCreate(TSFilter_t *tsfilter, PacketOutput outputpacket,void *oparg)
 {
     PIDFilter_t *result = NULL;
@@ -146,6 +160,9 @@ bool ServiceFilterAVSOnlyGet(PIDFilter_t *filter)
     return state->avsOnly;
 }
 
+/*******************************************************************************
+* Local Functions                                                              *
+*******************************************************************************/
 static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet)
 {
     int result = 0;
@@ -280,12 +297,12 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t *state)
     state->videoPID = 0xffff;
     state->audioPID = 0xffff;
     state->subPID = 0xffff;
-    printlog(LOG_DEBUG, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-    printlog(LOG_DEBUG, "Rewriting PMT on PID %x\n", state->service->pmtPid);
+    LogModule(LOG_DEBUG, SERVICEFILTER, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    LogModule(LOG_DEBUG, SERVICEFILTER, "Rewriting PMT on PID %x\n", state->service->pmtPid);
     pids = CachePIDsGet(state->service);
     for (i = 0; (pids != NULL) && (i < pids->count) && (!vfound || !afound || !sfound); i ++)
     {
-        printlog(LOG_DEBUG, "\tpid = %x type =%d subtype = %d\n", pids->pids[i].pid, pids->pids[i].type, pids->pids[i].subType);
+        LogModule(LOG_DEBUG, SERVICEFILTER, "\tpid = %x type =%d subtype = %d\n", pids->pids[i].pid, pids->pids[i].type, pids->pids[i].subType);
         if (!vfound && ((pids->pids[i].type == 1) || (pids->pids[i].type == 2)))
         {
             vfound = TRUE;
@@ -329,12 +346,12 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t *state)
         }
     }
     CachePIDsRelease();
-    printlog(LOG_DEBUG, "videopid = %x audiopid = %x subpid = %x\n", state->videoPID,state->audioPID,state->subPID);
+    LogModule(LOG_DEBUG, SERVICEFILTER, "videopid = %x audiopid = %x subpid = %x\n", state->videoPID,state->audioPID,state->subPID);
 
     section = dvbpsi_GenPMTSections(&pmt);
     ServiceFilterInitPacket(&state->pmtPacket, section, "PMT");
     TSPACKET_SETPID(state->pmtPacket, state->service->pmtPid);
-    printlog(LOG_DEBUG, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
+    LogModule(LOG_DEBUG, SERVICEFILTER, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     dvbpsi_DeletePSISections(section);
     dvbpsi_EmptyPMT(&pmt);
 }
@@ -355,7 +372,7 @@ static void ServiceFilterInitPacket(TSPacket_t *packet, dvbpsi_psi_section_t* se
 
     if (len > (sizeof(TSPacket_t) - 5))
     {
-        printlog(LOG_ERROR, "!!! ERROR %s section too big to fit in 1 TS packet !!!\n" );
+        LogModule(LOG_ERROR, SERVICEFILTER, "!!! ERROR %s section too big to fit in 1 TS packet !!!\n" );
     }
 
     for (i = 0; i < len; i ++)

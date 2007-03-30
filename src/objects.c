@@ -34,13 +34,13 @@ Object memory management.
 *******************************************************************************/
 #define MAX_CLASSES 50
 
-#define USE_MALLOC_FOR_ALLOC
+//#define USE_MALLOC_FOR_ALLOC
 
 #define OBJECTS_ASSERT(_pred, _msg...) \
     do { \
         if (!(_pred)) \
         { \
-            printlog(LOG_ERROR, _msg); \
+            LogModule(LOG_ERROR, OBJECT, _msg); \
             exit(1); \
         } \
     }while (0)
@@ -76,6 +76,7 @@ static void RemoveReferencedObject(Object_t *toRemove);
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
+static char OBJECT[] = "Object";
 static Class_t classes[MAX_CLASSES];
 static unsigned int classesCount = 0;
 static Object_t *referencedObjects = NULL;
@@ -101,17 +102,17 @@ int ObjectDeinit(void)
     {
         Object_t *current; 
         Object_t *next;
-        printlog(LOG_DEBUG, "Objects with references outstanding:\n");
+        LogModule(LOG_DEBUG, OBJECT, "Objects with references outstanding:\n");
         for (current = referencedObjects; current; current = next)
          {
             if (current->clazz)
             {
-                printlog(LOG_DEBUG, "\t%p (class %s) (refCount %d)\n", 
+                LogModule(LOG_DEBUG, OBJECT, "\t%p (class %s) (refCount %u)\n", 
                          ObjectToData(current), current->clazz->name, current->refCount);
             }
             else
             {
-                printlog(LOG_DEBUG, "\t%p (size %u) (malloc'ed)\n", ObjectToData(current), current->size);
+                LogModule(LOG_DEBUG, OBJECT, "\t%p (size %u) (malloc'ed)\n", ObjectToData(current), current->size);
             }
             next = current->next;
             free(current);
@@ -121,10 +122,10 @@ int ObjectDeinit(void)
     if (classesCount > 0)
     {
         unsigned int i;
-        printlog(LOG_DEBUG, "Registered Classes:\n");
+        LogModule(LOG_DEBUG, OBJECT, "Registered Classes:\n");
         for (i = 0; i < classesCount; i ++)
         {
-            printlog(LOG_DEBUG, "\t%s size %d destructor? %s\n", classes[i].name, classes[i].size, classes[i].destructor ? "Yes":"No");
+            LogModule(LOG_DEBUG, OBJECT, "\t%s size %d destructor? %s\n", classes[i].name, classes[i].size, classes[i].destructor ? "Yes":"No");
         }
     }
     pthread_mutex_destroy(&objectMutex);
@@ -153,7 +154,7 @@ int ObjectRegisterClass(char *classname, unsigned int size, ObjectDestructor_t d
     classes[classesCount].size = size;
     classes[classesCount].destructor = destructor;
     classesCount ++;
-    printlog(LOG_DEBUGV, "Registered class \"%s\" size %d destructor? %s\n", classname, size, destructor? "Yes":"No");
+    LogModule(LOG_DEBUGV, OBJECT, "Registered class \"%s\" size %d destructor? %s\n", classname, size, destructor? "Yes":"No");
     pthread_mutex_unlock(&objectMutex);
     return OBJECT_OK;
 }
@@ -174,7 +175,7 @@ void *ObjectCreateImpl(char *classname, char *file, int line)
     result = ObjectAllocImpl(clazz->size, clazz);
     if (result != NULL)
     {
-        printlog(LOG_DEBUGV, "OBJECT(%p): Created object of class \"%s\" app ptr %p (%s:%d)\n", DataToObject(result), classname, result, file, line);
+        LogModule(LOG_DEBUGV, OBJECT, "(%p) Created object of class \"%s\" app ptr %p (%s:%d)\n", DataToObject(result), classname, result, file, line);
     }
     pthread_mutex_unlock(&objectMutex);
     return result;
@@ -186,7 +187,7 @@ void ObjectRefIncImpl(void *ptr, char *file, int line)
     pthread_mutex_lock(&objectMutex);
     object = DataToObject(ptr);
     object->refCount ++;
-    printlog(LOG_DEBUGV, "OBJECT(%p): Incrementing ref count, now %d (%s:%d)\n", object, object->refCount, file, line);
+    LogModule(LOG_DEBUGV, OBJECT, "(%p) Incrementing ref count, now %d (%s:%d)\n", object, object->refCount, file, line);
     pthread_mutex_unlock(&objectMutex);
 }
 
@@ -199,18 +200,18 @@ bool ObjectRefDecImpl(void *ptr, char *file, int line)
     if (object->refCount > 0)
     {
         object->refCount --;
-        printlog(LOG_DEBUGV, "OBJECT(%p): Decrementing ref count, now %d (%s:%d)\n", object, object->refCount, file, line);        
+        LogModule(LOG_DEBUGV, OBJECT, "(%p) Decrementing ref count, now %d (%s:%d)\n", object, object->refCount, file, line);        
     }
 
     if (object->refCount == 0)
     {
         if (object->clazz)
         {
-            printlog(LOG_DEBUGV, "OBJECT(%p): Releasing object of class \"%s\" app ptr %p\n",object, object->clazz->name, ptr);
+            LogModule(LOG_DEBUGV, OBJECT, "(%p) Releasing object of class \"%s\" app ptr %p\n",object, object->clazz->name, ptr);
         }
         else
         {
-            printlog(LOG_DEBUGV, "OBJECT(%p): Releasing malloc'ed size %u app ptr %p\n",object, object->size, ptr);
+            LogModule(LOG_DEBUGV, OBJECT, "(%p) Releasing malloc'ed size %u app ptr %p\n",object, object->size, ptr);
         }
         /* Call class destructor */
         if (object->clazz && object->clazz->destructor)
@@ -220,7 +221,7 @@ bool ObjectRefDecImpl(void *ptr, char *file, int line)
 
         if (object->clazz && (object->clazz->size != object->size))
         {
-            printlog(LOG_ERROR, "OBJECT(%p): Class size != Object size! (class %u object %u)\n", object, object->clazz->size, object->size);
+            LogModule(LOG_ERROR, OBJECT, "(%p) Class size != Object size! (class %u object %u)\n", object, object->clazz->size, object->size);
         }
         /* Remove from referenced list */
         RemoveReferencedObject(object);
@@ -248,7 +249,7 @@ void *ObjectAlloc(int size)
     result = ObjectAllocImpl(size, NULL);
     if (result != NULL)
     {
-        printlog(LOG_DEBUGV, "OBJECT(%p): Malloc'ed memory size %d app ptr %p\n", DataToObject(result), size, result);
+        LogModule(LOG_DEBUGV, OBJECT,"(%p) Malloc'ed memory size %d app ptr %p\n", DataToObject(result), size, result);
     }
     pthread_mutex_unlock(&objectMutex);
 #endif
@@ -296,11 +297,11 @@ void ObjectDump(void *ptr)
     Object_t *object = DataToObject(ptr);
     if (object->clazz)
     {
-        printlog(LOG_DEBUG, "Object(%p) of class \"%s\" app ptr %p ref count %u\n",object, object->clazz->name, ptr, object->refCount);
+        LogModule(LOG_DEBUG, OBJECT, "Object(%p) of class \"%s\" app ptr %p ref count %u\n",object, object->clazz->name, ptr, object->refCount);
     }
     else
     {
-        printlog(LOG_DEBUG, "Malloc'ed(%p) size %u app ptr %p ref count %u\n",object, object->size, ptr, object->refCount);
+        LogModule(LOG_DEBUG, OBJECT, "Malloc'ed(%p) size %u app ptr %p ref count %u\n",object, object->size, ptr, object->refCount);
     }
 }
 /*******************************************************************************

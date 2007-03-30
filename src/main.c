@@ -60,26 +60,33 @@ Entry point to the application.
 #include "pluginmgr.h"
 #include "plugin.h"
 
+/*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
+
 #define INIT(_func, _name) \
     do {\
         if (_func) \
         { \
-            printlog(LOG_ERROR, "Failed to initialise %s.\n", _name); \
+            LogModule(LOG_ERROR, MAIN, "Failed to initialise %s.\n", _name); \
             if (DaemonMode)\
             {\
                 unlink(PidFile);\
             }\
             exit(1);\
         }\
-        printlog(LOG_DEBUGV, "Initialised %s.\n", _name);\
+        LogModule(LOG_DEBUGV, MAIN, "Initialised %s.\n", _name);\
     }while(0)
 
 #define DEINIT(_func, _name) \
     do {\
         _func;\
-        printlog(LOG_DEBUGV, "Deinitialised %s\n", _name);\
+        LogModule(LOG_DEBUGV, MAIN, "Deinitialised %s\n", _name);\
     }while(0)
 
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
 static void usage(char *appname);
 static void version(void);
 static void sighandler(int signum);
@@ -89,6 +96,9 @@ static void DeinitDaemon(void);
 static void ChannelChangedDoCallbacks(Multiplex_t *multiplex, Service_t *service);
 static void TuneMultiplex(Multiplex_t *multiplex);
 
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
 volatile Multiplex_t *CurrentMultiplex = NULL;
 volatile Service_t *CurrentService = NULL;
 PIDFilter_t *PIDFilters[PIDFilterIndex_Count];
@@ -107,6 +117,11 @@ char DataDirectory[PATH_MAX];
 static List_t *ChannelChangedCallbacksList = NULL;
 static char PidFile[PATH_MAX];
 
+static char MAIN[] = "Main";
+
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
 int main(int argc, char *argv[])
 {
     char *startupFile = NULL;
@@ -143,15 +158,15 @@ int main(int argc, char *argv[])
                 case 'o': primaryOutput = optarg;
                 break;
                 case 'a': adapterNumber = atoi(optarg);
-                printlog(LOG_INFOV, "Using adapter %d\n", adapterNumber);
+                LogModule(LOG_INFOV, MAIN, "Using adapter %d\n", adapterNumber);
                 break;
                 case 'f': startupFile = optarg;
-                printlog(LOG_INFOV, "Using startup script %s\n", startupFile);
+                LogModule(LOG_INFOV, MAIN, "Using startup script %s\n", startupFile);
                 break;
                 case 'F':
                 FilterServiceNames = TRUE;
                 FilterReplacementChar = optarg[0];
-                printlog(LOG_INFOV, "Non-printable characters will be replaced with \'%c\'\n", FilterReplacementChar);
+                LogModule(LOG_INFOV, MAIN, "Non-printable characters will be replaced with \'%c\'\n", FilterReplacementChar);
                 break;
                 /* Daemon options */
                 case 'd': DaemonMode = TRUE;
@@ -187,7 +202,7 @@ int main(int argc, char *argv[])
 
     if (primaryOutput == NULL)
     {
-        printlog(LOG_ERROR, "No output set!\n");
+        LogModule(LOG_ERROR, MAIN, "No output set!\n");
         usage(argv[0]);
         exit(1);
     }
@@ -198,7 +213,7 @@ int main(int argc, char *argv[])
     INIT(CacheInit(), "cache");
     INIT(DeliveryMethodManagerInit(), "delivery method manager");
 
-    printlog(LOG_INFO, "%d Services available on %d Multiplexes\n", ServiceCount(), MultiplexCount());
+    LogModule(LOG_INFO, MAIN, "%d Services available on %d Multiplexes\n", ServiceCount(), MultiplexCount());
 
     /* Initialise the DVB adapter */
     INIT(!(DVBAdapter = DVBInit(adapterNumber)), "DVB adapter");
@@ -218,7 +233,7 @@ int main(int argc, char *argv[])
     {
         PIDFilters[i]->enabled = TRUE;
     }
-    printlog(LOG_DEBUGV, "PID filters started\n");
+    LogModule(LOG_DEBUGV, MAIN, "PID filters started\n");
 
     INIT(OutputsInit(), "outputs");
     INIT(CommandInit(), "commands");
@@ -236,7 +251,7 @@ int main(int argc, char *argv[])
     PrimaryServiceOutput = OutputAllocate(PrimaryService, OutputType_Service, primaryOutput);
     if (!PrimaryServiceOutput)
     {
-        printlog(LOG_ERROR, "Failed to create primary service output, reason %s\n", OutputErrorStr);
+        LogModule(LOG_ERROR, MAIN, "Failed to create primary service output, reason %s\n", OutputErrorStr);
         exit(1);
     }
 
@@ -255,15 +270,15 @@ int main(int argc, char *argv[])
     {
         if (CommandProcessFile(startupFile))
         {
-            printlog(LOG_ERROR, "%s not found!\n", startupFile);
+            LogModule(LOG_ERROR, MAIN, "%s not found!\n", startupFile);
         }
+        LogModule(LOG_DEBUGV, MAIN, "Startup file processed\n");
     }
-    printlog(LOG_DEBUGV, "Startup file processed\n");
 
     if (DaemonMode)
     {
         RemoteInterfaceAcceptConnections();
-        printlog(LOG_DEBUGV, "Remote interface finished, shutting down\n");
+        LogModule(LOG_DEBUGV, MAIN, "Remote interface finished, shutting down\n");
         RemoteInterfaceDeInit();
     }
     else
@@ -274,7 +289,7 @@ int main(int argc, char *argv[])
         }
 
         CommandLoop();
-        printlog(LOG_DEBUGV, "Command loop finished, shutting down\n");
+        LogModule(LOG_DEBUGV, MAIN, "Command loop finished, shutting down\n");
 
         if (remoteInterface)
         {
@@ -299,7 +314,7 @@ int main(int argc, char *argv[])
     {
         PIDFilters[i]->enabled = FALSE;
     }
-    printlog(LOG_DEBUGV, "PID filters stopped\n");
+    LogModule(LOG_DEBUGV, MAIN, "PID filters stopped\n");
 
     PATProcessorDestroy( PIDFilters[PIDFilterIndex_PAT]);
     PMTProcessorDestroy( PIDFilters[PIDFilterIndex_PMT]);
@@ -310,7 +325,7 @@ int main(int argc, char *argv[])
     SectionProcessorDestroyAllProcessors();
     PESProcessorDestroyAllProcessors();
     
-    printlog(LOG_DEBUGV, "Processors destroyed\n");
+    LogModule(LOG_DEBUGV, MAIN, "Processors destroyed\n");
     /* Close the adapter and shutdown the filter etc*/
     DEINIT(TSFilterDestroy(TSFilter), "TS filter");
     DEINIT(DVBDispose(DVBAdapter), "DVB adapter");
@@ -445,7 +460,7 @@ static void InitDaemon(int adapter)
     sid = setsid();
     if (sid < 0)
     {
-        printlog(LOG_ERROR, "setsid failed\n");
+        LogModule(LOG_ERROR, MAIN, "setsid failed\n");
         /* Log the failure */
         exit(1);
     }
@@ -453,7 +468,7 @@ static void InitDaemon(int adapter)
     /* Change the current working directory */
     if ((chdir("/")) < 0)
     {
-        printlog(LOG_ERROR, "chdir failed\n");
+        LogModule(LOG_ERROR, MAIN, "chdir failed\n");
         /* Log the failure */
         exit(1);
     }
@@ -523,7 +538,7 @@ Service_t *SetCurrentService(char *name)
     Service_t *service;
 
     TSFilterLock(TSFilter);
-    printlog(LOG_DEBUG,"Writing changes back to database.\n");
+    LogModule(LOG_DEBUG, MAIN, "Writing changes back to database.\n");
     CacheWriteback();
     TSFilterUnLock(TSFilter);
 
@@ -533,28 +548,28 @@ Service_t *SetCurrentService(char *name)
         return NULL;
     }
 
-    printlog(LOG_DEBUG, "Service found id:0x%04x Multiplex:%d\n", service->id, service->multiplexFreq);
+    LogModule(LOG_DEBUG, MAIN, "Service found id:0x%04x Multiplex:%d\n", service->id, service->multiplexFreq);
     if ((CurrentService == NULL) || (!ServiceAreEqual(service,CurrentService)))
     {
-        printlog(LOG_DEBUGV,"Disabling filters\n");
+        LogModule(LOG_DEBUGV, MAIN, "Disabling filters\n");
         TSFilterEnable(TSFilter, FALSE);
 
         if (CurrentMultiplex)
         {
-            printlog(LOG_DEBUG,"Current Multiplex frequency = %d TS id = %d\n",CurrentMultiplex->freq, CurrentMultiplex->tsId);
+            LogModule(LOG_DEBUG, MAIN, "Current Multiplex frequency = %d TS id = %d\n",CurrentMultiplex->freq, CurrentMultiplex->tsId);
         }
         else
         {
-            printlog(LOG_DEBUG,"No current Multiplex!\n");
+            LogModule(LOG_DEBUG, MAIN, "No current Multiplex!\n");
         }
 
         if (multiplex)
         {
-            printlog(LOG_DEBUG,"New Multiplex frequency =%d TS id = %d\n",multiplex->freq, multiplex->tsId);
+            LogModule(LOG_DEBUG, MAIN, "New Multiplex frequency =%d TS id = %d\n",multiplex->freq, multiplex->tsId);
         }
         else
         {
-            printlog(LOG_DEBUG,"No new Multiplex!\n");
+            LogModule(LOG_DEBUG, MAIN, "No new Multiplex!\n");
         }
 
         if (CurrentService)
@@ -564,7 +579,7 @@ Service_t *SetCurrentService(char *name)
 
         if ((CurrentMultiplex!= NULL) && MultiplexAreEqual(multiplex, CurrentMultiplex))
         {
-            printlog(LOG_DEBUGV,"Same multiplex\n");
+            LogModule(LOG_DEBUGV, MAIN, "Same multiplex\n");
             CurrentService = service;
         }
         else
@@ -584,7 +599,7 @@ Service_t *SetCurrentService(char *name)
          */
         ChannelChangedDoCallbacks((Multiplex_t *)CurrentMultiplex, (Service_t *)CurrentService);
 
-        printlog(LOG_DEBUGV,"Enabling filters\n");
+        LogModule(LOG_DEBUGV, MAIN, "Enabling filters\n");
         TSFilterEnable(TSFilter, TRUE);
     }
     else
@@ -598,11 +613,11 @@ Service_t *SetCurrentService(char *name)
 void SetMultiplex(Multiplex_t *multiplex)
 {
     TSFilterLock(TSFilter);
-    printlog(LOG_DEBUG,"Writing changes back to database.\n");
+    LogModule(LOG_DEBUG, MAIN, "Writing changes back to database.\n");
     CacheWriteback();
     TSFilterUnLock(TSFilter);
 
-    printlog(LOG_DEBUGV,"Disabling filters\n");
+    LogModule(LOG_DEBUGV, MAIN, "Disabling filters\n");
     TSFilterEnable(TSFilter, FALSE);
     OutputSetService(PrimaryServiceOutput, NULL);
 
@@ -616,7 +631,7 @@ void SetMultiplex(Multiplex_t *multiplex)
      */
     ChannelChangedDoCallbacks((Multiplex_t *)CurrentMultiplex, NULL);
 
-    printlog(LOG_DEBUGV,"Enabling filters\n");
+    LogModule(LOG_DEBUGV, MAIN, "Enabling filters\n");
     TSFilterEnable(TSFilter, TRUE);
 }
 
@@ -627,19 +642,19 @@ static void TuneMultiplex(Multiplex_t *multiplex)
     MultiplexRefDec(CurrentMultiplex);
 
 
-    printlog(LOG_DEBUGV,"Caching Services\n");
+    LogModule(LOG_DEBUGV, MAIN, "Caching Services\n");
     CacheLoad(multiplex);
     
     MultiplexRefInc(multiplex);
     CurrentMultiplex = multiplex;
 
-    printlog(LOG_DEBUGV,"Getting Frondend parameters\n");
+    LogModule(LOG_DEBUGV, MAIN, "Getting Frondend parameters\n");
     MultiplexFrontendParametersGet((Multiplex_t*)CurrentMultiplex, &feparams);
 
-    printlog(LOG_DEBUGV,"Tuning\n");
+    LogModule(LOG_DEBUGV, MAIN, "Tuning\n");
     DVBFrontEndTune(DVBAdapter, &feparams);
 
-    printlog(LOG_DEBUGV,"Informing TSFilter multiplex has changed!\n");
+    LogModule(LOG_DEBUGV, MAIN, "Informing TSFilter multiplex has changed!\n");
     TSFilterMultiplexChanged(TSFilter, CurrentMultiplex);
 }
 

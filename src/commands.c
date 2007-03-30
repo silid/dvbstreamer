@@ -46,6 +46,9 @@ Command Processing and command functions.
 #include "plugin.h"
 #include "servicefilter.h"
 
+/*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
 #define PROMPT "DVBStreamer>"
 
 #define MAX_ARGS (10)
@@ -59,11 +62,18 @@ Command Processing and command functions.
         }\
     }while(0)
 
+/*******************************************************************************
+* Typedefs                                                                     *
+*******************************************************************************/
 struct PMTReceived_t
 {
     uint16_t id;
     bool received;
 };
+
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
 
 static void GetCommand(char **command, char **argument);
 static char **AttemptComplete (const char *text, int start, int end);
@@ -106,6 +116,10 @@ static void ScanMultiplex(Multiplex_t *multiplex);
 static void PATCallback(dvbpsi_pat_t* newpat);
 static void PMTCallback(dvbpsi_pmt_t* newpmt);
 static void SDTCallback(dvbpsi_sdt_t* newsdt);
+
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
 
 int (*CommandPrintf)(char *fmt, ...);
 CommandContext_t *CurrentCommandContext;
@@ -327,6 +341,11 @@ static struct PMTReceived_t *pmtsreceived = NULL;
 static pthread_mutex_t scanningmutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t scanningcond = PTHREAD_COND_INITIALIZER;
 
+static char COMMAND[] = "Command";
+
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
 
 int CommandInit(void)
 {
@@ -335,7 +354,7 @@ int CommandInit(void)
     commandslist = ListCreate();
     if (!commandslist)
     {
-        printlog(LOG_ERROR, "Failed to allocate commandslist!\n");
+        LogModule(LOG_ERROR, COMMAND, "Failed to allocate commandslist!\n");
         return -1;
     }
     ListAdd( commandslist, coreCommands);
@@ -485,6 +504,10 @@ bool CommandExecute(CommandContext_t *context, int (*cmdprintf)(char *, ...), ch
     
     return commandFound;
 }
+
+/*******************************************************************************
+* Local Functions                                                              *
+*******************************************************************************/
 
 /*************** Command parsing functions ***********************************/
 static char **AttemptComplete (const char *text, int start, int end)
@@ -960,8 +983,6 @@ static void CommandAddOutput(int argc, char **argv)
 
     CheckAuthenticated();
 
-    printlog(LOG_DEBUGV,"Name = \"%s\" Destination = \"%s\"\n", argv[0], argv[1]);
-
     output = OutputAllocate(argv[0], OutputType_Manual, argv[1]);
     if (!output)
     {
@@ -1089,8 +1110,6 @@ static void CommandAddSSF(int argc, char **argv)
     Output_t *output = NULL;
 
     CheckAuthenticated();
-
-    printlog(LOG_DEBUGV,"Name = \"%s\" Destination = \"%s\"\n", argv[0], argv[1]);
 
     output = OutputAllocate(argv[0], OutputType_Service, argv[1]);
     if (!output)

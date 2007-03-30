@@ -42,10 +42,16 @@ Remote Interface functions.
 #include "commands.h"
 #include "remoteintf.h"
 
+/*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
 #define MAX_CONNECTIONS   2 /* 1 for monitoring by web and another for control */
 #define MAX_LINE_LENGTH 256
 
 
+/*******************************************************************************
+* Typedefs                                                                     *
+*******************************************************************************/
 typedef struct Connection_t
 {
     int socketfd;
@@ -60,6 +66,9 @@ typedef struct Connection_t
 Connection_t;
 
 
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
 static void HandleConnection(Connection_t *connection);
 static void RemoteInterfaceAuthenticate(int argc, char **argv);
 static void RemoteInterfaceWho(int argc, char **argv);
@@ -68,6 +77,9 @@ static void RemoteInterfaceInfo(int argc, char **argv);
 static bool PrintResponse(FILE *fp, uint16_t errno, char * msg);
 static int  RemoteInterfacePrintfImpl(char *format, ...);
 
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
 static Command_t RemoteInterfaceCommands[] = {
         {
             "who",
@@ -123,6 +135,11 @@ static pthread_t acceptThread;
 static time_t serverStartTime;
 static char responselineStart[] = "DVBStreamer/" VERSION "/";
 
+static char REMOTEINTERFACE[] = "RemoteInterface";
+
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
 int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char *username, char *password)
 {
 #ifndef __CYGWIN__
@@ -138,14 +155,14 @@ int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char
     hints.ai_flags = AI_ADDRCONFIG | AI_PASSIVE;
     if ((getaddrinfo(bindAddress, portnumber, &hints, &addrinfo) != 0) || (addrinfo == NULL))
     {
-        printlog(LOG_DEBUG, "Failed to set bind address\n");
+        LogModule(LOG_DEBUG, REMOTEINTERFACE, "Failed to set bind address\n");
         return 1;
     }
 
     if (addrinfo->ai_addrlen > sizeof(struct sockaddr_storage))
     {
         freeaddrinfo(addrinfo);
-	printlog(LOG_DEBUG, "Failed to parse bind address\n");
+        LogModule(LOG_DEBUG, REMOTEINTERFACE, "Failed to parse bind address\n");
         return 1;
     }
     address_len = addrinfo->ai_addrlen;
@@ -155,12 +172,12 @@ int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char
     serverSocket = socket(address.ss_family, SOCK_STREAM, IPPROTO_TCP);
     if (serverSocket < 0)
     {
-        printlog(LOG_ERROR, "Failed to create server socket!\n");
+        LogModule(LOG_ERROR, REMOTEINTERFACE, "Failed to create server socket!\n");
         return 1;
     }
     if (bind(serverSocket, (struct sockaddr *) &address, address_len) < 0)
     {
-        printlog(LOG_ERROR, "Failed to bind server to port %d\n", REMOTEINTERFACE_PORT + adapter);
+        LogModule(LOG_ERROR, REMOTEINTERFACE, "Failed to bind server to port %d\n", REMOTEINTERFACE_PORT + adapter);
         close(serverSocket);
         return 1;
     }
@@ -170,7 +187,7 @@ int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char
     serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (serverSocket < 0)
     {
-        printlog(LOG_ERROR, "Failed to create server socket!\n");
+        LogModule(LOG_ERROR, REMOTEINTERFACE, "Failed to create server socket!\n");
         return 1;
     }
 
@@ -181,7 +198,7 @@ int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char
 
     if (bind(serverSocket, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0)
     {
-        printlog(LOG_ERROR, "Failed to bind server to port %d\n", REMOTEINTERFACE_PORT + adapter);
+        LogModule(LOG_ERROR, REMOTEINTERFACE, "Failed to bind server to port %d\n", REMOTEINTERFACE_PORT + adapter);
         close(serverSocket);
         return 1;
     }
@@ -194,10 +211,10 @@ int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char
     authPassword = strdup(password);
 
     time(&serverStartTime);
-    printlog(LOG_INFO, "Server created %s", ctime(&serverStartTime));
-    printlog(LOG_DEBUG, "Username    : %s\n", authUsername);
-    printlog(LOG_DEBUG, "Password    : %s\n", authPassword);
-    printlog(LOG_DEBUG, "Server Name : %s\n", infoStreamerName);
+    LogModule(LOG_INFO, REMOTEINTERFACE, "Server created %s", ctime(&serverStartTime));
+    LogModule(LOG_DEBUG, REMOTEINTERFACE, "Username    : %s\n", authUsername);
+    LogModule(LOG_DEBUG, REMOTEINTERFACE, "Password    : %s\n", authPassword);
+    LogModule(LOG_DEBUG, REMOTEINTERFACE, "Server Name : %s\n", infoStreamerName);
 
     CommandRegisterCommands(RemoteInterfaceCommands);
     return 0;
@@ -257,7 +274,7 @@ void RemoteInterfaceAcceptConnections(void)
                 pthread_mutex_lock(&activeConnectionsMutex);
                 if (activeConnections >= MAX_CONNECTIONS)
                 {
-                    printlog(LOG_INFO, "Connection attempt from %s:%d rejected as too many open connections!\n",
+                    LogModule(LOG_INFO, REMOTEINTERFACE, "Connection attempt from %s:%d rejected as too many open connections!\n",
                              inet_ntoa(clientAddress.sin_addr), clientAddress.sin_port);
                     PrintResponse(clientfp,COMMAND_ERROR_TOO_MANY_CONNS, "Too many connect clients!");
                     fclose(clientfp);
@@ -282,13 +299,13 @@ void RemoteInterfaceAcceptConnections(void)
                         connections[i].socketfp = clientfp;
                         connections[i].clientAddress = clientAddress;
                         activeConnections ++;
-                        printlog(LOG_INFO, "Connection attempt from %s:%d accepted!\n",
+                        LogModule(LOG_INFO, REMOTEINTERFACE, "Connection attempt from %s:%d accepted!\n",
                                  inet_ntoa(clientAddress.sin_addr), clientAddress.sin_port);
                         pthread_create(&connections[i].thread, NULL, (void*)HandleConnection, (void*)&connections[i]);
                     }
                     else
                     {
-                        printlog(LOG_INFO, "Connection attempt from %s:%d rejected as no connections structures left!\n",
+                        LogModule(LOG_INFO, REMOTEINTERFACE, "Connection attempt from %s:%d rejected as no connections structures left!\n",
                                  inet_ntoa(clientAddress.sin_addr), clientAddress.sin_port);
                         PrintResponse(clientfp,COMMAND_ERROR_TOO_MANY_CONNS, "Too many connect clients!");
                         fclose(clientfp);
@@ -347,7 +364,7 @@ static void HandleConnection(Connection_t *connection)
                 {
                     *nl = 0;
                 }
-                printlog(LOG_DEBUG, "%s: Received Line: \"%s\"\n", context.interface, line);
+                LogModule(LOG_DEBUG, REMOTEINTERFACE, "%s: Received Line: \"%s\"\n", context.interface, line);
                 CommandExecute(&context, RemoteInterfacePrintfImpl, line);
                 PrintResponse(socketfp,context.errorNumber, context.errorMessage);
             }
@@ -361,7 +378,7 @@ static void HandleConnection(Connection_t *connection)
             connection->connected = FALSE;
         }
     }
-    printlog(LOG_INFO, "%s: Connection closed!\n", context.interface);
+    LogModule(LOG_INFO, REMOTEINTERFACE, "%s: Connection closed!\n", context.interface);
     /* Close the socket and free our resources */
     fclose(socketfp);
     connection->connected = FALSE;

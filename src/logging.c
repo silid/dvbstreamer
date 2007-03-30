@@ -31,7 +31,8 @@ Logging functions.
 
 int verbosity = 0;
 
-static void printlogimpl(const char * format, va_list valist);
+static void LogImpl(int level, const char *module, const char * format, va_list valist);
+
 /*
  * Print out a log message to stderr depending on verbosity
  */
@@ -41,7 +42,7 @@ void printlog(int level, const char *format, ...)
     {
         va_list valist;
         va_start(valist, format);
-        printlogimpl(format, valist);
+        LogImpl(level, NULL, format, valist);
         va_end(valist);
     }
 }
@@ -50,11 +51,22 @@ void printlogva(int level, const char * format, va_list valist)
 {
     if (level <= verbosity)
     {
-        printlogimpl(format, valist);
+        LogImpl(level, NULL, format, valist);
     }
 }
 
-static void printlogimpl(const char * format, va_list valist)
+void LogModule(int level, const char *module, char *format, ...)
+{
+    if (level <= verbosity)
+    {
+        va_list valist;
+        va_start(valist, format);
+        LogImpl(level, module, format, valist);
+        va_end(valist);
+    }
+}
+
+static void LogImpl(int level, const char *module, const char * format, va_list valist)
 {
     char *logline;
     int len;
@@ -74,7 +86,9 @@ static void printlogimpl(const char * format, va_list valist)
         fputs(buffer, stderr);
     }
 #endif
-   
+
+    fprintf(stderr, "%-15s : ", module ? module:"<Unknown>");
+
     vfprintf(stderr, format, valist);
 
 #ifdef LOGGING_CHECK_DAEMON        

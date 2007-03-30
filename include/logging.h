@@ -64,9 +64,18 @@ extern int verbosity;
  * Write the text describe by format to the log output, if the current verbosity
  * level is greater or equal to level.
  * @param level The level at which to output this text.
- * @param foramt String in printf format to output.
+ * @param format String in printf format to output.
  */
 extern void printlog(int level, const char *format, ...);
+
+/**
+ * Write the text describe by format to the log output, if the current verbosity
+ * level is greater or equal to level.
+ * @param level The level at which to output this text.
+ * @param module The module that is doing the logging.
+ * @param format String in printf format to output.
+ */
+extern void LogModule(int level, const char *module, char *format, ...);
 
 /**
  * Write the text describe by format to the log output, if the current verbosity

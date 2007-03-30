@@ -36,8 +36,19 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 #include "dvb.h"
 #include "logging.h"
 
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
 static int DVBDemuxSetPESFilter(DVBAdapter_t *adapter, ushort pid, int pidtype, int taptype);
 
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
+static char DVBADAPTER[] = "DVBAdapter";
+
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
 DVBAdapter_t *DVBInit(int adapter)
 {
     DVBAdapter_t *result = NULL;
@@ -54,21 +65,21 @@ DVBAdapter_t *DVBInit(int adapter)
         result->frontEndFd = open(result->frontEndPath, O_RDWR);
         if (result->frontEndFd == -1)
         {
-            printlog(LOG_ERROR,"Failed to open %s : %s\n",result->frontEndPath, strerror(errno));
+            LogModule(LOG_ERROR, DVBADAPTER, "Failed to open %s : %s\n",result->frontEndPath, strerror(errno));
             DVBDispose(result);
             return NULL;
         }
         result->demuxFd = open(result->demuxPath, O_RDWR);
         if (result->demuxFd == -1)
         {
-            printlog(LOG_ERROR,"Failed to open %s : %s\n",result->demuxPath, strerror(errno));
+            LogModule(LOG_ERROR, DVBADAPTER, "Failed to open %s : %s\n",result->demuxPath, strerror(errno));
             DVBDispose(result);
             return NULL;
         }
         result->dvrFd = open(result->dvrPath, O_RDONLY | O_NONBLOCK);
         if (result->dvrFd == -1)
         {
-            printlog(LOG_ERROR,"Failed to open %s : %s\n",result->dvrPath, strerror(errno));
+            LogModule(LOG_ERROR, DVBADAPTER, "Failed to open %s : %s\n",result->dvrPath, strerror(errno));
             DVBDispose(result);
             return NULL;
         }
@@ -82,17 +93,17 @@ void DVBDispose(DVBAdapter_t *adapter)
 {
     if (adapter->dvrFd > -1)
     {
-        printlog(LOG_DEBUGV,"Closing DVR file descriptor\n");
+        LogModule(LOG_DEBUGV, DVBADAPTER, "Closing DVR file descriptor\n");
         close(adapter->dvrFd);
     }
     if (adapter->demuxFd > -1)
     {
-        printlog(LOG_DEBUGV,"Closing Demux file descriptor\n");
+        LogModule(LOG_DEBUGV, DVBADAPTER, "Closing Demux file descriptor\n");
         close(adapter->demuxFd);
     }
     if (adapter->frontEndFd > -1)
     {
-        printlog(LOG_DEBUGV,"Closing Frontend file descriptor\n");
+        LogModule(LOG_DEBUGV, DVBADAPTER, "Closing Frontend file descriptor\n");
         close(adapter->frontEndFd);
     }
     ObjectFree(adapter);
@@ -107,7 +118,7 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
 
     if (ioctl(adapter->frontEndFd, FE_SET_FRONTEND, frontend) < 0)
     {
-        printlog(LOG_ERROR,"setfront front: %s\n", strerror(errno));
+        LogModule(LOG_ERROR, DVBADAPTER, "setfront front: %s\n", strerror(errno));
         return 0;
     }
 
@@ -120,7 +131,7 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
         {
             if (ioctl(adapter->frontEndFd, FE_GET_EVENT, &event) == -EOVERFLOW)
             {
-                printlog(LOG_ERROR,"EOVERFLOW");
+                LogModule(LOG_ERROR, DVBADAPTER,"EOVERFLOW");
                 return 0;
             }
             if (event.parameters.frequency <= 0)
@@ -138,26 +149,26 @@ int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status, unsigned int *
     #ifndef __CYGWIN__
     if (ioctl(adapter->frontEndFd, FE_READ_STATUS, status) < 0)
     {
-        printlog(LOG_ERROR,"FE_READ_STATUS: %s\n", strerror(errno));
+        LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_STATUS: %s\n", strerror(errno));
         return 0;
     }
 
     if(ioctl(adapter->frontEndFd,FE_READ_BER, ber) < 0)
     {
-        printlog(LOG_ERROR,"FE_READ_BER: %s\n", strerror(errno));
+        LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_BER: %s\n", strerror(errno));
         return 0;
     }
 
     if(ioctl(adapter->frontEndFd,FE_READ_SIGNAL_STRENGTH,strength) < 0)
     {
-        printlog(LOG_ERROR,"FE_READ_SIGNAL_STRENGTH: %s\n", strerror(errno));
+        LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_SIGNAL_STRENGTH: %s\n", strerror(errno));
         return 0;
     }
 
 
     if(ioctl(adapter->frontEndFd,FE_READ_SNR,snr) < 0)
     {
-        printlog(LOG_ERROR,"FE_READ_SNR: %s\n", strerror(errno));
+        LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_SNR: %s\n", strerror(errno));
         return 0;
     }
     #endif
@@ -176,7 +187,7 @@ static int DVBDemuxSetPESFilter(DVBAdapter_t *adapter, ushort pid, int pidtype, 
     #ifndef __CYGWIN__
     if (ioctl(adapter->demuxFd, DMX_SET_PES_FILTER, &pesFilterParam) < 0)
     {
-        printlog(LOG_ERROR,"set_pid: %s\n", strerror(errno));
+        LogModule(LOG_ERROR, DVBADAPTER,"set_pid: %s\n", strerror(errno));
         return 0;
     }
     #endif
@@ -188,17 +199,17 @@ int DVBDemuxSetBufferSize(DVBAdapter_t *adapter, unsigned long size)
     #ifndef __CYGWIN__
     if (ioctl(adapter->demuxFd, DMX_STOP, 0)< 0)
     {
-        printlog(LOG_ERROR,"DMX_STOP: %s\n", strerror(errno));
+        LogModule(LOG_ERROR, DVBADAPTER,"DMX_STOP: %s\n", strerror(errno));
         return 0;
     }
     if (ioctl(adapter->demuxFd, DMX_SET_BUFFER_SIZE, size) < 0)
     {
-        printlog(LOG_ERROR,"DMX_SET_BUFFER_SIZE: %s\n", strerror(errno));
+        LogModule(LOG_ERROR, DVBADAPTER,"DMX_SET_BUFFER_SIZE: %s\n", strerror(errno));
         return 0;
     }
     if (ioctl(adapter->demuxFd, DMX_START, 0)< 0)
     {
-        printlog(LOG_ERROR,"DMX_STOP: %s\n", strerror(errno));
+        LogModule(LOG_ERROR, DVBADAPTER,"DMX_STOP: %s\n", strerror(errno));
         return 0;
     }
     #endif
