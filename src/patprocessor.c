@@ -211,6 +211,7 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
         {
             printlog(LOG_DEBUG, "Service not found in PAT while checking cache, deleting 0x%04x (%s)\n",
                 services[i]->id, services[i]->name);
+            CacheServicesRelease();
             CacheServiceDelete(services[i]);
             services = CacheServicesGet(&count);
             i --;
@@ -219,6 +220,7 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
         }
     }
 
+    CacheServicesRelease();
     CacheUpdateMultiplex(multiplex, newpat->i_version, newpat->i_ts_id);
 
     for (ListIterator_Init(iterator, NewPATCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))

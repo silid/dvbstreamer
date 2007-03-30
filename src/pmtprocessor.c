@@ -132,6 +132,7 @@ void PMTProcessorUnRegisterPMTCallback(PluginPMTProcessor_t callback)
 
 static int PMTProcessorFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet)
 {
+    int result = 0;
     if (CurrentMultiplex)
     {
         int i;
@@ -143,11 +144,13 @@ static int PMTProcessorFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t 
         {
             if (pid == services[i]->pmtPid)
             {
-                return 1;
+                result =  1;
+                break;
             }
         }
+        CacheServicesRelease();
     }
-    return 0;
+    return result;
 }
 
 static void PMTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex)
@@ -156,7 +159,6 @@ static void PMTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Mult
     int count;
     int i;
     Service_t **services;
-
     for (i = 0; i < MAX_HANDLES; i ++)
     {
         if (state->pmthandles[i])
@@ -168,7 +170,6 @@ static void PMTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Mult
             state->services[i]   = NULL;
         }
     }
-
     services = CacheServicesGet(&count);
     if (count > MAX_HANDLES)
     {
@@ -183,6 +184,7 @@ static void PMTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Mult
         state->pmthandles[i] = dvbpsi_AttachPMT(services[i]->id, PMTHandler, (void*)services[i]);
         state->payloadstartonly[i] = TRUE;
     }
+    CacheServicesRelease();
     
     MultiplexRefDec(state->multiplex);
     state->multiplex = (Multiplex_t*)newmultiplex;

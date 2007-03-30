@@ -76,18 +76,34 @@ Service_t *CacheServiceFindId(int id);
 Service_t *CacheServiceFindName(char *name, Multiplex_t **multiplex);
 
 /**
- * Retrieve all the services currently in the cache.
+ * Retrieve all the services currently in the cache and locks the cache to
+ * prevent updates to the list.CacheServicesRelease() should be called when the
+ * list is no longer needed.
+ *
  * @param count Used to store the number of services in the cache.
  * @return An array of pointers to Service_t instances.
  */
 Service_t **CacheServicesGet(int *count);
 
 /**
- * Retrieve the PIDs for a given service.
+ * Releases the services retieved by CacheServiesGet and allows updates to the
+ * cache.
+ */
+void CacheServicesRelease(void);
+
+/**
+ * Retrieve the PIDs for a given service and locks the cache to prevent updates.
+ * CachePIDsRelease() should be called when the list is no longer needed.
+ *
  * @param service Service to retrieve the PIDs for.
  * @return A PIDList_t structure.
  */
 PIDList_t *CachePIDsGet(Service_t *service);
+
+/**
+ * Releases the PIDs retrieved by CachePIDsGet and allows updates to the cache.
+ */
+void CachePIDsRelease(void);
 
 /**
  * Update the specified Multiplex's pat version and TS id.

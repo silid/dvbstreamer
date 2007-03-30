@@ -896,7 +896,11 @@ static void CommandPids(int argc, char **argv)
                 CommandPrintf("%2d: %d %d %d\n", i, pids->pids[i].pid, pids->pids[i].type, pids->pids[i].subType);
             }
 
-            if (!cached)
+            if (cached)
+            {
+                CachePIDsRelease();
+            }
+            else
             {
                 PIDListFree(pids);
             }
@@ -1141,7 +1145,7 @@ static void CommandSetSSF(int argc, char **argv)
     Output_t *output = NULL;
     char *outputName = argv[0];
     char *serviceName;
-    Service_t *service, *oldService = NULL;
+    Service_t *service;
 
     CheckAuthenticated();
 
@@ -1175,17 +1179,15 @@ static void CommandSetSSF(int argc, char **argv)
         CommandPrintf("Failed to find service %s\n", serviceName);
         return;
     }
-    OutputGetService(output, &oldService);
 
     if (OutputSetService(output, service))
     {
-        CommandPrintf("Failed to set service, reason %s\n", OutputErrorStr);
+        ServiceRefDec(service);
+        CommandPrintf("Failed to find multiplex for service %s\n", serviceName);
+        return;
     }
 
-    if (oldService)
-    {
-        ServiceRefDec(oldService);
-    }
+    ServiceRefDec(service);
 }
 
 static void CommandSetSFMRL(int argc, char **argv)
