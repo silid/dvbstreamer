@@ -330,7 +330,6 @@ int main(int argc, char *argv[])
         DeinitDaemon();
     }
 
-    printf("CurrentService %p CurrentMultiplex %p\n",CurrentService, CurrentMultiplex);
     DEINIT(ObjectDeinit(), "objects");
     return 0;
 }
