@@ -173,6 +173,7 @@ AC_SUBST(DVBSTREAMER_PLUGINDIR)
 AC_OUTPUT([
 Makefile
 include/Makefile
+include/dvbpsi/Makefile
 src/dvbpsi/Makefile
 src/Makefile
 src/plugins/Makefile
