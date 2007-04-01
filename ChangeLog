@@ -1,19 +1,21 @@
 0.7
 ---
 * NEW Simpler remote interface means that it is possible to execute all commands 
-   remotely, no need to use the dvbctrl command 'quote' any more.
-* Reworked internal command processing means all commands can tell if the user 
-   has entered a valid username/password
-* Structure member rename to make sure all structures follow the camel case convention.
-* New plugins:
+  remotely, no need to use the dvbctrl command 'quote' any more.
+* NEW plugins:
    - Date/Time plugin  - Simple plugin to print out the UTC date and time
    - Now/Next plugin   - Plugin to display the present show EPG info and what comes next.
-   - PES Extract plugin - Example plugin to show/test how to use the PESProcessor features.
-                                   (You can now extract a single pid to a PES ie a DVB radio channel to an MP3 file.)
+   - PES Extract plugin- Example plugin to show/test how to use the PESProcessor features.
+                         (You can now extract a single pid to a PES ie a DVB radio channel to an MP3 file.)
    - LCN Query plugin  - Plugin to find a service that is allocated to a logical channel number, can
-                                   also display all logical channel numbers and their service names.
- * Separated out the setup component from dvbstreamer to a new app to prevent confusing users
-   into always providing the channels.conf file.
+                         also display all logical channel numbers and their service names.
+* Separated out the setup component from dvbstreamer to a new app to prevent confusing users
+  into always providing the channels.conf file.
+* Reworked internal command processing means all commands can tell if the user 
+  has entered a valid username/password
+* Structure member rename to make sure all structures follow the camel case convention.
+* New object based memory allocation system to help debugging and prevent memory leaks.
+* Remove need for libdvbpsi, now included (heavily patched)
 
 
 0.6
