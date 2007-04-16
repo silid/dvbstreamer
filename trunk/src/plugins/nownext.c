@@ -27,12 +27,14 @@ Plugin to display Present/Following (ie Now/Next) EPG information.
 #include <stdint.h>
 
 #include "plugin.h"
-#include <dvbpsi/eit.h>
-#include <dvbpsi/dr_4d.h>
+#include "dvbpsi/datetime.h"
+#include "dvbpsi/eit.h"
+#include "dvbpsi/dr_4d.h"
+
 #include "list.h"
 #include "logging.h"
 #include "subtableprocessor.h"
-#include "dvbpsi/tdttot.h"
+
 
 
 /*******************************************************************************
@@ -47,29 +49,13 @@ Plugin to display Present/Following (ie Now/Next) EPG information.
 /*******************************************************************************
 * Typedefs                                                                     *
 *******************************************************************************/
-struct DVBTime_t
-{
-    int year;
-    int month;
-    int day;
-    int hour;
-    int minute;
-    int second;
-};
-
-struct DVBDuration_t
-{
-    int hour;
-    int minute;
-    int second;    
-};
 
 typedef struct Event_s
 {
     char name[MAX_STRING_LEN];
     char description[MAX_STRING_LEN];
-    struct DVBTime_t startTime;
-    struct DVBDuration_t duration;
+    dvbpsi_date_time_t startTime;
+    dvbpsi_eit_event_duration_t duration;
 }Event_t;
 
 typedef struct ServiceNowNextInfo_s
@@ -113,7 +99,8 @@ PLUGIN_COMMANDS(
         FALSE, 1, 1,
         "Display the current program.",
         "Display the current program on all channels (assuming the data is "
-        "present on the current TS).",
+        "present on the current TS). Dates are in YYYY/MM/DD format and times"
+        "are in HH:MM:SS",
         CommandNow
     },
     {
@@ -121,7 +108,8 @@ PLUGIN_COMMANDS(
         FALSE, 1, 1,
         "Display the next program.",
         "Display the next program on all channels (assuming the data is "
-        "present on the current TS).",
+        "present on the current TS). Dates are in YYYY/MM/DD format and times"
+        "are in HH:MM:SS",
         CommandNext
     }
 );
@@ -167,12 +155,12 @@ static void CommandNext(int argc, char **argv)
 
 static void PrintEvent(Event_t *event)
 {
-    CommandPrintf("Name: %s\n", event->name);
-    CommandPrintf("Start time (Y/M/D H:M:S): %4d/%2d/%2d %02d:%02d:%02d\n",
-        event->startTime.year, event->startTime.month, event->startTime.day,
-        event->startTime.hour, event->startTime.minute, event->startTime.second);
-    CommandPrintf("Duration (H:M:S): %02d:%02d:%02d\n", 
-        event->duration.hour, event->duration.minute, event->duration.second);
+    CommandPrintf("Name       : %s\n", event->name);
+    CommandPrintf("Start time : %4d/%2d/%2d %02d:%02d:%02d\n",
+        event->startTime.i_year, event->startTime.i_month, event->startTime.i_day,
+        event->startTime.i_hour, event->startTime.i_minute, event->startTime.i_second);
+    CommandPrintf("Duration   : %02d:%02d:%02d\n", 
+        event->duration.i_hours, event->duration.i_minutes, event->duration.i_seconds);
     CommandPrintf("Description:\n%s\n", event->description);
 }
 /*******************************************************************************
@@ -247,18 +235,9 @@ static void UpdateEvent(Event_t *event, dvbpsi_eit_event_t *eitevent)
 {
     dvbpsi_descriptor_t *descriptor;
     dvbpsi_short_event_dr_t * sedescriptor;
-    char startTime[5];
-    startTime[0] = (eitevent->i_start_time >> 32) & 0xff;
-    startTime[1] = (eitevent->i_start_time >> 24) & 0xff;    
-    startTime[2] = (eitevent->i_start_time >> 16) & 0xff;        
-    startTime[3] = (eitevent->i_start_time >>  8) & 0xff;            
-    startTime[4] = (eitevent->i_start_time >>  0) & 0xff;                
-    dvbpsi_DecodeMJDUTC(startTime, 
-                        &event->startTime.year, &event->startTime.month, &event->startTime.day,
-                        &event->startTime.hour,&event->startTime.minute, &event->startTime.second);
-    event->duration.hour   = (((eitevent->i_duration >> 20 )& 0xf) * 10) + ((eitevent->i_duration >> 16 )& 0xf);
-    event->duration.minute = (((eitevent->i_duration >> 12 )& 0xf) * 10) + ((eitevent->i_duration >>  8 )& 0xf);
-    event->duration.second = (((eitevent->i_duration >>  4 )& 0xf) * 10) + ((eitevent->i_duration >>  0 )& 0xf);
+
+    event->startTime = eitevent->t_start_time;
+    event->duration  = eitevent->t_duration;
                         
     for (descriptor = eitevent->p_first_descriptor; descriptor; descriptor = descriptor->p_next)
     {
@@ -287,7 +266,7 @@ static ServiceNowNextInfo_t *FindServiceName(char *name)
         return NULL;
     }
 
-    multiplex = MultiplexFind(service->multiplexFreq);
+    multiplex = MultiplexFind(service->multiplexUID);
     if (!multiplex)
     {
         CommandError(COMMAND_ERROR_GENERIC, "Failed to find multiplex!");

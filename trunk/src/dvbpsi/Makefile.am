@@ -9,6 +9,7 @@ libdvbpsi_a_SOURCES= \
 	descriptor.c \
 	dvbpsi.c \
 	psi.c \
+	datetime.c \
 	$(descriptors_src) \
 	$(tables_src)
 	

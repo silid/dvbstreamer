@@ -39,12 +39,7 @@ Time Date Table and Time Offset Table.
  */
 typedef struct dvbpsi_tdt_tot_s
 {
-    int                     i_year;  /*!< Year in UTC */
-    int                     i_month; /*!< Month in UTC */
-    int                     i_day;   /*!< Day in UTC */
-    int                     i_hour;  /*!< Hour in UTC */
-    int                     i_minute;/*!< Minute in UTC */
-    int                     i_second;/*!< Second in UTC */
+    dvbpsi_date_time_t      t_date_time; /*!< UTC Date/Time */
     dvbpsi_descriptor_t*    p_first_descriptor; /*!< TOT descriptors, only present if the table was a TOT */
 } dvbpsi_tdt_tot_t;
 
@@ -173,26 +168,4 @@ dvbpsi_descriptor_t* dvbpsi_TOTAddDescriptor(dvbpsi_tdt_tot_t *p_tot,
                                              uint8_t i_tag, uint8_t i_length,
                                              uint8_t* p_data);
 
-/*****************************************************************************
- * dvbpsi_DecodeMJDUTC
- *****************************************************************************/
-/*!
- * \fn void dvbpsi_DecodeMJDUTC(char *p_mjdutc, 
-                                int *p_year, 
-                                int *p_month, 
-                                int *p_day, 
-                                int *p_hour, 
-                                int *p_minute, 
-                                int *p_second)
- * \brief Decode date/time encoded in MJD UTC format into its constituent parts.
- * \param p_mjdutc pointer to MJD UTC encoded date time.
- * \param p_year Integer to store the decoded year in.
- * \param p_month Integer to store the decoded month in.
- * \param p_day Integer to store the decoded day in.
- * \param p_hour Integer to store the decoded hour in.
- * \param p_minute Integer to store the decoded minute in.
- * \param p_second Integer to store the decoded second in.
- */
-void dvbpsi_DecodeMJDUTC(char *p_mjdutc, int *p_year, int *p_month, int *p_day,
-                                 int *p_hour, int *p_minute, int *p_second);
 #endif

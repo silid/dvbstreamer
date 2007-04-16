@@ -28,6 +28,7 @@ Example plugin to print out the date/time from the TDT.
 
 #include "logging.h"
 #include "plugin.h"
+#include "dvbpsi/datetime.h"
 #include "dvbpsi/tdttot.h"
 
 /*******************************************************************************
@@ -87,8 +88,8 @@ static void CommandDateTime(int argc, char **argv)
     if (lastReceived)
     {
         CommandPrintf("UTC Date/Time (YYYY/MM/DD hh:mm:ss) %4d/%2d/%2d %02d:%02d:%02d",
-            lastDateTime.i_year, lastDateTime.i_month, lastDateTime.i_day,
-            lastDateTime.i_hour, lastDateTime.i_minute, lastDateTime.i_second);
+            lastDateTime.t_date_time.i_year, lastDateTime.t_date_time.i_month, lastDateTime.t_date_time.i_day,
+            lastDateTime.t_date_time.i_hour, lastDateTime.t_date_time.i_minute, lastDateTime.t_date_time.i_second);
         
         CommandPrintf("Last received %d seconds ago.\n", time(NULL) - lastReceived);
     }

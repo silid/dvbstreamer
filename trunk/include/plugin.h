@@ -45,6 +45,7 @@ Plugin Interface structures and macros.
 #ifndef _DVBPSI_SDT_H_
 #include <dvbpsi/sdt.h>
 #endif
+#include "dvbpsi/datetime.h"
 #include "dvbpsi/nit.h"
 #include "dvbpsi/tdttot.h"
 
