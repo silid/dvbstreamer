@@ -39,7 +39,15 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+/*****************************************************************************
+ * dvbpsi_eit_event_duration_t
+ *****************************************************************************/
+typedef struct dvbpsi_eit_event_duration_s
+{
+    unsigned int i_hours;
+    unsigned int i_minutes;
+    unsigned int i_seconds;
+}dvbpsi_eit_event_duration_t;
 
 /*****************************************************************************
  * dvbpsi_eit_event_t
@@ -57,15 +65,15 @@ extern "C" {
  */
 typedef struct dvbpsi_eit_event_s
 {
-  uint16_t                  i_event_id;             /*!< event_id */
-  uint64_t                  i_start_time;           /*!< start_time */
-  uint32_t                  i_duration;             /*!< duration */
-  uint8_t                   i_running_status;       /*!< Running status */
-  int                       b_free_ca;              /*!< Free CA mode flag */
-  uint16_t                  i_descriptors_length;   /*!< Descriptors loop
-                                                         length */
-  dvbpsi_descriptor_t *     p_first_descriptor;     /*!< First of the following
-                                                         DVB descriptors */
+  uint16_t                    i_event_id;             /*!< event_id */
+  dvbpsi_date_time_t          t_start_time;           /*!< start_time */
+  dvbpsi_eit_event_duration_t t_duration;             /*!< duration */
+  uint8_t                     i_running_status;       /*!< Running status */
+  int                         b_free_ca;              /*!< Free CA mode flag */
+  uint16_t                    i_descriptors_length;   /*!< Descriptors loop
+                                                           length */
+  dvbpsi_descriptor_t *       p_first_descriptor;     /*!< First of the following
+                                                           DVB descriptors */
 
 
   struct dvbpsi_eit_event_s * p_next;               /*!< next element of
@@ -221,23 +229,24 @@ do {                                                                    \
  *****************************************************************************/
 /*!
  * \fn dvbpsi_eit_event_t* dvbpsi_EITAddEvent(dvbpsi_eit_t* p_eit,
-                                              uint16_t i_event_id,
-                                              uint64_t i_start_time,
-                                              uint32_t i_duration,
-                                              uint8_t i_running_status,
-                                              int b_free_ca)
+ *                                            uint16_t i_event_id, 
+ *                                            dvbpsi_date_time_t t_start_time, 
+ *                                            dvbpsi_eit_event_duration_t t_duration,
+ *                                            uint8_t i_running_status, 
+ *                                            int b_free_ca)
  * \brief Add a service description at the end of the EIT.
  * \param p_eit pointer to the EIT structure
  * \param i_event_id Event ID
- * \param i_start_time Start Time
- * \param i_duration Duration
+ * \param t_start_time Start Time
+ * \param t_duration Duration
  * \param i_running_status Running status
  * \param b_free_ca Free CA flag
  * \return a pointer to the added service description.
  */
 dvbpsi_eit_event_t* dvbpsi_EITAddEvent(dvbpsi_eit_t* p_eit,
-    uint16_t i_event_id, uint64_t i_start_time, uint32_t i_duration,
-    uint8_t i_running_status, int b_free_ca);
+    uint16_t i_event_id, dvbpsi_date_time_t *p_start_time, 
+    dvbpsi_eit_event_duration_t *p_duration, uint8_t i_running_status, 
+    int b_free_ca);
 
 #ifdef __cplusplus
 };

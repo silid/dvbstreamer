@@ -3,6 +3,7 @@ dvbpsidir = $(pkgincludedir)/dvbpsi
 dvbpsi_DATA = \
 	demux.h \
 	descriptor.h \
+	datetime.h \
 	dr_02.h \
 	dr_03.h \
 	dr_04.h \

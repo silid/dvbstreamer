@@ -27,6 +27,7 @@ Decode Time Date Table and Time Offset Table.
 #include <dvbpsi/dvbpsi.h>
 #include <dvbpsi/psi.h>
 #include <dvbpsi/descriptor.h>
+#include "dvbpsi/datetime.h"
 #include "dvbpsi/tdttot.h"
 #include "logging.h"
 /*****************************************************************************
@@ -129,12 +130,12 @@ void dvbpsi_InitTDTTOT(dvbpsi_tdt_tot_t *p_tdt_tot,
                         int i_year, int i_month, int i_day,
                         int i_hour, int i_minute, int i_second)
 {
-  p_tdt_tot->i_year = i_year;
-  p_tdt_tot->i_month = i_month;
-  p_tdt_tot->i_day = i_day;
-  p_tdt_tot->i_hour = i_hour;
-  p_tdt_tot->i_minute = i_minute;
-  p_tdt_tot->i_second = i_second;
+  p_tdt_tot->t_date_time.i_year = i_year;
+  p_tdt_tot->t_date_time.i_month = i_month;
+  p_tdt_tot->t_date_time.i_day = i_day;
+  p_tdt_tot->t_date_time.i_hour = i_hour;
+  p_tdt_tot->t_date_time.i_minute = i_minute;
+  p_tdt_tot->t_date_time.i_second = i_second;
   p_tdt_tot->p_first_descriptor = NULL;
 }
 
@@ -188,8 +189,7 @@ void dvbpsi_DecodeTDTSection(dvbpsi_tdt_tot_t* p_tdt,
                              dvbpsi_psi_section_t* p_section)
 {
     // Decode UTC Time
-    dvbpsi_DecodeMJDUTC(p_section->p_payload_start, &p_tdt->i_year, &p_tdt->i_month, &p_tdt->i_day, 
-        &p_tdt->i_hour, &p_tdt->i_minute, &p_tdt->i_second);
+    dvbpsi_DecodeMJDUTC(p_section->p_payload_start, &p_tdt->t_date_time);
     p_tdt->p_first_descriptor = NULL;
 }
 
@@ -206,8 +206,7 @@ void dvbpsi_DecodeTOTSection(dvbpsi_tdt_tot_t* p_tot,
 
     // Decode UTC Time
     p_byte = p_section->p_payload_start;
-    dvbpsi_DecodeMJDUTC(p_byte, &p_tot->i_year, &p_tot->i_month, &p_tot->i_day, 
-        &p_tot->i_hour, &p_tot->i_minute, &p_tot->i_second);
+    dvbpsi_DecodeMJDUTC(p_byte, &p_tot->t_date_time);
     p_byte += 5;
     i_length = ((p_byte[0] & 0xf) << 8) | p_byte[1];
     p_byte += 2;
@@ -223,39 +222,6 @@ void dvbpsi_DecodeTOTSection(dvbpsi_tdt_tot_t* p_tot,
           dvbpsi_TOTAddDescriptor(p_tot, i_tag, i_desc_length, p_byte + 2);
         p_byte += 2 + i_desc_length;
     }
-}
-
-
-void dvbpsi_DecodeMJDUTC(char *p_mjdutc, int *p_year, int *p_month, int *p_day, int *p_hour, int *p_minute, int *p_second)
-{
-    #define BCD_CHAR_TO_INT(_bcd) (((_bcd >> 4) * 10) + (_bcd & 0x0f))
-
-    uint16_t i_mjd = (((uint16_t)p_mjdutc[0] << 8) | (uint16_t)(p_mjdutc[1] & 0xff));
-    double d_mjd = (double)i_mjd;
-    /*
-        To find Y, M, D from MJD
-        Y' = int [ (MJD - 15 078,2) / 365,25 ]
-        M' = int { [ MJD - 14 956,1 - int (Y' × 365,25) ] / 30,6001 }
-        D = MJD - 14 956 - int (Y' × 365,25) - int (M' × 30,6001)
-        If M' = 14 or M' = 15, then K = 1; else K = 0
-        Y = Y' + K
-        M = M' - 1 - K × 12
-    */
-    int i_temp_y, i_temp_m, i_k = 0;
-    i_temp_y = (int) ((d_mjd - 15078.2)/ 365.25);
-    i_temp_m = (int) (((d_mjd - 14956.1) - ((double)i_temp_y * 365.25)) / 30.6001);
-
-    if ((i_temp_m == 14) || (i_temp_m == 15))
-    {
-        i_k = 1;
-    }
-
-    *p_year = i_temp_y + i_k + 1900;
-    *p_month = (i_temp_m - 1) - (i_k * 12);
-    *p_day = (((i_mjd - 14956) - (int)((double)i_temp_y * 365.25)) - (int)((double)i_temp_m * 30.6001));
-    *p_hour = BCD_CHAR_TO_INT(p_mjdutc[2]);
-    *p_minute = BCD_CHAR_TO_INT(p_mjdutc[3]);
-    *p_second = BCD_CHAR_TO_INT(p_mjdutc[4]);
 }
 
 /*****************************************************************************

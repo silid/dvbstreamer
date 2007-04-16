@@ -43,6 +43,7 @@
 #include "psi.h"
 #include "descriptor.h"
 #include "demux.h"
+#include "datetime.h"
 #include "eit.h"
 #include "eit_private.h"
 
@@ -202,8 +203,9 @@ void dvbpsi_EmptyEIT(dvbpsi_eit_t* p_eit)
  * Add an event description at the end of the EIT.
  *****************************************************************************/
 dvbpsi_eit_event_t* dvbpsi_EITAddEvent(dvbpsi_eit_t* p_eit,
-    uint16_t i_event_id, uint64_t i_start_time, uint32_t i_duration,
-    uint8_t i_running_status,int b_free_ca)
+    uint16_t i_event_id, dvbpsi_date_time_t *p_start_time, 
+    dvbpsi_eit_event_duration_t *p_duration, uint8_t i_running_status, 
+    int b_free_ca)
 {
   dvbpsi_eit_event_t* p_event
                 = (dvbpsi_eit_event_t*)malloc(sizeof(dvbpsi_eit_event_t));
@@ -211,8 +213,8 @@ dvbpsi_eit_event_t* dvbpsi_EITAddEvent(dvbpsi_eit_t* p_eit,
   if(p_event)
   {
     p_event->i_event_id = i_event_id;
-    p_event->i_start_time = i_start_time;
-    p_event->i_duration = i_duration;
+    p_event->t_start_time = *p_start_time;
+    p_event->t_duration = *p_duration;
     p_event->i_running_status = i_running_status;
     p_event->b_free_ca = b_free_ca;
     p_event->p_next = NULL;
@@ -476,17 +478,22 @@ void dvbpsi_DecodeEITSections(dvbpsi_eit_t* p_eit,
         p_byte < p_section->p_payload_end - 12;)
     {
       uint16_t i_event_id = ((uint16_t)(p_byte[0]) << 8) | p_byte[1];
-      uint64_t i_start_time = ((uint64_t)(p_byte[2]) << 32)
-                               | ((uint64_t)(p_byte[3]) << 24)
-                               | ((uint64_t)(p_byte[4]) << 16)
-                               | ((uint64_t)(p_byte[5]) << 8) | p_byte[6];
+      dvbpsi_date_time_t t_start_time;
+      dvbpsi_eit_event_duration_t t_duration;
       uint32_t i_duration = ((uint32_t)(p_byte[7]) << 16)
                                | ((uint32_t)(p_byte[8]) << 8) | p_byte[9];
       uint8_t i_running_status = (uint8_t)(p_byte[10]) >> 5;
       int b_free_ca = (int)(p_byte[10] & 0x10) >> 4;
       uint16_t i_length = ((uint16_t)(p_byte[10] & 0xf) << 8) | p_byte[11];
+
+      dvbpsi_DecodeMJDUTC(&p_byte[2], &t_start_time);
+
+      t_duration.i_hours   = (((unsigned int)(p_byte[7] >> 4) & 0xf) * 10) + ((unsigned int)(p_byte[7] & 0xf));
+      t_duration.i_minutes = (((unsigned int)(p_byte[8] >> 4) & 0xf) * 10) + ((unsigned int)(p_byte[8] & 0xf));
+      t_duration.i_seconds = (((unsigned int)(p_byte[9] >> 4) & 0xf) * 10) + ((unsigned int)(p_byte[9] & 0xf));      
+
       dvbpsi_eit_event_t* p_event = dvbpsi_EITAddEvent(p_eit,
-          i_event_id, i_start_time, i_duration,
+          i_event_id, &t_start_time, &t_duration,
           i_running_status, b_free_ca);
       /* Event descriptors */
       p_byte += 12;
