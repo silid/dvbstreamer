@@ -184,6 +184,11 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
     Service_t **services;
 
     LogModule(LOG_DEBUG, PATPROCESSOR, "PAT recieved, version %d (old version %d)\n", newpat->i_version, multiplex->patVersion);
+    if (multiplex->patVersion == -1)
+    {
+        /* Cause a TS Structure change call back*/
+        state->tsfilter->tsStructureChanged = TRUE;
+    }
     /* Version has changed update the services */
     dvbpsi_pat_program_t *patentry = newpat->p_first_program;
     while(patentry)

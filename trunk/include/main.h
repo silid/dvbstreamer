@@ -37,22 +37,16 @@ enum PIDFilterIndex
 {
     PIDFilterIndex_PAT = 0, /**< Index of the PAT PID Filter. */
     PIDFilterIndex_PMT,     /**< Index of the PMT PID Filter. */
+#ifdef ATSC_STREAMER
+    PIDFilterIndex_PSIP,    /**< Index of the PSIP PID Filter. */
+#else
     PIDFilterIndex_SDT,     /**< Index of the SDT PID Filter. */
     PIDFilterIndex_NIT,     /**< Index of the NIT PID Filter. */
     PIDFilterIndex_TDT,     /**< Index of the TDT PID Filter. */
-
+#endif
     PIDFilterIndex_Count    /**< Number of main PID filters. */
 };
 
-/**
- * The multiplex of the current service.
- */
-extern volatile Multiplex_t *CurrentMultiplex;
-
-/**
- * The currently stream service, Service_t structure.
- */
-extern volatile Service_t *CurrentService;
 
 /**
  * Array containing the main PID filters (PAT, PMT and SDT).
@@ -101,34 +95,6 @@ extern char PrimaryService[];
  * Directory path where DVBStreamer stores its data.
  */
 extern char DataDirectory[];
-
-/**
- * Register a function to be called when the primary output service is changed.
- * @param callback The function to call.
- */
-void ChannelChangedRegisterCallback(PluginChannelChanged_t callback);
-
-/**
- * UnRegister a function to be called when the primary output service is changed.
- * @param callback The function to call.
- */
-void ChannelChangedUnRegisterCallback(PluginChannelChanged_t callback);
-
-/**
- * Set the current service being stream to the primary output.
- * Changing this can cause a re-tune!.
- * @param name Name of the new service.
- * @return The new services Service_t structure or NULL if the service was not found.
- */
-extern Service_t *SetCurrentService(char *name);
-
-/**
- * Set the current multiplex. Retunes to the new multiplex, TS stats are reset,
- * ChannelChange listeners are informed and the primary service is set to NULL.
- * Primary use for this is scanning a multiplex for services.
- * @param multiplex The new multiplex to tune to.
- */
-extern void SetMultiplex(Multiplex_t *multiplex);
 
 /**
  * Writes any changes in the cache back to the database, ensuring the TS Filter is disabled.

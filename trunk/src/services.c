@@ -27,7 +27,7 @@ Manage services and PIDs.
 #include "services.h"
 #include "logging.h"
 
-#define SERVICE_FIELDS SERVICE_MPLEXFREQ "," \
+#define SERVICE_FIELDS SERVICE_MULTIPLEXUID "," \
                        SERVICE_ID "," \
                        SERVICE_NAME "," \
                        SERVICE_PMTVERSION "," \
@@ -70,8 +70,8 @@ int ServiceDelete(Service_t  *service)
     STATEMENT_INIT;
 
     STATEMENT_PREPAREVA("DELETE FROM " SERVICES_TABLE " "
-                        "WHERE " SERVICE_MPLEXFREQ "=%d AND " SERVICE_ID "=%d;",
-                        service->multiplexFreq, service->id);
+                        "WHERE " SERVICE_MULTIPLEXUID "=%d AND " SERVICE_ID "=%d;",
+                        service->multiplexUID, service->id);
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
@@ -80,19 +80,19 @@ int ServiceDelete(Service_t  *service)
     return 0;
 }
 
-int ServiceAdd(int multiplexfreq, char *name, int id, int pmtversion, int pmtpid, int pcrpid)
+int ServiceAdd(int uid, char *name, int id, int pmtversion, int pmtpid, int pcrpid)
 {
     STATEMENT_INIT;
 
     STATEMENT_PREPAREVA("INSERT INTO "SERVICES_TABLE "("
-                        SERVICE_MPLEXFREQ ","
+                        SERVICE_MULTIPLEXUID ","
                         SERVICE_ID ","
                         SERVICE_PMTVERSION ","
                         SERVICE_PMTPID ","
                         SERVICE_PCRPID ","
                         SERVICE_NAME ")"
                         "VALUES (%d,%d,%d,%d,%d,'%q');",
-                        multiplexfreq, id, pmtversion, pmtpid, pcrpid, name);
+                        uid, id, pmtversion, pmtpid, pcrpid, name);
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
@@ -108,8 +108,8 @@ int ServicePMTVersionSet(Service_t  *service, int pmtversion)
 
     STATEMENT_PREPAREVA("UPDATE " SERVICES_TABLE " "
                         "SET " SERVICE_PMTVERSION "=%d "
-                        "WHERE " SERVICE_MPLEXFREQ "=%d AND " SERVICE_ID "=%d;",
-                        pmtversion, service->multiplexFreq,  service->id);
+                        "WHERE " SERVICE_MULTIPLEXUID "=%d AND " SERVICE_ID "=%d;",
+                        pmtversion, service->multiplexUID,  service->id);
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
@@ -133,8 +133,8 @@ int ServicePMTPIDSet(Service_t  *service, int pmtpid)
 
     STATEMENT_PREPAREVA("UPDATE " SERVICES_TABLE " "
                         "SET " SERVICE_PMTPID "=%d "
-                        "WHERE " SERVICE_MPLEXFREQ "=%d AND " SERVICE_ID "=%d;",
-                        pmtpid, service->multiplexFreq,  service->id);
+                        "WHERE " SERVICE_MULTIPLEXUID "=%d AND " SERVICE_ID "=%d;",
+                        pmtpid, service->multiplexUID,  service->id);
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
@@ -157,8 +157,8 @@ int ServicePCRPIDSet(Service_t  *service, int pcrpid)
 
     STATEMENT_PREPAREVA("UPDATE " SERVICES_TABLE " "
                         "SET " SERVICE_PCRPID "=%d "
-                        "WHERE " SERVICE_MPLEXFREQ "=%d AND " SERVICE_ID "=%d;",
-                        pcrpid, service->multiplexFreq,  service->id);
+                        "WHERE " SERVICE_MULTIPLEXUID "=%d AND " SERVICE_ID "=%d;",
+                        pcrpid, service->multiplexUID,  service->id);
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
@@ -181,8 +181,8 @@ int ServiceNameSet(Service_t  *service, char *name)
 
     STATEMENT_PREPAREVA("UPDATE " SERVICES_TABLE " "
                         "SET " SERVICE_NAME "='%q' "
-                        "WHERE " SERVICE_MPLEXFREQ "=%d AND " SERVICE_ID "=%d;",
-                        name, service->multiplexFreq,  service->id);
+                        "WHERE " SERVICE_MULTIPLEXUID "=%d AND " SERVICE_ID "=%d;",
+                        name, service->multiplexUID,  service->id);
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
@@ -221,8 +221,8 @@ Service_t *ServiceFindId(Multiplex_t *multiplex, int id)
     Service_t *result;
 
     STATEMENT_PREPAREVA("SELECT " SERVICE_FIELDS
-                        "FROM " SERVICES_TABLE " WHERE " SERVICE_MPLEXFREQ "=%d AND " SERVICE_ID "=%d;",
-                        multiplex->freq, id);
+                        "FROM " SERVICES_TABLE " WHERE " SERVICE_MULTIPLEXUID "=%d AND " SERVICE_ID "=%d;",
+                        multiplex->uid, id);
     RETURN_ON_ERROR(NULL);
 
     result = ServiceGetNext((ServiceEnumerator_t) stmt);
@@ -239,14 +239,14 @@ ServiceEnumerator_t ServiceEnumeratorGet()
     return stmt;
 }
 
-int ServiceForMultiplexCount(int freq)
+int ServiceForMultiplexCount(int uid)
 {
     STATEMENT_INIT;
     int result = -1;
 
     STATEMENT_PREPAREVA("SELECT count() "
-                        "FROM " SERVICES_TABLE " WHERE " SERVICE_MPLEXFREQ "=%d;",
-                        freq);
+                        "FROM " SERVICES_TABLE " WHERE " SERVICE_MULTIPLEXUID "=%d;",
+                        uid);
     RETURN_ON_ERROR(-1);
 
     STATEMENT_STEP();
@@ -260,13 +260,13 @@ int ServiceForMultiplexCount(int freq)
     return result;
 }
 
-ServiceEnumerator_t ServiceEnumeratorForMultiplex(int freq)
+ServiceEnumerator_t ServiceEnumeratorForMultiplex(Multiplex_t *multiplex)
 {
     STATEMENT_INIT;
 
     STATEMENT_PREPAREVA("SELECT " SERVICE_FIELDS
-                        "FROM " SERVICES_TABLE " WHERE " SERVICE_MPLEXFREQ"=%d;",
-                        freq);
+                        "FROM " SERVICES_TABLE " WHERE " SERVICE_MULTIPLEXUID"=%d;",
+                        multiplex->uid);
     RETURN_ON_ERROR(NULL);
 
     return stmt;
@@ -291,7 +291,7 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
         char *name;
 
         service = ServiceNew();
-        service->multiplexFreq = STATEMENT_COLUMN_INT( 0);
+        service->multiplexUID = STATEMENT_COLUMN_INT( 0);
         service->id = STATEMENT_COLUMN_INT( 1);
         name = STATEMENT_COLUMN_TEXT( 2);
         if (name)

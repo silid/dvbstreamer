@@ -39,6 +39,7 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 typedef struct DVBAdapter_t
 {
     int adapter;           /**< The adapter number ie /dev/dvb/adapter<#adapter> */
+    struct dvb_frontend_info info; /**< Information about the front end */
     // /dev/dvb/adapter#/frontend0
     char frontEndPath[30]; /**< Path to the frontend device */
     int frontEndFd;        /**< File descriptor for the frontend device */
@@ -51,6 +52,27 @@ typedef struct DVBAdapter_t
 }
 DVBAdapter_t;
 
+/**
+ * Enum to represent the different polarisation available for satellite
+ * transmission.
+ */
+enum Polarisation_e
+{
+    POL_HORIZONTAL = 0,
+    POL_VERTICAL
+};
+
+/**
+ * Structure used to hold the information necessary to setup DiSEqC switches 
+ * to receive a specifiec satellite.
+ */
+typedef struct DVBDiSEqCSettings_s
+{
+    bool tone;                       /**< Whether tone should be enabled or disabled. */
+    enum Polarisation_e polarisation;/**< Polarisation of the signal */
+    unsigned long satellite_number;  /**< Satellite number for the switch */
+}DVBDiSEqCSettings_t;
+    
 /**
  * Open a DVB Adapter.
  * This will open the frontend, demux and dvr devices.
@@ -72,7 +94,7 @@ void DVBDispose(DVBAdapter_t *adapter);
  * @param frontend The parameters to use to tune.
  * @return 0 on success, non-zero otherwise.
  */
-int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *frontend);
+int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *frontend, DVBDiSEqCSettings_t *diseqc);
 
 /**
  * Retrieve the status of the frontend of the specified adapter.

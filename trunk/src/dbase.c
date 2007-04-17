@@ -36,7 +36,8 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 *******************************************************************************/
 
 /* This is the version of the database not the application!*/
-#define DBASE_VERSION 0.4
+#define METADATA_DBASE_VERSION "dbase_version"
+#define DBASE_VERSION 0.5
 
 /*******************************************************************************
 * Prototypes                                                                   *
@@ -84,23 +85,20 @@ void DBaseDeInit()
 *******************************************************************************/
 static int DBaseCheckVersion()
 {
-    STATEMENT_INIT;
+    int rc;
     double version;
-    STATEMENT_PREPARE("select " VERSION_VERSION " from " VERSION_TABLE ";");
-    STATEMENT_STEP();
-    if ((rc != SQLITE_OK) && (rc != SQLITE_ROW) && (rc != SQLITE_DONE))
+    rc = DBaseMetadataGetDouble(METADATA_DBASE_VERSION, &version);
+    if (rc)
     {
-        LogModule(LOG_DEBUG, DBASE, "Failed to get contents of version table (%d)\n", rc);
+        LogModule(LOG_DEBUG, DBASE, "Failed to get version from Metadata table (%d)\n", rc);
         version = 0.0f;
     }
-    else
-    {
-        version = STATEMENT_COLUMN_DOUBLE(0);
-    }
-    STATEMENT_FINALIZE();
     LogModule(LOG_DEBUG, DBASE, "Current version of database is %f\n", version);
     /* Check version number and upgrade tables for future releases ? */
-    rc = DBaseCreateTables(version);
+    if (version < DBASE_VERSION)
+    {
+        rc = DBaseCreateTables(version);
+    }
     return rc;
 }
 
@@ -109,16 +107,36 @@ static int DBaseCreateTables(double version)
     int rc;
 
     LogModule(LOG_DEBUG, DBASE, "Creating tables\n");
-    /* Version 0.1 - 0.2 tables */
-    if (version < 0.1)
+    sqlite3_exec(DBaseInstance, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+
+    if (version < 0.5)
     {
+        sqlite3_exec(DBaseInstance, "DROP TABLE " SERVICES_TABLE ";DROP TABLE " MULTIPLEXES_TABLE ";" 
+                                    "DROP TABLE " PIDS_TABLE ";DROP TABLE " OFDMPARAMS_TABLE ";"
+                                    "DROP TABLE " QPSKPARAMS_TABLE ";DROP TABLE " QAMPARAMS_TABLE";"
+                                    , NULL, NULL, NULL);   
+
+        sqlite3_exec(DBaseInstance, "DROP TABLE Version;", NULL, NULL, NULL);
+        
+        rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " METADATA_TABLE " ( "
+                          METADATA_NAME " PRIMARY KEY,"
+                          METADATA_VALUE
+                          ");", NULL, NULL, NULL);
+        if (rc)
+        {
+            LogModule(LOG_ERROR, DBASE, "Failed to create Metadata table: %s\n", sqlite3_errmsg(DBaseInstance));
+            return rc;
+        }
+
+        
         rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " SERVICES_TABLE " ( "
-                          SERVICE_MPLEXFREQ ","
+                          SERVICE_MULTIPLEXUID ","
                           SERVICE_ID ","
                           SERVICE_NAME ","
-                          SERVICE_PMTPID ","
-                          SERVICE_PMTVERSION ","
-                          "PRIMARY KEY ( "SERVICE_MPLEXFREQ "," SERVICE_ID ")"
+                          SERVICE_PMTPID " DEFAULT -1,"
+                          SERVICE_PMTVERSION " DEFAULT -1,"
+                          SERVICE_PCRPID " DEFAULT -1,"
+                          "PRIMARY KEY ( "SERVICE_MULTIPLEXUID "," SERVICE_ID ")"
                           ");", NULL, NULL, NULL);
         if (rc)
         {
@@ -127,21 +145,41 @@ static int DBaseCreateTables(double version)
         }
 
         rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " MULTIPLEXES_TABLE " ( "
-                          MULTIPLEX_FREQ " PRIMARY KEY,"
-                          MULTIPLEX_ID ","
+                          MULTIPLEX_UID " INTEGER PRIMARY KEY,"
+                          MULTIPLEX_FREQ ","
                           MULTIPLEX_TYPE ","
-                          MULTIPLEX_PATVERSION
+                          MULTIPLEX_TSID " DEFAULT -1,"
+                          MULTIPLEX_NETID" DEFAULT -1,"
+                          MULTIPLEX_PATVERSION " DEFAULT -1"
                           ");", NULL, NULL, NULL);
         if (rc)
         {
             LogModule(LOG_ERROR, DBASE, "Failed to create Multiplexes table: %s\n", sqlite3_errmsg(DBaseInstance));
             return rc;
         }
+
+        rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " PIDS_TABLE " ( "
+                          PID_MULTIPLEXUID ","
+                          PID_SERVICEID ","
+                          PID_PID ","
+                          PID_TYPE ","
+                          PID_SUBTYPE ","
+                          PID_PMTVERSION ","
+                          PID_DESCRIPTORS " DEFAULT NULL,"
+                          "PRIMARY KEY(" PID_MULTIPLEXUID "," PID_SERVICEID "," PID_PID ")"
+                          ");", NULL, NULL, NULL);
+        if (rc)
+        {
+            LogModule(LOG_ERROR, DBASE, "Failed to create OFDMParameters table: %s\n", sqlite3_errmsg(DBaseInstance));
+            return rc;
+        }
+        
         /*
         (DVBT) OFDM: <frequency>:<inversion>:<bw>:<fec_hp>:<fec_lp>:<qam>:<transmissionm>:<guardlist>:<hierarchinfo>
         */
         rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " OFDMPARAMS_TABLE " ( "
-                          OFDMPARAM_FREQ " PRIMARY KEY,"
+                          OFDMPARAM_MULTIPLEXUID " PRIMARY KEY,"
+                          OFDMPARAM_FREQ ","
                           OFDMPARAM_INVERSION ","
                           OFDMPARAM_BW ","
                           OFDMPARAM_FEC_HP ","
@@ -157,50 +195,34 @@ static int DBaseCreateTables(double version)
             return rc;
         }
 
-        rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " PIDS_TABLE " ( "
-                          PID_MPLEXFREQ ","
-                          PID_SERVICEID ","
-                          PID_PID ","
-                          PID_TYPE ","
-                          PID_SUBTYPE ","
-                          PID_PMTVERSION ","
-                          "PRIMARY KEY(" PID_MPLEXFREQ "," PID_SERVICEID "," PID_PID ")"
-                          ");", NULL, NULL, NULL);
-        if (rc)
-        {
-            LogModule(LOG_ERROR, DBASE, "Failed to create OFDMParameters table: %s\n", sqlite3_errmsg(DBaseInstance));
-            return rc;
-        }
 
-        rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " VERSION_TABLE " ( "
-                          VERSION_VERSION
-                          ");", NULL, NULL, NULL);
-        if (rc)
-        {
-            LogModule(LOG_ERROR, DBASE, "Failed to create Version table: %s\n", sqlite3_errmsg(DBaseInstance));
-            return rc;
-        }
-    }
-    /* Version 0.2 - 0.3 tables */
-    if (version < 0.2)
-    {
+
+
         /*
         (DVBS) QPSK: <channel name>:<frequency>:<polarisation>:<sat_no>:<sym_rate>
-        (DVBC) QAM: <channel name>:<frequency>:<inversion>:<sym_rate>:<fec>:<qam>
         */
         rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " QPSKPARAMS_TABLE " ( "
-                          QPSKPARAM_FREQ " PRIMARY KEY,"
+                          QPSKPARAM_MULTIPLEXUID " PRIMARY KEY,"
+                          QPSKPARAM_FREQ ","
                           QPSKPARAM_INVERSION ","
                           QPSKPARAM_SYMBOL_RATE ","
-                          QPSKPARAM_FEC_INNER
+                          QPSKPARAM_FEC_INNER ","
+                          QPSKPARAM_TONE ","
+                          QPSKPARAM_POLARISATION ","
+                          QPSKPARAM_SATNUMBER
                           ");", NULL, NULL, NULL);
         if (rc)
         {
-            LogModule(LOG_ERROR, DBASE, "Failed to create OFDMParameters table: %s\n", sqlite3_errmsg(DBaseInstance));
+            LogModule(LOG_ERROR, DBASE, "Failed to create QPSKParameters table: %s\n", sqlite3_errmsg(DBaseInstance));
             return rc;
         }
+        /*
+        (DVBC) QAM: <channel name>:<frequency>:<inversion>:<sym_rate>:<fec>:<qam>
+        */
+
         rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " QAMPARAMS_TABLE " ( "
-                          QAMPARAM_FREQ " PRIMARY KEY,"
+                          QAMPARAM_MULTIPLEXUID " PRIMARY KEY,"
+                          QAMPARAM_FREQ ","
                           QAMPARAM_INVERSION ","
                           QAMPARAM_SYMBOL_RATE ","
                           QAMPARAM_FEC_INNER ","
@@ -208,44 +230,133 @@ static int DBaseCreateTables(double version)
                           ");", NULL, NULL, NULL);
         if (rc)
         {
-            LogModule(LOG_ERROR, DBASE, "Failed to create OFDMParameters table: %s\n", sqlite3_errmsg(DBaseInstance));
+            LogModule(LOG_ERROR, DBASE, "Failed to create QAMParameters table: %s\n", sqlite3_errmsg(DBaseInstance));
             return rc;
         }
-    }
-
-    /* Version 0.3 tables */
-    if (version < 0.3)
-    {
-        rc = sqlite3_exec(DBaseInstance, "ALTER TABLE " MULTIPLEXES_TABLE " ADD " MULTIPLEX_NETID ";", NULL, NULL, NULL);
-
+        /*
+        (ATSC) VSB:  <channel name>:<frequency>:<modulation>
+        */
+        rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " VSBPARAMS_TABLE " ( "
+                          VSBPARAM_MULTIPLEXUID " PRIMARY KEY,"
+                          VSBPARAM_FREQ ","
+                          VSBPARAM_MODULATION
+                          ");", NULL, NULL, NULL);
         if (rc)
         {
-            LogModule(LOG_ERROR, DBASE, "Failed to add network id column to multiplexes table: %s\n", sqlite3_errmsg(DBaseInstance));
-            return rc;
-        }
-    }
-
-    if (version < 0.4)
-    {
-        rc = sqlite3_exec(DBaseInstance, "ALTER TABLE " SERVICES_TABLE " ADD " SERVICE_PCRPID " DEFAULT -1;", NULL, NULL, NULL);
-
-        if (rc)
-        {
-            LogModule(LOG_ERROR, DBASE, "Failed to add pcrpid column to services table: %s\n", sqlite3_errmsg(DBaseInstance));
-            return rc;
-        }
-
-        rc = sqlite3_exec(DBaseInstance, "ALTER TABLE " PIDS_TABLE " ADD " PID_DESCRIPTORS " DEFAULT NULL;", NULL, NULL, NULL);
-
-        if (rc)
-        {
-            LogModule(LOG_ERROR, DBASE, "Failed to add descriptors column to pids table: %s\n", sqlite3_errmsg(DBaseInstance));
+            LogModule(LOG_ERROR, DBASE, "Failed to create VSBParameters table: %s\n", sqlite3_errmsg(DBaseInstance));
             return rc;
         }
 
     }
 
-    rc = sqlite3_exec(DBaseInstance, "DELETE FROM " VERSION_TABLE ";", NULL, NULL, NULL);
-    rc = sqlite3_exec(DBaseInstance, "INSERT INTO " VERSION_TABLE " VALUES ( " TOSTRING(DBASE_VERSION) " );", NULL, NULL, NULL);
+    DBaseMetadataSetDouble(METADATA_DBASE_VERSION,DBASE_VERSION);
+
+    sqlite3_exec(DBaseInstance, "COMMIT TRANSACTION;", NULL, NULL, NULL);
+                                                 
     return rc;
 }
+
+
+int DBaseMetadataGet(char *name, char **value)
+{
+    STATEMENT_INIT;
+    STATEMENT_PREPAREVA("SELECT " METADATA_VALUE " "
+                        "FROM " METADATA_TABLE " "
+                        "WHERE " METADATA_NAME "='%q';", name);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+    RETURN_RC_ON_ERROR;
+    
+    *value = strdup(STATEMENT_COLUMN_TEXT(0));
+    STATEMENT_FINALIZE();
+    return rc;
+}
+
+int DBaseMetadataSet(char *name, char *value)
+{
+    STATEMENT_INIT;
+    STATEMENT_PREPAREVA("INSERT OR REPLACE INTO " METADATA_TABLE " "
+                        "(" METADATA_NAME "," METADATA_VALUE ") "
+                        "VALUES('%q','%q');", name, value);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+    RETURN_RC_ON_ERROR;
+    
+    STATEMENT_FINALIZE();
+    return rc;
+}
+
+int DBaseMetadataGetInt(char *name, int *value)
+{
+    STATEMENT_INIT;
+    STATEMENT_PREPAREVA("SELECT " METADATA_VALUE " "
+                        "FROM " METADATA_TABLE " "
+                        "WHERE " METADATA_NAME "='%q';", name);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+    RETURN_RC_ON_ERROR;
+    
+    *value = STATEMENT_COLUMN_INT(0);
+    STATEMENT_FINALIZE();
+    return rc;
+}
+int DBaseMetadataSetInt(char *name, int value)
+{
+    STATEMENT_INIT;
+    STATEMENT_PREPAREVA("INSERT OR REPLACE INTO " METADATA_TABLE " "
+                        "(" METADATA_NAME "," METADATA_VALUE ") "
+                        "VALUES('%q',%d);", name, value);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+    RETURN_RC_ON_ERROR;
+    STATEMENT_FINALIZE();
+    return rc;
+}
+
+int DBaseMetadataGetDouble(char *name, double *value)
+{
+    STATEMENT_INIT;
+    STATEMENT_PREPAREVA("SELECT " METADATA_VALUE " "
+                        "FROM " METADATA_TABLE " "
+                        "WHERE " METADATA_NAME "='%q';", name);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+    RETURN_RC_ON_ERROR;
+    *value = STATEMENT_COLUMN_DOUBLE(0);
+    STATEMENT_FINALIZE();
+    return rc;
+}
+
+int DBaseMetadataSetDouble(char *name, double value)
+{
+    STATEMENT_INIT;
+    STATEMENT_PREPAREVA("INSERT OR REPLACE INTO " METADATA_TABLE " "
+                        "(" METADATA_NAME "," METADATA_VALUE ") "
+                        "VALUES('%q',%e);", name, value);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+    RETURN_RC_ON_ERROR;
+    STATEMENT_FINALIZE();
+    return rc;
+}
+
+int DBaseMetadataDelete(char *name)
+{
+    STATEMENT_INIT;
+    STATEMENT_PREPAREVA("DELETE FROM " METADATA_TABLE " "
+                        "WHERE " METADATA_NAME "='%q';", name);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_FINALIZE();
+    return rc;
+}
+

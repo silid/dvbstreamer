@@ -109,6 +109,11 @@ int main(int argc, char *argv[])
                 channelsFileType = FE_QAM;
                 printlog(LOG_INFOV, "Using DVB-C channels file %s\n", channelsFile);
                 break;
+            case 'A':
+                channelsFile = optarg;
+                channelsFileType = FE_ATSC;
+                printlog(LOG_INFOV, "Using ATSC channels file %s\n", channelsFile);
+                break;
             case 'h':
             default:
                 usage(argv[0]);
@@ -162,6 +167,8 @@ static void usage(char *appname)
             "      -s <file>     : Satellite channels.conf file to import services and \n"
             "                      multiplexes from.(EXPERIMENTAL)\n"
             "      -c <file>     : Cable channels.conf file to import services and \n"
+            "                      multiplexes from.(EXPERIMENTAL)\n",
+            "      -A <file>     : ATSC channels.conf file to import services and \n"
             "                      multiplexes from.(EXPERIMENTAL)\n",
             appname
            );

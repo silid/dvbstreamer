@@ -45,6 +45,7 @@ Command Processing and command functions.
 #include "deliverymethod.h"
 #include "plugin.h"
 #include "servicefilter.h"
+#include "tuning.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -760,7 +761,7 @@ static void CommandQuit(int argc, char **argv)
 
 static void CommandListServices(int argc, char **argv)
 {
-    ServiceEnumerator_t enumerator;
+    ServiceEnumerator_t enumerator = NULL;
     Service_t *service;
 
     /* Make sure the database is up-to-date before displaying the names */
@@ -769,23 +770,25 @@ static void CommandListServices(int argc, char **argv)
     if (argc == 1)
     {
         char *mux = argv[0];
-        int muxfreq;
+        Multiplex_t *multiplex = NULL;
         if (strcmp(mux, "mux") == 0)
         {
-            if (CurrentMultiplex)
-            {
-                muxfreq = CurrentMultiplex->freq;
-            }
-            else
+            multiplex = TuningCurrentMultiplexGet();
+            if (!multiplex)
             {
                 CommandPrintf("No multiplex currently selected!\n");
+                return;
             }
         }
         else
         {
-            muxfreq = atoi(mux);
+            int freq = atoi(mux);
+            multiplex = MultiplexFindFrequency(freq);
         }
-        enumerator = ServiceEnumeratorForMultiplex(muxfreq);
+        if (multiplex)
+        {
+            enumerator = ServiceEnumeratorForMultiplex(multiplex);
+        }
         if (enumerator == NULL)
         {
             CommandPrintf("Failed to find multiplex \"%s\"\n", mux);
@@ -835,7 +838,7 @@ static void CommandSelect(int argc, char **argv)
 
     CheckAuthenticated();
 
-    service = SetCurrentService(argv[0]);
+    service = TuningCurrentServiceSet(argv[0]);
     if (service)
     {
         CommandPrintf("Name      = %s\n", service->name);
@@ -849,15 +852,20 @@ static void CommandSelect(int argc, char **argv)
 
 static void CommandCurrent(int argc, char **argv)
 {
-	if ( CurrentService)
-	{
-		CommandPrintf("Current Service : \"%s\" (0x%04x) Multiplex: %d\n",
-			CurrentService->name, CurrentService->id, CurrentMultiplex->freq);
-	}
-	else
-	{
-		CommandPrintf("No current service\n");
-	}
+    Service_t *service = TuningCurrentServiceGet();
+    if ( service)
+    {
+        Multiplex_t *multiplex = TuningCurrentMultiplexGet();
+        
+        CommandPrintf("Current Service : \"%s\" (0x%04x) Multiplex: %d\n",
+            service->name, service->id, multiplex->freq);
+        ServiceRefDec(service);
+        MultiplexRefDec(multiplex);
+    }
+    else
+    {
+        CommandPrintf("No current service\n");
+    }
 }
 
 static void CommandServiceInfo(int argc, char **argv)
@@ -868,8 +876,11 @@ static void CommandServiceInfo(int argc, char **argv)
     service = CacheServiceFindName(argv[0], &multiplex);
     if (service)
     {
+        Multiplex_t *currentMultiplex;
+        currentMultiplex = TuningCurrentMultiplexGet();
+        
         CommandPrintf("ID : 0x%04x\n", service->id);
-        if (MultiplexAreEqual(multiplex, CurrentMultiplex))
+        if (MultiplexAreEqual(multiplex, currentMultiplex))
         {
             char *runningstatus[] = {
                 "Unknown",
@@ -889,6 +900,7 @@ static void CommandServiceInfo(int argc, char **argv)
             ServiceRefDec(service);
         }
         
+        MultiplexRefDec(currentMultiplex);
         MultiplexRefDec(multiplex);
 
     }
@@ -1165,6 +1177,7 @@ static void CommandSetSSF(int argc, char **argv)
     char *outputName = argv[0];
     char *serviceName;
     Service_t *service;
+    Multiplex_t *multiplex;
 
     CheckAuthenticated();
 
@@ -1332,14 +1345,16 @@ static void CommandHelp(int argc, char **argv)
 
 static void CommandScan(int argc, char **argv)
 {
-    
+    Service_t *currentService;    
     Multiplex_t *multiplex;
     char currservice[SERVICE_MAX_NAME_LEN];
 
     CheckAuthenticated();
-    if (CurrentService)
+    currentService = TuningCurrentServiceGet();
+    if (currentService)
     {
-        strcpy(currservice, CurrentService->name);
+        strcpy(currservice, currentService->name);
+        ServiceRefDec(currentService);
     }
     else
     {
@@ -1378,7 +1393,7 @@ static void CommandScan(int argc, char **argv)
     else
     {
         int muxfreq = atoi(argv[0]);
-        multiplex = MultiplexFind(muxfreq);
+        multiplex = MultiplexFindFrequency(muxfreq);
         if (multiplex)
         {
             ScanMultiplex(multiplex);
@@ -1388,7 +1403,7 @@ static void CommandScan(int argc, char **argv)
 
     if (currservice[0])
     {
-        SetCurrentService(currservice);
+        TuningCurrentServiceSet(currservice);
     }
 }
 /************************** Scan Callback Functions **************************/
@@ -1404,7 +1419,7 @@ static void ScanMultiplex(Multiplex_t *multiplex)
 
 
 
-    SetMultiplex(multiplex);
+    TuningCurrentMultiplexSet(multiplex);
 
     patreceived = FALSE;
     sdtreceived = FALSE;

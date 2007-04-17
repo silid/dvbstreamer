@@ -32,7 +32,8 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 #include <sys/ioctl.h>
 #include <linux/dvb/dmx.h>
 #include <linux/dvb/frontend.h>
-
+#include <pthread.h>
+#include "types.h"
 #include "dvb.h"
 #include "logging.h"
 
@@ -40,11 +41,17 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 * Prototypes                                                                   *
 *******************************************************************************/
 static int DVBDemuxSetPESFilter(DVBAdapter_t *adapter, ushort pid, int pidtype, int taptype);
+static int DVBFrontEndDiSEqCSet(DVBAdapter_t *adapter, DVBDiSEqCSettings_t *diseqc);
 
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
 static char DVBADAPTER[] = "DVBAdapter";
+
+#ifdef __CYGWIN__
+static bool locked = FALSE;
+static pthread_mutex_t tuningMutex;
+#endif
 
 /*******************************************************************************
 * Global functions                                                             *
@@ -69,6 +76,14 @@ DVBAdapter_t *DVBInit(int adapter)
             DVBDispose(result);
             return NULL;
         }
+#ifndef __CYGWIN__        
+        if (ioctl(result->frontEndFd, FE_GET_INFO, &result->info) < 0)
+        {
+            LogModule(LOG_ERROR, DVBADAPTER, "Failed to get front end info: %s\n",strerror(errno));
+            DVBDispose(result);
+            return NULL;
+        }
+#endif
         result->demuxFd = open(result->demuxPath, O_RDWR);
         if (result->demuxFd == -1)
         {
@@ -76,6 +91,7 @@ DVBAdapter_t *DVBInit(int adapter)
             DVBDispose(result);
             return NULL;
         }
+#ifndef __CYGWIN__        
         result->dvrFd = open(result->dvrPath, O_RDONLY | O_NONBLOCK);
         if (result->dvrFd == -1)
         {
@@ -83,9 +99,14 @@ DVBAdapter_t *DVBInit(int adapter)
             DVBDispose(result);
             return NULL;
         }
-
+#else
+        result->dvrFd = -1;
+#endif
         /* Stream the entire TS to the DVR device */
         DVBDemuxSetPESFilter(result, 8192, DMX_PES_OTHER, DMX_OUT_TS_TAP);
+#ifdef __CYGWIN__     
+        pthread_mutex_init(&tuningMutex, NULL);
+#endif
     }
     return result;
 }
@@ -106,16 +127,24 @@ void DVBDispose(DVBAdapter_t *adapter)
         LogModule(LOG_DEBUGV, DVBADAPTER, "Closing Frontend file descriptor\n");
         close(adapter->frontEndFd);
     }
+#ifdef __CYGWIN__         
+    pthread_mutex_destroy(&tuningMutex);
+#endif
     ObjectFree(adapter);
 }
 
-int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *frontend)
+int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *frontend, DVBDiSEqCSettings_t *diseqc)
 {
 #ifndef __CYGWIN__
     /*  fe_status_t festatus; */
     struct dvb_frontend_event event;
     struct pollfd pfd[1];
 
+    if (adapter->info.type == FE_QPSK)
+    {
+        DVBFrontEndDiSEqCSet(adapter, diseqc);
+    }
+    
     if (ioctl(adapter->frontEndFd, FE_SET_FRONTEND, frontend) < 0)
     {
         LogModule(LOG_ERROR, DVBADAPTER, "setfront front: %s\n", strerror(errno));
@@ -140,9 +169,60 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
             }
         }
     }
-#endif    
+#else
+    char filename[256];
+    sprintf(filename, "/dev/dvb/adapter%d/%d", adapter->adapter, frontend->frequency);
+    pthread_mutex_lock(&tuningMutex);
+    if (adapter->dvrFd> -1)
+    {
+        close(adapter->dvrFd);
+    }
+    adapter->dvrFd = open(filename, O_RDONLY | O_NONBLOCK);
+    locked = TRUE;
+    pthread_mutex_unlock(&tuningMutex);
+#endif       
     return 1;
 }
+
+static int DVBFrontEndDiSEqCSet(DVBAdapter_t *adapter, DVBDiSEqCSettings_t *diseqc)
+{
+#ifndef  __CYGWIN__
+   struct dvb_diseqc_master_cmd cmd =
+      {{0xe0, 0x10, 0x38, 0xf0, 0x00, 0x00}, 4};
+
+   cmd.msg[3] = 0xf0 | ((diseqc->satellite_number* 4) & 0x0f) |
+      (diseqc->tone ? 1 : 0) | (diseqc->polarisation? 0 : 2);
+
+   if (ioctl(adapter->frontEndFd, FE_SET_TONE, SEC_TONE_OFF) < 0)
+   {
+      return 0;
+   }
+   
+   if (ioctl(adapter->frontEndFd, FE_SET_VOLTAGE, diseqc->polarisation ? SEC_VOLTAGE_13 : SEC_VOLTAGE_18) < 0)
+   {
+      return 0;
+   }
+   usleep(15000);
+   
+   if (ioctl(adapter->frontEndFd, FE_DISEQC_SEND_MASTER_CMD, &cmd) < 0)
+   {
+      return 0;
+   }
+   usleep(15000);
+
+   if (ioctl(adapter->frontEndFd, FE_DISEQC_SEND_BURST,(diseqc->satellite_number / 4) % 2 ? SEC_MINI_B : SEC_MINI_A) < 0)
+   {
+      return 0;
+   }
+   usleep(15000);
+   if (ioctl(adapter->frontEndFd, FE_SET_TONE, diseqc->tone ? SEC_TONE_ON : SEC_TONE_OFF) < 0)
+   {
+      return 0;
+   }
+#endif   
+   return 1;
+}
+
 
 int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status, unsigned int *ber, unsigned int *strength, unsigned int *snr)
 {
@@ -218,6 +298,7 @@ int DVBDemuxSetBufferSize(DVBAdapter_t *adapter, unsigned long size)
 
 int DVBDVRRead(DVBAdapter_t *adapter, char *data, int max, int timeout)
 {
+#ifndef __CYGWIN__    
     int result = -1;
     struct pollfd pfd[1];
 
@@ -231,5 +312,37 @@ int DVBDVRRead(DVBAdapter_t *adapter, char *data, int max, int timeout)
             result = read(adapter->dvrFd, data, max);
         }
     }
+#else    
+    int result = -1;    
+    static unsigned int count = 0;
+    pthread_mutex_lock(&tuningMutex);    
+    if (locked)
+    {
+        tryagain:
+        result = read(adapter->dvrFd, data, max);
+        if (result <= 0)
+        {
+            lseek(adapter->dvrFd,0,0);
+            goto tryagain;
+        }
+
+        if (result > -1)
+        {
+            count += result / 188;
+        }
+
+        if (count > 116)
+        {
+            usleep(100);
+            count = 0;
+        }
+        
+    }
+    else
+    {
+        usleep(timeout * 10);
+    }
+    pthread_mutex_unlock(&tuningMutex);
+    #endif
     return result;
 }
