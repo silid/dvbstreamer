@@ -35,6 +35,8 @@ Plugin Manager functions.
 #include "plugin.h"
 #include "logging.h"
 #include "main.h"
+#include "tuning.h"
+
 /*******************************************************************************
 * Typedefs                                                                     *
 *******************************************************************************/
@@ -232,8 +234,10 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
                 break;
                 case PLUGIN_FEATURE_TYPE_CHANNELCHANGED:
                 LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed channel changed callback.\n", pluginInterface->name);
-                ChannelChangedRegisterCallback(pluginInterface->features[i].details);
+                TuningChannelChangedRegisterCallback(pluginInterface->features[i].details);
                 break;
+#ifdef ATSC_STREAMER
+#else
                 case PLUGIN_FEATURE_TYPE_SDTPROCESSOR:
                 LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed SDT processor.\n", pluginInterface->name);
                 SDTProcessorRegisterSDTCallback(pluginInterface->features[i].details);
@@ -246,6 +250,7 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
                 LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed TDT processor.\n", pluginInterface->name);
                 TDTProcessorRegisterTDTCallback(pluginInterface->features[i].details);
                 break;
+#endif
                 case PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR:
                 {
                     PluginSectionProcessorDetails_t *details = pluginInterface->features[i].details;
@@ -310,8 +315,10 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface)
                 break;
                 case PLUGIN_FEATURE_TYPE_CHANNELCHANGED:
                 LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled channel changed callback.\n", pluginInterface->name);
-                ChannelChangedUnRegisterCallback(pluginInterface->features[i].details);
+                TuningChannelChangedUnRegisterCallback(pluginInterface->features[i].details);
                 break;
+#ifdef ATSC_STREAMER
+#else
                 case PLUGIN_FEATURE_TYPE_SDTPROCESSOR:
                 LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled SDT processor.\n", pluginInterface->name);
                 SDTProcessorUnRegisterSDTCallback(pluginInterface->features[i].details);
@@ -324,6 +331,7 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface)
                 LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled TDT processor.\n", pluginInterface->name);
                 TDTProcessorUnRegisterTDTCallback(pluginInterface->features[i].details);
                 break;
+#endif                
                 case PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR:
                 {
                     PluginSectionProcessorDetails_t *details = pluginInterface->features[i].details;

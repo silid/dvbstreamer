@@ -31,8 +31,15 @@ Caches service and PID information from the database for the current multiplex.
 #include "logging.h"
 #include "cache.h"
 #include "dbase.h"
+/*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
 
 #define SERVICES_MAX (256)
+
+/*******************************************************************************
+* Typedefs                                                                     *
+*******************************************************************************/
 
 enum CacheFlags
 {
@@ -42,6 +49,17 @@ enum CacheFlags
     CacheFlag_Dirty_Name    = 0x04,
     CacheFlag_Dirty_Added   = 0x10,
 };
+
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
+static void CacheServicesFree(void);
+static void CachePIDsFree(void);
+static int CachePIDsLoad(Service_t *service, int index);
+
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
 static char CACHE[] = "Cache";
 static int cachedServicesMultiplexDirty = 0;
 static Multiplex_t *cachedServicesMultiplex = NULL;
@@ -54,9 +72,9 @@ static Service_t*      cachedServices[SERVICES_MAX];
 static Service_t*      cachedDeletedServices[SERVICES_MAX];
 static PIDList_t*      cachedPIDs[SERVICES_MAX];
 
-static void CacheServicesFree(void);
-static void CachePIDsFree(void);
-static int CachePIDsLoad(Service_t *service, int index);
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
 
 int CacheInit()
 {
@@ -74,7 +92,7 @@ void CacheDeInit()
 int CacheLoad(Multiplex_t *multiplex)
 {
     int result = 1;
-    int count = ServiceForMultiplexCount(multiplex->freq);
+    int count = ServiceForMultiplexCount(multiplex->uid);
 
     pthread_mutex_lock(&cacheUpdateMutex);
     LogModule(LOG_DEBUG, CACHE, "Freeing services\n");
@@ -82,13 +100,13 @@ int CacheLoad(Multiplex_t *multiplex)
     /* Free the services and PIDs from the previous multiplex */
     CacheServicesFree();
 
-    LogModule(LOG_DEBUG, CACHE, "Loading %d services for %d\n", count, multiplex->freq);
+    LogModule(LOG_DEBUG, CACHE, "Loading %d services for %d\n", count, multiplex->uid);
     if (count > 0)
     {
         int i;
         ServiceEnumerator_t enumerator;
 
-        enumerator = ServiceEnumeratorForMultiplex(multiplex->freq);
+        enumerator = ServiceEnumeratorForMultiplex(multiplex);
         for (i=0; i < count; i++)
         {
             cachedServices[i] = ServiceGetNext(enumerator);
@@ -154,7 +172,7 @@ Service_t *CacheServiceFindName(char *name, Multiplex_t **multiplex)
         result = ServiceFindName(name);
         if (result)
         {
-            *multiplex = MultiplexFind(result->multiplexFreq);
+            *multiplex = MultiplexFind(result->multiplexUID);
         }
     }
     return result;
@@ -289,7 +307,7 @@ Service_t *CacheServiceAdd(int id)
         result->pmtVersion = -1;
         result->pmtPid = 8192;
         sprintf(result->name, "%04x", id);
-        result->multiplexFreq = cachedServicesMultiplex->freq;
+        result->multiplexUID = cachedServicesMultiplex->uid;
         
         pthread_mutex_lock(&cacheUpdateMutex);
 
@@ -395,7 +413,7 @@ void CacheWriteback()
         if (cacheFlags[i] & CacheFlag_Dirty_Added)
         {
             LogModule(LOG_DEBUG, CACHE, "Adding service %s (0x%04x)\n", cachedServices[i]->name, cachedServices[i]->id);
-            ServiceAdd(cachedServices[i]->multiplexFreq, cachedServices[i]->name, cachedServices[i]->id,
+            ServiceAdd(cachedServices[i]->multiplexUID, cachedServices[i]->name, cachedServices[i]->id,
                 cachedServices[i]->pmtVersion, cachedServices[i]->pmtPid, cachedServices[i]->pcrPid);
             cacheFlags[i] &= ~CacheFlag_Dirty_Name;
         }

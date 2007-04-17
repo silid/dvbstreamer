@@ -36,7 +36,7 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 /**
  * Constant for Service Table Column name
  */
-#define SERVICE_MPLEXFREQ       "mplexfreq"
+#define SERVICE_MULTIPLEXUID    "mplexuid"
 /**
  * Constant for Service Table Column name
  */
@@ -65,11 +65,15 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 /**
  * Constant for Multiplex column name
  */
+#define MULTIPLEX_UID           "uid"
+/**
+ * Constant for Multiplex column name
+ */
 #define MULTIPLEX_FREQ          "freq"
 /**
  * Constant for Multiplex column name
  */
-#define MULTIPLEX_ID            "id"
+#define MULTIPLEX_TSID          "tsid"
 /**
  * Constant for Multiplex column name
  */
@@ -87,6 +91,10 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
  * Constant for OFDMParameters table name,
  */
 #define OFDMPARAMS_TABLE        "OFDMParameters"
+/**
+ * Constant for OFDMParameters column name.
+ */
+#define OFDMPARAM_MULTIPLEXUID  "mplexuid"
 /**
  * Constant for OFDMParameters column name.
  */
@@ -127,7 +135,11 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 /**
  * Constant for QPSKParameters table name.
  */
-#define QPSKPARAMS_TABLE		"QPSKParameters"
+#define QPSKPARAMS_TABLE  "QPSKParameters"
+/**
+ * Constant for QPSKParameters column name.
+ */
+#define QPSKPARAM_MULTIPLEXUID  "mplexuid"
 /**
  * Constant for QPSKParameters column name.
  */
@@ -144,11 +156,27 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
  * Constant for QPSKParameters column name.
  */
 #define QPSKPARAM_FEC_INNER      "fec_inner"
+/**
+ * Constant for QPSKParameters column name.
+ */
+#define QPSKPARAM_TONE           "tone"
+/**
+ * Constant for QPSKParameters column name.
+ */
+#define QPSKPARAM_POLARISATION   "polarisation"
+/**
+ * Constant for QPSKParameters column name.
+ */
+#define QPSKPARAM_SATNUMBER      "satnumber"
 
 /**
  * Constant for QAMParameters table name.
  */
-#define QAMPARAMS_TABLE			"QAMParameters"
+#define QAMPARAMS_TABLE   "QAMParameters"
+/**
+ * Constant for QAMParameters column name.
+ */
+#define QAMPARAM_MULTIPLEXUID  "mplexuid"
 /**
  * Constant for QAMParameters column name.
  */
@@ -171,14 +199,30 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 #define QAMPARAM_MODULATION     "modulation"
 
 /**
+ * Constant for VSBParameters table name.
+ */
+#define VSBPARAMS_TABLE   "VSBParameters"
+/**
+ * Constant for VSBParameters column name.
+ */
+#define VSBPARAM_MULTIPLEXUID  "mplexuid"
+/**
+ * Constant for VSBParameters column name.
+ */
+#define VSBPARAM_FREQ           "freq"
+/**
+ * Constant for VSBParameters column name.
+ */
+#define VSBPARAM_MODULATION     "modulation"
+
+/**
  * Constant for the PIDs table name,
  */
 #define PIDS_TABLE              "PIDs"
-
 /**
  * Constant for PID column name.
  */
-#define PID_MPLEXFREQ           "mplexfreq"
+#define PID_MULTIPLEXUID        "mplexuid"
 /**
  * Constant for PID column name.
  */
@@ -205,13 +249,18 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 #define PID_DESCRIPTORS         "descriptors"
 
 /**
- * Constant for Version table name.
+ * Constant for Metadata table name.
  */
-#define VERSION_TABLE           "Version"
+#define METADATA_TABLE           "Metadata"
 /**
- * Constant for Version column name.
+ * Constant for Metadata column name.
  */
-#define VERSION_VERSION         "version"
+#define METADATA_NAME            "name"
+/**
+ * Constant for Metadata column name.
+ */
+#define METADATA_VALUE           "value"
+
 
 /** @} */
 
@@ -287,7 +336,7 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
  */
 #define PRINTLOG_SQLITE3ERROR() \
     do{\
-        LogModule(LOG_INFO, "dbase", "%s(%d): Failed with error code 0x%x = %s\n",__FUNCTION__,__LINE__, rc, sqlite3_errmsg(DBaseInstance));\
+        LogModule(LOG_DEBUG, "dbase", "%s(%d): Failed with error code 0x%x = %s\n",__FUNCTION__,__LINE__, rc, sqlite3_errmsg(DBaseInstance));\
     }while(0)
 
 /**
@@ -337,6 +386,60 @@ int DBaseInit(int adapter);
  * De-initialise the database.
  */
 void DBaseDeInit();
+/**
+ * Retrieve the specified metadata property.
+ * @param name The name of the property.
+ * @param value The location to store the value in. This should must be free'd 
+ *              once finished with.
+ * @return 0 on success, otherwise an SQLite error code.
+ */
+int DBaseMetadataGet(char *name, char **value);
+
+/**
+ * Set the specified metadata property to the string specified.
+ * @param name The name of the property.
+ * @param value The value to set it to.
+ * @return 0 on success, otherwise an SQLite error code.
+ */
+int DBaseMetadataSet(char *name, char *value);
+
+/**
+ * Retrieve the specified metadata property.
+ * @param name The name of the property.
+ * @param value The location to store the value in.
+ * @return 0 on success, otherwise an SQLite error code.
+ */
+int DBaseMetadataGetInt(char *name, int *value);
+/**
+ * Set the specified metadata property to the int specified.
+ * @param name The name of the property.
+ * @param value The value to set it to.
+ * @return 0 on success, otherwise an SQLite error code.
+ */
+int DBaseMetadataSetInt(char *name, int value);
+
+/**
+ * Retrieve the specified metadata property.
+ * @param name The name of the property.
+ * @param value The location to store the value in.
+ * @return 0 on success, otherwise an SQLite error code.
+ */
+int DBaseMetadataGetDouble(char *name, double *value);
+
+/**
+ * Set the specified metadata property to the double specified.
+ * @param name The name of the property.
+ * @param value The value to set it to.
+ * @return 0 on success, otherwise an SQLite error code.
+ */
+int DBaseMetadataSetDouble(char *name, double value);
+
+/**
+ * Delete the specified metadata property.
+ * @param name The name of the property.
+ * @return 0 on success, otherwise an SQLite error code.
+ */
+int DBaseMetadataDelete(char *name);
 
 /** @} */
 #endif

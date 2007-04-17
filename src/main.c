@@ -224,10 +224,13 @@ int main(int argc, char *argv[])
     /* Create PAT/PMT/SDT filters */
     PIDFilters[PIDFilterIndex_PAT] = PATProcessorCreate(TSFilter);
     PIDFilters[PIDFilterIndex_PMT] = PMTProcessorCreate(TSFilter);
+#ifdef ATSC_STREAMER
+    PIDFilters[PIDFilterIndex_PSIP] = PSIPProcessorCreate(TSFilter);
+#else
     PIDFilters[PIDFilterIndex_SDT] = SDTProcessorCreate(TSFilter);
     PIDFilters[PIDFilterIndex_NIT] = NITProcessorCreate(TSFilter);
     PIDFilters[PIDFilterIndex_TDT] = TDTProcessorCreate(TSFilter);
-
+#endif
     /* Enable all the filters */
     for (i = 0; i < PIDFilterIndex_Count; i ++)
     {
@@ -238,7 +241,7 @@ int main(int argc, char *argv[])
     INIT(OutputsInit(), "outputs");
     INIT(CommandInit(), "commands");
 
-    ChannelChangedCallbacksList = ListCreate();
+    INIT(TuningInit(), "tuning");
 
     /*
      * Start plugins after outputs but before creating the primary output to
@@ -305,7 +308,7 @@ int main(int argc, char *argv[])
      */
     DEINIT(PluginManagerDeInit(), "plugin manager");
 
-    ListFree(ChannelChangedCallbacksList, NULL);
+    DEINIT(TuningDeinit(), "tuning");
 
     DEINIT(CommandDeInit(), "commands");
 
@@ -318,10 +321,13 @@ int main(int argc, char *argv[])
 
     PATProcessorDestroy( PIDFilters[PIDFilterIndex_PAT]);
     PMTProcessorDestroy( PIDFilters[PIDFilterIndex_PMT]);
+#ifdef ATSC_STREAMER
+    PSIPProcessorDestroy( PIDFilters[PIDFilterIndex_PSIP]);
+#else
     SDTProcessorDestroy( PIDFilters[PIDFilterIndex_SDT]);
     NITProcessorDestroy( PIDFilters[PIDFilterIndex_NIT]);
     TDTProcessorDestroy( PIDFilters[PIDFilterIndex_TDT]);
-
+#endif
     SectionProcessorDestroyAllProcessors();
     PESProcessorDestroyAllProcessors();
     
@@ -495,167 +501,6 @@ static void DeinitDaemon(void)
     /* Remove pid file */
     unlink(PidFile);
     exit(0);
-}
-
-/*******************************************************************************
-* Channel Change functions                                                     *
-*******************************************************************************/
-void ChannelChangedRegisterCallback(PluginChannelChanged_t callback)
-{
-
-    if (ChannelChangedCallbacksList)
-    {
-        ListAdd(ChannelChangedCallbacksList, callback);
-    }
-}
-
-void ChannelChangedUnRegisterCallback(PluginChannelChanged_t callback)
-{
-    if (ChannelChangedCallbacksList)
-    {
-        ListRemove(ChannelChangedCallbacksList, callback);
-    }
-}
-
-static void ChannelChangedDoCallbacks(Multiplex_t *multiplex, Service_t *service)
-{
-    ListIterator_t iterator;
-    for (ListIterator_Init(iterator, ChannelChangedCallbacksList);
-        ListIterator_MoreEntries(iterator);ListIterator_Next(iterator))
-    {
-        PluginChannelChanged_t callback = ListIterator_Current(iterator);
-        callback(multiplex, service);
-    }
-}
-
-/*
- * Find the service named <name> and tune to the new frequency for the multiplex the service is
- * on (if required) and then select the new service id to filter packets for.
- */
-Service_t *SetCurrentService(char *name)
-{
-    Multiplex_t *multiplex;
-    Service_t *service;
-
-    TSFilterLock(TSFilter);
-    LogModule(LOG_DEBUG, MAIN, "Writing changes back to database.\n");
-    CacheWriteback();
-    TSFilterUnLock(TSFilter);
-
-    service = CacheServiceFindName(name, &multiplex);
-    if (!service)
-    {
-        return NULL;
-    }
-
-    LogModule(LOG_DEBUG, MAIN, "Service found id:0x%04x Multiplex:%d\n", service->id, service->multiplexFreq);
-    if ((CurrentService == NULL) || (!ServiceAreEqual(service,CurrentService)))
-    {
-        LogModule(LOG_DEBUGV, MAIN, "Disabling filters\n");
-        TSFilterEnable(TSFilter, FALSE);
-
-        if (CurrentMultiplex)
-        {
-            LogModule(LOG_DEBUG, MAIN, "Current Multiplex frequency = %d TS id = %d\n",CurrentMultiplex->freq, CurrentMultiplex->tsId);
-        }
-        else
-        {
-            LogModule(LOG_DEBUG, MAIN, "No current Multiplex!\n");
-        }
-
-        if (multiplex)
-        {
-            LogModule(LOG_DEBUG, MAIN, "New Multiplex frequency =%d TS id = %d\n",multiplex->freq, multiplex->tsId);
-        }
-        else
-        {
-            LogModule(LOG_DEBUG, MAIN, "No new Multiplex!\n");
-        }
-
-        if (CurrentService)
-        {
-            ServiceRefDec(CurrentService);
-        }
-
-        if ((CurrentMultiplex!= NULL) && MultiplexAreEqual(multiplex, CurrentMultiplex))
-        {
-            LogModule(LOG_DEBUGV, MAIN, "Same multiplex\n");
-            CurrentService = service;
-        }
-        else
-        {
-            TuneMultiplex(multiplex);
-
-            CurrentService = CacheServiceFindId(service->id);
-            ServiceRefDec(service);
-        }
-
-        TSFilterZeroStats(TSFilter);
-        OutputSetService(PrimaryServiceOutput, (Service_t*)CurrentService);
-
-        /*
-         * Inform any interested parties that we have now changed the current
-         * service.
-         */
-        ChannelChangedDoCallbacks((Multiplex_t *)CurrentMultiplex, (Service_t *)CurrentService);
-
-        LogModule(LOG_DEBUGV, MAIN, "Enabling filters\n");
-        TSFilterEnable(TSFilter, TRUE);
-    }
-    else
-    {
-        ServiceRefDec(service);
-    }
-    MultiplexRefDec(multiplex);
-    return (Service_t*)CurrentService;
-}
-
-void SetMultiplex(Multiplex_t *multiplex)
-{
-    TSFilterLock(TSFilter);
-    LogModule(LOG_DEBUG, MAIN, "Writing changes back to database.\n");
-    CacheWriteback();
-    TSFilterUnLock(TSFilter);
-
-    LogModule(LOG_DEBUGV, MAIN, "Disabling filters\n");
-    TSFilterEnable(TSFilter, FALSE);
-    OutputSetService(PrimaryServiceOutput, NULL);
-
-    TuneMultiplex(multiplex);
-
-    TSFilterZeroStats(TSFilter);
-
-    /*
-     * Inform any interested parties that we have now changed the current
-     * service.
-     */
-    ChannelChangedDoCallbacks((Multiplex_t *)CurrentMultiplex, NULL);
-
-    LogModule(LOG_DEBUGV, MAIN, "Enabling filters\n");
-    TSFilterEnable(TSFilter, TRUE);
-}
-
-static void TuneMultiplex(Multiplex_t *multiplex)
-{
-    struct dvb_frontend_parameters feparams;
-
-    MultiplexRefDec(CurrentMultiplex);
-
-
-    LogModule(LOG_DEBUGV, MAIN, "Caching Services\n");
-    CacheLoad(multiplex);
-    
-    MultiplexRefInc(multiplex);
-    CurrentMultiplex = multiplex;
-
-    LogModule(LOG_DEBUGV, MAIN, "Getting Frondend parameters\n");
-    MultiplexFrontendParametersGet((Multiplex_t*)CurrentMultiplex, &feparams);
-
-    LogModule(LOG_DEBUGV, MAIN, "Tuning\n");
-    DVBFrontEndTune(DVBAdapter, &feparams);
-
-    LogModule(LOG_DEBUGV, MAIN, "Informing TSFilter multiplex has changed!\n");
-    TSFilterMultiplexChanged(TSFilter, CurrentMultiplex);
 }
 
 void UpdateDatabase()

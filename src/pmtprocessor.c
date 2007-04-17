@@ -155,8 +155,9 @@ void PMTProcessorUnRegisterPMTCallback(PluginPMTProcessor_t callback)
 
 static int PMTProcessorFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet)
 {
+    PMTProcessor_t *state = (PMTProcessor_t *)arg;
     int result = 0;
-    if (CurrentMultiplex)
+    if (state->multiplex)
     {
         int i;
         int count;

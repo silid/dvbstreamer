@@ -26,6 +26,7 @@ Manage multiplexes and tuning parameters.
 #include <linux/dvb/dmx.h>
 #include <linux/dvb/frontend.h>
 #include "objects.h"
+#include "dvb.h"
 /**
  * @defgroup Multiplex Multiplex information
  * {@
@@ -36,6 +37,7 @@ Manage multiplexes and tuning parameters.
  */
 typedef struct Multiplex_t
 {    
+    int uid;        /**< Unique ID for this multiplex */
     int freq;       /**< Frequency the multiplex is broadcast on. */
     int tsId;       /**< Transport Stream ID. */
     int networkId;  /**< Network ID */
@@ -50,7 +52,7 @@ typedef void * MultiplexEnumerator_t;
  * Macro to compare 2 Multiplex_t structures.
  */
 #define MultiplexAreEqual(_multiplex1, _multiplex2) \
-    ((_multiplex1)->freq == (_multiplex2)->freq)
+    ((_multiplex1)->uid == (_multiplex2)->uid)
 
 /**
  * Initialise the multiplex module for use.
@@ -69,13 +71,22 @@ int MultiplexDeinit(void);
  * @return The number of multiplexes in the database.
  */
 int MultiplexCount();
+
 /**
- * Retrieve the Multiplex_t structure for the given frequency.
- * The returned structured should be free'd using free().
- * @param freq Frequency of the multiplex to retrieve.
+ * Retrieve the Multiplex_t structure for the UID.
+ * The returned structured should be released using MultiplexRefDec.
+ * @param UID Unique ID of the multiplex to retrieve.
  * @return A Mulitplex_t or NULL if the frequency could not be found.
  */
 Multiplex_t *MultiplexFind(int freq);
+
+/**
+ * Retrieve the first Multiplex_t structure for the given frequency.
+ * The returned structured should be released using MultiplexRefDec.
+ * @param freq Frequency of the multiplex to retrieve.
+ * @return A Mulitplex_t or NULL if the frequency could not be found.
+ */
+Multiplex_t *MultiplexFindFrequency(int freq);
 
 /**
  * Retrieve an enumerator for all the multiplexes in the database.
@@ -103,15 +114,17 @@ Multiplex_t *MultiplexGetNext(MultiplexEnumerator_t enumerator);
  * @param feparams Used to store the frontend parameters.
  * @return 0 on success, otherwise an SQLite error code.
  */
-int MultiplexFrontendParametersGet(Multiplex_t *multiplex, struct dvb_frontend_parameters *feparams);
+int MultiplexFrontendParametersGet(Multiplex_t *multiplex, struct dvb_frontend_parameters *feparams, DVBDiSEqCSettings_t *diseqc);
 
 /**
  * Add a multiplex to the database.
  * @param type The type of frontend used to receive this transport stream.
  * @param feparams The parameters to pass to the frontend to tune to the new TS.
+ * @param diseqc Any DiSEqC properties required to tune.
+ * @param uid On exit used to store the UID of the new multiplex.
  * @return 0 on success, otherwise an SQLite error code.
  */
-int MultiplexAdd(fe_type_t type, struct dvb_frontend_parameters *feparams);
+int MultiplexAdd(fe_type_t type, struct dvb_frontend_parameters *feparams, DVBDiSEqCSettings_t *diseqc, int *uid);
 
 /**
  * Set the PAT version of a multiplex.
@@ -139,7 +152,7 @@ int MultiplexNetworkIdSet(Multiplex_t *multiplex, int netid);
 
 /**
  * Retrieve the Multiplex_t structure for the network and TS id.
- * The returned structured should be free'd using free().
+ * The returned structured should be released using MultiplexRefDec.
  * @param netid Network id to find.
  * @param tsid Transport stream id to find.
  * @return A Mulitplex_t or NULL if the frequency could not be found.

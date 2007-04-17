@@ -44,6 +44,7 @@ the output to only include this service.
 *******************************************************************************/
 typedef struct ServiceFilter_t
 {
+    Multiplex_t  *currentMultiplex;
     Service_t    *service;
     Service_t    *nextService;
     bool          serviceChanged;
@@ -70,6 +71,7 @@ typedef struct ServiceFilter_t
 *******************************************************************************/
 static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet);
 static TSPacket_t *ServiceFilterProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
+static void ServiceFilterMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex);
 static void ServiceFilterPATRewrite(ServiceFilter_t *state);
 static void ServiceFilterPMTRewrite(ServiceFilter_t *state);
 static void ServiceFilterInitPacket(TSPacket_t *packet, dvbpsi_psi_section_t* section, char *sectionname);
@@ -98,7 +100,7 @@ PIDFilter_t *ServiceFilterCreate(TSFilter_t *tsfilter, PacketOutput outputpacket
         {
             ObjectRefDec(state);
         }
-
+        PIDFilterMultiplexChangeSet(result, ServiceFilterMultiplexChanged, state);
         pthread_mutex_init(&state->serviceChangeMutex, NULL);
     }
     return result;
@@ -113,6 +115,7 @@ void ServiceFilterDestroy(PIDFilter_t *filter)
     {
         ServiceRefDec(state->nextService);
     }
+    MultiplexRefDec(state->currentMultiplex);
     ServiceRefDec(state->service);
     pthread_mutex_destroy(&state->serviceChangeMutex);
     ObjectRefDec(state);
@@ -189,7 +192,7 @@ static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t
         PIDList_t *pids;
 
         /* Is this service on the current multiplex ? */
-        if ((!CurrentMultiplex) || (state->service->multiplexFreq != CurrentMultiplex->freq))
+        if ((!state->currentMultiplex) || (state->service->multiplexUID != state->currentMultiplex->uid))
         {
             return 0;
         }
@@ -263,14 +266,23 @@ static TSPacket_t *ServiceFilterProcessPacket(PIDFilter_t *pidfilter, void *arg,
     return packet;
 }
 
+static void ServiceFilterMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex)
+{
+    ServiceFilter_t *state = (ServiceFilter_t *)arg;
+
+    MultiplexRefDec(state->currentMultiplex);
+    state->currentMultiplex = newmultiplex;
+    MultiplexRefInc(state->currentMultiplex);
+}
+
 static void ServiceFilterPATRewrite(ServiceFilter_t *state)
 {
     dvbpsi_pat_t pat;
     dvbpsi_psi_section_t* section;
 
-    MultiplexRefInc(CurrentMultiplex);
-    dvbpsi_InitPAT(&pat, CurrentMultiplex->tsId, state->patVersion, 1);
-    MultiplexRefDec(CurrentMultiplex);
+    MultiplexRefInc(state->currentMultiplex);
+    dvbpsi_InitPAT(&pat, state->currentMultiplex->tsId, state->patVersion, 1);
+    MultiplexRefDec(state->currentMultiplex);
     
     dvbpsi_PATAddProgram(&pat, state->service->id, state->service->pmtPid);
 

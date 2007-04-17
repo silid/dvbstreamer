@@ -92,8 +92,8 @@ PIDList_t *PIDListGet(Service_t *service)
                         PID_SUBTYPE ","
                         PID_PMTVERSION ","
                         PID_DESCRIPTORS " "
-                        "FROM " PIDS_TABLE " WHERE " PID_MPLEXFREQ "=%d AND " PID_SERVICEID "=%d;",
-                        service->multiplexFreq, service->id);
+                        "FROM " PIDS_TABLE " WHERE " PID_MULTIPLEXUID "=%d AND " PID_SERVICEID "=%d;",
+                        service->multiplexUID, service->id);
             if (rc == SQLITE_OK)
             {
 
@@ -131,8 +131,8 @@ int PIDListCount(Service_t *service)
     int result = -1;
 
     STATEMENT_PREPAREVA("SELECT count () FROM " PIDS_TABLE " "
-                        "WHERE " PID_MPLEXFREQ "=%d AND " PID_SERVICEID "=%d;",
-                        service->multiplexFreq, service->id);
+                        "WHERE " PID_MULTIPLEXUID "=%d AND " PID_SERVICEID "=%d;",
+                        service->multiplexUID, service->id);
     RETURN_ON_ERROR(-1);
 
     STATEMENT_STEP();
@@ -150,8 +150,8 @@ int PIDListRemove(Service_t *service)
     STATEMENT_INIT;
 
     STATEMENT_PREPAREVA("DELETE FROM " PIDS_TABLE " "
-                        "WHERE " PID_MPLEXFREQ "=%d AND " PID_SERVICEID "=%d;",
-                        service->multiplexFreq, service->id);
+                        "WHERE " PID_MULTIPLEXUID "=%d AND " PID_SERVICEID "=%d;",
+                        service->multiplexUID, service->id);
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
@@ -169,7 +169,7 @@ static int PIDAdd(Service_t *service, PID_t *pid)
 
     STATEMENT_PREPAREVA("INSERT INTO " PIDS_TABLE " "
                         "VALUES (%d,%d,%d,%d,%d,%d,?);",
-                        service->multiplexFreq, service->id,
+                        service->multiplexUID, service->id,
                         pid->pid, pid->type, pid->subType, service->pmtVersion);
     RETURN_RC_ON_ERROR;
 

@@ -55,7 +55,7 @@ typedef enum RunningStatus_e
 typedef struct Service_t
 {
     char name[SERVICE_MAX_NAME_LEN]; /**< Name of the service. */
-    int multiplexFreq; /**< Multiplex frequency this service is broadcast on. */
+    int multiplexUID; /**< Multiplex frequency this service is broadcast on. */
     int id;            /**< Service/Program ID of the service. */
     int pmtVersion;    /**< Last processed version of the PMT. */
     int pmtPid;        /**< PID the PMT for this service is sent on. */
@@ -75,7 +75,7 @@ typedef void *ServiceEnumerator_t;
  * Macro to compare 2 service structures.
  */
 #define ServiceAreEqual(_service1, _service2) \
-    (((_service1)->multiplexFreq == (_service2)->multiplexFreq) && \
+    (((_service1)->multiplexUID == (_service2)->multiplexUID) && \
     ((_service1)->id == (_service2)->id))
 
 /**
@@ -112,7 +112,7 @@ int ServiceForMultiplexCount(int freq);
 int ServiceDelete(Service_t  *service);
 /**
  * Add a service to the database.
- * @param multiplexfreq The multiplex the service is broadcast on.
+ * @param multiplexuid The multiplex the service is broadcast on.
  * @param name Name of the service.
  * @param id The service/program id of the service.
  * @param pmtversion The version of the last PMT processed.
@@ -120,7 +120,7 @@ int ServiceDelete(Service_t  *service);
  * @param pcrpid The PID the service's PCR is transmitted on.
  * @return 0 on success, otherwise an SQLite error code.
  */
-int ServiceAdd(int multiplexfreq, char *name, int id, int pmtversion, int pmtpid, int pcrpid);
+int ServiceAdd(int multiplexuid, char *name, int id, int pmtversion, int pmtpid, int pcrpid);
 
 /**
  * Set the PMT version for the given service.
@@ -156,7 +156,7 @@ int ServiceNameSet(Service_t  *service, char *name);
 
 /**
  * Find the service with the given name.
- * The returned service should be free'd with ServiceFree when no longer required.
+ * The returned service should be released with ServiceRefDec.
  * @param name The name of the service to find.
  * @return A service structure or NULL if the service was not found.
  */
@@ -164,7 +164,8 @@ Service_t *ServiceFindName(char *name);
 
 /**
  * Find the service with the given id.
- * The returned service should be free'd with ServiceFree when no longer required.
+ * The returned service should be released with ServiceRefDec.
+ * @param multiplex The multiplex the service is broadcast on.
  * @param id The id of the service to find.
  * @return A service structure or NULL if the service was not found.
  */
@@ -178,9 +179,10 @@ ServiceEnumerator_t ServiceEnumeratorGet();
 
 /**
  * Rerieve an enumerator for the specified multiplex.
+ * @param multiplex The multiplex the service is broadcast on.
  * @return A service enumerator or NULL if there is not enough memory.
  */
-ServiceEnumerator_t ServiceEnumeratorForMultiplex(int freq);
+ServiceEnumerator_t ServiceEnumeratorForMultiplex(Multiplex_t *multiplex);
 
 /**
  * Free an enumerator.
@@ -189,6 +191,7 @@ void ServiceEnumeratorDestroy(ServiceEnumerator_t enumerator);
 
 /**
  * Retrieve the next service from an enumerator.
+ * The returned service should be released with ServiceRefDec.
  * @param enumerator The enumerator to retrieve the next service from.
  * @return A Service_t structure or NULL if there are no more services (with 
  * the reference count set to 1)
