@@ -246,7 +246,7 @@ static void CommandListLCN(int argc, char **argv)
 {
     int i;
     int count = 0;
-    LCNEntry_t *entry;
+
     for ( i = 0; i < MAX_ENTRIES; i ++)
     {
         if (entries[i].networkId != ONETID_INVALID)

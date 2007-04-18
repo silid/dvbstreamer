@@ -28,7 +28,7 @@ Process Network Information Tables.
 PIDFilter_t *NITProcessorCreate(TSFilter_t *tsfilter);
 void NITProcessorDestroy(PIDFilter_t *filter);
 
-void NITProcessorRegisterSDTCallback(PluginNITProcessor_t callback);
-void NITProcessorUnRegisterSDTCallback(PluginNITProcessor_t callback);
+void NITProcessorRegisterNITCallback(PluginNITProcessor_t callback);
+void NITProcessorUnRegisterNITCallback(PluginNITProcessor_t callback);
 
 #endif

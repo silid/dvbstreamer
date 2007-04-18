@@ -74,7 +74,7 @@ static void RemoteInterfaceAuthenticate(int argc, char **argv);
 static void RemoteInterfaceWho(int argc, char **argv);
 static void RemoteInterfaceLogout(int argc, char **argv);
 static void RemoteInterfaceInfo(int argc, char **argv);
-static bool PrintResponse(FILE *fp, uint16_t errno, char * msg);
+static void PrintResponse(FILE *fp, uint16_t errno, char * msg);
 static int  RemoteInterfacePrintfImpl(char *format, ...);
 
 /*******************************************************************************
@@ -261,7 +261,7 @@ void RemoteInterfaceAcceptConnections(void)
                 FILE *clientfp;
                 int clientfd;
                 struct sockaddr_in clientAddress;
-                int clientAddressSize;
+                socklen_t clientAddressSize;
 
                 clientAddressSize = sizeof(clientAddress);
                 clientfd = accept(serverSocket, (struct sockaddr *) & clientAddress, &clientAddressSize);
@@ -390,7 +390,7 @@ static void HandleConnection(Connection_t *connection)
     pthread_mutex_unlock(&activeConnectionsMutex);
 }
 
-static bool PrintResponse(FILE *fp, uint16_t errno, char * msg)
+static void PrintResponse(FILE *fp, uint16_t errno, char * msg)
 {
     fprintf(fp, "%s%d %s\n", responselineStart, errno, msg);
     fflush(fp);

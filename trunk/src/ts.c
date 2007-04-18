@@ -60,7 +60,6 @@ TSFilter_t* TSFilterCreate(DVBAdapter_t *adapter)
 
 void TSFilterDestroy(TSFilter_t* tsfilter)
 {
-    ListIterator_t iterator;
     tsfilter->quit = TRUE;
     pthread_join(tsfilter->thread, NULL);
     pthread_mutex_destroy(&tsfilter->mutex);

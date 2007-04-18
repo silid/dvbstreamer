@@ -20,6 +20,8 @@ sectionprocessor.c
 Process PSI/SI sections.
 
 */
+#define _GNU_SOURCE
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -96,7 +98,6 @@ void SectionProcessorStopPID(uint16_t pid, PluginSectionProcessor_t callback, vo
 
 void SectionProcessorDestroyAllProcessors(void)
 {
-    ListIterator_t iterator;
     if (SectionProcessorsList == NULL)
     {
         return;
@@ -156,7 +157,6 @@ static PIDFilter_t *SectionProcessorCreate(TSFilter_t *tsfilter, uint16_t pid)
 static void SectionProcessorDestroy(PIDFilter_t *filter)
 {
     SectionProcessor_t *state = (SectionProcessor_t *)filter->ppArg;
-    ListIterator_t iterator;
     assert(filter->processPacket == SectionProcessorProcessPacket);
     PIDFilterFree(filter);
 
@@ -202,12 +202,6 @@ static void SectionProcessorUnRegisterSectionCallback(PIDFilter_t *filter,Plugin
             break;
         }
     }
-}
-
-static bool SectionProcessorHasCallbacks(PIDFilter_t *filter)
-{
-    SectionProcessor_t *state = (SectionProcessor_t *)filter->ppArg;
-    return (ListCount(state->sectioncallbackslist) > 0);
 }
 
 static void SectionProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex)

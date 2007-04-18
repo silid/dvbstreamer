@@ -29,6 +29,9 @@ Plugin Manager functions.
 #include "deliverymethod.h"
 #include "patprocessor.h"
 #include "pmtprocessor.h"
+#include "sdtprocessor.h"
+#include "nitprocessor.h"
+#include "tdtprocessor.h"
 #include "sectionprocessor.h"
 #include "pesprocessor.h"
 #include "pluginmgr.h"
@@ -112,7 +115,6 @@ int PluginManagerInit(void)
 
 void PluginManagerDeInit(void)
 {
-    ListIterator_t iterator;
     LogModule(LOG_DEBUG, PLUGINMANAGER,"Plugin Manager Deinitialising...\n");
     CommandUnRegisterCommands(PluginManagerCommands);
     ListFree(PluginsList, (ListDataDestructor_t)PluginManagerUnloadPlugin);

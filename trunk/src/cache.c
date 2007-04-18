@@ -54,8 +54,6 @@ enum CacheFlags
 * Prototypes                                                                   *
 *******************************************************************************/
 static void CacheServicesFree(void);
-static void CachePIDsFree(void);
-static int CachePIDsLoad(Service_t *service, int index);
 
 /*******************************************************************************
 * Global variables                                                             *

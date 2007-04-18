@@ -7,7 +7,7 @@
 INCLUDES = @INCLTDL@
 
 AM_CFLAGS =\
-     -I$(top_srcdir)/include
+     -I$(top_srcdir)/include -Wall -Werror
 
 
 if ATSC
@@ -74,7 +74,7 @@ dvbstreamer_SOURCES = \
     nitprocessor.c \
     tdtprocessor.c
 
-dvbstreamer_CFLAGS = -I$(top_srcdir)/include -DLOGGING_CHECK_DAEMON -DDVB_STREAMER
+dvbstreamer_CFLAGS = -I$(top_srcdir)/include -DLOGGING_CHECK_DAEMON -DDVB_STREAMER -Wall -Werror
 
 dvbstreamer_LDFLAGS = -rdynamic -Wl,-whole-archive -Wl,dvbpsi/libdvbpsi.a -Wl,-no-whole-archive 
 
@@ -139,7 +139,7 @@ atscstreamer_SOURCES = \
     subtableprocessor.c \
     psipprocessor.c
     
-atscstreamer_CFLAGS = -I$(top_srcdir)/include -DLOGGING_CHECK_DAEMON -DATSC_STREAMER
+atscstreamer_CFLAGS = -I$(top_srcdir)/include -DLOGGING_CHECK_DAEMON -DATSC_STREAMER -Wall -Werror
 
 atscstreamer_LDFLAGS = -rdynamic -Wl,-whole-archive -Wl,dvbpsi/libdvbpsi.a -Wl,-no-whole-archive 
 
@@ -170,7 +170,7 @@ setupatscstreamer_SOURCES = \
     dbase.c \
     objects.c 
 
-setupatscstreamer_CFLAGS = -I$(top_srcdir)/include -DATSC_STREAMER
+setupatscstreamer_CFLAGS = -I$(top_srcdir)/include -DATSC_STREAMER -Wall -Werror
 
 setupatscstreamer_LDFLAGS =
 

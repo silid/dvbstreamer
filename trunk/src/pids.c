@@ -60,7 +60,7 @@ void PIDListFree(PIDList_t *pids)
 
 int PIDListSet(Service_t *service, PIDList_t *pids)
 {
-    int rc;
+    int rc = 0;
     int i;
 
     for (i = 0; i < pids->count; i ++)

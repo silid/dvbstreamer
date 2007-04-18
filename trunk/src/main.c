@@ -59,6 +59,7 @@ Entry point to the application.
 #include "deliverymethod.h"
 #include "pluginmgr.h"
 #include "plugin.h"
+#include "tuning.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -93,14 +94,10 @@ static void sighandler(int signum);
 static void installsighandler(void);
 static void InitDaemon(int adapter);
 static void DeinitDaemon(void);
-static void ChannelChangedDoCallbacks(Multiplex_t *multiplex, Service_t *service);
-static void TuneMultiplex(Multiplex_t *multiplex);
 
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
-volatile Multiplex_t *CurrentMultiplex = NULL;
-volatile Service_t *CurrentService = NULL;
 PIDFilter_t *PIDFilters[PIDFilterIndex_Count];
 TSFilter_t *TSFilter;
 DVBAdapter_t *DVBAdapter;
@@ -114,7 +111,6 @@ Output_t *PrimaryServiceOutput = NULL;
 
 char DataDirectory[PATH_MAX];
 
-static List_t *ChannelChangedCallbacksList = NULL;
 static char PidFile[PATH_MAX];
 
 static char MAIN[] = "Main";
@@ -336,11 +332,7 @@ int main(int argc, char *argv[])
     DEINIT(TSFilterDestroy(TSFilter), "TS filter");
     DEINIT(DVBDispose(DVBAdapter), "DVB adapter");
     DEINIT(DeliveryMethodManagerDeInit(), "delivery method manager");
-    DEINIT(CacheDeInit(), "cache");
-
-    ServiceRefDec(CurrentService);
-    MultiplexRefDec(CurrentMultiplex);
-    
+    DEINIT(CacheDeInit(), "cache");    
 
     DEINIT(ServiceDeinit(), "service");
     DEINIT(MultiplexDeinit(), "multiplex");

@@ -46,6 +46,10 @@ Command Processing and command functions.
 #include "plugin.h"
 #include "servicefilter.h"
 #include "tuning.h"
+#include "patprocessor.h"
+#include "pmtprocessor.h"
+#include "sdtprocessor.h"
+
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -76,7 +80,6 @@ struct PMTReceived_t
 * Prototypes                                                                   *
 *******************************************************************************/
 
-static void GetCommand(char **command, char **argument);
 static char **AttemptComplete (const char *text, int start, int end);
 static char *CompleteCommand(const char *text, int state);
 static bool ProcessCommand(char *command, char *argument);
@@ -386,8 +389,6 @@ void CommandUnRegisterCommands(Command_t *commands)
 /**************** Command Loop/Startup file functions ************************/
 void CommandLoop(void)
 {
-    char *command;
-    char *argument;
     CommandContext_t context;
     char historyLine[256];
     quit = FALSE;
@@ -418,7 +419,7 @@ void CommandLoop(void)
             {
                 if (context.errorNumber == COMMAND_ERROR_UNKNOWN_COMMAND)
                 {
-                    printf("Unknown command \"%s\"\n", command);
+                    printf("Unknown command \"%s\"\n", line);
                 }
             }
             free(line);
@@ -430,8 +431,6 @@ int CommandProcessFile(char *file)
 {
     int lineno = 0;
     FILE *fp;
-    char *command;
-    char *argument;
     char line[256];
     char *nl;
 
@@ -466,7 +465,7 @@ int CommandProcessFile(char *file)
         lineno ++;
         if (!CommandExecute(&context, CommandPrintfImpl, line))
         {
-            fprintf(stderr, "%s(%d): Unknown command \"%s\"\n", file, lineno, command);
+            fprintf(stderr, "%s(%d): Unknown command \"%s\"\n", file, lineno, line);
         }
     }
 
@@ -562,10 +561,9 @@ static bool ProcessCommand(char *command, char *argument)
 {
     char **argv = NULL;
     int argc = 0;
-    int i;
     bool commandFound = FALSE;
     ListIterator_t iterator;
-    Command_t *commandInfo;
+    Command_t *commandInfo = NULL;
 
     for ( ListIterator_Init(iterator, commandslist); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
@@ -1177,7 +1175,6 @@ static void CommandSetSSF(int argc, char **argv)
     char *outputName = argv[0];
     char *serviceName;
     Service_t *service;
-    Multiplex_t *multiplex;
 
     CheckAuthenticated();
 
@@ -1291,7 +1288,6 @@ static void CommandHelp(int argc, char **argv)
 
     if (argc)
     {
-        int commandFound = 0;
         Command_t *requestedcmd = NULL;
         for ( ListIterator_Init(iterator, commandslist); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
         {
@@ -1411,13 +1407,8 @@ static void CommandScan(int argc, char **argv)
 static void ScanMultiplex(Multiplex_t *multiplex)
 {
     struct timespec timeout;
-    bool patreceivedstate = FALSE;
-    bool allpmtsreceivedstate = FALSE;
-    bool sdtreceivedstate = FALSE;
     
     CommandPrintf("Scanning %d\n", multiplex->freq);
-
-
 
     TuningCurrentMultiplexSet(multiplex);
 

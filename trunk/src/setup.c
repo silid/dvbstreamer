@@ -65,7 +65,6 @@ int main(int argc, char *argv[])
 {
     fe_type_t channelsFileType = FE_OFDM;
     char *channelsFile = NULL;
-    int i;
     int adapterNumber = 0;
 
     /* Create the data directory */
@@ -167,7 +166,7 @@ static void usage(char *appname)
             "      -s <file>     : Satellite channels.conf file to import services and \n"
             "                      multiplexes from.(EXPERIMENTAL)\n"
             "      -c <file>     : Cable channels.conf file to import services and \n"
-            "                      multiplexes from.(EXPERIMENTAL)\n",
+            "                      multiplexes from.(EXPERIMENTAL)\n"
             "      -A <file>     : ATSC channels.conf file to import services and \n"
             "                      multiplexes from.(EXPERIMENTAL)\n",
             appname

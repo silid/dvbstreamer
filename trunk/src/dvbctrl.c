@@ -57,7 +57,7 @@ static char line[MAX_LINE_LENGTH];
 
 int main(int argc, char *argv[])
 {
-    int i, consumed, commandCount=0;
+    int i;
     socklen_t address_len;
 #ifdef __CYGWIN__
     struct hostent *hostinfo;
@@ -251,7 +251,6 @@ int main(int argc, char *argv[])
  */
 static void usage(char *appname)
 {
-    int c;
     fprintf(stderr, "Usage:%s [<options>] <commands>\n"
             "      Options:\n"
             "      -v            : Increase the amount of debug output, can be used multiple\n"

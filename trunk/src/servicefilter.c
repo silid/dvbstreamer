@@ -188,7 +188,6 @@ static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t
 
     if (state->service)
     {
-        int count;
         PIDList_t *pids;
 
         /* Is this service on the current multiplex ? */

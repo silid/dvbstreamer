@@ -68,8 +68,6 @@ void LogModule(int level, const char *module, char *format, ...)
 
 static void LogImpl(int level, const char *module, const char * format, va_list valist)
 {
-    char *logline;
-    int len;
     
 #ifdef LOGGING_CHECK_DAEMON
     if (DaemonMode)
