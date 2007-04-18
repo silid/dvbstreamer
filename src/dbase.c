@@ -23,6 +23,7 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <limits.h>
 #include <sys/types.h>
 

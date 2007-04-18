@@ -277,6 +277,13 @@ void TSFilterEnable(TSFilter_t * tsfilter, bool enable);
 void TSFilterZeroStats(TSFilter_t *tsfilter);
 
 /**
+ * Informs all PID filters that the multiplex has changed to newmultiplex.
+ * @param tsfilter TSFilter_t instance to inform.
+ * @param newmultiplex The new multiplex that the DVB adapter is now tuned to.
+ */
+void TSFilterMultiplexChanged(TSFilter_t *tsfilter, Multiplex_t *newmultiplex);
+
+/**
  * Lock access to the TSFilter_t structure to this thread.
  * @param tsfilter The instance to lock access to.
  */
@@ -287,6 +294,7 @@ void TSFilterZeroStats(TSFilter_t *tsfilter);
  * @param tsfilter The instance to unlock access to.
  */
 #define TSFilterUnLock(tsfilter) pthread_mutex_unlock(&(tsfilter)->mutex)
+
 
 /**@}*/
 

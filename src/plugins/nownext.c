@@ -176,7 +176,6 @@ static void Init0x12Filter(PIDFilter_t *filter)
 
 static void Deinit0x12Filter(PIDFilter_t *filter)
 {
-    ListIterator_t iterator;
     filter->enabled = FALSE;
     SubTableProcessorDeinit(filter);
     ListFree(serviceNowNextInfoList, free);
@@ -197,7 +196,6 @@ static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t table
 
 static void ProcessEIT(void *arg, dvbpsi_eit_t *newEIT)
 {
-    dvbpsi_eit_event_t *event;
     ServiceNowNextInfo_t *info = FindService(newEIT->i_network_id, newEIT->i_ts_id, newEIT->i_service_id);
     printlog(LOG_DEBUG, "EIT received (version %d) net id %x ts id %x service id %x info %p\n",
         newEIT->i_version, newEIT->i_network_id, newEIT->i_ts_id, newEIT->i_service_id, info);

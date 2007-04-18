@@ -36,6 +36,7 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 #include "types.h"
 #include "dvb.h"
 #include "logging.h"
+#include "objects.h"
 
 /*******************************************************************************
 * Prototypes                                                                   *

@@ -20,6 +20,7 @@ pesprocessor.c
 Process PES sections.
 
 */
+#define _GNU_SOURCE
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -43,8 +44,8 @@ typedef struct PESProcessor_t
     bool payloadStartOnly;
     bool discontinuity;
     int counter;
-    int packetLength;
-    char packet[64 * 1024]; /* Maximum size of a PES packet is 64KB */
+    uint16_t packetLength;
+    uint8_t packet[64 * 1024]; /* Maximum size of a PES packet is 64KB */
     List_t *callbacksList;
 }
 PESProcessor_t;
@@ -106,7 +107,6 @@ void PESProcessorStopPID(uint16_t pid, PluginPESProcessor_t callback, void *user
 
 void PESProcessorDestroyAllProcessors(void)
 {
-    ListIterator_t iterator;
     if (SectionProcessorsList == NULL)
     {
         return;
@@ -210,12 +210,6 @@ static void PESProcessorUnRegisterCallback(PIDFilter_t *filter,PluginPESProcesso
     }
 }
 
-static bool PESProcessorHasCallbacks(PIDFilter_t *filter)
-{
-    PESProcessor_t *state = (PESProcessor_t *)filter->ppArg;
-    return (ListCount(state->callbacksList) > 0);
-}
-
 static void PESProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex)
 {
     PESProcessor_t *state = (PESProcessor_t *)arg;
@@ -240,7 +234,7 @@ static TSPacket_t * PESProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg,
         && !state->discontinuity)
     {
         /* TS duplicate*/
-        return;
+        return NULL;
     }
 
     if (expectedCounter != state->counter)
@@ -251,7 +245,7 @@ static TSPacket_t * PESProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg,
     /* Return if no payload in the TS packet */
     if (!(packet->header[3] & 0x10))
     {
-        return;
+        return NULL;
     }
 
     /* Skip the adaptation_field if present */
@@ -279,6 +273,6 @@ static TSPacket_t * PESProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg,
     memcpy(state->packet + state->packetLength, &packet->payload[payloadStart], 184 - payloadStart);
     state->packetLength += 184 - payloadStart;
 
-    return 0;
+    return NULL;
 }
 

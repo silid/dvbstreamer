@@ -25,6 +25,7 @@ Object memory management.
 #include <unistd.h>
 #include <stdint.h>
 #include <assert.h>
+#include <pthread.h>
 
 #include "logging.h"
 #include "objects.h"

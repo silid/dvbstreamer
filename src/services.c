@@ -34,9 +34,6 @@ Manage services and PIDs.
                        SERVICE_PMTPID ","\
                        SERVICE_PCRPID " "
 
-static void *RollUpDescriptors(dvbpsi_descriptor_t *descriptors, int *datasize);
-static dvbpsi_descriptor_t *UnRollDescriptors(char *descriptors, int size);
-
 int ServiceInit(void)
 {
     return  ObjectRegisterType(Service_t);

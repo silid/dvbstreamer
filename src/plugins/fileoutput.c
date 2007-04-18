@@ -20,6 +20,7 @@ fileoutput.c
 File Delivery Method handler, all packets are written to the file of choosing.
 
 */
+#define _FILE_OFFSET_BITS 64
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -101,11 +102,9 @@ DeliveryMethodInstance_t *FileOutputCreate(char *arg)
         instance->SendPacket = FileOutputSendPacket;
         instance->SendBlock = FileOutputSendBlock;
         instance->DestroyInstance = FileOutputDestroy;
-        #ifdef __CYGWIN__
+
         instance->fp = fopen((char*)(arg + PREFIX_LEN), "wb");
-        #else
-        instance->fp = fopen64((char*)(arg + PREFIX_LEN), "wb");
-        #endif
+
         if (!instance->fp)
         {
             free(instance);
