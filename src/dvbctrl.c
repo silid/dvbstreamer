@@ -65,8 +65,8 @@ int main(int argc, char *argv[])
 #else
     struct sockaddr_storage address;
     struct addrinfo *addrinfo, hints;
-#endif    
     char portnumber[10];    
+#endif    
     char *filename = NULL;
     int socketfd = -1;
     FILE *socketfp;

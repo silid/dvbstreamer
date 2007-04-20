@@ -97,11 +97,12 @@ Service_t *TuningCurrentServiceSet(char *name)
     Output_t *primaryServiceOutput;
     Multiplex_t *multiplex;
     Service_t *service;
+    TSFilter_t *tsFilter = MainTSFilterGet();
 
-    TSFilterLock(TSFilter);
+    TSFilterLock(tsFilter);
     LogModule(LOG_DEBUG, TUNING, "Writing changes back to database.\n");
     CacheWriteback();
-    TSFilterUnLock(TSFilter);
+    TSFilterUnLock(tsFilter);
 
     service = CacheServiceFindName(name, &multiplex);
     if (!service)
@@ -113,7 +114,7 @@ Service_t *TuningCurrentServiceSet(char *name)
     if ((CurrentService == NULL) || (!ServiceAreEqual(service,CurrentService)))
     {
         printlog(LOG_DEBUGV,"Disabling filters\n");
-        TSFilterEnable(TSFilter, FALSE);
+        TSFilterEnable(tsFilter, FALSE);
 
         if (CurrentMultiplex)
         {
@@ -151,7 +152,7 @@ Service_t *TuningCurrentServiceSet(char *name)
             ServiceRefDec(service);
         }
 
-        TSFilterZeroStats(TSFilter);
+        TSFilterZeroStats(tsFilter);
 
         primaryServiceOutput = OutputFind(PrimaryService, OutputType_Service);
         OutputSetService(primaryServiceOutput, (Service_t*)CurrentService);
@@ -163,7 +164,7 @@ Service_t *TuningCurrentServiceSet(char *name)
         ChannelChangedDoCallbacks((Multiplex_t *)CurrentMultiplex, (Service_t *)CurrentService);
 
         LogModule(LOG_DEBUGV, TUNING, "Enabling filters\n");
-        TSFilterEnable(TSFilter, TRUE);
+        TSFilterEnable(tsFilter, TRUE);
     }
     else
     {
@@ -183,21 +184,22 @@ Multiplex_t *TuningCurrentMultiplexGet(void)
 void TuningCurrentMultiplexSet(Multiplex_t *multiplex)
 {
     Output_t *primaryServiceOutput;
+    TSFilter_t *tsFilter = MainTSFilterGet();
     
-    TSFilterLock(TSFilter);
+    TSFilterLock(tsFilter);
     LogModule(LOG_DEBUG, TUNING, "Writing changes back to database.\n");
     CacheWriteback();
-    TSFilterUnLock(TSFilter);
+    TSFilterUnLock(tsFilter);
 
     LogModule(LOG_DEBUGV, TUNING, "Disabling filters\n");
-    TSFilterEnable(TSFilter, FALSE);
+    TSFilterEnable(tsFilter, FALSE);
     
     primaryServiceOutput = OutputFind(PrimaryService, OutputType_Service);
     OutputSetService(primaryServiceOutput, NULL);
 
     TuneMultiplex(multiplex);
 
-    TSFilterZeroStats(TSFilter);
+    TSFilterZeroStats(tsFilter);
 
     /*
      * Inform any interested parties that we have now changed the current
@@ -206,7 +208,7 @@ void TuningCurrentMultiplexSet(Multiplex_t *multiplex)
     ChannelChangedDoCallbacks((Multiplex_t *)CurrentMultiplex, NULL);
 
     LogModule(LOG_DEBUGV, TUNING, "Enabling filters\n");
-    TSFilterEnable(TSFilter, TRUE);
+    TSFilterEnable(tsFilter, TRUE);
 }
 
 /*******************************************************************************
@@ -228,6 +230,8 @@ static void TuneMultiplex(Multiplex_t *multiplex)
 {
     struct dvb_frontend_parameters feparams;
     DVBDiSEqCSettings_t diseqc;
+    DVBAdapter_t *dvbAdapter = MainDVBAdapterGet();
+    TSFilter_t *tsFilter = MainTSFilterGet();
     
     MultiplexRefDec(CurrentMultiplex);
 
@@ -241,9 +245,9 @@ static void TuneMultiplex(Multiplex_t *multiplex)
     MultiplexFrontendParametersGet((Multiplex_t*)CurrentMultiplex, &feparams, &diseqc);
 
     LogModule(LOG_DEBUGV, TUNING, "Tuning\n");
-    DVBFrontEndTune(DVBAdapter, &feparams, &diseqc);
+    DVBFrontEndTune(dvbAdapter, &feparams, &diseqc);
 
     LogModule(LOG_DEBUGV,TUNING, "Informing TSFilter multiplex has changed!\n");
-    TSFilterMultiplexChanged(TSFilter, CurrentMultiplex);
+    TSFilterMultiplexChanged(tsFilter, CurrentMultiplex);
 }
 

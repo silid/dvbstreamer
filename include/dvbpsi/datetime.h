@@ -53,5 +53,5 @@ typedef struct dvbpsi_date_time_s
  * \param p_minute Integer to store the decoded minute in.
  * \param p_second Integer to store the decoded second in.
  */
-void dvbpsi_DecodeMJDUTC(char *p_mjdutc, dvbpsi_date_time_t *p_date_time);
+void dvbpsi_DecodeMJDUTC(uint8_t *p_mjdutc, dvbpsi_date_time_t *p_date_time);
 #endif /*_DATETIME_H*/

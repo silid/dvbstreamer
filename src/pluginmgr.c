@@ -213,7 +213,7 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
                 case PLUGIN_FEATURE_TYPE_FILTER:
                 {
                     PluginFilter_t *pluginFilter = pluginInterface->features[i].details;
-                    pluginFilter->filter = PIDFilterAllocate(TSFilter);
+                    pluginFilter->filter = PIDFilterAllocate(MainTSFilterGet());
                     if (pluginFilter->filter)
                     {
                         LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed filter.\n", pluginInterface->name);

@@ -42,7 +42,9 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 * Prototypes                                                                   *
 *******************************************************************************/
 static int DVBDemuxSetPESFilter(DVBAdapter_t *adapter, ushort pid, int pidtype, int taptype);
+#ifndef __CYGWIN__
 static int DVBFrontEndDiSEqCSet(DVBAdapter_t *adapter, DVBDiSEqCSettings_t *diseqc);
+#endif
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -185,9 +187,9 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
     return 1;
 }
 
+#ifndef  __CYGWIN__
 static int DVBFrontEndDiSEqCSet(DVBAdapter_t *adapter, DVBDiSEqCSettings_t *diseqc)
 {
-#ifndef  __CYGWIN__
    struct dvb_diseqc_master_cmd cmd =
       {{0xe0, 0x10, 0x38, 0xf0, 0x00, 0x00}, 4};
 
@@ -220,9 +222,9 @@ static int DVBFrontEndDiSEqCSet(DVBAdapter_t *adapter, DVBDiSEqCSettings_t *dise
    {
       return 0;
    }
-#endif   
    return 1;
 }
+#endif   
 
 
 int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status, unsigned int *ber, unsigned int *strength, unsigned int *snr)

@@ -57,6 +57,7 @@ Output_t *OutputAllocate(char *name, OutputType type, char *destination)
 {
     Output_t *output = NULL;
     ListIterator_t iterator;
+    TSFilter_t *tsFilter = MainTSFilterGet();
     List_t *list = (type == OutputType_Manual) ? ManualOutputsList:ServiceOutputsList;
     for ( ListIterator_Init(iterator, list); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
@@ -82,7 +83,7 @@ Output_t *OutputAllocate(char *name, OutputType type, char *destination)
     switch (type)
     {
         case OutputType_Manual:
-            output->filter = PIDFilterAllocate(TSFilter);
+            output->filter = PIDFilterAllocate(tsFilter);
             if (!output->filter)
             {
                 OutputErrorStr = "Failed to allocate PID filter!";
@@ -102,7 +103,7 @@ Output_t *OutputAllocate(char *name, OutputType type, char *destination)
             }
             break;
         case OutputType_Service:
-            output->filter = ServiceFilterCreate(TSFilter, NULL, NULL);
+            output->filter = ServiceFilterCreate(tsFilter, NULL, NULL);
             if (!output->filter)
             {
                 OutputErrorStr = "Failed to allocate Service filter!";

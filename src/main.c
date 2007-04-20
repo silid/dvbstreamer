@@ -86,6 +86,27 @@ Entry point to the application.
     }while(0)
 
 /*******************************************************************************
+* Typedefs                                                                     *
+*******************************************************************************/
+
+/**
+ * Enum describing the location of the main PID Filters in the PIDFilters array
+ */
+enum PIDFilterIndex
+{
+    PIDFilterIndex_PAT = 0, /**< Index of the PAT PID Filter. */
+    PIDFilterIndex_PMT,     /**< Index of the PMT PID Filter. */
+#ifdef ATSC_STREAMER
+    PIDFilterIndex_PSIP,    /**< Index of the PSIP PID Filter. */
+#else
+    PIDFilterIndex_SDT,     /**< Index of the SDT PID Filter. */
+    PIDFilterIndex_NIT,     /**< Index of the NIT PID Filter. */
+    PIDFilterIndex_TDT,     /**< Index of the TDT PID Filter. */
+#endif
+    PIDFilterIndex_Count    /**< Number of main PID filters. */
+};
+
+/*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
 static void usage(char *appname);
@@ -98,7 +119,6 @@ static void DeinitDaemon(void);
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
-PIDFilter_t *PIDFilters[PIDFilterIndex_Count];
 TSFilter_t *TSFilter;
 DVBAdapter_t *DVBAdapter;
 
@@ -107,7 +127,6 @@ bool DaemonMode = FALSE;
 bool FilterServiceNames = FALSE;
 char FilterReplacementChar = ' ';
 char PrimaryService[] = "<Primary>";
-Output_t *PrimaryServiceOutput = NULL;
 
 char DataDirectory[PATH_MAX];
 
@@ -129,6 +148,9 @@ int main(int argc, char *argv[])
     char *bindAddress = NULL;
     char *primaryOutput = "null://";
     bool remoteInterface = FALSE;
+    Output_t *primaryServiceOutput = NULL;
+    PIDFilter_t *PIDFilters[PIDFilterIndex_Count];
+    
     /* Create the data directory */
     sprintf(DataDirectory, "%s/.dvbstreamer", getenv("HOME"));
     mkdir(DataDirectory, S_IRWXU);
@@ -247,8 +269,8 @@ int main(int argc, char *argv[])
     INIT(PluginManagerInit(), "plugin manager");
 
     /* Create Service filter */
-    PrimaryServiceOutput = OutputAllocate(PrimaryService, OutputType_Service, primaryOutput);
-    if (!PrimaryServiceOutput)
+    primaryServiceOutput = OutputAllocate(PrimaryService, OutputType_Service, primaryOutput);
+    if (!primaryServiceOutput)
     {
         LogModule(LOG_ERROR, MAIN, "Failed to create primary service output, reason %s\n", OutputErrorStr);
         exit(1);
@@ -345,6 +367,23 @@ int main(int argc, char *argv[])
 
     DEINIT(ObjectDeinit(), "objects");
     return 0;
+}
+
+void UpdateDatabase()
+{
+    TSFilterLock(TSFilter);
+    CacheWriteback();
+    TSFilterUnLock(TSFilter);
+}
+
+TSFilter_t *MainTSFilterGet(void)
+{
+    return TSFilter;
+}
+
+DVBAdapter_t *MainDVBAdapterGet(void)
+{
+    return DVBAdapter;
 }
 
 /*
@@ -495,9 +534,3 @@ static void DeinitDaemon(void)
     exit(0);
 }
 
-void UpdateDatabase()
-{
-    TSFilterLock(TSFilter);
-    CacheWriteback();
-    TSFilterUnLock(TSFilter);
-}
