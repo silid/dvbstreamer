@@ -105,7 +105,7 @@ static int DBaseCheckVersion()
 
 static int DBaseCreateTables(double version)
 {
-    int rc;
+    int rc = 0;
 
     LogModule(LOG_DEBUG, DBASE, "Creating tables\n");
     sqlite3_exec(DBaseInstance, "BEGIN TRANSACTION;", NULL, NULL, NULL);

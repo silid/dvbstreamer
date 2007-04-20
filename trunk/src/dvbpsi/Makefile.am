@@ -1,6 +1,7 @@
 AM_CFLAGS =\
      -I$(top_srcdir)/include \
-     -I$(top_srcdir)/include/dvbpsi
+     -I$(top_srcdir)/include/dvbpsi \
+     -Wall -Werror
      
 noinst_LIBRARIES = libdvbpsi.a
 

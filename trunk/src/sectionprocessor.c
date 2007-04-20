@@ -69,7 +69,7 @@ void SectionProcessorStartPID(uint16_t pid, PluginSectionProcessor_t callback, v
     PIDFilter_t *processor = SectionProcessorFind(pid);
     if (processor == NULL)
     {
-        processor = SectionProcessorCreate(TSFilter, pid);
+        processor = SectionProcessorCreate(MainTSFilterGet(), pid);
     }
     if (processor)
     {

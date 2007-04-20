@@ -952,20 +952,29 @@ static void CommandPids(int argc, char **argv)
 
 static void CommandStats(int argc, char **argv)
 {
-    int i;
     ListIterator_t iterator;
+    TSFilter_t *tsFilter = MainTSFilterGet();
+    
     CommandPrintf("PSI/SI Processor Statistics\n"
-                          "---------------------------\n");
+                  "---------------------------\n");
 
-    for (i = 0; i < PIDFilterIndex_Count; i ++)
+    for ( ListIterator_Init(iterator, tsFilter->pidFilters); 
+          ListIterator_MoreEntries(iterator); 
+          ListIterator_Next(iterator))
     {
-        CommandPrintf("\t%-15s : %d\n", PIDFilters[i]->name, PIDFilters[i]->packetsProcessed);
+        PIDFilter_t *filter = (PIDFilter_t *)ListIterator_Current(iterator);
+        if (filter->outputPacket == NULL)
+        {
+            CommandPrintf("\t%-15s : %d\n", filter->name, filter->packetsProcessed);
+        }
     }
     CommandPrintf("\n");
 
     CommandPrintf("Service Filter Statistics\n"
-                          "-------------------------\n");
-    for ( ListIterator_Init(iterator, ServiceOutputsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+                  "-------------------------\n");
+    for ( ListIterator_Init(iterator, ServiceOutputsList); 
+          ListIterator_MoreEntries(iterator); 
+          ListIterator_Next(iterator))
     {
         Output_t *output = ListIterator_Current(iterator);
         CommandPrintf("\t%-15s : %d\n", output->name, output->filter->packetsOutput);
@@ -973,8 +982,10 @@ static void CommandStats(int argc, char **argv)
     CommandPrintf("\n");
 
     CommandPrintf("Manual Output Statistics\n"
-                          "------------------------\n");
-     for ( ListIterator_Init(iterator, ManualOutputsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+                  "------------------------\n");
+     for ( ListIterator_Init(iterator, ManualOutputsList); 
+           ListIterator_MoreEntries(iterator); 
+           ListIterator_Next(iterator))
     {
         Output_t *output = ListIterator_Current(iterator);
         CommandPrintf("\t%-15s : %d\n", output->name, output->filter->packetsOutput);
@@ -983,8 +994,8 @@ static void CommandStats(int argc, char **argv)
 
 
 
-    CommandPrintf("Total packets processed: %d\n", TSFilter->totalPackets);
-    CommandPrintf("Approximate TS bitrate : %gMbs\n", ((double)TSFilter->bitrate / (1024.0 * 1024.0)));
+    CommandPrintf("Total packets processed: %d\n", tsFilter->totalPackets);
+    CommandPrintf("Approximate TS bitrate : %gMbs\n", ((double)tsFilter->bitrate / (1024.0 * 1024.0)));
 }
 
 static void CommandAddOutput(int argc, char **argv)
@@ -1269,7 +1280,7 @@ static void CommandFEStatus(int argc, char **argv)
 {
     fe_status_t status;
     unsigned int ber, strength, snr;
-    DVBFrontEndStatus(DVBAdapter, &status, &ber, &strength, &snr);
+    DVBFrontEndStatus(MainDVBAdapterGet(), &status, &ber, &strength, &snr);
 
     CommandPrintf("Tuner status:  %s%s%s%s%s%s\n",
              (status & FE_HAS_SIGNAL)?"Signal, ":"",
@@ -1451,6 +1462,7 @@ static void PATCallback(dvbpsi_pat_t* newpat)
     {
         int i;
         dvbpsi_pat_program_t *patentry = newpat->p_first_program;
+        TSFilter_t *tsFilter = MainTSFilterGet();
         pmtcount = 0;
         while(patentry)
         {
@@ -1473,7 +1485,7 @@ static void PATCallback(dvbpsi_pat_t* newpat)
             patentry = patentry->p_next;
         }
         patreceived = TRUE;
-        TSFilter->tsStructureChanged = TRUE; /* Force all PMTs to be received again incase we are scanning a mux we have pids for */
+        tsFilter->tsStructureChanged = TRUE; /* Force all PMTs to be received again incase we are scanning a mux we have pids for */
         if (patreceived)
         {
             pthread_mutex_lock(&scanningmutex);

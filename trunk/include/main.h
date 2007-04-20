@@ -31,42 +31,6 @@ Entry point to the application.
 #include "plugin.h"
 
 /**
- * Enum describing the location of the main PID Filters in the PIDFilters array
- */
-enum PIDFilterIndex
-{
-    PIDFilterIndex_PAT = 0, /**< Index of the PAT PID Filter. */
-    PIDFilterIndex_PMT,     /**< Index of the PMT PID Filter. */
-#ifdef ATSC_STREAMER
-    PIDFilterIndex_PSIP,    /**< Index of the PSIP PID Filter. */
-#else
-    PIDFilterIndex_SDT,     /**< Index of the SDT PID Filter. */
-    PIDFilterIndex_NIT,     /**< Index of the NIT PID Filter. */
-    PIDFilterIndex_TDT,     /**< Index of the TDT PID Filter. */
-#endif
-    PIDFilterIndex_Count    /**< Number of main PID filters. */
-};
-
-
-/**
- * Array containing the main PID filters (PAT, PMT and SDT).
- * Use the PIDFilterIndex enum to access this array.
- */
-extern PIDFilter_t  *PIDFilters[];
-
-/**
- * The TSFilter_t instance being used by the application
- */
-extern TSFilter_t   *TSFilter;
-
-/**
- * The DVBAdapter_t instance being used by the application.
- */
-extern DVBAdapter_t *DVBAdapter;
-
-
-
-/**
  * Boolean used to signal the program to terminate.
  */
 extern bool ExitProgram;
@@ -100,5 +64,18 @@ extern char DataDirectory[];
  * Writes any changes in the cache back to the database, ensuring the TS Filter is disabled.
  */
 void UpdateDatabase();
+
+/**
+ * Retrieve the main Transport Stream Filter object.
+ * @return The main TSFilter_t object.
+ */
+TSFilter_t *MainTSFilterGet(void);
+
+/**
+ * Retrieve the DVBAdapter_t object being used by the main TSFilter_t object.
+ * @return The main DVBAdapter_t object.
+ */
+DVBAdapter_t *MainDVBAdapterGet(void);
+
 
 #endif

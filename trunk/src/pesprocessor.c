@@ -77,7 +77,7 @@ void PESProcessorStartPID(uint16_t pid, PluginPESProcessor_t callback, void *use
     
     if (processor == NULL)
     {
-        processor = PESProcessorCreate(TSFilter, pid);
+        processor = PESProcessorCreate(MainTSFilterGet(), pid);
     }
     if (processor)
     {

@@ -74,7 +74,6 @@ dvbpsi_handle dvbpsi_AttachTDTTOT(dvbpsi_tdt_tot_callback pf_callback,
 {
   dvbpsi_handle h_dvbpsi = (dvbpsi_decoder_t*)malloc(sizeof(dvbpsi_decoder_t));
   dvbpsi_tdt_tot_decoder_t* p_tdt_tot_decoder;
-  unsigned int i;
 
   if(h_dvbpsi == NULL)
     return NULL;

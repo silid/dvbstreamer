@@ -38,8 +38,9 @@ int UDPCreateSocket(sa_family_t family)
     int reuseAddr = 1;
 #ifndef __CYGWIN__
     struct addrinfo *addrinfo, hints;
-#endif
     int ret;
+#endif
+
 
     if (socketfd < 0)
     {

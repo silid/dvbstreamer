@@ -114,13 +114,13 @@ bool UDPOutputCanHandle(char *mrl)
 
 DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
 {
+    struct UDPOutputState_t *state;
+#ifndef __CYGWIN__
     char *host_start;
     int host_len;
     char hostbuffer[256];
     char *host = NULL;
     char *port = NULL;
-    struct UDPOutputState_t *state;
-#ifndef __CYGWIN__
     struct addrinfo *addrinfo, hints;
 
     /* Ignore the prefix */

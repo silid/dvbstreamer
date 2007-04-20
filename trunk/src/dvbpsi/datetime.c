@@ -36,7 +36,7 @@ Date and Time decoding functions.
 #include "datetime.h"
 
 
-void dvbpsi_DecodeMJDUTC(char *p_mjdutc, dvbpsi_date_time_t *p_date_time)
+void dvbpsi_DecodeMJDUTC(uint8_t *p_mjdutc, dvbpsi_date_time_t *p_date_time)
 {
     #define BCD_CHAR_TO_INT(_bcd) (((_bcd >> 4) * 10) + (_bcd & 0x0f))
 
