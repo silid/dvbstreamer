@@ -1,7 +1,7 @@
 /*****************************************************************************
  * sdt.h
  * (c)2001-2002 VideoLAN
- * $Id: sdt.h 103 2005-01-21 14:34:51Z massiot $
+ * $Id: sdt.h 118 2005-09-14 19:16:53Z massiot $
  *
  * Authors: Johan Bilien <jobi@via.ecp.fr>
  *
@@ -230,6 +230,28 @@ do {                                                                    \
 dvbpsi_sdt_service_t *dvbpsi_SDTAddService(dvbpsi_sdt_t* p_sdt,
     uint16_t i_service_id, int b_eit_schedule, int b_eit_present,
     uint8_t i_running_status,int b_free_ca);
+
+
+/*****************************************************************************
+ * dvbpsi_SDTServiceAddDescriptor
+ *****************************************************************************/
+/*!
+ * \fn dvbpsi_descriptor_t *dvbpsi_SDTServiceAddDescriptor(
+                                               dvbpsi_sdt_service_t *p_service,
+                                               uint8_t i_tag, uint8_t i_length,
+                                               uint8_t *p_data)
+ * \brief Add a descriptor in the SDT service.
+ * \param p_service pointer to the service structure
+ * \param i_tag descriptor's tag
+ * \param i_length descriptor's length
+ * \param p_data descriptor's data
+ * \return a pointer to the added descriptor.
+ */
+dvbpsi_descriptor_t *dvbpsi_SDTServiceAddDescriptor(
+                                               dvbpsi_sdt_service_t *p_service,
+                                               uint8_t i_tag, uint8_t i_length,
+                                               uint8_t *p_data);
+
 
 /*****************************************************************************
  * dvbpsi_GenSDTSections
