@@ -1,6 +1,6 @@
 /*****************************************************************************
  * dr_56.c
- * (c)2004 VideoLAN
+ * (c)2004-2007 VideoLAN
  * $Id: dr_56.c 93 2004-10-19 19:17:49Z massiot $
  *
  * Authors: Derk-Jan Hartman <hartman at videolan dot org>
@@ -51,9 +51,9 @@ dvbpsi_teletext_dr_t * dvbpsi_DecodeTeletextDr(
   dvbpsi_teletext_dr_t * p_decoded;
 
   /* Check the tag */
-  if(p_descriptor->i_tag != 0x56)
+  if((p_descriptor->i_tag != 0x56) && (p_descriptor->i_tag != 0x46))
   {
-    DVBPSI_ERROR_ARG("dr_56 decoder", "bad tag (0x%x)", p_descriptor->i_tag);
+    DVBPSI_ERROR_ARG("dr_46/56 decoder", "bad tag (0x%x)", p_descriptor->i_tag);
     return NULL;
   }
 
@@ -98,10 +98,9 @@ dvbpsi_teletext_dr_t * dvbpsi_DecodeTeletextDr(
                 ((uint8_t)(p_descriptor->p_data[5 * i + 3]) >> 3);
     
     p_decoded->p_pages[i].i_teletext_magazine_number = 
-              ((uint16_t)(p_descriptor->p_data[5 * i + 3]) & 0x07)
-            | p_descriptor->p_data[5 * i + 5];
+              ((uint16_t)(p_descriptor->p_data[5 * i + 3]) & 0x07);
     
-    p_decoded->p_pages[i].i_teletext_page_number = p_descriptor->p_data[4 * i + 4]; 
+    p_decoded->p_pages[i].i_teletext_page_number = p_descriptor->p_data[5 * i + 4];
   }
   
   p_descriptor->p_decoded = (void*)p_decoded;

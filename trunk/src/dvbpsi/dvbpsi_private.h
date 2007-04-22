@@ -33,10 +33,10 @@
  * Error management
  *****************************************************************************/
 #define DVBPSI_ERROR(src, str)                                          \
-        printlog( LOG_DIARRHEA, "libdvbpsi error (" src "): " str "\n");
+        LogModule( LOG_DIARRHEA, "dvbpsi", "libdvbpsi error (" src "): " str "\n");
 #ifdef HAVE_VARIADIC_MACROS
 #  define DVBPSI_ERROR_ARG(src, str, x...)                              \
-        printlog( LOG_DIARRHEA, "libdvbpsi error (" src "): " str "\n", x);
+        LogModule( LOG_DIARRHEA, "dvbpsi",  "libdvbpsi error (" src "): " str "\n", x);
 #else
    inline void DVBPSI_ERROR_ARG( char *src, const char *str, ... )
    { va_list ap; char *line; va_start( ap, str );
@@ -45,10 +45,10 @@
 
 #ifdef DEBUG
 #  define DVBPSI_DEBUG(src, str)                                        \
-          printlog( LOG_DIARRHEA, "libdvbpsi debug (" src "): " str "\n");
+          LogModule( LOG_DIARRHEA,  "dvbpsi", "libdvbpsi debug (" src "): " str "\n");
 #  ifdef HAVE_VARIADIC_MACROS
 #     define DVBPSI_DEBUG_ARG(src, str, x...)                           \
-          printlog( LOG_DIARRHEA, "libdvbpsi debug (" src "): " str "\n", x);
+          LogModule( LOG_DIARRHEA,  "dvbpsi", "libdvbpsi debug (" src "): " str "\n", x);
 #  else
       inline void DVBPSI_DEBUG_ARG( char *src, const char *str, ... )
       { va_list ap; char *line; va_start( ap, str );
