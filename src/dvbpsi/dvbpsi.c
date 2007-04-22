@@ -2,7 +2,7 @@
  * dvbpsi.c: conversion from TS packets to PSI sections
  *----------------------------------------------------------------------------
  * (c)2001-2002 VideoLAN
- * $Id: dvbpsi.c 111 2005-07-04 15:20:54Z massiot $
+ * $Id: dvbpsi.c 131 2006-02-03 15:44:46Z massiot $
  *
  * Authors: Arnaud de Bossoreille de Ribou <bozo@via.ecp.fr>
  *
@@ -210,6 +210,11 @@ void dvbpsi_PushPacket(dvbpsi_handle h_dvbpsi, uint8_t* p_data)
           }
           else
           {
+            p_section->i_extension = 0;
+            p_section->i_version = 0;
+            p_section->b_current_next = 1;
+            p_section->i_number = 0;
+            p_section->i_last_number = 0;
             p_section->p_payload_start = p_section->p_data + 3;
           }
 
