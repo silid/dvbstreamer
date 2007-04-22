@@ -1,7 +1,7 @@
 /*****************************************************************************
  * dr_0a.h
  * (c)2001-2002 VideoLAN
- * $Id: dr_0a.h 88 2004-02-24 14:31:18Z sam $
+ * $Id: dr_0a.h 132 2006-07-18 08:34:12Z sigmunau $
  *
  * Authors: Arnaud de Bossoreille de Ribou <bozo@via.ecp.fr>
  *
@@ -39,7 +39,9 @@
 extern "C" {
 #endif
 
-
+#define DR_0A_API_VER 2
+typedef uint8_t iso_639_language_code_t[3];
+	
 /*****************************************************************************
  * dvbpsi_iso639_dr_t
  *****************************************************************************/
@@ -58,8 +60,10 @@ typedef struct dvbpsi_iso639_dr_s
 {
   uint8_t       i_code_count;           /*!< length of the i_iso_639_code
                                              array */
-  uint8_t       i_iso_639_code[252];    /*!< ISO_639_language_code */
-  uint8_t       i_audio_type;           /*!< audio_type */
+  struct {
+    iso_639_language_code_t  iso_639_code;    /*!< ISO_639_language_code */
+    uint8_t                  i_audio_type;    /*!< audio_type */
+  } code[64];
 
 } dvbpsi_iso639_dr_t;
 
