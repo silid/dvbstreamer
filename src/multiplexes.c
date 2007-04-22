@@ -104,11 +104,7 @@ Multiplex_t *MultiplexFindId(int netid, int tsid)
     Multiplex_t *result = NULL;
     STATEMENT_INIT;
 
-    STATEMENT_PREPAREVA("SELECT " MULTIPLEX_FREQ ","
-                        MULTIPLEX_TSID ","
-                        MULTIPLEX_NETID ","
-                        MULTIPLEX_TYPE ","
-                        MULTIPLEX_PATVERSION " "
+    STATEMENT_PREPAREVA("SELECT " MULTIPLEX_FIELDS " "
                         "FROM " MULTIPLEXES_TABLE
                         " WHERE " MULTIPLEX_NETID "=%d AND " MULTIPLEX_TSID "=%d;",
                         netid, tsid);
