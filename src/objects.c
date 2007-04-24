@@ -151,7 +151,7 @@ int ObjectRegisterClass(char *classname, unsigned int size, ObjectDestructor_t d
         return OBJECT_ERR_OUT_OF_MEMORY;
     }
     
-    classes[classesCount].name = classname;
+    classes[classesCount].name = strdup(classname);
     classes[classesCount].size = size;
     classes[classesCount].destructor = destructor;
     classesCount ++;
