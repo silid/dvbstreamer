@@ -877,7 +877,8 @@ static void CommandServiceInfo(int argc, char **argv)
         Multiplex_t *currentMultiplex;
         currentMultiplex = TuningCurrentMultiplexGet();
         
-        CommandPrintf("ID : 0x%04x\n", service->id);
+        CommandPrintf("ID : 0x%04x (Net ID 0x%04x TS ID 0x%04x)\n", 
+                service->id, multiplex->networkId, multiplex->tsId);
         if (MultiplexAreEqual(multiplex, currentMultiplex))
         {
             char *runningstatus[] = {
@@ -900,7 +901,10 @@ static void CommandServiceInfo(int argc, char **argv)
         
         MultiplexRefDec(currentMultiplex);
         MultiplexRefDec(multiplex);
-
+    }
+    else
+    {
+        CommandError(COMMAND_ERROR_GENERIC, "Service not found!");
     }
 }
 
@@ -946,7 +950,7 @@ static void CommandPids(int argc, char **argv)
     }
     else
     {
-        CommandPrintf("Could not find \"%s\"\n", argv[0]);
+        CommandError(COMMAND_ERROR_GENERIC, "Service not found!");
     }
 }
 
@@ -1007,7 +1011,7 @@ static void CommandAddOutput(int argc, char **argv)
     output = OutputAllocate(argv[0], OutputType_Manual, argv[1]);
     if (!output)
     {
-        CommandPrintf("Failed to add output, reason \"%s\"\n", OutputErrorStr);
+        CommandError(COMMAND_ERROR_GENERIC, OutputErrorStr);
     }
 }
 
@@ -1019,7 +1023,7 @@ static void CommandRmOutput(int argc, char **argv)
 
     if (strcmp(argv[0], PrimaryService) == 0)
     {
-        CommandPrintf("Cannot remove the primary output!\n");
+        CommandError(COMMAND_ERROR_GENERIC,"Cannot remove the primary output!");
         return;
     }
 
@@ -1059,7 +1063,7 @@ static void CommandSetOutputMRL(int argc, char **argv)
     }
     else
     {
-        CommandPrintf("Failed to set MRL to \"%s\" for %s\n", argv[1], argv[0]);
+        CommandError(COMMAND_ERROR_GENERIC,"Failed to set MRL");
     }
 }
 static void CommandAddPID(int argc, char **argv)
@@ -1135,7 +1139,7 @@ static void CommandAddSSF(int argc, char **argv)
     output = OutputAllocate(argv[0], OutputType_Service, argv[1]);
     if (!output)
     {
-        CommandPrintf("Failed to add output, reason \"%s\"\n", OutputErrorStr);
+        CommandError(COMMAND_ERROR_GENERIC, OutputErrorStr);
     }
 }
 
@@ -1148,7 +1152,7 @@ static void CommandRemoveSSF(int argc, char **argv)
 
     if (strcmp(argv[0], PrimaryService) == 0)
     {
-        CommandPrintf("You cannot remove the primary service!\n");
+        CommandError(COMMAND_ERROR_GENERIC,"You cannot remove the primary service!");
         return;
     }
 
@@ -1192,7 +1196,7 @@ static void CommandSetSSF(int argc, char **argv)
     serviceName = strchr(outputName, ' ');
     if (!serviceName)
     {
-        CommandPrintf("No service specified!");
+        CommandError(COMMAND_ERROR_GENERIC,"No service specified!");
         return;
     }
 
@@ -1202,14 +1206,14 @@ static void CommandSetSSF(int argc, char **argv)
 
     if (strcmp(outputName, PrimaryService) == 0)
     {
-        CommandPrintf("Use \'select\' to change the primary service!\n");
+        CommandError(COMMAND_ERROR_GENERIC,"Use \'select\' to change the primary service!");
         return;
     }
 
     output = OutputFind(outputName, OutputType_Service);
     if (output == NULL)
     {
-        CommandPrintf("Failed to find output %s\n", outputName);
+        CommandError(COMMAND_ERROR_GENERIC,"Failed to find output!");
         return;
     }
 
@@ -1223,7 +1227,7 @@ static void CommandSetSSF(int argc, char **argv)
     if (OutputSetService(output, service))
     {
         ServiceRefDec(service);
-        CommandPrintf("Failed to find multiplex for service %s\n", serviceName);
+        CommandError(COMMAND_ERROR_GENERIC,"Failed to find multiplex for service");
         return;
     }
 
@@ -1247,7 +1251,7 @@ static void CommandSetSFMRL(int argc, char **argv)
     }
     else
     {
-        CommandPrintf("Failed to set MRL to \"%s\" for %s\n", argv[1], argv[0]);
+        CommandError(COMMAND_ERROR_GENERIC,"Failed to set MRL!");
     }
 }
 
@@ -1272,7 +1276,7 @@ static void CommandSetSFAVSOnly(int argc, char **argv)
     }
     else
     {
-        CommandPrintf("Need to specify on or off.\n");
+        CommandError(COMMAND_ERROR_WRONG_ARGS,"Need to specify on or off.\n");
     }
 }
 
@@ -1321,7 +1325,7 @@ static void CommandHelp(int argc, char **argv)
         }
         else
         {
-            CommandPrintf("No help for unknown command \"%s\"\n", argv[0]);
+            CommandError(COMMAND_ERROR_GENERIC,"No help for unknown command!");
         }
     }
     else
