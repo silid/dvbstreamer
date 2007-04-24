@@ -89,6 +89,7 @@ static void UpdateEvent(Event_t *event, dvbpsi_eit_event_t *eitevent);
 static PluginFilter_t filter = {NULL, Init0x12Filter, Deinit0x12Filter};
 static List_t *serviceNowNextInfoList;
 
+static char NOWNEXT[]="NowNext";
 
 /*******************************************************************************
 * Plugin Setup                                                                 *
@@ -197,7 +198,7 @@ static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t table
 static void ProcessEIT(void *arg, dvbpsi_eit_t *newEIT)
 {
     ServiceNowNextInfo_t *info = FindService(newEIT->i_network_id, newEIT->i_ts_id, newEIT->i_service_id);
-    printlog(LOG_DEBUG, "EIT received (version %d) net id %x ts id %x service id %x info %p\n",
+    LogModule(LOG_DEBUG, NOWNEXT, "EIT received (version %d) net id %x ts id %x service id %x info %p\n",
         newEIT->i_version, newEIT->i_network_id, newEIT->i_ts_id, newEIT->i_service_id, info);
     if (!info)
     {
