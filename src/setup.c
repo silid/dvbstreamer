@@ -37,6 +37,7 @@ Setups the database for the main application.
 #include "services.h"
 #include "main.h"
 #include "logging.h"
+#include "lnb.h"
 
 
 #define INIT(_func, _name) \
@@ -66,7 +67,8 @@ int main(int argc, char *argv[])
     fe_type_t channelsFileType = FE_OFDM;
     char *channelsFile = NULL;
     int adapterNumber = 0;
-
+    LNBInfo_t lnbInfo = {NULL,NULL,0,0,0};
+    
     /* Create the data directory */
     sprintf(DataDirectory, "%s/.dvbstreamer", getenv("HOME"));
     mkdir(DataDirectory, S_IRWXU);
@@ -74,7 +76,7 @@ int main(int argc, char *argv[])
     while (TRUE)
     {
         int c;
-        c = getopt(argc, argv, "vVdro:a:t:s:c:h");
+        c = getopt(argc, argv, "vVdro:a:t:s:c:l:h");
         if (c == -1)
         {
             break;
@@ -113,12 +115,43 @@ int main(int argc, char *argv[])
                 channelsFileType = FE_ATSC;
                 printlog(LOG_INFOV, "Using ATSC channels file %s\n", channelsFile);
                 break;
+            case 'l': /* LNB settings */
+                if (LNBDecode(optarg, &lnbInfo))
+                {
+                    int i = 0;
+                    LNBInfo_t *knownLNB;
+                    do
+                    {
+                        knownLNB = LNBEnumerate(i);
+                        if (knownLNB)
+                        {
+                            char **desclines;
+                            printf("%s :\n", knownLNB->name);
+
+                            for (desclines = knownLNB->desc; *desclines; desclines ++)
+                            {
+                                printf("   %s\n", *desclines);
+                            }
+                            printf("\n");
+                            i ++;
+                        }
+                    }while(knownLNB);
+                    exit(1);
+                }
+                break;
             case 'h':
             default:
                 usage(argv[0]);
                 exit(1);
         }
     }
+
+    if ((channelsFileType == FE_QPSK) && (lnbInfo.lowFrequency == 0))
+    {
+        fprintf(stderr, "No LNB information provide for DVB-S channels.conf file!\n");
+        exit(1);
+    }
+    
     INIT(ObjectInit(), "objects");
     INIT(MultiplexInit(), "multiplex");
     INIT(ServiceInit(), "service");
@@ -138,6 +171,14 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+    if (channelsFileType == FE_QPSK)
+    {
+        /* Write out LNB settings. */
+        DBaseMetadataSetInt(METADATA_NAME_LNB_LOW_FREQ, lnbInfo.lowFrequency * 1000);
+        DBaseMetadataSetInt(METADATA_NAME_LNB_HIGH_FREQ, lnbInfo.highFrequency * 1000);
+        DBaseMetadataSetInt(METADATA_NAME_LNB_SWITCH_FREQ, lnbInfo.switchFrequency * 1000);        
+    }
+    
     sqlite3_exec(DBaseInstance, "COMMIT TRANSACTION;", NULL, NULL, NULL);    
     
     printf("%d Services available on %d Multiplexes\n", ServiceCount(), MultiplexCount());
@@ -160,15 +201,23 @@ static void usage(char *appname)
             "      -v            : Increase the amount of debug output, can be used multiple\n"
             "                      times for more output\n"
             "      -V            : Print version information then exit\n"
+            "\n"
             "      -a <adapter>  : Use adapter number (ie /dev/dvb/adapter<adapter>/...)\n"
+            "\n"
             "      -t <file>     : Terrestrial channels.conf file to import services and \n"
-            "                      multiplexes from.\n"
+            "                      multiplexes from. (DVB-T)\n"
+            "\n"
             "      -s <file>     : Satellite channels.conf file to import services and \n"
-            "                      multiplexes from.(EXPERIMENTAL)\n"
+            "                      multiplexes from.(DVB-S)\n"
+            "      -l <LNB Type> : (DVB-S Only) Set LNB type being used\n"
+            "                      (Use -l help to print types) or \n"
+            "      -l <low>,<high>,<switch> Specify LO frequencies in MHz\n"
+            "\n"
             "      -c <file>     : Cable channels.conf file to import services and \n"
-            "                      multiplexes from.(EXPERIMENTAL)\n"
+            "                      multiplexes from. (DVB-C)\n"
+            "\n"
             "      -A <file>     : ATSC channels.conf file to import services and \n"
-            "                      multiplexes from.(EXPERIMENTAL)\n",
+            "                      multiplexes from. (ATSC) (EXPERIMENTAL)\n",
             appname
            );
 }

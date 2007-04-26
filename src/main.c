@@ -236,6 +236,18 @@ int main(int argc, char *argv[])
     /* Initialise the DVB adapter */
     INIT(!(DVBAdapter = DVBInit(adapterNumber)), "DVB adapter");
 
+    if (DVBAdapter->info.type == FE_QPSK)
+    {
+        int lowFreq = 0;
+        int highFreq = 0;
+        int switchFreq = 0;
+        
+        DBaseMetadataGetInt(METADATA_NAME_LNB_LOW_FREQ, &lowFreq);
+        DBaseMetadataGetInt(METADATA_NAME_LNB_HIGH_FREQ, &highFreq);
+        DBaseMetadataGetInt(METADATA_NAME_LNB_SWITCH_FREQ, &switchFreq);
+        DVBFrontEndLNBInfoSet(DVBAdapter, lowFreq, highFreq, switchFreq);
+    }
+    
     /* Create Transport stream filter thread */
     INIT(!(TSFilter = TSFilterCreate(DVBAdapter)), "TS filter");
 

@@ -75,15 +75,27 @@ dnl ---------------------------------------------------------------------------
 dnl Enable args
 dnl ---------------------------------------------------------------------------
 AC_ARG_ENABLE([atsc],
-     [  --enable-atsc    Build atscstreamer rather than dvbstreamer],
-     [case "${enableval}" in
-       yes) atsc=true ;;
-       no)  atsc=false ;;
-       *) AC_MSG_ERROR([bad value ${enableval} for --enable-atsc]) ;;
-     esac],[atsc=false])
+	AS_HELP_STRING([--enable-atsc], [ Build dvbstreamer with ATSC support. The name of the executable will be atscstreamer rather than dvbstreamer]),
+     	[case "${enableval}" in
+       	yes) atsc=true ;;
+       	no)  atsc=false ;;
+       	*) AC_MSG_ERROR([bad value ${enableval} for --enable-atsc]) ;;
+    	esac],[atsc=false])
 
 AM_CONDITIONAL([ATSC], [test x$atsc = xtrue])
-     
+
+AC_ARG_ENABLE([getaddrinfo],
+	AS_HELP_STRING([--disable-getaddrinfo], [ Disable use of the getaddrinfo function, this is needed for IPv6 support but some libc don't properly support it]),
+	[case "${enableval}" in
+       	yes) use_getaddrinfo=true ;;
+       	no)  use_getaddrinfo=false ;;
+       	*) AC_MSG_ERROR([bad value ${enableval} for --disable-getaddrinfo]) ;;
+     	esac],[use_getaddrinfo=true])
+
+if test "${use_getaddrinfo}" != "false"; then
+    AC_DEFINE(USE_GETADDRINFO, 1, Use getaddrinfo for address resolution)
+fi
+
 dnl ---------------------------------------------------------------------------
 dnl Check for sqlite 3
 dnl ---------------------------------------------------------------------------

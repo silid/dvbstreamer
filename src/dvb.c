@@ -43,6 +43,7 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 *******************************************************************************/
 static int DVBDemuxSetPESFilter(DVBAdapter_t *adapter, ushort pid, int pidtype, int taptype);
 #ifndef __CYGWIN__
+static int DVBFrontEndSatelliteSetup(DVBAdapter_t *adapter, struct dvb_frontend_parameters *frontend, DVBDiSEqCSettings_t *diseqc);
 static int DVBFrontEndDiSEqCSet(DVBAdapter_t *adapter, DVBDiSEqCSettings_t *diseqc);
 #endif
 
@@ -140,15 +141,16 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
 {
 #ifndef __CYGWIN__
     /*  fe_status_t festatus; */
+    struct dvb_frontend_parameters localFEParams = *frontend;
     struct dvb_frontend_event event;
     struct pollfd pfd[1];
 
     if (adapter->info.type == FE_QPSK)
     {
-        DVBFrontEndDiSEqCSet(adapter, diseqc);
+        DVBFrontEndSatelliteSetup(adapter, &localFEParams, diseqc);
     }
     
-    if (ioctl(adapter->frontEndFd, FE_SET_FRONTEND, frontend) < 0)
+    if (ioctl(adapter->frontEndFd, FE_SET_FRONTEND, localFEParams) < 0)
     {
         LogModule(LOG_ERROR, DVBADAPTER, "setfront front: %s\n", strerror(errno));
         return 0;
@@ -187,7 +189,47 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
     return 1;
 }
 
-#ifndef  __CYGWIN__
+void DVBFrontEndLNBInfoSet(DVBAdapter_t *adapter, int lowFreq, int highFreq, int switchFreq)
+{
+    adapter->lnbLowFreq = lowFreq;
+    adapter->lnbHighFreq = highFreq;
+    adapter->lnbSwitchFreq = switchFreq;
+}
+#ifndef  __CYGWIN__    
+static int DVBFrontEndSatelliteSetup(DVBAdapter_t *adapter, struct dvb_frontend_parameters *frontend, DVBDiSEqCSettings_t *diseqc)
+{
+    int hiband = 0;
+    int ifreq = 0;
+    
+    if (adapter->lnbSwitchFreq && adapter->lnbHighFreq && 
+        (frontend->frequency >= adapter->lnbSwitchFreq))
+    {
+        hiband = 1;
+    }
+
+    if (hiband)
+    {
+      ifreq = frontend->frequency - adapter->lnbHighFreq ;
+      diseqc->tone = TRUE;
+    }
+    else 
+    {
+      if (frontend->frequency < adapter->lnbLowFreq)
+      {
+          ifreq = adapter->lnbLowFreq - frontend->frequency;
+      }
+      else
+      {
+          ifreq = frontend->frequency - adapter->lnbLowFreq;
+      }
+      diseqc->tone = FALSE;
+    }
+
+    frontend->frequency = ifreq;
+    
+    return DVBFrontEndDiSEqCSet(adapter, diseqc);
+}
+
 static int DVBFrontEndDiSEqCSet(DVBAdapter_t *adapter, DVBDiSEqCSettings_t *diseqc)
 {
    struct dvb_diseqc_master_cmd cmd =
@@ -213,7 +255,7 @@ static int DVBFrontEndDiSEqCSet(DVBAdapter_t *adapter, DVBDiSEqCSettings_t *dise
    }
    usleep(15000);
 
-   if (ioctl(adapter->frontEndFd, FE_DISEQC_SEND_BURST,(diseqc->satellite_number / 4) % 2 ? SEC_MINI_B : SEC_MINI_A) < 0)
+   if (ioctl(adapter->frontEndFd, FE_DISEQC_SEND_BURST, diseqc->satellite_number % 2 ? SEC_MINI_B : SEC_MINI_A) < 0)
    {
       return 0;
    }

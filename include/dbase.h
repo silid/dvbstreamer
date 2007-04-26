@@ -261,6 +261,18 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
  */
 #define METADATA_VALUE           "value"
 
+/**
+ * Constant for Metadata property for LNB settings.
+ */
+#define METADATA_NAME_LNB_LOW_FREQ     "lnb.lowfreq"
+/**
+ * Constant for Metadata property for LNB settings.
+ */
+#define METADATA_NAME_LNB_HIGH_FREQ    "lnb.highfreq"
+/**
+ * Constant for Metadata property for LNB settings.
+ */
+#define METADATA_NAME_LNB_SWITCH_FREQ  "lnb.switchfreq"
 
 /** @} */
 
