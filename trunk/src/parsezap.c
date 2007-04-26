@@ -216,18 +216,10 @@ static int parsezapline(char * str, fe_type_t fe_type)
     switch(fe_type)
     {
         case FE_QPSK:
-            
-            if(freq > 11700)
-            {
-                front_param.frequency = (freq - 10600)*1000;
-                diseqcsettings.tone = TRUE;
-            } else {
-                front_param.frequency = (freq - 9750)*1000;
-                diseqcsettings.tone = FALSE;
-            }
-            front_param.frequency = freq;
-            front_param.inversion = INVERSION_AUTO;
 
+            front_param.frequency = freq * 1000;
+            front_param.inversion = INVERSION_AUTO;
+            diseqcsettings.tone = FALSE;
             /* find out the polarisation */
             NEXTFIELD();
             diseqcsettings.polarisation = (field[0] == 'h' ? POL_HORIZONTAL: POL_VERTICAL);

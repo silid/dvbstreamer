@@ -49,6 +49,10 @@ typedef struct DVBAdapter_t
     // /dev/dvb/adapter#/dvr0
     char dvrPath[30];      /**< Path to the dvr device */
     int dvrFd;             /**< File descriptor for the dvr device */
+
+    int lnbLowFreq;        /**< LNB LO frequency information */
+    int lnbHighFreq;       /**< LNB LO frequency information */
+    int lnbSwitchFreq;     /**< LNB LO frequency information */
 }
 DVBAdapter_t;
 
@@ -97,6 +101,16 @@ void DVBDispose(DVBAdapter_t *adapter);
 int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *frontend, DVBDiSEqCSettings_t *diseqc);
 
 /**
+ * Set the LNB LO frequencies.
+ * @param adapter The adapter to set the LNB information on.
+ * @param lowFreq Low LO frequency.
+ * @param highFreq high LO frequency.
+ * @param switchFreq switch LO frequency.
+ * @return 0 on success, non-zero otherwise.
+ */
+void DVBFrontEndLNBInfoSet(DVBAdapter_t *adapter, int lowFreq, int highFreq, int switchFreq);
+
+/**
  * Retrieve the status of the frontend of the specified adapter.
  * @param adapter  The adapter to check.
  * @param status   Used to return the status flags.
@@ -118,7 +132,9 @@ int DVBDemuxSetBufferSize(DVBAdapter_t *adapter, unsigned long size);
 /**
  * Read upto max bytes from the dvr device belonging to the specified adapter.
  * @param adapter The adapter to read from.
- * @param
+ * @param data Buffer to read into.
+ * @param max Maximum number of bytes to read.
+ * @param timeout Maximum amount of time to wait for data.
  * @return 0 on success, non-zero otherwise.
  */
 int DVBDVRRead(DVBAdapter_t *adapter, char *data, int max, int timeout);

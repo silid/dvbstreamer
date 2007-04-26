@@ -103,11 +103,12 @@ setupdvbstreamer_SOURCES = \
     multiplexes.c\
     services.c\
     dbase.c \
-    objects.c 
+    objects.c \
+    lnb.c
 
 setupdvbstreamer_LDFLAGS =
 
-setupdvbstreamer_LDADD = -lsqlite3
+setupdvbstreamer_LDADD = -lsqlite3 -lpthread
 
 
 #
@@ -168,10 +169,11 @@ setupatscstreamer_SOURCES = \
     multiplexes.c\
     services.c\
     dbase.c \
-    objects.c 
+    objects.c  \
+    lnb.c
 
 setupatscstreamer_CFLAGS = -I$(top_srcdir)/include -DATSC_STREAMER -Wall -Werror
 
 setupatscstreamer_LDFLAGS =
 
-setupatscstreamer_LDADD = -lsqlite3
+setupatscstreamer_LDADD = -lsqlite3 -lpthread
