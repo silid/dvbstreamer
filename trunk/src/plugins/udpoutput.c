@@ -45,6 +45,9 @@ UDP Output Delivery Method handler.
 #define DEFAULT_HOST "localhost"
 #define DEFAULT_PORT "1234"
 
+#ifdef __CYGWIN__
+#define LogModule(_l, _m, _f...) fprintf(stderr, "%-15s : ", _m); fprintf(stderr, _f)
+#endif
 
 /*******************************************************************************
 * Typedefs                                                                     *
@@ -87,6 +90,7 @@ DeliveryMethodHandler_t UDPOutputHandler = {
             UDPOutputCreate
         };
 
+const char UDPOUTPUT[] = "UDPOutput";
 
 /*******************************************************************************
 * Plugin Setup                                                                 *
@@ -115,124 +119,133 @@ bool UDPOutputCanHandle(char *mrl)
 DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
 {
     struct UDPOutputState_t *state;
-#ifndef __CYGWIN__
-    char *host_start;
-    int host_len;
+    int i = 0;
+    unsigned char ttl = 1;
     char hostbuffer[256];
-    char *host = NULL;
-    char *port = NULL;
-    struct addrinfo *addrinfo, hints;
+    char portbuffer[6]; /* 65536\0 */
 
     /* Ignore the prefix */
     arg += PREFIX_LEN;
 
     if (arg[0] == '[')
     {
-        host_start = arg + 1;
-        port = strchr(arg, ']');
-        if (port == NULL)
+        arg ++;
+        LogModule(LOG_DEBUG, UDPOUTPUT, "IPv6 Address! %s\n", arg);
+        for (i = 0;arg[i] && (arg[i] != ']'); i ++)
         {
-            return NULL;
+            hostbuffer[i] = arg[i];
         }
-        host_len = port - host_start;
-        port++;
+        hostbuffer[i] = 0;
+        arg += i;
+        if (*arg == ']')
+        {
+            arg ++;
+        }
     }
     else
     {
-        port = strchr(arg, ':');
-        if (port == NULL)
+        LogModule(LOG_DEBUG, UDPOUTPUT, "IPv4 Address! %s\n", arg);
+        for (i = 0;arg[i] && (arg[i] != ':'); i ++)
         {
-            host = strlen(arg) ? arg : DEFAULT_HOST;
+            hostbuffer[i] = arg[i];
         }
-        else
-        {
-            host_start = arg;
-            host_len = port - host_start;
-        }
+        hostbuffer[i] = 0;
+        arg += i;
     }
 
-    if (host == NULL)
+    if (*arg == ':')
     {
-        if (host_len == 0)
+        arg ++;
+        LogModule(LOG_DEBUG, UDPOUTPUT, "Port parameter detected! %s\n", arg);
+        /* Process port */
+        for (i = 0;arg[i] && (arg[i] != ':'); i ++)
         {
-            host = DEFAULT_HOST;
+            portbuffer[i] = arg[i];
         }
-        else
+        portbuffer[i] = 0;
+        arg += i;
+        if (*arg == ':')
         {
-            if (host_len + 1 > sizeof(hostbuffer))
-            {
-                return NULL;
-            }
-            memcpy((void *)hostbuffer, host_start, host_len);
-            hostbuffer[host_len] = 0;
-            host = hostbuffer;
-        }
-    }
-
-    if (port == NULL)
-    {
-        port = DEFAULT_PORT;
-    }
-    else
-    {
-        switch (*port)
-        {
-            case ':':
-                port++;
-                if (strlen(port))
-                {
-                    break;
-                }
-            /* fall though */
-            case 0:
-                port = DEFAULT_PORT;
-                break;
-            default:
-                return NULL;
+            arg ++;
+            LogModule(LOG_DEBUG, UDPOUTPUT, "TTL parameter detected! %s\n", arg);
+            /* process ttl */
+            ttl = (unsigned char)atoi(arg) & 255;
         }
     }
-#endif
+    if (hostbuffer[0] == 0)
+    {
+        strcpy(hostbuffer, DEFAULT_HOST);
+    }
+    if (portbuffer[0] == 0)
+    {
+        strcpy(portbuffer, DEFAULT_PORT);
+    }
     state = calloc(1, sizeof(struct UDPOutputState_t));
     if (state == NULL)
     {
-#ifndef __CYGWIN__
-        printlog(LOG_DEBUG, "Failed to allocate UDP Output state\n");
-#endif
+        LogModule(LOG_DEBUG, UDPOUTPUT, "Failed to allocate UDP Output state\n");
         return NULL;
     }
     state->SendPacket = UDPOutputSendPacket;
     state->SendBlock = UDPOutputSendBlock;
     state->DestroyInstance = UDPOutputDestroy;
-#ifndef __CYGWIN__
-    printlog(LOG_DEBUG,"UDP Host \"%s\" Port \"%s\"\n", host, port);
-    memset((void *)&hints, 0, sizeof(hints));
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_flags = AI_ADDRCONFIG;
-    if ((getaddrinfo(host, port, &hints, &addrinfo) != 0) || (addrinfo == NULL))
-    {
-        printlog(LOG_DEBUG, "Failed to set UDP target address\n");
-        free(state);
-        return NULL;
-    }
 
-    if (addrinfo->ai_addrlen > sizeof(struct sockaddr_storage))
+    LogModule(LOG_DEBUG, UDPOUTPUT, "UDP Host \"%s\" Port \"%s\" TTL %d\n", hostbuffer, portbuffer, ttl);
+#ifdef USE_GETADDRINFO    
     {
+        struct addrinfo *addrinfo, hints;
+        memset((void *)&hints, 0, sizeof(hints));
+        hints.ai_socktype = SOCK_DGRAM;
+        hints.ai_flags = AI_ADDRCONFIG;
+        if ((getaddrinfo(hostbuffer, portbuffer, &hints, &addrinfo) != 0) || (addrinfo == NULL))
+        {
+            LogModule(LOG_DEBUG, UDPOUTPUT,"Failed to set UDP target address\n");
+            free(state);
+            return NULL;
+        }
+
+        if (addrinfo->ai_addrlen > sizeof(struct sockaddr_storage))
+        {
+            freeaddrinfo(addrinfo);
+            free(state);
+            return NULL;
+        }
+        state->addressLen = addrinfo->ai_addrlen;
+        memcpy(&state->address, addrinfo->ai_addr, addrinfo->ai_addrlen);
         freeaddrinfo(addrinfo);
-        free(state);
-        return NULL;
     }
-    state->addressLen = addrinfo->ai_addrlen;
-    memcpy(&state->address, addrinfo->ai_addr, addrinfo->ai_addrlen);
-    freeaddrinfo(addrinfo);
+#else
+    {
+        struct sockaddr_in sockaddr;
+        struct hostent *hostinfo;
+        sockaddr.sin_port=htons(atoi(portbuffer));
+        hostinfo = gethostbyname(hostbuffer);
+        if (hostinfo == NULL)
+        {
+            LogModule(LOG_DEBUG, UDPOUTPUT,"Failed to set UDP target address\n");
+            return NULL;
+        }
+        sockaddr.sin_family = hostinfo->h_addrtype;
+        memcpy((char *)&(sockaddr.sin_addr), hostinfo->h_addr, hostinfo->h_length);
+        
+        memcpy(&state->address, &sockaddr, sizeof(sockaddr));
+        state->addressLen = sizeof(sockaddr);
+    }
+#endif
 
     state->socket = UDPCreateSocket(state->address.ss_family);
     if (state->socket == -1)
     {
-        printlog(LOG_DEBUG, "Failed to create UDP socket\n");
+        LogModule(LOG_DEBUG, UDPOUTPUT,"Failed to create UDP socket\n");
         free(state);
         return NULL;
     }
-#endif
+    
+    if (ttl > 1)
+    {
+        setsockopt(state->socket,IPPROTO_IP,IP_MULTICAST_TTL, &ttl,sizeof(ttl));
+    }
+    
     state->datagramFullCount = MAX_TS_PACKETS_PER_DATAGRAM;
     return (DeliveryMethodInstance_t *)state;
 }
@@ -240,9 +253,7 @@ DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
 void UDPOutputDestroy(DeliveryMethodInstance_t *this)
 {
     struct UDPOutputState_t *state = (struct UDPOutputState_t *)this;
-#ifndef __CYGWIN__
     close(state->socket);
-#endif
     free(state);
 }
 

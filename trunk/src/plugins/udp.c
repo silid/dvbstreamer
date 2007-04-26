@@ -20,6 +20,7 @@ udpsend.c
 Simplify UDP socket creation and packet sending.
 
 */
+#include "config.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -27,55 +28,82 @@ Simplify UDP socket creation and packet sending.
 #include <sys/socket.h>
 #include <string.h>
 #include <netdb.h>
+#include "main.h"
 #include "logging.h"
 #include "udp.h"
 
-#define PORT "54197" // 0xd3b5 ~= DVBS
+/*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
 
+#define PORT 54197 // 0xd3b5 ~= DVBS
+
+#ifdef __CYGWIN__
+#define LogModule(_l, _m, _f...) fprintf(stderr, "%-15s : ", _m); fprintf(stderr, _f)
+#endif
+
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
+static const char UDP[] = "UDP";
+
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
 int UDPCreateSocket(sa_family_t family)
 {
     int socketfd = socket(family, SOCK_DGRAM, IPPROTO_UDP);
     int reuseAddr = 1;
-#ifndef __CYGWIN__
+    struct sockaddr *addr;
+    socklen_t addr_len;
+#ifdef USE_GETADDRINFO
     struct addrinfo *addrinfo, hints;
     int ret;
+#else     
+    struct sockaddr_in ip4addr;
 #endif
-
 
     if (socketfd < 0)
     {
-        #ifndef __CYGWIN__
-        printlog(LOG_ERROR, "socket() failed\n");
-        #endif
+        LogModule(LOG_ERROR, UDP, "socket() failed\n");
         return -1;
     }
 
     if (setsockopt(socketfd, SOL_SOCKET, SO_REUSEADDR, &reuseAddr, sizeof(int)))
     {
-        #ifndef __CYGWIN__
-        printlog(LOG_ERROR,"setsockopt(SOL_SOCKET, SO_REUSEADDR) failed\n");
-        #endif
+        LogModule(LOG_ERROR, UDP, "setsockopt(SOL_SOCKET, SO_REUSEADDR) failed\n");
         close(socketfd);
         return -1;
     }
-#ifndef __CYGWIN__
+#ifdef USE_GETADDRINFO
     memset((void *)&hints, 0, sizeof(hints));
     hints.ai_family = family;
     hints.ai_socktype = SOCK_DGRAM;
     hints.ai_flags = AI_PASSIVE | AI_NUMERICSERV;
-    ret = getaddrinfo(NULL, PORT, &hints, &addrinfo);
+    ret = getaddrinfo(NULL, TOSTRING(PORT), &hints, &addrinfo);
     if (ret != 0 || addrinfo == NULL)
     {
-        printlog(LOG_ERROR, "getaddrinfo() failed with error %s\n", gai_strerror(ret));
+        LogModule(LOG_ERROR, UDP, "getaddrinfo() failed with error %s\n", gai_strerror(ret));
         return -1;
     }
+    addr = addrinfo->ai_addr;
+    addr_len = addrinfo->ai_addrlen;
+#else
+    ip4addr.sin_family = AF_INET;
+    ip4addr.sin_port = PORT;
+    ip4addr.sin_addr.s_addr = INADDR_ANY;
+    addr = (struct sockaddr*)&ip4addr;
+    addr_len = sizeof(ip4addr);
+#endif
 
-    if	(bind(socketfd, addrinfo->ai_addr, addrinfo->ai_addrlen)<0)
+    if (bind(socketfd, addr, addr_len)<0)
     {
-        printlog(LOG_ERROR, "bind() failed\n");
+        LogModule(LOG_ERROR,UDP, "bind() failed\n");
         close(socketfd);
         socketfd = -1;
     }
+    
+#ifdef USE_GETADDRINFO
     freeaddrinfo(addrinfo);
 #endif
     return socketfd;
