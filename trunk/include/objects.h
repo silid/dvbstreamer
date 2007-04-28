@@ -69,6 +69,14 @@ int ObjectRegisterClass(char *classname, unsigned int size, ObjectDestructor_t d
 #define ObjectRegisterType(_type) ObjectRegisterClass(TOSTRING(_type), sizeof(_type), NULL)
 
 /**
+ * Helper macro to register a type as an object class.
+ * @param _type The type to register with the object system.
+ * @param _destructor Function to call when free'ing an object of the type being
+ * registered.
+ */
+#define ObjectRegisterTypeDestructor(_type, _destructor) ObjectRegisterClass(TOSTRING(_type), sizeof(_type), _destructor)
+
+/**
  * Create a new object of class <classname>. The initial reference count for the
  * returned object will be 1.
  * @param classname Class of object to create.

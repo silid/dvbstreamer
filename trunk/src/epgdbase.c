@@ -1,0 +1,557 @@
+/*
+Copyright (C) 2006  Adam Charrett
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
+
+schedule.c
+
+Plugin to collect EPG schedule information.
+
+*/
+#define _XOPEN_SOURCE
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <stdint.h>
+#include <pthread.h>
+#include <limits.h>
+#include <time.h>
+
+#include "main.h"
+#include "types.h"
+
+#include "dbase.h"
+#include "epgdbase.h"
+
+#include "list.h"
+#include "logging.h"
+#include "objects.h"
+
+/*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
+#define EPGDBASE_VERSION_NAME "EPGDBaseVersion"
+#define EPGDBASE_VERSION 0.1
+
+/* Undef it and redefine it to use the correct database connection */
+#undef STATEMENT_PREPARE
+#define STATEMENT_PREPARE(_statement) rc = sqlite3_prepare( EPGDBaseConnection,  _statement, -1, &stmt, NULL)
+
+#undef PRINTLOG_SQLITE3ERROR
+#define PRINTLOG_SQLITE3ERROR() \
+    do{\
+        LogModule(LOG_DEBUG, "dbase", "%s(%d): Failed with error code 0x%x = %s\n",__FUNCTION__,__LINE__, rc, sqlite3_errmsg(EPGDBaseConnection));\
+    }while(0)
+
+#define EPGEVENT_FIELDS EPGEVENT_NETID "," EPGEVENT_TSID "," EPGEVENT_SERVICEID "," \
+                        EPGEVENT_EVENTID "," EPGEVENT_STARTTIME "," EPGEVENT_ENDTIME  "," \
+                        EPGEVENT_CA
+
+#define EPGRATING_FIELDS_NOID EPGRATING_NETID "," EPGRATING_TSID "," \
+                         EPGRATING_SERVICEID "," EPGRATING_EVENTID "," EPGRATING_STANDARD "," \
+                         EPGRATING_RATING
+
+#define EPGRATING_FIELDS_NOREF EPGRATING_ID "," EPGRATING_STANDARD "," \
+                         EPGRATING_RATING
+                         
+#define EPGDETAIL_FIELDS_NOID EPGDETAIL_NETID "," EPGDETAIL_TSID "," \
+                          EPGDETAIL_SERVICEID "," EPGDETAIL_EVENTID "," EPGDETAIL_LANGUAGE "," \
+                          EPGDETAIL_NAME "," EPGDETAIL_VALUE
+
+#define EPGDETAIL_FIELDS_NOREF EPGDETAIL_ID "," EPGDETAIL_LANGUAGE "," \
+                          EPGDETAIL_NAME "," EPGDETAIL_VALUE                          
+
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
+static void EPGEventRatingDestructor(void *arg);
+static void EPGEventDetailDestructor(void *arg);
+
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
+static pthread_mutex_t EPGMutex = PTHREAD_MUTEX_INITIALIZER;
+static sqlite3 *EPGDBaseConnection;
+static const char TimeFormat[] = "%Y-%m-%d %T";
+static const char EPGDBASE[] = "EPGDBase";
+
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
+int EPGDBaseInit(int adapter)
+{
+    char file[PATH_MAX];
+    int rc;
+
+    ObjectRegisterType(EPGEvent_t);
+    ObjectRegisterTypeDestructor(EPGEventRating_t, EPGEventRatingDestructor);    
+    ObjectRegisterTypeDestructor(EPGEventDetail_t, EPGEventDetailDestructor);
+
+    sprintf(file, "%s/epg%d.db", DataDirectory, adapter);
+    rc = sqlite3_open(file, &EPGDBaseConnection);
+    if (rc == SQLITE_OK)
+    {
+        rc = sqlite3_exec(EPGDBaseConnection, "CREATE TABLE IF NOT EXISTS " EPGEVENTS_TABLE" ( "
+                          EPGEVENT_FIELDS ","
+                          "PRIMARY KEY ( "EPGEVENT_NETID "," EPGEVENT_TSID "," EPGEVENT_SERVICEID "," EPGEVENT_EVENTID ")"
+                          ");", NULL, NULL, NULL);
+        if (rc)
+        {
+            LogModule(LOG_ERROR, EPGDBASE, "Failed to create EPG Events table: %s\n", sqlite3_errmsg(EPGDBaseConnection));
+            return rc;
+        }
+
+        rc = sqlite3_exec(EPGDBaseConnection, "CREATE TABLE IF NOT EXISTS " EPGRATINGS_TABLE" ( "
+                         EPGRATING_ID        " INTEGER PRIMARY KEY AUTOINCREMENT," 
+                         EPGRATING_NETID     "," 
+                         EPGRATING_TSID      ","
+                         EPGRATING_SERVICEID "," 
+                         EPGRATING_EVENTID   "," 
+                         EPGRATING_STANDARD  ","
+                         EPGRATING_RATING
+                         ");", NULL, NULL, NULL);
+        if (rc)
+        {
+            LogModule(LOG_ERROR, EPGDBASE, "Failed to create EPG Ratings table: %s\n", sqlite3_errmsg(EPGDBaseConnection));
+            return rc;
+        }
+
+        rc = sqlite3_exec(EPGDBaseConnection, "CREATE TABLE IF NOT EXISTS " EPGDETAILS_TABLE" ( "
+                         EPGDETAIL_ID        " INTEGER PRIMARY KEY AUTOINCREMENT," 
+                         EPGDETAIL_NETID     "," 
+                         EPGDETAIL_TSID      ","
+                         EPGDETAIL_SERVICEID "," 
+                         EPGDETAIL_EVENTID   "," 
+                         EPGDETAIL_LANGUAGE  ","
+                         EPGDETAIL_NAME  ","
+                         EPGDETAIL_VALUE
+                         ");", NULL, NULL, NULL);
+        if (rc)
+        {
+            LogModule(LOG_ERROR, EPGDBASE, "Failed to create EPG Ratings table: %s\n", sqlite3_errmsg(EPGDBaseConnection));
+            return rc;
+        }
+    }
+    return rc;
+}
+
+
+int EPGDBaseDeInit()
+{
+    sqlite3_close(EPGDBaseConnection);
+    return 0;
+}
+
+int EPGDBaseTransactionStart(void)
+{
+    pthread_mutex_lock(&EPGMutex);
+    return  sqlite3_exec(EPGDBaseConnection, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+}
+
+int EPGDBaseTransactionCommit(void)
+{
+    int rc = sqlite3_exec(EPGDBaseConnection, "COMMIT TRANSACTION;", NULL, NULL, NULL);
+    pthread_mutex_unlock(&EPGMutex);
+    return rc;
+}
+
+int EPGDBaseEventAdd(EPGEvent_t *event)
+{
+    STATEMENT_INIT;
+    char startTime[25];
+    char endTime[25];
+    strftime(startTime, sizeof(startTime), TimeFormat, &event->startTime);
+    strftime(endTime, sizeof(endTime), TimeFormat, &event->endTime);    
+    STATEMENT_PREPAREVA("INSERT INTO " EPGEVENTS_TABLE"("EPGEVENT_FIELDS") "
+                        "VALUES (%d,%d,%d,%d,'%q','%q',%d);",
+                        event->serviceRef.netId,event->serviceRef.tsId,event->serviceRef.serviceId,
+                        event->eventId, startTime, endTime, event->ca);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_FINALIZE();
+    return 0;
+}
+
+int EPGDBaseEventRemove(EPGServiceRef_t *serviceRef, unsigned int eventId)
+{
+    STATEMENT_INIT;
+
+    STATEMENT_PREPAREVA("DELETE FROM " EPGEVENTS_TABLE " "
+                        "WHERE " EPGEVENT_NETID "=%u AND " 
+                                 EPGEVENT_TSID "=%u AND " 
+                                 EPGEVENT_SERVICEID "=%u AND "
+                                 EPGEVENT_EVENTID "=%u;",
+                        serviceRef->netId, 
+                        serviceRef->tsId, 
+                        serviceRef->serviceId, 
+                        eventId);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+
+    STATEMENT_FINALIZE();
+    return 0;   
+}
+
+int EPGDBaseEventCountAll()
+{
+    int result = -1;
+    STATEMENT_INIT;
+
+    STATEMENT_PREPARE("SELECT count() FROM " EPGEVENTS_TABLE ";");
+    RETURN_ON_ERROR(-1);
+
+    STATEMENT_STEP();
+    if (rc == SQLITE_ROW)
+    {
+        result = STATEMENT_COLUMN_INT( 0);
+        rc = 0;
+    }
+    STATEMENT_FINALIZE();
+    return result;
+}
+
+int EPGDBaseEventCountService(EPGServiceRef_t *serviceRef)
+{
+    int result = -1;
+    STATEMENT_INIT;
+
+    STATEMENT_PREPAREVA("SELECT count() FROM " EPGEVENTS_TABLE " WHERE "
+        EPGEVENT_NETID "=%u AND " EPGEVENT_TSID "=%u AND " EPGEVENT_SERVICEID "=%u;",
+        serviceRef->netId, serviceRef->tsId, serviceRef->serviceId);
+    RETURN_ON_ERROR(-1);
+
+    STATEMENT_STEP();
+    if (rc == SQLITE_ROW)
+    {
+        result = STATEMENT_COLUMN_INT( 0);
+        rc = 0;
+    }
+    STATEMENT_FINALIZE();
+    return result;
+}
+
+EPGDBaseEnumerator_t EPGDBaseEventEnumeratorGetAll()
+{
+    STATEMENT_INIT;
+
+    STATEMENT_PREPARE("SELECT " EPGEVENT_FIELDS " "
+                        "FROM " EPGEVENTS_TABLE ";");
+    RETURN_ON_ERROR(NULL);
+
+    return stmt;
+}
+
+EPGDBaseEnumerator_t EPGDBaseEventEnumeratorGetService(EPGServiceRef_t *serviceRef)
+{
+    STATEMENT_INIT;
+
+    STATEMENT_PREPAREVA("SELECT " EPGEVENT_FIELDS " "
+                        "FROM " EPGEVENTS_TABLE " "
+                        "WHERE " EPGEVENT_NETID "=%u AND " 
+                                 EPGEVENT_TSID "=%u AND " 
+                                 EPGEVENT_SERVICEID "=%u;",
+                        serviceRef->netId, serviceRef->tsId, serviceRef->serviceId);
+    RETURN_ON_ERROR(NULL);
+
+    return stmt;
+}
+
+EPGEvent_t *EPGDBaseEventGetNext(EPGDBaseEnumerator_t enumerator)
+{
+    sqlite3_stmt *stmt = (sqlite3_stmt *)enumerator;
+    int rc;
+
+    STATEMENT_STEP();
+    if (rc == SQLITE_ROW)
+    {
+        EPGEvent_t *event = NULL;
+        char *temp;
+        event = ObjectCreateType(EPGEvent_t);
+        event->serviceRef.netId = (unsigned int)STATEMENT_COLUMN_INT( 0);
+        event->serviceRef.tsId = (unsigned int)STATEMENT_COLUMN_INT( 1);
+        event->serviceRef.serviceId = (unsigned int)STATEMENT_COLUMN_INT( 2);
+        event->eventId = (unsigned int)STATEMENT_COLUMN_INT( 3);
+        temp = STATEMENT_COLUMN_TEXT(4);
+        LogModule(LOG_DEBUG, EPGDBASE, "Retrieve Event start time (%x:%x:%x) %x %s\n",
+            event->serviceRef.netId,event->serviceRef.tsId,event->serviceRef.serviceId,
+            event->eventId ,temp);
+        strptime(temp, TimeFormat, &event->startTime);
+        temp = STATEMENT_COLUMN_TEXT(5);
+        LogModule(LOG_DEBUG, EPGDBASE, "Retrieve Event end time   (%x:%x:%x) %x %s\n",
+                    event->serviceRef.netId,event->serviceRef.tsId,event->serviceRef.serviceId,
+                    event->eventId ,temp);
+
+        strptime(temp, TimeFormat, &event->endTime);        
+        event->ca = STATEMENT_COLUMN_INT( 6) ? TRUE: FALSE;
+        return event;
+    }
+
+    if (rc != SQLITE_DONE)
+    {
+        PRINTLOG_SQLITE3ERROR();
+    }
+    return NULL;
+}
+
+
+int EPGDBaseRatingAdd(EPGServiceRef_t *serviceRef, unsigned int eventId, char *system, char *rating)
+{
+    STATEMENT_INIT;
+    STATEMENT_PREPAREVA("INSERT INTO " EPGRATINGS_TABLE "(" EPGRATING_FIELDS_NOID ") "
+                        "VALUES (%d,%d,%d,%d,'%q','%q');",
+                        serviceRef->netId,serviceRef->tsId,serviceRef->serviceId,
+                        eventId, system, rating);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_FINALIZE();
+    return 0;
+}
+
+int EPGDBaseRatingRemoveAll(EPGServiceRef_t *serviceRef, unsigned int eventId)
+{
+    STATEMENT_INIT;
+
+    STATEMENT_PREPAREVA("DELETE FROM " EPGRATINGS_TABLE " "
+                        "WHERE " EPGRATING_NETID "=%u AND " 
+                                 EPGRATING_TSID "=%u AND " 
+                                 EPGRATING_SERVICEID "=%u AND "
+                                 EPGRATING_EVENTID "=%u;",
+                        serviceRef->netId, 
+                        serviceRef->tsId, 
+                        serviceRef->serviceId, 
+                        eventId);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+
+    STATEMENT_FINALIZE();
+    return 0;   
+}
+
+int EPGDBaseRatingCount(EPGServiceRef_t *serviceRef, unsigned int eventId)
+{
+    int result = -1;
+    STATEMENT_INIT;
+
+    STATEMENT_PREPAREVA("SELECT count() FROM " EPGRATINGS_TABLE " WHERE "
+        EPGRATING_NETID "=%u AND " EPGRATING_TSID "=%u AND " EPGRATING_SERVICEID "=%u AND "
+        EPGRATING_EVENTID "=%u;",
+        serviceRef->netId, serviceRef->tsId, serviceRef->serviceId, eventId);
+    RETURN_ON_ERROR(-1);
+
+    STATEMENT_STEP();
+    if (rc == SQLITE_ROW)
+    {
+        result = STATEMENT_COLUMN_INT( 0);
+        rc = 0;
+    }
+    STATEMENT_FINALIZE();
+    return result;
+}
+
+EPGDBaseEnumerator_t EPGDBaseRatingEnumeratorGet(EPGServiceRef_t *serviceRef, unsigned int eventId)
+{
+    STATEMENT_INIT;
+
+    STATEMENT_PREPAREVA("SELECT " EPGRATING_FIELDS_NOREF " "
+                        "FROM " EPGRATINGS_TABLE" "
+                        "WHERE " EPGRATING_NETID "=%u AND " 
+                                 EPGRATING_TSID "=%u AND " 
+                                 EPGRATING_SERVICEID "=%u AND "
+                                 EPGRATING_EVENTID "=%u;",
+                        serviceRef->netId, serviceRef->tsId, serviceRef->serviceId, eventId);
+    RETURN_ON_ERROR(NULL);
+
+    return stmt;
+}
+
+EPGEventRating_t *EPGDBaseRatingGetNext(EPGDBaseEnumerator_t enumerator)
+{
+    sqlite3_stmt *stmt = (sqlite3_stmt *)enumerator;
+    int rc;
+
+    STATEMENT_STEP();
+    if (rc == SQLITE_ROW)
+    {
+        EPGEventRating_t *rating = NULL;
+        char *temp;
+        rating = ObjectCreateType(EPGEventRating_t);
+        rating->id = STATEMENT_COLUMN_INT( 0);
+        temp = STATEMENT_COLUMN_TEXT( 1);
+        rating->system= strdup(temp);
+        temp = STATEMENT_COLUMN_TEXT( 2);
+        rating->rating = strdup(temp);        
+        return rating;
+    }
+
+    if (rc != SQLITE_DONE)
+    {
+        PRINTLOG_SQLITE3ERROR();
+    }
+    return NULL;
+}
+
+int EPGDBaseDetailAdd(EPGServiceRef_t *serviceRef, unsigned int eventId, char *lang, char * name, char *value)
+{
+    STATEMENT_INIT;
+    STATEMENT_PREPAREVA("INSERT INTO " EPGDETAILS_TABLE "(" EPGDETAIL_FIELDS_NOID ") "
+                        "VALUES (%d,%d,%d,%d,'%q','%q','%q');",
+                        serviceRef->netId,serviceRef->tsId,serviceRef->serviceId,
+                        eventId, lang, name, value);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_FINALIZE();
+    return 0;
+}
+
+int EPGDBaseDetailRemoveAll(EPGServiceRef_t *serviceRef, unsigned int eventId)
+{
+    STATEMENT_INIT;
+
+    STATEMENT_PREPAREVA("DELETE FROM " EPGDETAILS_TABLE " "
+                        "WHERE " EPGDETAIL_NETID "=%u AND " 
+                                 EPGDETAIL_TSID "=%u AND " 
+                                 EPGDETAIL_SERVICEID "=%u AND "
+                                 EPGDETAIL_EVENTID "=%u;",
+                        serviceRef->netId, 
+                        serviceRef->tsId, 
+                        serviceRef->serviceId, 
+                        eventId);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+
+    STATEMENT_FINALIZE();
+    return 0;   
+}
+
+int EPGDBaseDetailCount(EPGServiceRef_t *serviceRef, unsigned int eventId)
+{
+    int result = -1;
+    STATEMENT_INIT;
+
+    STATEMENT_PREPAREVA("SELECT count() FROM " EPGDETAILS_TABLE " WHERE "
+        EPGDETAIL_NETID "=%u AND " EPGDETAIL_TSID "=%u AND " EPGDETAIL_SERVICEID "=%u AND "
+        EPGDETAIL_EVENTID "=%u;",
+        serviceRef->netId, serviceRef->tsId, serviceRef->serviceId, eventId);
+    RETURN_ON_ERROR(-1);
+
+    STATEMENT_STEP();
+    if (rc == SQLITE_ROW)
+    {
+        result = STATEMENT_COLUMN_INT( 0);
+        rc = 0;
+    }
+    STATEMENT_FINALIZE();
+    return result;
+}
+
+EPGDBaseEnumerator_t EPGDBaseDetailGet(EPGServiceRef_t *serviceRef, unsigned int eventId, char *name)
+{
+    STATEMENT_INIT;
+
+    STATEMENT_PREPAREVA("SELECT " EPGDETAIL_FIELDS_NOREF " "
+                        "FROM " EPGDETAILS_TABLE " "
+                        "WHERE " EPGDETAIL_NETID "=%u AND " 
+                                 EPGDETAIL_TSID "=%u AND " 
+                                 EPGDETAIL_SERVICEID "=%u AND "
+                                 EPGDETAIL_EVENTID "=%u AND "
+                                 EPGDETAIL_NAME "='%q';",
+                        serviceRef->netId, serviceRef->tsId, serviceRef->serviceId, 
+                        eventId, name);
+    RETURN_ON_ERROR(NULL);
+
+    return stmt;
+}
+
+EPGDBaseEnumerator_t EPGDBaseDetailEnumeratorGet(EPGServiceRef_t *serviceRef, unsigned int eventId)
+{
+    STATEMENT_INIT;
+
+    STATEMENT_PREPAREVA("SELECT " EPGDETAIL_FIELDS_NOREF " "
+                        "FROM " EPGDETAILS_TABLE " "
+                        "WHERE " EPGDETAIL_NETID "=%u AND " 
+                                 EPGDETAIL_TSID "=%u AND " 
+                                 EPGDETAIL_SERVICEID "=%u AND "
+                                 EPGDETAIL_EVENTID "=%u;",
+                        serviceRef->netId, serviceRef->tsId, serviceRef->serviceId, eventId);
+    RETURN_ON_ERROR(NULL);
+
+    return stmt;
+}
+
+EPGEventDetail_t *EPGDBaseDetailGetNext(EPGDBaseEnumerator_t enumerator)
+{
+    sqlite3_stmt *stmt = (sqlite3_stmt *)enumerator;
+    int rc;
+
+    STATEMENT_STEP();
+    if (rc == SQLITE_ROW)
+    {
+        EPGEventDetail_t *detail = NULL;
+        char *temp;
+        detail = ObjectCreateType(EPGEventDetail_t);
+        detail->id = STATEMENT_COLUMN_INT( 0);
+        temp = STATEMENT_COLUMN_TEXT( 1);
+        strcpy(detail->lang, temp);
+        temp = STATEMENT_COLUMN_TEXT( 2);
+        detail->name = strdup(temp);
+        temp = STATEMENT_COLUMN_TEXT( 3);
+        detail->value = strdup(temp);        
+        return detail;
+    }
+
+    if (rc != SQLITE_DONE)
+    {
+        PRINTLOG_SQLITE3ERROR();
+    }
+    return NULL;
+}
+
+void EPGDBaseEnumeratorDestroy(EPGDBaseEnumerator_t enumerator)
+{
+    int rc;
+    sqlite3_stmt *stmt = (sqlite3_stmt *)enumerator;
+    STATEMENT_FINALIZE();
+}
+
+/*******************************************************************************
+* Local Functions                                                              *
+*******************************************************************************/
+static void EPGEventRatingDestructor(void *arg)
+{
+    EPGEventRating_t *rating = arg;
+    free(rating->rating);
+    free(rating->system);
+}
+
+static void EPGEventDetailDestructor(void *arg)
+{
+    EPGEventDetail_t *detail = arg;
+    free(detail->name);
+    free(detail->value);
+}

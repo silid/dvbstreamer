@@ -262,6 +262,109 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 #define METADATA_VALUE           "value"
 
 /**
+ * Constant for the EPG Events table.
+ */
+#define EPGEVENTS_TABLE          "EPGEvents"
+/**
+ * Constant for EPG Event column name.
+ */
+#define EPGEVENT_NETID           "netid"
+/**
+ * Constant for EPG Event column name.
+ */
+#define EPGEVENT_TSID            "tsid"
+/**
+ * Constant for EPG Event column name.
+ */
+#define EPGEVENT_SERVICEID       "serviceid"
+/**
+ * Constant for EPG Event column name.
+ */
+#define EPGEVENT_EVENTID         "eventid"
+/**
+ * Constant for EPG Event column name.
+ */
+#define EPGEVENT_STARTTIME       "starttime"
+/**
+ * Constant for EPG Event column name.
+ */
+#define EPGEVENT_ENDTIME         "endtime"
+/**
+ * Constant for EPG Event column name.
+ */
+#define EPGEVENT_CA              "ca"
+
+/**
+ * Constant for the EPG Ratings table.
+ */
+#define EPGRATINGS_TABLE         "EPGRatings"
+/**
+ * Constant for EPG Rating column name.
+ */
+#define EPGRATING_ID             "id"
+/**
+ * Constant for EPG Rating column name.
+ */
+#define EPGRATING_NETID           "netid"
+/**
+ * Constant for EPG Rating column name.
+ */
+#define EPGRATING_TSID            "tsid"
+/**
+ * Constant for EPG Rating column name.
+ */
+#define EPGRATING_SERVICEID       "serviceid"
+/**
+ * Constant for EPG Rating column name.
+ */
+#define EPGRATING_EVENTID         "eventid"
+/**
+ * Constant for EPG Rating column name.
+ */
+#define EPGRATING_STANDARD        "standard"
+/**
+ * Constant for EPG Rating column name.
+ */
+#define EPGRATING_RATING          "rating"
+
+/**
+ * Constant for the EPG Details table.
+ */
+#define EPGDETAILS_TABLE         "EPGDetails"
+/**
+ * Constant for EPG Detail column name.
+ */
+#define EPGDETAIL_ID             "id"
+/**
+ * Constant for EPG Detail column name.
+ */
+#define EPGDETAIL_NETID           "netid"
+/**
+ * Constant for EPG Detail column name.
+ */
+#define EPGDETAIL_TSID            "tsid"
+/**
+ * Constant for EPG Detail column name.
+ */
+#define EPGDETAIL_SERVICEID       "serviceid"
+/**
+ * Constant for EPG Detail column name.
+ */
+#define EPGDETAIL_EVENTID         "eventid"
+/**
+ * Constant for EPG Detail column name.
+ */
+#define EPGDETAIL_LANGUAGE        "lang"
+/**
+ * Constant for EPG Detail column name.
+ */
+#define EPGDETAIL_NAME            "name"
+/**
+ * Constant for EPG Detail column name.
+ */
+#define EPGDETAIL_VALUE           "value"
+
+/**
  * Constant for Metadata property for LNB settings.
  */
 #define METADATA_NAME_LNB_LOW_FREQ     "lnb.lowfreq"
