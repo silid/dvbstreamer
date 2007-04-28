@@ -150,7 +150,7 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
         DVBFrontEndSatelliteSetup(adapter, &localFEParams, diseqc);
     }
     
-    if (ioctl(adapter->frontEndFd, FE_SET_FRONTEND, localFEParams) < 0)
+    if (ioctl(adapter->frontEndFd, FE_SET_FRONTEND, &localFEParams) < 0)
     {
         LogModule(LOG_ERROR, DVBADAPTER, "setfront front: %s\n", strerror(errno));
         return 0;
