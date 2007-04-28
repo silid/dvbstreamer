@@ -227,6 +227,20 @@ Service_t *ServiceFindId(Multiplex_t *multiplex, int id)
     return result;
 }
 
+Service_t *ServiceFindFQID(uint16_t networkId, uint16_t tsId, uint16_t serviceId)
+{
+    Service_t *service = NULL;
+    Multiplex_t *multiplex;
+
+    multiplex = MultiplexFindId(networkId, tsId);
+    if (multiplex)
+    {
+        service = ServiceFindId(multiplex, serviceId);
+        MultiplexRefDec(multiplex);
+    }
+    return service;
+}
+
 ServiceEnumerator_t ServiceEnumeratorGet()
 {
     STATEMENT_INIT;

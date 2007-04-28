@@ -38,6 +38,7 @@ Entry point to the application.
 
 #include "parsezap.h"
 #include "dbase.h"
+#include "epgdbase.h"
 #include "multiplexes.h"
 #include "services.h"
 #include "dvb.h"
@@ -226,6 +227,7 @@ int main(int argc, char *argv[])
     }
 
     INIT(DBaseInit(adapterNumber), "database");
+    INIT(EPGDBaseInit(adapterNumber), "EPG database");
     INIT(MultiplexInit(), "multiplex");
     INIT(ServiceInit(), "service");
     INIT(CacheInit(), "cache");
@@ -370,6 +372,7 @@ int main(int argc, char *argv[])
 
     DEINIT(ServiceDeinit(), "service");
     DEINIT(MultiplexDeinit(), "multiplex");
+    DEINIT(EPGDBaseDeInit(), "EPG database");    
     DEINIT(DBaseDeInit(), "database");
 
     if (DaemonMode)

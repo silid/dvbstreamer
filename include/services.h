@@ -172,6 +172,16 @@ Service_t *ServiceFindName(char *name);
 Service_t *ServiceFindId(Multiplex_t *multiplex, int id);
 
 /**
+ * Find the service based on the fully qualified ID.
+ * The returned service should be released with ServiceRefDec.
+ * @param networkId Network ID of the multiplex this service is on.
+ * @param tsId TS ID of the multiplex this service is on.
+ * @param serviecID ID of the service to find.
+ * @return A service structure or NULL if the service was not found.
+ */
+Service_t *ServiceFindFQID(uint16_t networkId, uint16_t tsId, uint16_t serviceId);
+    
+/**
  * Rerieve an enumerator for the entire service table.
  * @return A service enumerator or NULL if there is not enough memory.
  */

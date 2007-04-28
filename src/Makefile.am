@@ -41,7 +41,8 @@ common_src = \
     pluginmgr.c \
     sectionprocessor.c \
     pesprocessor.c \
-    subtableprocessor.c
+    subtableprocessor.c \
+    epgdbase.c
 
 #
 # DVBStreamer
@@ -69,7 +70,8 @@ dvbstreamer_SOURCES = \
     pluginmgr.c \
     sectionprocessor.c \
     pesprocessor.c \
-    subtableprocessor.c \
+    subtableprocessor.c  \
+    epgdbase.c \
     sdtprocessor.c\
     nitprocessor.c \
     tdtprocessor.c
@@ -137,7 +139,8 @@ atscstreamer_SOURCES = \
     pluginmgr.c \
     sectionprocessor.c \
     pesprocessor.c \
-    subtableprocessor.c \
+    subtableprocessor.c  \
+    epgdbase.c \
     psipprocessor.c
     
 atscstreamer_CFLAGS = -I$(top_srcdir)/include -DLOGGING_CHECK_DAEMON -DATSC_STREAMER -Wall -Werror
