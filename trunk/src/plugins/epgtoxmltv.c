@@ -27,6 +27,8 @@ Plugin to dump the EPG Database out in XMLTV format.
 #include <stdint.h>
 #include <time.h>
 
+#include "main.h"
+
 #include "plugin.h"
 #include "epgdbase.h"
 
