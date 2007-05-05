@@ -138,7 +138,6 @@ static int findMultiplex(fe_type_t fe_type, int freq, DVBDiSEqCSettings_t *diseq
                 if (fe_type == FE_QPSK)
                 {
                     if ((muxdiseqcsettings.polarisation == diseqcsettings->polarisation) &&
-                        (muxdiseqcsettings.tone == diseqcsettings->tone) &&
                         (muxdiseqcsettings.satellite_number == diseqcsettings->satellite_number))
                     {
                         *uid = multiplex->uid;
@@ -219,7 +218,6 @@ static int parsezapline(char * str, fe_type_t fe_type)
 
             front_param.frequency = freq * 1000;
             front_param.inversion = INVERSION_AUTO;
-            diseqcsettings.tone = FALSE;
             /* find out the polarisation */
             NEXTFIELD();
             diseqcsettings.polarisation = (field[0] == 'h' ? POL_HORIZONTAL: POL_VERTICAL);

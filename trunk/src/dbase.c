@@ -208,7 +208,6 @@ static int DBaseCreateTables(double version)
                           QPSKPARAM_INVERSION ","
                           QPSKPARAM_SYMBOL_RATE ","
                           QPSKPARAM_FEC_INNER ","
-                          QPSKPARAM_TONE ","
                           QPSKPARAM_POLARISATION ","
                           QPSKPARAM_SATNUMBER
                           ");", NULL, NULL, NULL);
@@ -247,7 +246,6 @@ static int DBaseCreateTables(double version)
             LogModule(LOG_ERROR, DBASE, "Failed to create VSBParameters table: %s\n", sqlite3_errmsg(DBaseInstance));
             return rc;
         }
-
     }
 
     DBaseMetadataSetDouble(METADATA_DBASE_VERSION,DBASE_VERSION);

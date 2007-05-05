@@ -159,10 +159,6 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 /**
  * Constant for QPSKParameters column name.
  */
-#define QPSKPARAM_TONE           "tone"
-/**
- * Constant for QPSKParameters column name.
- */
 #define QPSKPARAM_POLARISATION   "polarisation"
 /**
  * Constant for QPSKParameters column name.
