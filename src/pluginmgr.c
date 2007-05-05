@@ -41,6 +41,10 @@ Plugin Manager functions.
 #include "tuning.h"
 
 /*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
+#define PLUGIN_FEATURE_INFO(_feature) {_feature, # _feature}
+/*******************************************************************************
 * Typedefs                                                                     *
 *******************************************************************************/
 
@@ -48,6 +52,12 @@ struct PluginEntry_t
 {
     lt_dlhandle handle;
     Plugin_t *pluginInterface;
+};
+
+struct PluginFeatureInfo_t
+{
+    int feature;
+    char *name;
 };
 
 /*******************************************************************************
@@ -60,6 +70,8 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface);
 
 static void PluginManagerLsPlugins(int argc, char **argv);
 static void PluginManagerPluginInfo(int argc, char **argv);
+
+static char *FindPluginFeatureName(int type);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -85,8 +97,29 @@ static Command_t PluginManagerCommands[] = {
         {NULL, FALSE, 0, 0, NULL, NULL}
     };
 
-static char PLUGINMANAGER[] = "PluginManager";
+struct PluginFeatureInfo_t pluginFeatures[] = {
+    PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_FILTER),
+    PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_PATPROCESSOR),
+    PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_PMTPROCESSOR),
+    PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_DELIVERYMETHOD),
+    PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_CHANNELCHANGED),
+    PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_SDTPROCESSOR),
+    PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_NITPROCESSOR),
+    PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_TDTPROCESSOR),
+    PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR),
+    PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_PESPROCESSOR),
+    PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_INSTALL),
+    PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_NONE)
 
+};
+
+static char PLUGINMANAGER[] = "PluginManager";
+#ifdef __CYGWIN__    
+extern Plugin_t LCNQueryPluginInterface;
+extern Plugin_t NowNextPluginInterface;
+extern Plugin_t DVBSchedulePluginInterface;
+extern Plugin_t EPGtoXMLTVPluginInterface;
+#endif
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
@@ -100,7 +133,23 @@ int PluginManagerInit(void)
 
     /* Load all the plugins */
     lt_dlforeachfile(DVBSTREAMER_PLUGINDIR, PluginManagerLoadPlugin, NULL);
-
+#ifdef __CYGWIN__
+    {
+        struct PluginEntry_t *entry;
+        entry = calloc(1, sizeof(struct PluginEntry_t));
+        entry->pluginInterface = &LCNQueryPluginInterface;
+        ListAdd(PluginsList, entry);
+        entry = calloc(1, sizeof(struct PluginEntry_t));
+        entry->pluginInterface = &NowNextPluginInterface;
+        ListAdd(PluginsList, entry);
+        entry = calloc(1, sizeof(struct PluginEntry_t));
+        entry->pluginInterface = &DVBSchedulePluginInterface;
+        ListAdd(PluginsList, entry);        
+        entry = calloc(1, sizeof(struct PluginEntry_t));
+        entry->pluginInterface = &EPGtoXMLTVPluginInterface;
+        ListAdd(PluginsList, entry);                
+    }
+#endif
     /* Process the plugins */
     for ( ListIterator_Init(iterator, PluginsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
@@ -108,6 +157,7 @@ int PluginManagerInit(void)
         LogModule(LOG_DEBUG, PLUGINMANAGER,"Installing %s\n", entry->pluginInterface->name);
         PluginManagerInstallPlugin(entry->pluginInterface);
     }
+
     CommandRegisterCommands(PluginManagerCommands);
     LogModule(LOG_DEBUG, PLUGINMANAGER, "Plugin Manager Initialised\n");
     return 0;
@@ -167,6 +217,7 @@ static int PluginManagerLoadPlugin(const char *filename, void *userarg)
                 if (entry)
                 {
                     entry->pluginInterface = pluginInterface;
+                    entry->handle = handle;
                     if (ListAdd(PluginsList, entry))
                     {
                         LogModule(LOG_INFOV, PLUGINMANAGER, "Loaded plugin %s\n", pluginInterface->name);
@@ -193,7 +244,10 @@ static void PluginManagerUnloadPlugin(struct PluginEntry_t *entry)
 {
     LogModule(LOG_DEBUG, PLUGINMANAGER, "Uninstalling %s\n", entry->pluginInterface->name);
     PluginManagerUninstallPlugin(entry->pluginInterface);
-    lt_dlclose(entry->handle);
+    if (entry->handle)
+    {
+        lt_dlclose(entry->handle);
+    }
     free(entry);
 }
 
@@ -386,17 +440,87 @@ static void PluginManagerPluginInfo(int argc, char **argv)
 
     if (pluginInterface)
     {
-        CommandPrintf("Name    : %s\n"
-                      "Version : %s\n"
-                      "Author  : %s\n"
-                      "Description:\n%s\n",
+        int i;
+        char *pluginFor = "<Invalid>";
+        
+        CommandPrintf("Name        : %s\n"
+                      "Version     : %s\n"
+                      "Author      : %s\n"
+                      "Description :\n%s\n\n",
                       pluginInterface->name,
                       pluginInterface->version,
                       pluginInterface->author,
                       pluginInterface->description);
+
+        CommandPrintf("Plugin Details\n"
+                      "--------------\n");
+        switch(pluginInterface->pluginFor)
+        {
+            case PLUGIN_FOR_DVB:
+                pluginFor = "DVB";
+                break;
+            case PLUGIN_FOR_ATSC:
+                pluginFor = "ATSC";
+                break;
+            case PLUGIN_FOR_ALL:
+                pluginFor = "All transport types";
+                break;
+        }
+        CommandPrintf("\nPlugin For : %s\n", pluginFor);
+        
+        CommandPrintf("\nFeatures   :\n");
+        if (pluginInterface->features)
+        {
+            for (i = 0;(pluginInterface->features[i].type != PLUGIN_FEATURE_TYPE_NONE); i++)
+            {
+                char *name = FindPluginFeatureName(pluginInterface->features[i].type);
+                if (name)
+                {
+                    CommandPrintf("\t%s\n", name);
+                }
+                else
+                {
+                    CommandPrintf("\t<Invalid Feature type %d>\n", pluginInterface->features[i].type);
+                }
+            }
+        }
+        else
+        {
+            CommandPrintf("<None>\n");
+        }
+        CommandPrintf("\nCommands   :\n");
+        if (pluginInterface->commands)
+        {
+            for (i = 0;pluginInterface->commands[i].command; i ++)
+            {
+                CommandPrintf("\t%s\n", pluginInterface->commands[i].command);
+            }
+        }
+         else
+        {
+            CommandPrintf("<None>\n");
+        }
+        CommandPrintf("\n");
     }
     else
     {
         CommandPrintf("Plugin \"%s\" not found.\n", argv[0]);
     }
+}
+
+/*******************************************************************************
+* Local Functions                                                              *
+*******************************************************************************/
+
+static char *FindPluginFeatureName(int type)
+{
+    int i;
+    for (i = 0; pluginFeatures[i].feature != PLUGIN_FEATURE_TYPE_NONE; i ++)
+    {
+        if (pluginFeatures[i].feature == type)
+        {
+            return pluginFeatures[i].name;
+        }
+    }
+    return NULL;
 }

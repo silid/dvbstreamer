@@ -60,6 +60,7 @@ PLUGIN_COMMANDS(
 );
 
 PLUGIN_INTERFACE_CF(
+    PLUGIN_FOR_DVB,
     "Date/Time", 
     "0.1", 
     "Example plugin that uses the TDT/TOT.", 

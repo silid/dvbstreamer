@@ -62,6 +62,7 @@ PLUGIN_COMMANDS(
 );
 
 PLUGIN_INTERFACE_C(
+    PLUGIN_FOR_ALL,
     "EPGtoXMLTV", "0.1", 
     "Plugin to dump the EPG Database out in XMLTV format.", 
     "charrea6@users.sourceforge.net"

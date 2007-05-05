@@ -101,6 +101,7 @@ PLUGIN_FEATURES(
 );
 
 PLUGIN_INTERFACE_F(
+    PLUGIN_FOR_ALL,
     "UDPOutput", 
     "0.1", 
     "Simple UDP Delivery method.\nUse udp://<host>:<port>", 

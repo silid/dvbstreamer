@@ -110,6 +110,7 @@ PLUGIN_FEATURES(
     );
 
 PLUGIN_INTERFACE_F(
+    PLUGIN_FOR_DVB,
     "DVBSchedule", "0.1", 
     "Plugin to capture DVB EPG schedule information.", 
     "charrea6@users.sourceforge.net"

@@ -110,8 +110,12 @@ PLUGIN_COMMANDS(
         CommandFindLCN
     }
 );
+#ifdef __CYGWIN__
+#define PluginInterface LCNQueryPluginInterface
+#endif
 
 PLUGIN_INTERFACE_CF(
+    PLUGIN_FOR_DVB,
     "LCNQuery", 
     "0.1", 
     "Logical Channel Number look-up/list", 

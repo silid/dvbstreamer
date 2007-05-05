@@ -59,6 +59,7 @@ PLUGIN_FEATURES(
 );
 
 PLUGIN_INTERFACE_F(
+    PLUGIN_FOR_ALL,
     "NullOutput", 
     "0.1", 
     "Null Delivery method, all packets are dropped.", 
