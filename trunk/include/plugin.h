@@ -116,6 +116,18 @@ typedef struct PluginFeature_t
 	void *details;  /**< Pointer to a structure containing specific details for the feature. */
 }PluginFeature_t;
 
+/**
+ * Constant for a plugin that is just for use when processing DVB signals.
+ */
+#define PLUGIN_FOR_DVB  0x01
+/**
+ * Constant for a plugin this is just for use when processing ATSC signals.
+ */
+#define PLUGIN_FOR_ATSC 0x02
+/**
+ * Constant for a plugin that should be loaded for any type of signal.
+ */
+#define PLUGIN_FOR_ALL  0xff
 
 /**
  * Structure used to define a plugin.
@@ -145,6 +157,7 @@ typedef struct PluginFeature_t
 typedef struct Plugin_t
 {
     unsigned int requiredVersion; /**< Version of DVBStreamer required to run this plugin */
+    unsigned int pluginFor;       /**< What type of transport stream this plugin is meant for. */
 	char *name;                   /**< Name of the plugin */
 	char *version;                /**< String describing the version of the plugin */
 	char *description;            /**< Description of the plugin */
@@ -156,21 +169,21 @@ typedef struct Plugin_t
 /**
  * Simple macro to help in defining the Plugin Interface with only commands.
  */
-#define PLUGIN_INTERFACE_C(_name, _version, _desc, _author) \
-    Plugin_t PluginInterface = { DVBSTREAMER_VERSION, _name, _version, _desc, _author, PluginCommands, NULL}
+#define PLUGIN_INTERFACE_C(_for, _name, _version, _desc, _author) \
+    Plugin_t PluginInterface = { DVBSTREAMER_VERSION, _for, _name, _version, _desc, _author, PluginCommands, NULL}
 
 /**
  * Simple macro to help in defining the Plugin Interface with only features.
  */
-#define PLUGIN_INTERFACE_F(_name, _version, _desc, _author) \
-    Plugin_t PluginInterface = { DVBSTREAMER_VERSION, _name, _version, _desc, _author, NULL, PluginFeatures}
+#define PLUGIN_INTERFACE_F(_for, _name, _version, _desc, _author) \
+    Plugin_t PluginInterface = { DVBSTREAMER_VERSION, _for, _name, _version, _desc, _author, NULL, PluginFeatures}
 
 /**
  * Simple macro to help in defining the Plugin Interface with both commands and
  * features
  */
-#define PLUGIN_INTERFACE_CF(_name, _version, _desc, _author) \
-    Plugin_t PluginInterface = { DVBSTREAMER_VERSION, _name, _version, _desc, _author, PluginCommands, PluginFeatures}
+#define PLUGIN_INTERFACE_CF(_for, _name, _version, _desc, _author) \
+    Plugin_t PluginInterface = { DVBSTREAMER_VERSION, _for, _name, _version, _desc, _author, PluginCommands, PluginFeatures}
 
 /**
  * Use this macro to define the commands a plugin provides.

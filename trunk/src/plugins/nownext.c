@@ -94,6 +94,10 @@ static char NOWNEXT[]="NowNext";
 /*******************************************************************************
 * Plugin Setup                                                                 *
 *******************************************************************************/
+#ifdef __CYGWIN__
+#define PluginInterface NowNextPluginInterface
+#endif
+
 PLUGIN_COMMANDS(
     {
         "now",
@@ -120,6 +124,7 @@ PLUGIN_FEATURES(
     );
 
 PLUGIN_INTERFACE_CF(
+    PLUGIN_FOR_DVB,
     "NowNext", "0.1", 
     "Plugin to display present/following EPG information.", 
     "charrea6@users.sourceforge.net"

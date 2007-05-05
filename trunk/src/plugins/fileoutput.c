@@ -75,6 +75,7 @@ PLUGIN_FEATURES(
 );
 
 PLUGIN_INTERFACE_F(
+    PLUGIN_FOR_ALL,
     "FileOutput", 
     "0.1", 
     "File Delivery method.\nUse file://<file name>\n"

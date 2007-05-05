@@ -75,6 +75,7 @@ PLUGIN_COMMANDS(
 );
 
 PLUGIN_INTERFACE_C(
+    PLUGIN_FOR_ALL,
     "ExtractPES", 
     "0.1", 
     "Example usage of the PES Filter.", 
