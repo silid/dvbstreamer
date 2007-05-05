@@ -72,7 +72,6 @@ enum Polarisation_e
  */
 typedef struct DVBDiSEqCSettings_s
 {
-    bool tone;                       /**< Whether tone should be enabled or disabled. */
     enum Polarisation_e polarisation;/**< Polarisation of the signal */
     unsigned long satellite_number;  /**< Satellite number for the switch */
 }DVBDiSEqCSettings_t;

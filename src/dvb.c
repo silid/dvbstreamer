@@ -44,7 +44,7 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 static int DVBDemuxSetPESFilter(DVBAdapter_t *adapter, ushort pid, int pidtype, int taptype);
 #ifndef __CYGWIN__
 static int DVBFrontEndSatelliteSetup(DVBAdapter_t *adapter, struct dvb_frontend_parameters *frontend, DVBDiSEqCSettings_t *diseqc);
-static int DVBFrontEndDiSEqCSet(DVBAdapter_t *adapter, DVBDiSEqCSettings_t *diseqc);
+static int DVBFrontEndDiSEqCSet(DVBAdapter_t *adapter, DVBDiSEqCSettings_t *diseqc, bool tone);
 #endif
 
 /*******************************************************************************
@@ -200,6 +200,7 @@ static int DVBFrontEndSatelliteSetup(DVBAdapter_t *adapter, struct dvb_frontend_
 {
     int hiband = 0;
     int ifreq = 0;
+    bool tone = FALSE;
     
     if (adapter->lnbSwitchFreq && adapter->lnbHighFreq && 
         (frontend->frequency >= adapter->lnbSwitchFreq))
@@ -210,7 +211,7 @@ static int DVBFrontEndSatelliteSetup(DVBAdapter_t *adapter, struct dvb_frontend_
     if (hiband)
     {
       ifreq = frontend->frequency - adapter->lnbHighFreq ;
-      diseqc->tone = TRUE;
+      tone = TRUE;
     }
     else 
     {
@@ -222,21 +223,21 @@ static int DVBFrontEndSatelliteSetup(DVBAdapter_t *adapter, struct dvb_frontend_
       {
           ifreq = frontend->frequency - adapter->lnbLowFreq;
       }
-      diseqc->tone = FALSE;
+      tone = FALSE;
     }
 
     frontend->frequency = ifreq;
     
-    return DVBFrontEndDiSEqCSet(adapter, diseqc);
+    return DVBFrontEndDiSEqCSet(adapter, diseqc, tone);
 }
 
-static int DVBFrontEndDiSEqCSet(DVBAdapter_t *adapter, DVBDiSEqCSettings_t *diseqc)
+static int DVBFrontEndDiSEqCSet(DVBAdapter_t *adapter, DVBDiSEqCSettings_t *diseqc, bool tone)
 {
    struct dvb_diseqc_master_cmd cmd =
       {{0xe0, 0x10, 0x38, 0xf0, 0x00, 0x00}, 4};
 
    cmd.msg[3] = 0xf0 | ((diseqc->satellite_number* 4) & 0x0f) |
-      (diseqc->tone ? 1 : 0) | (diseqc->polarisation? 0 : 2);
+      (tone ? 1 : 0) | (diseqc->polarisation? 0 : 2);
 
    if (ioctl(adapter->frontEndFd, FE_SET_TONE, SEC_TONE_OFF) < 0)
    {
@@ -260,7 +261,7 @@ static int DVBFrontEndDiSEqCSet(DVBAdapter_t *adapter, DVBDiSEqCSettings_t *dise
       return 0;
    }
    usleep(15000);
-   if (ioctl(adapter->frontEndFd, FE_SET_TONE, diseqc->tone ? SEC_TONE_ON : SEC_TONE_OFF) < 0)
+   if (ioctl(adapter->frontEndFd, FE_SET_TONE, tone ? SEC_TONE_ON : SEC_TONE_OFF) < 0)
    {
       return 0;
    }

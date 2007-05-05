@@ -358,7 +358,6 @@ static int QPSKParametersGet(int uid, struct dvb_frontend_parameters *feparams, 
                         QPSKPARAM_INVERSION ","
                         QPSKPARAM_SYMBOL_RATE ","
                         QPSKPARAM_FEC_INNER ","
-                        QPSKPARAM_TONE ","
                         QPSKPARAM_POLARISATION ","
                         QPSKPARAM_SATNUMBER " "
                         "FROM " QPSKPARAMS_TABLE " WHERE " QPSKPARAM_MULTIPLEXUID"=%d;"
@@ -373,7 +372,6 @@ static int QPSKParametersGet(int uid, struct dvb_frontend_parameters *feparams, 
         feparams->u.qpsk.symbol_rate  = STATEMENT_COLUMN_INT(2);
         feparams->u.qpsk.fec_inner    = STATEMENT_COLUMN_INT(3);
 
-        diseqc->tone             = STATEMENT_COLUMN_INT(4);
         diseqc->polarisation     = STATEMENT_COLUMN_INT(5);
         diseqc->satellite_number = STATEMENT_COLUMN_INT(6);
         rc = 0;
@@ -392,7 +390,6 @@ static int QPSKParametersAdd(int uid,struct dvb_frontend_parameters *feparams, D
                         "%d," /* QPSKPARAM_INVERSION */
                         "%d," /* QPSKPARAM_SYMBOL_RATE */
                         "%d," /* QPSKPARAM_FEC_INNER */
-                        "%d," /* QPSKPARAM_TONE */
                         "%d," /* QPSKPARAM_POLARISATION */
                         "%d"  /* QPSKPARAM_SATNUMBER */
                         ");",
@@ -401,7 +398,6 @@ static int QPSKParametersAdd(int uid,struct dvb_frontend_parameters *feparams, D
                         feparams->inversion,
                         feparams->u.qpsk.symbol_rate,
                         feparams->u.qpsk.fec_inner,
-                        diseqc->tone,
                         diseqc->polarisation,
                         diseqc->satellite_number);
     RETURN_RC_ON_ERROR;
