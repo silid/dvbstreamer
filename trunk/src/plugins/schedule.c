@@ -38,7 +38,7 @@ Plugin to collect EPG schedule information.
 #include "list.h"
 #include "logging.h"
 #include "subtableprocessor.h"
-
+#include "dvbtext.h"
 
 
 /*******************************************************************************
@@ -242,24 +242,25 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *eiteve
         serviceRef->netId, serviceRef->tsId, serviceRef->serviceId, epgevent.eventId,
         startTimeStr, endTimeStr);
     
-    EPGDBaseEventAdd(&epgevent);
+    if (EPGDBaseEventAdd(&epgevent) != 0)
+    {
+        return;
+    }
         
     for (descriptor = eitevent->p_first_descriptor; descriptor; descriptor = descriptor->p_next)
     {
         if (descriptor->i_tag == SHORT_EVENT_DR)
         {
             char lang[4];
-            char temp[256];
+            char *temp;
             dvbpsi_short_event_dr_t * sed = dvbpsi_DecodeShortEventDr(descriptor);
             lang[0] = sed->i_iso_639_code[0];
             lang[1] = sed->i_iso_639_code[1];
             lang[2] = sed->i_iso_639_code[2];
             lang[3] = 0;
-            memcpy(temp, sed->i_event_name, sed->i_event_name_length);
-            temp[sed->i_event_name_length] = 0;
+            temp = DVBTextToUTF8((char *)sed->i_event_name, sed->i_event_name_length);
             EPGDBaseDetailAdd(serviceRef, epgevent.eventId, lang, EPG_EVENT_DETAIL_TITLE, temp);
-            memcpy(temp, sed->i_text, sed->i_text_length);
-            temp[sed->i_text_length] = 0;
+            temp = DVBTextToUTF8((char *)sed->i_text, sed->i_text_length);
             EPGDBaseDetailAdd(serviceRef, epgevent.eventId, lang, EPG_EVENT_DETAIL_DESCRIPTION, temp);
         }
         if (descriptor->i_tag == PARENTAL_RATINGS_DR)

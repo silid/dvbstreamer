@@ -81,6 +81,16 @@ void DBaseDeInit()
     sqlite3_close(DBaseInstance);
 }
 
+int DBaseTransactionBegin(void)
+{
+    return sqlite3_exec(DBaseInstance, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+}
+
+int DBaseTransactionCommit(void)
+{
+    return sqlite3_exec(DBaseInstance, "COMMIT TRANSACTION;", NULL, NULL, NULL);
+}
+
 /*******************************************************************************
 * Local Functions                                                              *
 *******************************************************************************/

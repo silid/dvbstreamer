@@ -124,9 +124,11 @@ int ObjectDeinit(void)
     {
         unsigned int i;
         LogModule(LOG_DEBUG, OBJECT, "Registered Classes:\n");
+        LogModule(LOG_DEBUG, OBJECT, "\tClass Name                       | Size       | Destructor?\n");
+        LogModule(LOG_DEBUG, OBJECT, "\t---------------------------------|------------|------------\n");
         for (i = 0; i < classesCount; i ++)
         {
-            LogModule(LOG_DEBUG, OBJECT, "\t%s size %d destructor? %s\n", classes[i].name, classes[i].size, classes[i].destructor ? "Yes":"No");
+            LogModule(LOG_DEBUG, OBJECT, "\t%-32s | %10d | %s\n", classes[i].name, classes[i].size, classes[i].destructor ? "Yes":"No");
         }
     }
     pthread_mutex_destroy(&objectMutex);

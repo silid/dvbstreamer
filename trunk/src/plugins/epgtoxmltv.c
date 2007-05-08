@@ -28,12 +28,14 @@ Plugin to dump the EPG Database out in XMLTV format.
 #include <time.h>
 
 #include "main.h"
-
+#include "utf8.h"
 #include "plugin.h"
 #include "epgdbase.h"
+#include "dbase.h"
 
 #include "list.h"
 #include "logging.h"
+
 
 /*******************************************************************************
 * Prototypes                                                                   *
@@ -44,7 +46,7 @@ static void DumpProgrammes(void);
 static void DumpMultiplexProgrammes(Multiplex_t *multiplex);
 static void DumpServiceProgrammes(Multiplex_t *multiplex, Service_t *service);
 static void DumpProgramme(Multiplex_t *multiplex, Service_t *service, EPGEvent_t *event);
-
+static void PrintXmlified(char *text);
 /*******************************************************************************
 * Plugin Setup                                                                 *
 *******************************************************************************/
@@ -100,37 +102,57 @@ static void DumpChannels(void)
 static void DumpProgrammes(void)
 {
     MultiplexEnumerator_t enumerator = MultiplexEnumeratorGet();
+    List_t *multiplexes = ListCreate();
+    ListIterator_t iterator;
     Multiplex_t *multiplex;
+    DBaseTransactionBegin();
     EPGDBaseTransactionStart();
     do
     {
         multiplex = MultiplexGetNext(enumerator);
         if (multiplex)
         {
-            DumpMultiplexProgrammes(multiplex);
-            MultiplexRefDec(multiplex);
+            ListAdd(multiplexes, multiplex);
         }
     }while(multiplex && !ExitProgram);
     MultiplexEnumeratorDestroy(enumerator);
+
+    for (ListIterator_Init(iterator, multiplexes); ListIterator_MoreEntries(iterator);ListIterator_Next(iterator))
+    {
+        multiplex = ListIterator_Current(iterator);
+        DumpMultiplexProgrammes(multiplex);
+        MultiplexRefDec(multiplex);
+    }
+    ListFree(multiplexes,NULL);
     EPGDBaseTransactionCommit();
+    DBaseTransactionCommit();
 }
 
 static void DumpMultiplexProgrammes(Multiplex_t *multiplex)
 {
     Service_t *service;
     ServiceEnumerator_t enumerator = ServiceEnumeratorForMultiplex(multiplex);
-
+    List_t *services = ListCreate();
+    ListIterator_t iterator;
     do
     {
         service = ServiceGetNext(enumerator);
         if (service)
         {
-            DumpServiceProgrammes(multiplex, service);
-            ServiceRefDec(service);
+            ListAdd(services, service);
         }
     }
     while(service && !ExitProgram);
     ServiceEnumeratorDestroy(enumerator); 
+    
+    for (ListIterator_Init(iterator, services); ListIterator_MoreEntries(iterator);ListIterator_Next(iterator))
+    {
+        service = ListIterator_Current(iterator);
+        DumpServiceProgrammes(multiplex, service);
+        ServiceRefDec(service);
+    }    
+    ListFree(services, NULL);
+
 }
 
 static void DumpServiceProgrammes(Multiplex_t *multiplex, Service_t *service)
@@ -164,20 +186,23 @@ static void DumpProgramme(Multiplex_t *multiplex, Service_t *service, EPGEvent_t
     serviceRef.netId = multiplex->networkId;
     serviceRef.tsId = multiplex->tsId;
     serviceRef.serviceId = service->id;
-    
+
     CommandPrintf("<programme start=\"%04d%02d%02d%02d%02d%02d\" stop=\"%04d%02d%02d%02d%02d%02d\" channel=\"%s\">\n",
                     event->startTime.tm_year + 1900, event->startTime.tm_mon + 1, event->startTime.tm_mday,
                     event->startTime.tm_hour, event->startTime.tm_min, event->startTime.tm_sec,
                     event->endTime.tm_year + 1900, event->endTime.tm_mon + 1, event->endTime.tm_mday,
                     event->endTime.tm_hour, event->endTime.tm_min, event->endTime.tm_sec,                    
                     service->name);
+
     enumerator = EPGDBaseDetailGet(&serviceRef, event->eventId, EPG_EVENT_DETAIL_TITLE);
     do
     {
         detail = EPGDBaseDetailGetNext(enumerator);
         if (detail)
         {
-            CommandPrintf("<title lang=\"%s\">%s</title>\n", detail->lang, detail->value);
+            CommandPrintf("<title lang=\"%s\">", detail->lang);
+            PrintXmlified(detail->value);
+            CommandPrintf("</title>\n");
             ObjectRefDec(detail);
         }
     }while(detail && !ExitProgram);
@@ -189,12 +214,67 @@ static void DumpProgramme(Multiplex_t *multiplex, Service_t *service, EPGEvent_t
         detail = EPGDBaseDetailGetNext(enumerator);
         if (detail)
         {
-            CommandPrintf("<desc lang=\"%s\">%s</desc>\n", detail->lang, detail->value);
+            CommandPrintf("<desc lang=\"%s\">", detail->lang);
+            PrintXmlified(detail->value);
+            CommandPrintf("</desc>\n");
             ObjectRefDec(detail);            
         }
     }while(detail && !ExitProgram);
     EPGDBaseEnumeratorDestroy(enumerator);
-    
+
     CommandPrintf("</programme>\n");
 }
 
+static void PrintXmlified(char *text)
+{
+    char buffer[256];
+    char temp[10];
+    int bufferIndex = 0;
+    int i;
+    int len = strlen(text);
+
+    buffer[0] = 0;
+    for (i = 0; i < len;)
+    {
+        unsigned int ch = UTF8_nextchar(text, &i);
+        switch (ch) {
+            case '\t':
+            case '\n':
+            case ' ' ... '%': // &
+            case '\'' ... ';': // <
+            case '=': // >
+            case '?' ... 0x7E:
+                temp[0] = (char)ch;
+                temp[1] = 0;
+                break;
+            case '&':
+                strcpy(temp, "&amp;");
+                break;
+            case '<':
+                strcpy(temp, "&lt;");
+                break;
+            case '>':
+                strcpy(temp, "&gt;");
+                break;
+            case 0x0000 ... 0x0008:
+            case 0x000B ... 0x001F:
+            case 0x007F:
+                fprintf(stderr, "Illegal char %04x\n", i);
+            default:
+                UTF8_wc_toutf8(temp, ch);
+                break;
+        } // switch
+        if (strlen(temp) + bufferIndex > sizeof(buffer))
+        {
+            CommandPrintf("%s", buffer);
+            bufferIndex = 0;
+            buffer[0] = 0;
+        }
+        strcat(buffer, temp);
+        bufferIndex += strlen(temp);
+    }
+    if (bufferIndex)
+    {
+        CommandPrintf("%s", buffer);
+    }
+}

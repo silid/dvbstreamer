@@ -61,15 +61,13 @@ Plugin to collect EPG schedule information.
                         EPGEVENT_EVENTID "," EPGEVENT_STARTTIME "," EPGEVENT_ENDTIME  "," \
                         EPGEVENT_CA
 
-#define EPGRATING_FIELDS_NOID EPGRATING_NETID "," EPGRATING_TSID "," \
-                         EPGRATING_SERVICEID "," EPGRATING_EVENTID "," EPGRATING_STANDARD "," \
+#define EPGRATING_FIELDS_NOID EPGRATING_EVENTUID "," EPGRATING_STANDARD "," \
                          EPGRATING_RATING
 
 #define EPGRATING_FIELDS_NOREF EPGRATING_ID "," EPGRATING_STANDARD "," \
                          EPGRATING_RATING
                          
-#define EPGDETAIL_FIELDS_NOID EPGDETAIL_NETID "," EPGDETAIL_TSID "," \
-                          EPGDETAIL_SERVICEID "," EPGDETAIL_EVENTID "," EPGDETAIL_LANGUAGE "," \
+#define EPGDETAIL_FIELDS_NOID EPGDETAIL_EVENTUID "," EPGDETAIL_LANGUAGE "," \
                           EPGDETAIL_NAME "," EPGDETAIL_VALUE
 
 #define EPGDETAIL_FIELDS_NOREF EPGDETAIL_ID "," EPGDETAIL_LANGUAGE "," \
@@ -80,11 +78,17 @@ Plugin to collect EPG schedule information.
 *******************************************************************************/
 static void EPGEventRatingDestructor(void *arg);
 static void EPGEventDetailDestructor(void *arg);
-
+static long long int CreateEventUID(EPGServiceRef_t *serviceRef, unsigned int eventId);
+static void *ReaperProcess(void *arg);
+static int PurgeOldEvents(void);
+static void PurgeEvent(EPGEvent_t *event);
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
 static pthread_mutex_t EPGMutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  ReaperCondVar = PTHREAD_COND_INITIALIZER;
+static pthread_t       ReaperThread;
+static bool            ReaperExit = FALSE;
 static sqlite3 *EPGDBaseConnection;
 static const char TimeFormat[] = "%Y-%m-%d %T";
 static const char EPGDBASE[] = "EPGDBase";
@@ -117,10 +121,7 @@ int EPGDBaseInit(int adapter)
 
         rc = sqlite3_exec(EPGDBaseConnection, "CREATE TABLE IF NOT EXISTS " EPGRATINGS_TABLE" ( "
                          EPGRATING_ID        " INTEGER PRIMARY KEY AUTOINCREMENT," 
-                         EPGRATING_NETID     "," 
-                         EPGRATING_TSID      ","
-                         EPGRATING_SERVICEID "," 
-                         EPGRATING_EVENTID   "," 
+                         EPGRATING_EVENTUID   "," 
                          EPGRATING_STANDARD  ","
                          EPGRATING_RATING
                          ");", NULL, NULL, NULL);
@@ -132,10 +133,7 @@ int EPGDBaseInit(int adapter)
 
         rc = sqlite3_exec(EPGDBaseConnection, "CREATE TABLE IF NOT EXISTS " EPGDETAILS_TABLE" ( "
                          EPGDETAIL_ID        " INTEGER PRIMARY KEY AUTOINCREMENT," 
-                         EPGDETAIL_NETID     "," 
-                         EPGDETAIL_TSID      ","
-                         EPGDETAIL_SERVICEID "," 
-                         EPGDETAIL_EVENTID   "," 
+                         EPGDETAIL_EVENTUID   "," 
                          EPGDETAIL_LANGUAGE  ","
                          EPGDETAIL_NAME  ","
                          EPGDETAIL_VALUE
@@ -145,6 +143,9 @@ int EPGDBaseInit(int adapter)
             LogModule(LOG_ERROR, EPGDBASE, "Failed to create EPG Ratings table: %s\n", sqlite3_errmsg(EPGDBaseConnection));
             return rc;
         }
+
+        pthread_create(&ReaperThread, NULL, ReaperProcess, NULL);
+        
     }
     return rc;
 }
@@ -152,6 +153,10 @@ int EPGDBaseInit(int adapter)
 
 int EPGDBaseDeInit()
 {
+    ReaperExit = TRUE;
+    pthread_cond_signal(&ReaperCondVar);
+    pthread_join(ReaperThread, NULL);
+    
     sqlite3_close(EPGDBaseConnection);
     return 0;
 }
@@ -172,12 +177,14 @@ int EPGDBaseTransactionCommit(void)
 int EPGDBaseEventAdd(EPGEvent_t *event)
 {
     STATEMENT_INIT;
-    char startTime[25];
-    char endTime[25];
-    strftime(startTime, sizeof(startTime), TimeFormat, &event->startTime);
-    strftime(endTime, sizeof(endTime), TimeFormat, &event->endTime);    
+    time_t startTime;
+    time_t endTime;
+
+    startTime = mktime(&event->startTime);
+    endTime = mktime(&event->endTime);  
+
     STATEMENT_PREPAREVA("INSERT INTO " EPGEVENTS_TABLE"("EPGEVENT_FIELDS") "
-                        "VALUES (%d,%d,%d,%d,'%q','%q',%d);",
+                        "VALUES (%d,%d,%d,%d,%d,%d,%d);",
                         event->serviceRef.netId,event->serviceRef.tsId,event->serviceRef.serviceId,
                         event->eventId, startTime, endTime, event->ca);
     RETURN_RC_ON_ERROR;
@@ -283,23 +290,20 @@ EPGEvent_t *EPGDBaseEventGetNext(EPGDBaseEnumerator_t enumerator)
     if (rc == SQLITE_ROW)
     {
         EPGEvent_t *event = NULL;
-        char *temp;
+        time_t temptime;
+        struct tm *temptm;
+        
         event = ObjectCreateType(EPGEvent_t);
         event->serviceRef.netId = (unsigned int)STATEMENT_COLUMN_INT( 0);
         event->serviceRef.tsId = (unsigned int)STATEMENT_COLUMN_INT( 1);
         event->serviceRef.serviceId = (unsigned int)STATEMENT_COLUMN_INT( 2);
         event->eventId = (unsigned int)STATEMENT_COLUMN_INT( 3);
-        temp = STATEMENT_COLUMN_TEXT(4);
-        LogModule(LOG_DEBUG, EPGDBASE, "Retrieve Event start time (%x:%x:%x) %x %s\n",
-            event->serviceRef.netId,event->serviceRef.tsId,event->serviceRef.serviceId,
-            event->eventId ,temp);
-        strptime(temp, TimeFormat, &event->startTime);
-        temp = STATEMENT_COLUMN_TEXT(5);
-        LogModule(LOG_DEBUG, EPGDBASE, "Retrieve Event end time   (%x:%x:%x) %x %s\n",
-                    event->serviceRef.netId,event->serviceRef.tsId,event->serviceRef.serviceId,
-                    event->eventId ,temp);
-
-        strptime(temp, TimeFormat, &event->endTime);        
+        temptime = STATEMENT_COLUMN_INT(4);
+        temptm = gmtime(&temptime);
+        event->startTime = *temptm;
+        temptime = STATEMENT_COLUMN_INT(5);
+        temptm = gmtime(&temptime);
+        event->endTime = *temptm;
         event->ca = STATEMENT_COLUMN_INT( 6) ? TRUE: FALSE;
         return event;
     }
@@ -314,11 +318,13 @@ EPGEvent_t *EPGDBaseEventGetNext(EPGDBaseEnumerator_t enumerator)
 
 int EPGDBaseRatingAdd(EPGServiceRef_t *serviceRef, unsigned int eventId, char *system, char *rating)
 {
+    long long int eventUID;
     STATEMENT_INIT;
+    eventUID  = CreateEventUID(serviceRef, eventId);
+    
     STATEMENT_PREPAREVA("INSERT INTO " EPGRATINGS_TABLE "(" EPGRATING_FIELDS_NOID ") "
-                        "VALUES (%d,%d,%d,%d,'%q','%q');",
-                        serviceRef->netId,serviceRef->tsId,serviceRef->serviceId,
-                        eventId, system, rating);
+                        "VALUES (%lld,'%q','%q');",
+                        eventUID, system, rating);
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
@@ -330,17 +336,13 @@ int EPGDBaseRatingAdd(EPGServiceRef_t *serviceRef, unsigned int eventId, char *s
 
 int EPGDBaseRatingRemoveAll(EPGServiceRef_t *serviceRef, unsigned int eventId)
 {
+    long long int eventUID;
     STATEMENT_INIT;
+    eventUID  = CreateEventUID(serviceRef, eventId);
 
     STATEMENT_PREPAREVA("DELETE FROM " EPGRATINGS_TABLE " "
-                        "WHERE " EPGRATING_NETID "=%u AND " 
-                                 EPGRATING_TSID "=%u AND " 
-                                 EPGRATING_SERVICEID "=%u AND "
-                                 EPGRATING_EVENTID "=%u;",
-                        serviceRef->netId, 
-                        serviceRef->tsId, 
-                        serviceRef->serviceId, 
-                        eventId);
+                        "WHERE " EPGRATING_EVENTUID "=%lld;",
+                        eventUID);
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
@@ -352,12 +354,12 @@ int EPGDBaseRatingRemoveAll(EPGServiceRef_t *serviceRef, unsigned int eventId)
 int EPGDBaseRatingCount(EPGServiceRef_t *serviceRef, unsigned int eventId)
 {
     int result = -1;
+    long long int eventUID;
     STATEMENT_INIT;
+    eventUID  = CreateEventUID(serviceRef, eventId);
 
     STATEMENT_PREPAREVA("SELECT count() FROM " EPGRATINGS_TABLE " WHERE "
-        EPGRATING_NETID "=%u AND " EPGRATING_TSID "=%u AND " EPGRATING_SERVICEID "=%u AND "
-        EPGRATING_EVENTID "=%u;",
-        serviceRef->netId, serviceRef->tsId, serviceRef->serviceId, eventId);
+                        EPGRATING_EVENTUID "=%lld;", eventUID);
     RETURN_ON_ERROR(-1);
 
     STATEMENT_STEP();
@@ -372,15 +374,14 @@ int EPGDBaseRatingCount(EPGServiceRef_t *serviceRef, unsigned int eventId)
 
 EPGDBaseEnumerator_t EPGDBaseRatingEnumeratorGet(EPGServiceRef_t *serviceRef, unsigned int eventId)
 {
+    long long int eventUID;
     STATEMENT_INIT;
+    eventUID  = CreateEventUID(serviceRef, eventId);
 
     STATEMENT_PREPAREVA("SELECT " EPGRATING_FIELDS_NOREF " "
                         "FROM " EPGRATINGS_TABLE" "
-                        "WHERE " EPGRATING_NETID "=%u AND " 
-                                 EPGRATING_TSID "=%u AND " 
-                                 EPGRATING_SERVICEID "=%u AND "
-                                 EPGRATING_EVENTID "=%u;",
-                        serviceRef->netId, serviceRef->tsId, serviceRef->serviceId, eventId);
+                        "WHERE " EPGRATING_EVENTUID "=%lld;",
+                        eventUID);
     RETURN_ON_ERROR(NULL);
 
     return stmt;
@@ -414,11 +415,13 @@ EPGEventRating_t *EPGDBaseRatingGetNext(EPGDBaseEnumerator_t enumerator)
 
 int EPGDBaseDetailAdd(EPGServiceRef_t *serviceRef, unsigned int eventId, char *lang, char * name, char *value)
 {
+    long long int eventUID;
     STATEMENT_INIT;
+    eventUID  = CreateEventUID(serviceRef, eventId);
+    
     STATEMENT_PREPAREVA("INSERT INTO " EPGDETAILS_TABLE "(" EPGDETAIL_FIELDS_NOID ") "
-                        "VALUES (%d,%d,%d,%d,'%q','%q','%q');",
-                        serviceRef->netId,serviceRef->tsId,serviceRef->serviceId,
-                        eventId, lang, name, value);
+                        "VALUES (%lld,'%q','%q','%q');",
+                        eventUID, lang, name, value);
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
@@ -430,17 +433,13 @@ int EPGDBaseDetailAdd(EPGServiceRef_t *serviceRef, unsigned int eventId, char *l
 
 int EPGDBaseDetailRemoveAll(EPGServiceRef_t *serviceRef, unsigned int eventId)
 {
+    long long int eventUID;
     STATEMENT_INIT;
+    eventUID  = CreateEventUID(serviceRef, eventId);
 
     STATEMENT_PREPAREVA("DELETE FROM " EPGDETAILS_TABLE " "
-                        "WHERE " EPGDETAIL_NETID "=%u AND " 
-                                 EPGDETAIL_TSID "=%u AND " 
-                                 EPGDETAIL_SERVICEID "=%u AND "
-                                 EPGDETAIL_EVENTID "=%u;",
-                        serviceRef->netId, 
-                        serviceRef->tsId, 
-                        serviceRef->serviceId, 
-                        eventId);
+                        "WHERE " EPGDETAIL_EVENTUID "=%lld;",
+                        eventUID);
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
@@ -452,12 +451,12 @@ int EPGDBaseDetailRemoveAll(EPGServiceRef_t *serviceRef, unsigned int eventId)
 int EPGDBaseDetailCount(EPGServiceRef_t *serviceRef, unsigned int eventId)
 {
     int result = -1;
+    long long int eventUID;
     STATEMENT_INIT;
+    eventUID  = CreateEventUID(serviceRef, eventId);
 
     STATEMENT_PREPAREVA("SELECT count() FROM " EPGDETAILS_TABLE " WHERE "
-        EPGDETAIL_NETID "=%u AND " EPGDETAIL_TSID "=%u AND " EPGDETAIL_SERVICEID "=%u AND "
-        EPGDETAIL_EVENTID "=%u;",
-        serviceRef->netId, serviceRef->tsId, serviceRef->serviceId, eventId);
+                        EPGDETAIL_EVENTUID "=%lld;", eventUID);
     RETURN_ON_ERROR(-1);
 
     STATEMENT_STEP();
@@ -472,17 +471,15 @@ int EPGDBaseDetailCount(EPGServiceRef_t *serviceRef, unsigned int eventId)
 
 EPGDBaseEnumerator_t EPGDBaseDetailGet(EPGServiceRef_t *serviceRef, unsigned int eventId, char *name)
 {
+    long long int eventUID;
     STATEMENT_INIT;
+    eventUID  = CreateEventUID(serviceRef, eventId);
 
     STATEMENT_PREPAREVA("SELECT " EPGDETAIL_FIELDS_NOREF " "
                         "FROM " EPGDETAILS_TABLE " "
-                        "WHERE " EPGDETAIL_NETID "=%u AND " 
-                                 EPGDETAIL_TSID "=%u AND " 
-                                 EPGDETAIL_SERVICEID "=%u AND "
-                                 EPGDETAIL_EVENTID "=%u AND "
+                        "WHERE " EPGDETAIL_EVENTUID "=%lld AND "
                                  EPGDETAIL_NAME "='%q';",
-                        serviceRef->netId, serviceRef->tsId, serviceRef->serviceId, 
-                        eventId, name);
+                        eventUID, name);
     RETURN_ON_ERROR(NULL);
 
     return stmt;
@@ -490,15 +487,13 @@ EPGDBaseEnumerator_t EPGDBaseDetailGet(EPGServiceRef_t *serviceRef, unsigned int
 
 EPGDBaseEnumerator_t EPGDBaseDetailEnumeratorGet(EPGServiceRef_t *serviceRef, unsigned int eventId)
 {
+    long long int eventUID;
     STATEMENT_INIT;
+    eventUID  = CreateEventUID(serviceRef, eventId);
 
     STATEMENT_PREPAREVA("SELECT " EPGDETAIL_FIELDS_NOREF " "
                         "FROM " EPGDETAILS_TABLE " "
-                        "WHERE " EPGDETAIL_NETID "=%u AND " 
-                                 EPGDETAIL_TSID "=%u AND " 
-                                 EPGDETAIL_SERVICEID "=%u AND "
-                                 EPGDETAIL_EVENTID "=%u;",
-                        serviceRef->netId, serviceRef->tsId, serviceRef->serviceId, eventId);
+                        "WHERE " EPGDETAIL_EVENTUID "=%lld;", eventUID);
     RETURN_ON_ERROR(NULL);
 
     return stmt;
@@ -554,4 +549,69 @@ static void EPGEventDetailDestructor(void *arg)
     EPGEventDetail_t *detail = arg;
     free(detail->name);
     free(detail->value);
+}
+
+static long long int CreateEventUID(EPGServiceRef_t *serviceRef, unsigned int eventId)
+{
+    long long int result;
+    result = ((long long int)(serviceRef->netId     & 0xffff) << 48) |
+             ((long long int)(serviceRef->tsId      & 0xffff) << 32) |
+             ((long long int)(serviceRef->serviceId & 0xffff) << 16) |
+              (long long int)(eventId               & 0xffff);
+
+    return result;
+}
+
+static void *ReaperProcess(void *arg)
+{
+    struct timespec timeout;
+    
+    pthread_mutex_lock(&EPGMutex);
+    while(!ReaperExit)
+    {
+        LogModule(LOG_DEBUG, EPGDBASE, "Purging old events!\n");
+        PurgeOldEvents();
+        clock_gettime( CLOCK_REALTIME, &timeout);
+        timeout.tv_sec += (24 * 60) * 60;
+        pthread_cond_timedwait(&ReaperCondVar, &EPGMutex, &timeout);
+    }
+    pthread_mutex_unlock(&EPGMutex);    
+    return NULL;
+}
+
+static int PurgeOldEvents(void)
+{
+    STATEMENT_INIT;
+    EPGEvent_t *event;
+    time_t past24 = time(NULL);
+    past24 -= (24*60) * 60; /* Delete everything that finished 24 hours ago */
+
+    STATEMENT_PREPAREVA("SELECT " EPGEVENT_FIELDS " "
+                        "FROM " EPGEVENTS_TABLE " "
+                        "WHERE " EPGEVENT_ENDTIME "<=%d;", 
+                        past24);
+    RETURN_RC_ON_ERROR;
+    do
+    {
+        event = EPGDBaseEventGetNext(stmt);
+        if (event)
+        {
+            LogModule(LOG_DEBUG, EPGDBASE, "Deleting event %x:%x:%x:%x", 
+                event->serviceRef.netId,event->serviceRef.tsId, event->serviceRef.serviceId,
+                event->eventId);
+            PurgeEvent(event);
+            ObjectRefDec(event);
+        }
+    }
+    while(event);
+    
+    STATEMENT_FINALIZE();
+    return 0;
+}
+
+static void PurgeEvent(EPGEvent_t *event)
+{
+    EPGDBaseEventRemove(&event->serviceRef, event->eventId);
+    EPGDBaseRatingRemoveAll(&event->serviceRef, event->eventId);
+    EPGDBaseDetailRemoveAll(&event->serviceRef, event->eventId);    
 }

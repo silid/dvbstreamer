@@ -48,14 +48,13 @@ typedef enum RunningStatus_e
     RunningStatus_Running         = 4,
 }RunningStatus_e;
 
-#define SERVICE_MAX_NAME_LEN (256)
 /**
  * Structure desribing a digital TV service.
  */
 typedef struct Service_t
 {
-    char name[SERVICE_MAX_NAME_LEN]; /**< Name of the service. */
-    int multiplexUID; /**< Multiplex frequency this service is broadcast on. */
+    char *name;        /**< Name of the service. */
+    int multiplexUID;  /**< Multiplex frequency this service is broadcast on. */
     int id;            /**< Service/Program ID of the service. */
     int pmtVersion;    /**< Last processed version of the PMT. */
     int pmtPid;        /**< PID the PMT for this service is sent on. */
