@@ -44,6 +44,7 @@ Process Service Description Tables and update the services information.
 #include "logging.h"
 #include "sdtprocessor.h"
 #include "subtableprocessor.h"
+#include "dvbtext.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -164,18 +165,9 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
                     dvbpsi_service_dr_t* servicedesc = dvbpsi_DecodeServiceDr(descriptor);
                     if (servicedesc)
                     {
-                        char name[255];
-                        int i;
-                        for (i = 0; i < servicedesc->i_service_name_length; i ++)
-                        {
-                            char chr = servicedesc->i_service_name[i];
-                            if (FilterServiceNames && !isprint(chr))
-                            {
-                                chr = FilterReplacementChar;
-                            }
-                            name[i] = chr;
-                        }
-                        name[servicedesc->i_service_name_length] = 0;
+                        char *name;
+                        name = DVBTextToUTF8((char *)servicedesc->i_service_name, servicedesc->i_service_name_length);
+
                         /* Only update the name if it has changed */
                         if (strcmp(name, service->name))
                         {

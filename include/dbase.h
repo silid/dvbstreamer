@@ -301,19 +301,7 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 /**
  * Constant for EPG Rating column name.
  */
-#define EPGRATING_NETID           "netid"
-/**
- * Constant for EPG Rating column name.
- */
-#define EPGRATING_TSID            "tsid"
-/**
- * Constant for EPG Rating column name.
- */
-#define EPGRATING_SERVICEID       "serviceid"
-/**
- * Constant for EPG Rating column name.
- */
-#define EPGRATING_EVENTID         "eventid"
+#define EPGRATING_EVENTUID         "eventuid"
 /**
  * Constant for EPG Rating column name.
  */
@@ -334,19 +322,7 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 /**
  * Constant for EPG Detail column name.
  */
-#define EPGDETAIL_NETID           "netid"
-/**
- * Constant for EPG Detail column name.
- */
-#define EPGDETAIL_TSID            "tsid"
-/**
- * Constant for EPG Detail column name.
- */
-#define EPGDETAIL_SERVICEID       "serviceid"
-/**
- * Constant for EPG Detail column name.
- */
-#define EPGDETAIL_EVENTID         "eventid"
+#define EPGDETAIL_EVENTUID         "eventuid"
 /**
  * Constant for EPG Detail column name.
  */
@@ -497,6 +473,20 @@ int DBaseInit(int adapter);
  * De-initialise the database.
  */
 void DBaseDeInit();
+
+/**
+ * Start a transaction on the database.
+ * Can be used to increase the speed when reading from multiple tables.
+ * @return 0 on success, otherwise an SQLite error code. 
+ */
+int DBaseTransactionBegin(void);
+
+/**
+ * Commit a transaction on the database.
+ * @return 0 on success, otherwise an SQLite error code.
+ */
+int DBaseTransactionCommit(void);
+
 /**
  * Retrieve the specified metadata property.
  * @param name The name of the property.

@@ -841,6 +841,7 @@ static void CommandSelect(int argc, char **argv)
     {
         CommandPrintf("Name      = %s\n", service->name);
         CommandPrintf("ID        = %04x\n", service->id);
+        ServiceRefDec(service);
     }
     else
     {
@@ -896,9 +897,9 @@ static void CommandServiceInfo(int argc, char **argv)
         else
         {
             CommandPrintf("Not in current multiplex, no further information available.\n");
-            ServiceRefDec(service);
         }
         
+        ServiceRefDec(service);
         MultiplexRefDec(currentMultiplex);
         MultiplexRefDec(multiplex);
     }
@@ -1358,18 +1359,18 @@ static void CommandScan(int argc, char **argv)
 {
     Service_t *currentService;    
     Multiplex_t *multiplex;
-    char currservice[SERVICE_MAX_NAME_LEN];
+    char *currservice;
 
     CheckAuthenticated();
     currentService = TuningCurrentServiceGet();
     if (currentService)
     {
-        strcpy(currservice, currentService->name);
+        currservice = strdup(currentService->name);
         ServiceRefDec(currentService);
     }
     else
     {
-        currservice[0] = 0;
+        currservice = NULL;
     }
     
     if (strcmp(argv[0], "all") == 0)
@@ -1412,9 +1413,10 @@ static void CommandScan(int argc, char **argv)
         }
     }
 
-    if (currservice[0])
+    if (currservice)
     {
         TuningCurrentServiceSet(currservice);
+        free(currservice);
     }
 }
 /************************** Scan Callback Functions **************************/

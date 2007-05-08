@@ -263,7 +263,18 @@ void CacheUpdateServiceName(Service_t *service, char *name)
     {
         if ((cachedServices[i]) && ServiceAreEqual(service, cachedServices[i]))
         {
-            strncpy(cachedServices[i]->name, name, SERVICE_MAX_NAME_LEN);
+            if (cachedServices[i]->name)
+            {
+                free(cachedServices[i]->name);
+            }
+            if (name)
+            {
+                cachedServices[i]->name = strdup(name);
+            }
+            else
+            {
+                cachedServices[i]->name = NULL;
+            }
             cacheFlags[i] |= CacheFlag_Dirty_Name;
             break;
         }
@@ -369,7 +380,7 @@ void CacheWriteback()
     pthread_mutex_lock(&cacheUpdateMutex);
     LogModule(LOG_DEBUG, CACHE, "Writing changes to cache back to database\n");
 
-    sqlite3_exec(DBaseInstance, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+    DBaseTransactionBegin();
 
     /* Delete deleted services from the database along with their PIDs
        NOTE: Delete these first encase we have seen them again after
@@ -440,7 +451,7 @@ void CacheWriteback()
 
 
 
-    sqlite3_exec(DBaseInstance, "COMMIT TRANSACTION;", NULL, NULL, NULL);
+    DBaseTransactionCommit();
     pthread_mutex_unlock(&cacheUpdateMutex);
 }
 

@@ -42,39 +42,18 @@ common_src = \
     sectionprocessor.c \
     pesprocessor.c \
     subtableprocessor.c \
-    epgdbase.c
+    epgdbase.c \
+    utf8.c
 
 #
 # DVBStreamer
 #
 dvbstreamer_SOURCES = \
-    main.c\
-    tuning.c \
-    dvb.c\
-    objects.c \
-    multiplexes.c\
-    services.c\
-    pids.c\
-    ts.c\
-    patprocessor.c\
-    pmtprocessor.c\
-    servicefilter.c\
-    dbase.c\
-    cache.c\
-    logging.c\
-    commands.c\
-    remoteintf.c\
-    outputs.c\
-    list.c\
-    deliverymethod.c\
-    pluginmgr.c \
-    sectionprocessor.c \
-    pesprocessor.c \
-    subtableprocessor.c  \
-    epgdbase.c \
     sdtprocessor.c\
     nitprocessor.c \
-    tdtprocessor.c
+    tdtprocessor.c \
+    dvbtext.c \
+    $(common_src)
 
 dvbstreamer_CFLAGS = -I$(top_srcdir)/include -DLOGGING_CHECK_DAEMON -DDVB_STREAMER -Wall -Werror
 
@@ -117,31 +96,8 @@ setupdvbstreamer_LDADD = -lsqlite3 -lpthread
 # ATSCStreamer
 #
 atscstreamer_SOURCES = \
-    main.c\
-    tuning.c \
-    dvb.c\
-    objects.c \
-    multiplexes.c\
-    services.c\
-    pids.c\
-    ts.c\
-    patprocessor.c\
-    pmtprocessor.c\
-    servicefilter.c\
-    dbase.c\
-    cache.c\
-    logging.c\
-    commands.c\
-    remoteintf.c\
-    outputs.c\
-    list.c\
-    deliverymethod.c\
-    pluginmgr.c \
-    sectionprocessor.c \
-    pesprocessor.c \
-    subtableprocessor.c  \
-    epgdbase.c \
-    psipprocessor.c
+    psipprocessor.c \
+    $(common_src)
     
 atscstreamer_CFLAGS = -I$(top_srcdir)/include -DLOGGING_CHECK_DAEMON -DATSC_STREAMER -Wall -Werror
 

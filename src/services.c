@@ -27,16 +27,29 @@ Manage services and PIDs.
 #include "services.h"
 #include "logging.h"
 
+/*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
+
 #define SERVICE_FIELDS SERVICE_MULTIPLEXUID "," \
                        SERVICE_ID "," \
                        SERVICE_NAME "," \
                        SERVICE_PMTVERSION "," \
                        SERVICE_PMTPID ","\
                        SERVICE_PCRPID " "
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
+
+static void ServiceDestructor(void * arg);
+
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
 
 int ServiceInit(void)
 {
-    return  ObjectRegisterType(Service_t);
+    return  ObjectRegisterTypeDestructor(Service_t, ServiceDestructor);
 }
 
 int ServiceDeinit(void)
@@ -185,7 +198,7 @@ int ServiceNameSet(Service_t  *service, char *name)
     STATEMENT_STEP();
     if (rc == SQLITE_DONE)
     {
-        strncpy(service->name, name, SERVICE_MAX_NAME_LEN);
+        service->name = strdup(name);
         rc = SQLITE_OK;
     }
     else
@@ -307,7 +320,7 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
         name = STATEMENT_COLUMN_TEXT( 2);
         if (name)
         {
-            strncpy(service->name,name, SERVICE_MAX_NAME_LEN);
+            service->name = strdup(name);
         }
         service->pmtVersion = STATEMENT_COLUMN_INT( 3);
         service->pmtPid = STATEMENT_COLUMN_INT( 4);
@@ -321,3 +334,17 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
     }
     return NULL;
 }
+
+/*******************************************************************************
+* Local Functions                                                              *
+*******************************************************************************/
+static void ServiceDestructor(void * arg)
+{
+    Service_t *service = arg;
+    if (service->name)
+    {
+        free(service->name);
+    }
+}
+
+
