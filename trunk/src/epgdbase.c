@@ -585,6 +585,7 @@ static int PurgeOldEvents(void)
     EPGEvent_t *event;
     time_t past24 = time(NULL);
     past24 -= (24*60) * 60; /* Delete everything that finished 24 hours ago */
+    sqlite3_exec(EPGDBaseConnection, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 
     STATEMENT_PREPAREVA("SELECT " EPGEVENT_FIELDS " "
                         "FROM " EPGEVENTS_TABLE " "
@@ -596,7 +597,7 @@ static int PurgeOldEvents(void)
         event = EPGDBaseEventGetNext(stmt);
         if (event)
         {
-            LogModule(LOG_DEBUG, EPGDBASE, "Deleting event %x:%x:%x:%x", 
+            LogModule(LOG_DEBUG, EPGDBASE, "Deleting event %x:%x:%x:%x\n", 
                 event->serviceRef.netId,event->serviceRef.tsId, event->serviceRef.serviceId,
                 event->eventId);
             PurgeEvent(event);
@@ -604,7 +605,7 @@ static int PurgeOldEvents(void)
         }
     }
     while(event);
-    
+    sqlite3_exec(EPGDBaseConnection, "COMMIT TRANSACTION;", NULL, NULL, NULL);
     STATEMENT_FINALIZE();
     return 0;
 }
