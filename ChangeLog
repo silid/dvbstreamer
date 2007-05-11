@@ -1,3 +1,12 @@
+0.8 
+---
+* DVB-S fully supported, thanks to Alex Luccisano.
+* ATSC support, very preliminary should be able to tune to multiplex and stream services
+  but no automatic detection of new channels, names, events etc.
+* DVB EPG support, no captures schedule data and can be exported to xmltv format.
+* RTP support and Time To Live setting for UDP and RTP packets useful when sending
+  to a multicast address.
+
 0.7
 ---
 * NEW Simpler remote interface means that it is possible to execute all commands 
