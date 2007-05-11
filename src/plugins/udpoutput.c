@@ -26,6 +26,7 @@ UDP Output Delivery Method handler.
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <sys/time.h>
 
 #include "plugin.h"
 #include "ts.h"
@@ -40,6 +41,7 @@ UDP Output Delivery Method handler.
 #define IP_HEADER (5*4)
 #define UDP_HEADER (2*4)
 #define MAX_TS_PACKETS_PER_DATAGRAM ((MTU - (IP_HEADER+UDP_HEADER)) / sizeof(TSPacket_t))
+#define RTP_HEADER_SIZE 12
 
 /* Default output targets if only host or port part is given */
 #define DEFAULT_HOST "localhost"
@@ -63,18 +65,25 @@ struct UDPOutputState_t
     struct sockaddr_storage address;
     int datagramFullCount;
     int tsPacketCount;
+    uint16_t sequence;
+    /* rtpHeader must always come before outputBuffer as the order is important
+       when sending RTP packets as rtpHeader is passed as the address of the 
+       buffer to send!
+    */
+    uint8_t rtpHeader[RTP_HEADER_SIZE]; 
     TSPacket_t outputBuffer[MAX_TS_PACKETS_PER_DATAGRAM];
 };
-
 
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
-bool UDPOutputCanHandle(char *mrl);
-DeliveryMethodInstance_t *UDPOutputCreate(char *arg);
-void UDPOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet);
-void UDPOutputSendBlock(DeliveryMethodInstance_t *this, void *block, unsigned long blockLen);
-void UDPOutputDestroy(DeliveryMethodInstance_t *this);
+static bool UDPOutputCanHandle(char *mrl);
+static DeliveryMethodInstance_t *UDPOutputCreate(char *arg);
+static void UDPOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet);
+static void UDPOutputSendBlock(DeliveryMethodInstance_t *this, void *block, unsigned long blockLen);
+static void UDPOutputDestroy(DeliveryMethodInstance_t *this);
+static void RTPOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet);
+static void RTPHeaderInit(uint8_t *header, uint16_t sequence);
 
 
 /*******************************************************************************
@@ -83,6 +92,7 @@ void UDPOutputDestroy(DeliveryMethodInstance_t *this);
 /** Constants for the start of the MRL **/
 #define PREFIX_LEN (sizeof(UDPPrefix) - 1)
 const char UDPPrefix[] = "udp://";
+const char RTPPrefix[] = "rtp://";
 
 /** Plugin Interface **/
 DeliveryMethodHandler_t UDPOutputHandler = {
@@ -103,8 +113,10 @@ PLUGIN_FEATURES(
 PLUGIN_INTERFACE_F(
     PLUGIN_FOR_ALL,
     "UDPOutput", 
-    "0.1", 
-    "Simple UDP Delivery method.\nUse udp://<host>:<port>", 
+    "0.2", 
+    "UDP Delivery methods.\n"
+    "Use udp://<host>:<port>[:<ttl>] for simple raw TS packets in a UDP datagram.\n"
+    "Use rtp://<host>:<port>[:<ttl>] for RTP encapsulation.", 
     "charrea6@users.sourceforge.net"
 );
 
@@ -112,19 +124,26 @@ PLUGIN_INTERFACE_F(
 /*******************************************************************************
 * Delivery Method Functions                                                    *
 *******************************************************************************/
-bool UDPOutputCanHandle(char *mrl)
+static bool UDPOutputCanHandle(char *mrl)
 {
-    return (strncmp(UDPPrefix, mrl, PREFIX_LEN) == 0);
+    return (strncmp(UDPPrefix, mrl, PREFIX_LEN) == 0) || 
+           (strncmp(RTPPrefix, mrl, PREFIX_LEN) == 0);
 }
 
-DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
+static DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
 {
     struct UDPOutputState_t *state;
     int i = 0;
     unsigned char ttl = 1;
     char hostbuffer[256];
     char portbuffer[6]; /* 65536\0 */
+    bool rtp;
 
+    hostbuffer[0] = 0;
+    portbuffer[0] = 0;
+    
+    rtp = strncmp(RTPPrefix, arg, PREFIX_LEN) == 0;
+    
     /* Ignore the prefix */
     arg += PREFIX_LEN;
 
@@ -181,14 +200,24 @@ DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
     {
         strcpy(portbuffer, DEFAULT_PORT);
     }
+
     state = calloc(1, sizeof(struct UDPOutputState_t));
     if (state == NULL)
     {
         LogModule(LOG_DEBUG, UDPOUTPUT, "Failed to allocate UDP Output state\n");
         return NULL;
     }
-    state->SendPacket = UDPOutputSendPacket;
-    state->SendBlock = UDPOutputSendBlock;
+    
+    if (rtp)
+    {
+        state->SendPacket = RTPOutputSendPacket;
+        state->SendBlock = NULL;        
+    }
+    else
+    {
+        state->SendPacket = UDPOutputSendPacket;
+        state->SendBlock = UDPOutputSendBlock;
+    }
     state->DestroyInstance = UDPOutputDestroy;
 
     LogModule(LOG_DEBUG, UDPOUTPUT, "UDP Host \"%s\" Port \"%s\" TTL %d\n", hostbuffer, portbuffer, ttl);
@@ -251,27 +280,27 @@ DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
     return (DeliveryMethodInstance_t *)state;
 }
 
-void UDPOutputDestroy(DeliveryMethodInstance_t *this)
+static void UDPOutputDestroy(DeliveryMethodInstance_t *this)
 {
     struct UDPOutputState_t *state = (struct UDPOutputState_t *)this;
     close(state->socket);
     free(state);
 }
 
-void UDPOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet)
+static void UDPOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet)
 {
     struct UDPOutputState_t *state = (struct UDPOutputState_t*)this;
     state->outputBuffer[state->tsPacketCount++] = *packet;
     if (state->tsPacketCount >= state->datagramFullCount)
     {
         UDPSendTo(state->socket, (char*)state->outputBuffer,
-                  MAX_TS_PACKETS_PER_DATAGRAM * TSPACKET_SIZE,
+                  state->datagramFullCount * TSPACKET_SIZE,
                   (struct sockaddr *)(&state->address), state->addressLen);
         state->tsPacketCount = 0;
     }
 }
 
-void UDPOutputSendBlock(DeliveryMethodInstance_t *this, void *block, unsigned long blockLen)
+static void UDPOutputSendBlock(DeliveryMethodInstance_t *this, void *block, unsigned long blockLen)
 {
     struct UDPOutputState_t *state = (struct UDPOutputState_t*)this;
     UDPSendTo(state->socket, (char*)block,
@@ -279,3 +308,41 @@ void UDPOutputSendBlock(DeliveryMethodInstance_t *this, void *block, unsigned lo
               (struct sockaddr *)(&state->address), state->addressLen);
 }
 
+static void RTPOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet)
+{
+    struct UDPOutputState_t *state = (struct UDPOutputState_t*)this;
+    state->outputBuffer[state->tsPacketCount++] = *packet;
+    if (state->tsPacketCount >= state->datagramFullCount)
+    {
+        RTPHeaderInit(state->rtpHeader, state->sequence);
+        UDPSendTo(state->socket, (char*)state->rtpHeader,
+                  (state->datagramFullCount * TSPACKET_SIZE) + RTP_HEADER_SIZE,
+                  (struct sockaddr *)(&state->address), state->addressLen);
+        state->tsPacketCount = 0;
+        state->sequence ++;
+    }
+}
+
+static void RTPHeaderInit(uint8_t *header, uint16_t sequence)
+{
+    uint32_t temp;
+    struct timeval tv;  
+    gettimeofday(&tv,(struct timezone*) NULL);  
+    /* Flags and payload type */
+    header[0] = (2 << 6); /* Version 2, No Padding, No Extensions, No CSRC count */
+    header[1] = 33;       /* No Marker, Payload type MP2T */
+
+    /* Sequence */
+    header[2] = (uint8_t) (sequence >> 8) & 0xff;
+    header[3] = (uint8_t) (sequence >> 0) & 0xff;
+
+    /* Time stamp */
+    temp = ((tv.tv_sec%1000000)*1000000 + tv.tv_usec)/11; /* approximately a 90Khz clock (1000000/90000 = 11.1111111...)*/
+    memcpy(&header[4], &temp, 4);
+
+    /* SSRC (Not implemented) */
+    header[8] = 0x0f;
+    header[9] = 0x0f;
+    header[10] = 0x0f;
+    header[11] = 0x0f;
+}
