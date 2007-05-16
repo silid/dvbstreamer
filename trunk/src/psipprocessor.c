@@ -40,10 +40,17 @@ Process ATSC PSIP tables
 #include "cache.h"
 #include "logging.h"
 #include "list.h"
+#include "subtableprocessor.h"
 #include "psipprocessor.h"
 
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
 static void SubTableHandler(void * state, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension);
-static void PSIPHandler(void* arg, dvbpsi_nit_t* newNIT);
+
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
 
 PIDFilter_t *PSIPProcessorCreate(TSFilter_t *tsfilter)
 {
@@ -60,6 +67,10 @@ void PSIPProcessorDestroy(PIDFilter_t *filter)
 {
     SubTableProcessorDestroy(filter);
 }
+
+/*******************************************************************************
+* Local Functions                                                              *
+*******************************************************************************/
 
 static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension)
 {

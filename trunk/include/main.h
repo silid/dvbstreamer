@@ -77,5 +77,9 @@ TSFilter_t *MainTSFilterGet(void);
  */
 DVBAdapter_t *MainDVBAdapterGet(void);
 
-
+/**
+ * Used to determine whether DVBStreamer is using a DVB frontend.
+ * @return TRUE if the frontend is a DVB frontend, FALSE if it is an ATSC frontend.
+ */
+bool MainIsDVB();
 #endif

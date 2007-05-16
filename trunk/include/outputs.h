@@ -28,11 +28,6 @@ Additional output management functions.
  * @{
  */
 /**
- * Maximum number of outputs
- */
-#define MAX_OUTPUTS (MAX_FILTERS - PIDFilterIndex_Count)
-
-/**
  * Enum representing the different types of output.
  */
 typedef enum OutputType
