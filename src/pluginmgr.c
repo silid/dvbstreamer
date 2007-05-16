@@ -126,6 +126,7 @@ extern Plugin_t EPGtoXMLTVPluginInterface;
 int PluginManagerInit(void)
 {
     ListIterator_t iterator;
+    uint8_t isDVBMask;
     lt_dlinit();
     PluginsList = ListCreate();
     LogModule(LOG_DEBUG, PLUGINMANAGER, "Plugin Manager Initialising...\n");
@@ -150,12 +151,23 @@ int PluginManagerInit(void)
         ListAdd(PluginsList, entry);                
     }
 #endif
+    isDVBMask = MainIsDVB() ? PLUGIN_FOR_DVB:PLUGIN_FOR_ATSC;
+
     /* Process the plugins */
     for ( ListIterator_Init(iterator, PluginsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         struct PluginEntry_t *entry = ListIterator_Current(iterator);
-        LogModule(LOG_DEBUG, PLUGINMANAGER,"Installing %s\n", entry->pluginInterface->name);
-        PluginManagerInstallPlugin(entry->pluginInterface);
+        if ((entry->pluginInterface->pluginFor & isDVBMask) != 0)
+        {
+            LogModule(LOG_DEBUG, PLUGINMANAGER,"Installing %s\n", entry->pluginInterface->name);
+            PluginManagerInstallPlugin(entry->pluginInterface);
+        }
+        else
+        {
+            lt_dlclose(entry->handle);
+            free(entry);
+            ListRemoveCurrent(&iterator);
+        }
     }
 
     CommandRegisterCommands(PluginManagerCommands);

@@ -49,6 +49,7 @@ Entry point to the application.
 #include "sdtprocessor.h"
 #include "nitprocessor.h"
 #include "tdtprocessor.h"
+#include "psipprocessor.h"
 #include "sectionprocessor.h"
 #include "pesprocessor.h"
 #include "servicefilter.h"
@@ -86,26 +87,16 @@ Entry point to the application.
         LogModule(LOG_DEBUGV, MAIN, "Deinitialised %s\n", _name);\
     }while(0)
 
-/*******************************************************************************
-* Typedefs                                                                     *
-*******************************************************************************/
+#define MAX_PIDFILTERS 5 /* For DVB this is PAT,PMT,SDT,TDT,NIT for ATSC this is just PAT,PMT,PSIP */
 
-/**
- * Enum describing the location of the main PID Filters in the PIDFilters array
- */
-enum PIDFilterIndex
-{
-    PIDFilterIndex_PAT = 0, /**< Index of the PAT PID Filter. */
-    PIDFilterIndex_PMT,     /**< Index of the PMT PID Filter. */
-#ifdef ATSC_STREAMER
-    PIDFilterIndex_PSIP,    /**< Index of the PSIP PID Filter. */
-#else
-    PIDFilterIndex_SDT,     /**< Index of the SDT PID Filter. */
-    PIDFilterIndex_NIT,     /**< Index of the NIT PID Filter. */
-    PIDFilterIndex_TDT,     /**< Index of the TDT PID Filter. */
-#endif
-    PIDFilterIndex_Count    /**< Number of main PID filters. */
-};
+#define PIDFILTER_INDEX_PAT 0
+#define PIDFILTER_INDEX_PMT 1
+/* DVB */
+#define PIDFILTER_INDEX_SDT 2
+#define PIDFILTER_INDEX_NIT 3
+#define PIDFILTER_INDEX_TDT 4
+/* ATSC */
+#define PIDFILTER_INDEX_PSIP 2
 
 /*******************************************************************************
 * Prototypes                                                                   *
@@ -150,7 +141,7 @@ int main(int argc, char *argv[])
     char *primaryOutput = "null://";
     bool remoteInterface = FALSE;
     Output_t *primaryServiceOutput = NULL;
-    PIDFilter_t *PIDFilters[PIDFilterIndex_Count];
+    PIDFilter_t *PIDFilters[MAX_PIDFILTERS];
     
     /* Create the data directory */
     sprintf(DataDirectory, "%s/.dvbstreamer", getenv("HOME"));
@@ -254,19 +245,28 @@ int main(int argc, char *argv[])
     INIT(!(TSFilter = TSFilterCreate(DVBAdapter)), "TS filter");
 
     /* Create PAT/PMT/SDT filters */
-    PIDFilters[PIDFilterIndex_PAT] = PATProcessorCreate(TSFilter);
-    PIDFilters[PIDFilterIndex_PMT] = PMTProcessorCreate(TSFilter);
-#ifdef ATSC_STREAMER
-    PIDFilters[PIDFilterIndex_PSIP] = PSIPProcessorCreate(TSFilter);
-#else
-    PIDFilters[PIDFilterIndex_SDT] = SDTProcessorCreate(TSFilter);
-    PIDFilters[PIDFilterIndex_NIT] = NITProcessorCreate(TSFilter);
-    PIDFilters[PIDFilterIndex_TDT] = TDTProcessorCreate(TSFilter);
-#endif
-    /* Enable all the filters */
-    for (i = 0; i < PIDFilterIndex_Count; i ++)
+    memset(&PIDFilters, 0, sizeof(PIDFilters));
+    
+    PIDFilters[PIDFILTER_INDEX_PAT] = PATProcessorCreate(TSFilter);
+    PIDFilters[PIDFILTER_INDEX_PMT] = PMTProcessorCreate(TSFilter);
+    if (MainIsDVB())
     {
-        PIDFilters[i]->enabled = TRUE;
+        PIDFilters[PIDFILTER_INDEX_SDT] = SDTProcessorCreate(TSFilter);
+        PIDFilters[PIDFILTER_INDEX_NIT] = NITProcessorCreate(TSFilter);
+        PIDFilters[PIDFILTER_INDEX_TDT] = TDTProcessorCreate(TSFilter);
+    }
+    else
+    {
+        PIDFilters[PIDFILTER_INDEX_PSIP] = PSIPProcessorCreate(TSFilter);
+    }
+
+    /* Enable all the filters */
+    for (i = 0; i < MAX_PIDFILTERS; i ++)
+    {
+        if (PIDFilters[i])
+        {
+            PIDFilters[i]->enabled = TRUE;
+        }
     }
     LogModule(LOG_DEBUGV, MAIN, "PID filters started\n");
 
@@ -345,21 +345,27 @@ int main(int argc, char *argv[])
     DEINIT(CommandDeInit(), "commands");
 
     /* Disable all the filters */
-    for (i = 0; i < PIDFilterIndex_Count; i ++)
+    for (i = 0; i < MAX_PIDFILTERS; i ++)
     {
-        PIDFilters[i]->enabled = FALSE;
+        if (PIDFilters[i])
+        {
+            PIDFilters[i]->enabled = FALSE;
+        }
     }
     LogModule(LOG_DEBUGV, MAIN, "PID filters stopped\n");
 
-    PATProcessorDestroy( PIDFilters[PIDFilterIndex_PAT]);
-    PMTProcessorDestroy( PIDFilters[PIDFilterIndex_PMT]);
-#ifdef ATSC_STREAMER
-    PSIPProcessorDestroy( PIDFilters[PIDFilterIndex_PSIP]);
-#else
-    SDTProcessorDestroy( PIDFilters[PIDFilterIndex_SDT]);
-    NITProcessorDestroy( PIDFilters[PIDFilterIndex_NIT]);
-    TDTProcessorDestroy( PIDFilters[PIDFilterIndex_TDT]);
-#endif
+    PATProcessorDestroy( PIDFilters[PIDFILTER_INDEX_PAT]);
+    PMTProcessorDestroy( PIDFilters[PIDFILTER_INDEX_PMT]);
+    if (MainIsDVB())
+    {
+        SDTProcessorDestroy( PIDFilters[PIDFILTER_INDEX_SDT]);
+        NITProcessorDestroy( PIDFilters[PIDFILTER_INDEX_NIT]);
+        TDTProcessorDestroy( PIDFilters[PIDFILTER_INDEX_TDT]);
+    }
+    else
+    {
+        PSIPProcessorDestroy( PIDFilters[PIDFILTER_INDEX_PSIP]);
+    }
     SectionProcessorDestroyAllProcessors();
     PESProcessorDestroyAllProcessors();
     
@@ -399,6 +405,11 @@ TSFilter_t *MainTSFilterGet(void)
 DVBAdapter_t *MainDVBAdapterGet(void)
 {
     return DVBAdapter;
+}
+
+bool MainIsDVB()
+{
+    return DVBAdapter->info.type != FE_ATSC;
 }
 
 /*

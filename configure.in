@@ -74,16 +74,6 @@ AC_MSG_RESULT([$DVBSTREAMER_LIBNAME])
 dnl ---------------------------------------------------------------------------
 dnl Enable args
 dnl ---------------------------------------------------------------------------
-AC_ARG_ENABLE([atsc],
-	AS_HELP_STRING([--enable-atsc], [ Build dvbstreamer with ATSC support. The name of the executable will be atscstreamer rather than dvbstreamer]),
-     	[case "${enableval}" in
-       	yes) atsc=true ;;
-       	no)  atsc=false ;;
-       	*) AC_MSG_ERROR([bad value ${enableval} for --enable-atsc]) ;;
-    	esac],[atsc=false])
-
-AM_CONDITIONAL([ATSC], [test x$atsc = xtrue])
-
 AC_ARG_ENABLE([getaddrinfo],
 	AS_HELP_STRING([--disable-getaddrinfo], [ Disable use of the getaddrinfo function, this is needed for IPv6 support but some libc don't properly support it]),
 	[case "${enableval}" in

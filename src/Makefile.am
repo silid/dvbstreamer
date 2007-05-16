@@ -10,15 +10,12 @@ AM_CFLAGS =\
      -I$(top_srcdir)/include -Wall -Werror
 
 
-if ATSC
-bin_PROGRAMS = atscstreamer atscctrl setupatscstreamer
-else
 bin_PROGRAMS = dvbstreamer dvbctrl setupdvbstreamer
-endif
 
-
-# source common to DVB and ATSC streamer
-common_src = \
+#
+# DVBStreamer
+#
+dvbstreamer_SOURCES = \
     main.c\
     tuning.c \
     dvb.c\
@@ -43,19 +40,14 @@ common_src = \
     pesprocessor.c \
     subtableprocessor.c \
     epgdbase.c \
-    utf8.c
-
-#
-# DVBStreamer
-#
-dvbstreamer_SOURCES = \
+    utf8.c \
     sdtprocessor.c\
     nitprocessor.c \
     tdtprocessor.c \
-    dvbtext.c \
-    $(common_src)
+    psipprocessor.c \
+    dvbtext.c
 
-dvbstreamer_CFLAGS = -I$(top_srcdir)/include -DLOGGING_CHECK_DAEMON -DDVB_STREAMER -Wall -Werror
+dvbstreamer_CFLAGS = -I$(top_srcdir)/include -DLOGGING_CHECK_DAEMON -Wall -Werror
 
 dvbstreamer_LDFLAGS = -rdynamic -Wl,-whole-archive -Wl,dvbpsi/libdvbpsi.a -Wl,-no-whole-archive 
 
@@ -91,48 +83,3 @@ setupdvbstreamer_LDFLAGS =
 
 setupdvbstreamer_LDADD = -lsqlite3 -lpthread
 
-
-#
-# ATSCStreamer
-#
-atscstreamer_SOURCES = \
-    psipprocessor.c \
-    $(common_src)
-    
-atscstreamer_CFLAGS = -I$(top_srcdir)/include -DLOGGING_CHECK_DAEMON -DATSC_STREAMER -Wall -Werror
-
-atscstreamer_LDFLAGS = -rdynamic -Wl,-whole-archive -Wl,dvbpsi/libdvbpsi.a -Wl,-no-whole-archive 
-
-atscstreamer_LDADD = \
-	  -lpthread -lsqlite3 -lreadline @GETTIME_LIB@ @READLINE_TERMCAP@ @LIBLTDL@
-	  
-#
-# atscctrl
-#
-atscctrl_SOURCES = \
-    dvbctrl.c\
-    logging.c
-
-atscctrl_LDFLAGS =
-
-atscctrl_LDADD =
-
-
-#
-# setupatscstreamer
-#
-setupatscstreamer_SOURCES = \
-    setup.c\
-    logging.c\
-    parsezap.c\
-    multiplexes.c\
-    services.c\
-    dbase.c \
-    objects.c  \
-    lnb.c
-
-setupatscstreamer_CFLAGS = -I$(top_srcdir)/include -DATSC_STREAMER -Wall -Werror
-
-setupatscstreamer_LDFLAGS =
-
-setupatscstreamer_LDADD = -lsqlite3 -lpthread
