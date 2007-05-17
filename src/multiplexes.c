@@ -486,9 +486,9 @@ static int VSBParametersGet(int uid, struct dvb_frontend_parameters *feparams)
 static int VSBParametersAdd(int uid, struct dvb_frontend_parameters *feparams)
 {
     STATEMENT_INIT;
-    STATEMENT_PREPAREVA("INSERT INTO " QAMPARAMS_TABLE " "
+    STATEMENT_PREPAREVA("INSERT INTO " VSBPARAMS_TABLE " "
                         "VALUES ("
-                        "%d",
+                        "%d,"
                         "%d," /* VSBPARAM_FREQ */
                         "%d" /* VSBPARAM_MODULATION */
                         ");",
