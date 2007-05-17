@@ -20,6 +20,8 @@ cache.c
 Caches service and PID information from the database for the current multiplex.
 
 */
+    
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -315,7 +317,7 @@ Service_t *CacheServiceAdd(int id)
         result->id = id;
         result->pmtVersion = -1;
         result->pmtPid = 8192;
-        sprintf(result->name, "%04x", id);
+        asprintf(&result->name, "%04x", id);
         result->multiplexUID = cachedServicesMultiplex->uid;
         
         pthread_mutex_lock(&cacheUpdateMutex);
