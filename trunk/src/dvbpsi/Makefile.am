@@ -47,6 +47,8 @@ tables_src =  \
 	tables/pmt.c \
 	tables/sdt.c \
 	tables/nit.c \
-	tables/tdttot.c
+	tables/tdttot.c \
+	tables/mgt.c \
+	tables/stt.c
 
 

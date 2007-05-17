@@ -30,6 +30,8 @@ Process ATSC PSIP tables
 #include <dvbpsi/descriptor.h>
 #include <dvbpsi/dr.h>
 #include <dvbpsi/demux.h>
+#include "dvbpsi/mgt.h"
+#include "dvbpsi/stt.h"
 
 #include "multiplexes.h"
 #include "services.h"
@@ -47,6 +49,13 @@ Process ATSC PSIP tables
 * Prototypes                                                                   *
 *******************************************************************************/
 static void SubTableHandler(void * state, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension);
+static void ProcessMGT(void *arg, dvbpsi_mgt_t *newMGT);
+static void ProcessSTT(void *arg, dvbpsi_stt_t *newSTT);
+
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
+static const char PSIPPROCESSOR[] = "PSIPProcessor";
 
 /*******************************************************************************
 * Global functions                                                             *
@@ -74,10 +83,57 @@ void PSIPProcessorDestroy(PIDFilter_t *filter)
 
 static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension)
 {
-    /* STT */
-    /* MGT */
-    /* TVCT */
-    /* CVCT */
+    switch (tableId)
+    {
+        /* MGT */
+        case 0xC7:
+            dvbpsi_AttachMGT(demuxHandle, tableId, ProcessMGT, arg);
+            break;
+        /* TVCT */
+        case 0xC8:
+            break;
+        /* CVCT */
+        case 0xC9:
+            break;
+        /* RRT */
+        case 0xCA:
+            break;
+        /* STT */
+        case 0xCD:
+            dvbpsi_AttachSTT(demuxHandle,tableId, ProcessSTT, arg);
+            break;
+    }
 }
 
+static void ProcessMGT(void *arg, dvbpsi_mgt_t *newMGT)
+{
+    dvbpsi_mgt_table_t *table;
+    LogModule(LOG_DEBUG, PSIPPROCESSOR,"New MGT Received! Version %d Protocol %d\n", newMGT->i_version, newMGT->i_protocol);
+    for (table = newMGT->p_first_table; table; table = table->p_next)
+    {
+        LogModule(LOG_DEBUG, PSIPPROCESSOR, "\tType=%d PID=%d Version=%d number bytes=%d\n",
+            table->i_type, table->i_pid, table->i_version, table->i_number_bytes);
+    }
+    dvbpsi_DeleteMGT(newMGT);
+}
+
+static void ProcessSTT(void *arg, dvbpsi_stt_t *newSTT)
+{
+    struct tm gpsEpoch;
+    time_t gpsEpochSeconds;
+    time_t utcSeconds;
+    LogModule(LOG_DEBUG, PSIPPROCESSOR,"New STT Received! Protocol %d GPS Time =%lu GPS->UTC Offset = %u \n",
+            newSTT->i_protocol, newSTT->i_system_time, newSTT->i_gps_utc_offset);
+    gpsEpoch.tm_hour = 0;
+    gpsEpoch.tm_min  = 0;
+    gpsEpoch.tm_sec  = 0;
+    gpsEpoch.tm_mday = 6;
+    gpsEpoch.tm_mon  = 0;
+    gpsEpoch.tm_year = 80;
+    gpsEpochSeconds = mktime(&gpsEpoch);
+    utcSeconds = gpsEpochSeconds + newSTT->i_system_time -  newSTT->i_gps_utc_offset;
+
+    LogModule(LOG_DEBUG, PSIPPROCESSOR, "STT UTC Time = %s\n", asctime(gmtime(&utcSeconds)));
+    
+}
 
