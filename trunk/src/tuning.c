@@ -113,7 +113,7 @@ Service_t *TuningCurrentServiceSet(char *name)
     LogModule(LOG_DEBUG, TUNING, "Service found id:0x%04x Multiplex:%d\n", service->id, service->multiplexUID);
     if ((CurrentService == NULL) || (!ServiceAreEqual(service,CurrentService)))
     {
-        printlog(LOG_DEBUGV,"Disabling filters\n");
+        LogModule(LOG_DEBUGV, TUNING, "Disabling filters\n");
         TSFilterEnable(tsFilter, FALSE);
 
         if (CurrentMultiplex)
