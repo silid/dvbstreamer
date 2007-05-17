@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
     while (TRUE)
     {
         int c;
-        c = getopt(argc, argv, "vVdro:a:t:s:c:l:h");
+        c = getopt(argc, argv, "vVdro:a:t:s:c:A:l:h");
         if (c == -1)
         {
             break;
