@@ -83,7 +83,6 @@ typedef struct dvbpsi_mgt_s
  */
 typedef void (* dvbpsi_mgt_callback)(void* p_cb_data, dvbpsi_mgt_t* p_new_mgt);
 
-
 /*****************************************************************************
  * dvbpsi_AttachMGT
  *****************************************************************************/
