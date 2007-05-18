@@ -251,12 +251,14 @@ int main(int argc, char *argv[])
     PIDFilters[PIDFILTER_INDEX_PMT] = PMTProcessorCreate(TSFilter);
     if (MainIsDVB())
     {
+        LogModule(LOG_INFO, MAIN, "Starting DVB filters\n");        
         PIDFilters[PIDFILTER_INDEX_SDT] = SDTProcessorCreate(TSFilter);
         PIDFilters[PIDFILTER_INDEX_NIT] = NITProcessorCreate(TSFilter);
         PIDFilters[PIDFILTER_INDEX_TDT] = TDTProcessorCreate(TSFilter);
     }
     else
     {
+        LogModule(LOG_INFO, MAIN, "Starting ATSC filters\n");        
         PIDFilters[PIDFILTER_INDEX_PSIP] = PSIPProcessorCreate(TSFilter);
     }
 
@@ -358,14 +360,12 @@ int main(int argc, char *argv[])
     PMTProcessorDestroy( PIDFilters[PIDFILTER_INDEX_PMT]);
     if (MainIsDVB())
     {
-        LogModule(LOG_INFO, MAIN, "Starting DVB filters\n");
         SDTProcessorDestroy( PIDFilters[PIDFILTER_INDEX_SDT]);
         NITProcessorDestroy( PIDFilters[PIDFILTER_INDEX_NIT]);
         TDTProcessorDestroy( PIDFilters[PIDFILTER_INDEX_TDT]);
     }
     else
     {
-        LogModule(LOG_INFO, MAIN, "Starting ATSC filters\n");
         PSIPProcessorDestroy( PIDFilters[PIDFILTER_INDEX_PSIP]);
     }
     SectionProcessorDestroyAllProcessors();

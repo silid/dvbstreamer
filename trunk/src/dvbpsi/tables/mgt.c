@@ -506,7 +506,8 @@ void dvbpsi_DecodeMGTSections(dvbpsi_mgt_t* p_mgt,
 
   while(p_section)
   {
-    uint16_t i_tables_defined = (p_section->p_payload_start[1] << 8) | p_section->p_payload_start[2];
+    uint16_t i_tables_defined = (p_section->p_payload_start[1] << 8) | 
+                                 p_section->p_payload_start[2];
     uint16_t i_table_count = 0;
     uint16_t i_length = 0;
     
@@ -514,6 +515,7 @@ void dvbpsi_DecodeMGTSections(dvbpsi_mgt_t* p_mgt,
         ((p_byte + 6) < p_section->p_payload_end) && (i_table_count < i_tables_defined); 
         i_table_count ++)
     {
+        dvbpsi_mgt_table_t* p_table;
         uint16_t i_type = ((uint16_t)(p_byte[0] << 8)) | p_byte[1];
         uint16_t i_pid  = ((uint16_t)(p_byte[2] & 0x1f) << 8) | p_byte[3];                                           
         uint8_t i_version = (uint8_t)(p_byte[4] & 0x1f);
@@ -523,8 +525,7 @@ void dvbpsi_DecodeMGTSections(dvbpsi_mgt_t* p_mgt,
                                   p_byte[8];
         i_length = ((uint16_t)(p_byte[9] & 0xf) <<8) | p_byte[10];
 
-        dvbpsi_mgt_table_t* p_table = dvbpsi_MGTAddTable(p_mgt, i_type, i_pid, 
-            i_version, i_number_bytes);
+        p_table = dvbpsi_MGTAddTable(p_mgt, i_type, i_pid, i_version, i_number_bytes);
 
         /* Table descriptors */
         p_byte += 11;

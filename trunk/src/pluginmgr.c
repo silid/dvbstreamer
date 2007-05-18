@@ -164,6 +164,7 @@ int PluginManagerInit(void)
         }
         else
         {
+            LogModule(LOG_DEBUG, PLUGINMANAGER, "Not installing %s as not suitable.\n", entry->pluginInterface->name);
             lt_dlclose(entry->handle);
             free(entry);
             ListRemoveCurrent(&iterator);
