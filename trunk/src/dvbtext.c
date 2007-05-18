@@ -217,7 +217,8 @@ char *DVBTextToUTF8(char *toConvert, size_t toConvertLen)
         LogModule(LOG_DEBUG, DVBTEXT, "Conversion failed.\n");
         return NULL;
     }
-    outBytes[ret] = 0;
+    *outBytes = 0;
+
     LogModule(LOG_DEBUG, DVBTEXT, "Conversion successful.\n");
     return ResultBuffer;
 }
