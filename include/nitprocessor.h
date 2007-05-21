@@ -25,6 +25,9 @@ Process Network Information Tables.
 #include "plugin.h"
 #include "ts.h"
 
+int NITProcessorInit(void);
+void NITProcessorDeInit(void);
+
 PIDFilter_t *NITProcessorCreate(TSFilter_t *tsfilter);
 void NITProcessorDestroy(PIDFilter_t *filter);
 

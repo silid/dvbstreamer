@@ -44,14 +44,39 @@ Process Network Information Tables.
 #include "subtableprocessor.h"
 #include "dvbpsi/nit.h"
 
+/*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
 
 #define TABLE_ID_NIT_ACTUAL 0x40
 #define TABLE_ID_NIT_OTHER  0x41
 
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
+
 static void SubTableHandler(void * state, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension);
 static void NITHandler(void* arg, dvbpsi_nit_t* newNIT);
 
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
+
 static List_t *NewNITCallbacksList = NULL;
+
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
+int NITProcessorInit(void)
+{
+    NewNITCallbacksList = ListCreate();
+    return NewNITCallbacksList ? 0: -1;
+}
+
+void NITProcessorDeInit(void)
+{
+    ListFree(NewNITCallbacksList, NULL);
+}
 
 PIDFilter_t *NITProcessorCreate(TSFilter_t *tsfilter)
 {
@@ -61,11 +86,6 @@ PIDFilter_t *NITProcessorCreate(TSFilter_t *tsfilter)
         result->name = "NIT";
     }
 
-    if (!NewNITCallbacksList)
-    {
-        NewNITCallbacksList = ListCreate();
-    }
-    
     return result;
 }
 
@@ -89,6 +109,10 @@ void NITProcessorUnRegisterNITCallback(PluginNITProcessor_t callback)
         ListRemove(NewNITCallbacksList, callback);
     }
 }
+
+/*******************************************************************************
+* Local Functions                                                              *
+*******************************************************************************/
 
 static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension)
 {

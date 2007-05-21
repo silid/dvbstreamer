@@ -135,6 +135,7 @@ int main(int argc, char *argv[])
     char *startupFile = NULL;
     int i;
     int adapterNumber = 0;
+    int scanAll = 0;
     char *username = "dvbstreamer";
     char *password = "control";
     char *serverName = NULL;
@@ -258,7 +259,11 @@ int main(int argc, char *argv[])
     PIDFilters[PIDFILTER_INDEX_PMT] = PMTProcessorCreate(TSFilter);
     if (MainIsDVB())
     {
-        LogModule(LOG_INFO, MAIN, "Starting DVB filters\n");        
+        LogModule(LOG_INFO, MAIN, "Starting DVB filters\n");
+        INIT(SDTProcessorInit(), "SDT Processor");
+        INIT(TDTProcessorInit(), "TDT Processor");
+        INIT(NITProcessorInit(), "NIT Processor");
+        
         PIDFilters[PIDFILTER_INDEX_SDT] = SDTProcessorCreate(TSFilter);
         PIDFilters[PIDFILTER_INDEX_NIT] = NITProcessorCreate(TSFilter);
         PIDFilters[PIDFILTER_INDEX_TDT] = TDTProcessorCreate(TSFilter);
@@ -266,6 +271,7 @@ int main(int argc, char *argv[])
     else
     {
         LogModule(LOG_INFO, MAIN, "Starting ATSC filters\n");        
+        INIT(PSIPProcessorInit(), "PSIP Processor");        
         PIDFilters[PIDFILTER_INDEX_PSIP] = PSIPProcessorCreate(TSFilter);
     }
 
@@ -319,6 +325,19 @@ int main(int argc, char *argv[])
         LogModule(LOG_DEBUGV, MAIN, "Startup file processed\n");
     }
 
+    if (DBaseMetadataGetInt(METADATA_NAME_SCAN_ALL, &scanAll) == 0)
+    {
+        if (scanAll)
+        {
+            printf("New setup, performing initial scan to fill in missing details.\n");
+            if (!CommandExecuteConsole("scan all"))
+            {
+                printf("Failed to find scan command\n");
+            }
+            printf("Initial scan finished.\n");
+        }
+        DBaseMetadataDelete(METADATA_NAME_SCAN_ALL);
+    }
     if (DaemonMode)
     {
         RemoteInterfaceAcceptConnections();
@@ -349,7 +368,7 @@ int main(int argc, char *argv[])
      */
     DEINIT(PluginManagerDeInit(), "plugin manager");
 
-    DEINIT(TuningDeinit(), "tuning");
+    DEINIT(TuningDeInit(), "tuning");
 
     DEINIT(CommandDeInit(), "commands");
 
@@ -370,10 +389,14 @@ int main(int argc, char *argv[])
         SDTProcessorDestroy( PIDFilters[PIDFILTER_INDEX_SDT]);
         NITProcessorDestroy( PIDFilters[PIDFILTER_INDEX_NIT]);
         TDTProcessorDestroy( PIDFilters[PIDFILTER_INDEX_TDT]);
+        DEINIT(SDTProcessorDeInit(), "SDT Processor");
+        DEINIT(TDTProcessorDeInit(), "TDT Processor");
+        DEINIT(NITProcessorDeInit(), "NIT Processor");        
     }
     else
     {
         PSIPProcessorDestroy( PIDFilters[PIDFILTER_INDEX_PSIP]);
+        DEINIT(PSIPProcessorDeInit(), "PSIP Processor");
     }
     SectionProcessorDestroyAllProcessors();
     PESProcessorDestroyAllProcessors();

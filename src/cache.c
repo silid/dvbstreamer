@@ -33,6 +33,7 @@ Caches service and PID information from the database for the current multiplex.
 #include "logging.h"
 #include "cache.h"
 #include "dbase.h"
+#include "main.h"
 /*******************************************************************************
 * Defines                                                                      *
 *******************************************************************************/
@@ -49,7 +50,10 @@ enum CacheFlags
     CacheFlag_Dirty_PMTPID  = 0x01,
     CacheFlag_Dirty_PIDs    = 0x02, /* Also means PMT Version and PCR PID needs to be updated */
     CacheFlag_Dirty_Name    = 0x04,
-    CacheFlag_Dirty_Added   = 0x10,
+    CacheFlag_Dirty_Source  = 0x08,    
+    CacheFlag_Dirty_CA      = 0x10,
+    CacheFlag_Dirty_Type    = 0x20,    
+    CacheFlag_Dirty_Added   = 0x80,
 };
 
 /*******************************************************************************
@@ -285,6 +289,60 @@ void CacheUpdateServiceName(Service_t *service, char *name)
     pthread_mutex_unlock(&cacheUpdateMutex);
 }
 
+void CacheUpdateServiceSource(Service_t *service, uint16_t source)
+{
+    int i;
+    pthread_mutex_lock(&cacheUpdateMutex);
+
+    for (i = 0; i < cachedServicesCount; i ++)
+    {
+        if ((cachedServices[i]) && ServiceAreEqual(service, cachedServices[i]))
+        {
+            cachedServices[i]->source = source;
+            cacheFlags[i] |= CacheFlag_Dirty_Source;
+            break;
+        }
+    }
+
+    pthread_mutex_unlock(&cacheUpdateMutex);
+}
+
+void CacheUpdateServiceConditionalAccess(Service_t *service, bool ca)
+{
+    int i;
+    pthread_mutex_lock(&cacheUpdateMutex);
+
+    for (i = 0; i < cachedServicesCount; i ++)
+    {
+        if ((cachedServices[i]) && ServiceAreEqual(service, cachedServices[i]))
+        {
+            cachedServices[i]->conditionalAccess = ca;
+            cacheFlags[i] |= CacheFlag_Dirty_CA;
+            break;
+        }
+    }
+
+    pthread_mutex_unlock(&cacheUpdateMutex);
+}
+
+void CacheUpdateServiceType(Service_t *service, ServiceType type)
+{
+    int i;
+    pthread_mutex_lock(&cacheUpdateMutex);
+
+    for (i = 0; i < cachedServicesCount; i ++)
+    {
+        if ((cachedServices[i]) && ServiceAreEqual(service, cachedServices[i]))
+        {
+            cachedServices[i]->type = type;
+            cacheFlags[i] |= CacheFlag_Dirty_Type;
+            break;
+        }
+    }
+
+    pthread_mutex_unlock(&cacheUpdateMutex);
+}
+
 void CacheUpdatePIDs(Service_t *service, int pcrpid, PIDList_t *pids, int pmtversion)
 {
     int i;
@@ -315,6 +373,14 @@ Service_t *CacheServiceAdd(int id)
     if (result)
     {
         result->id = id;
+        if (MainIsDVB())
+        {
+            result->source = id;
+        }
+        else
+        {
+            result->source = -1;
+        }
         result->pmtVersion = -1;
         result->pmtPid = 8192;
         asprintf(&result->name, "%04x", id);
@@ -425,8 +491,11 @@ void CacheWriteback()
         {
             LogModule(LOG_DEBUG, CACHE, "Adding service %s (0x%04x)\n", cachedServices[i]->name, cachedServices[i]->id);
             ServiceAdd(cachedServices[i]->multiplexUID, cachedServices[i]->name, cachedServices[i]->id,
-                cachedServices[i]->pmtVersion, cachedServices[i]->pmtPid, cachedServices[i]->pcrPid);
-            cacheFlags[i] &= ~CacheFlag_Dirty_Name;
+                cachedServices[i]->source, cachedServices[i]->conditionalAccess,  cachedServices[i]->type,
+                cachedServices[i]->pmtVersion, cachedServices[i]->pmtPid, 
+                cachedServices[i]->pcrPid);
+            cacheFlags[i] &= ~(CacheFlag_Dirty_Name | CacheFlag_Dirty_PMTPID | 
+                               CacheFlag_Dirty_Source | CacheFlag_Dirty_CA | CacheFlag_Dirty_Type);
         }
 
         if (cacheFlags[i] & CacheFlag_Dirty_PMTPID)
@@ -448,10 +517,23 @@ void CacheWriteback()
             LogModule(LOG_DEBUG, CACHE, "Updating name for 0x%04x new name %s\n", cachedServices[i]->id, cachedServices[i]->name);
             ServiceNameSet(cachedServices[i], cachedServices[i]->name);
         }
+        if (cacheFlags[i] & CacheFlag_Dirty_Source)
+        {
+            LogModule(LOG_DEBUG, CACHE, "Updating source for 0x%04x new source %x\n", cachedServices[i]->id, cachedServices[i]->source);
+            ServiceSourceSet(cachedServices[i], cachedServices[i]->source);
+        }
+        if (cacheFlags[i] & CacheFlag_Dirty_CA)
+        {
+            LogModule(LOG_DEBUG, CACHE, "Updating CA state for 0x%04x new CA state %s\n", cachedServices[i]->id, cachedServices[i]->conditionalAccess ? "CA":"FTA");
+            ServiceConditionalAccessSet(cachedServices[i], cachedServices[i]->conditionalAccess);
+        }
+        if (cacheFlags[i] & CacheFlag_Dirty_Type)
+        {
+            LogModule(LOG_DEBUG, CACHE, "Updating Type for 0x%04x new Type %d\n", cachedServices[i]->id, cachedServices[i]->type);
+            ServiceTypeSet(cachedServices[i], cachedServices[i]->type);
+        }        
         cacheFlags[i] = 0;
     }
-
-
 
     DBaseTransactionCommit();
     pthread_mutex_unlock(&cacheUpdateMutex);

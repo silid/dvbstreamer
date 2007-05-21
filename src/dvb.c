@@ -53,7 +53,7 @@ static int DVBFrontEndDiSEqCSet(DVBAdapter_t *adapter, DVBDiSEqCSettings_t *dise
 static char DVBADAPTER[] = "DVBAdapter";
 
 #ifdef __CYGWIN__
-static bool locked = FALSE;
+static volatile bool locked = FALSE;
 static pthread_mutex_t tuningMutex;
 #endif
 
@@ -86,6 +86,15 @@ DVBAdapter_t *DVBInit(int adapter)
             LogModule(LOG_ERROR, DVBADAPTER, "Failed to get front end info: %s\n",strerror(errno));
             DVBDispose(result);
             return NULL;
+        }
+#else
+        if (adapter == 0)
+        {
+            result->info.type = FE_OFDM;
+        }
+        else
+        {
+            result->info.type = FE_ATSC;
         }
 #endif
         result->demuxFd = open(result->demuxPath, O_RDWR);
@@ -178,12 +187,13 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
     char filename[256];
     sprintf(filename, "/dev/dvb/adapter%d/%d", adapter->adapter, frontend->frequency);
     pthread_mutex_lock(&tuningMutex);
+    LogModule(LOG_DEBUG, "Attempting to open %s\n", filename);
     if (adapter->dvrFd> -1)
     {
         close(adapter->dvrFd);
     }
     adapter->dvrFd = open(filename, O_RDONLY | O_NONBLOCK);
-    locked = TRUE;
+    locked = (adapter->dvrFd != -1) ? TRUE:FALSE;
     pthread_mutex_unlock(&tuningMutex);
 #endif       
     return 1;
@@ -297,6 +307,18 @@ int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status, unsigned int *
         LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_SNR: %s\n", strerror(errno));
         return 0;
     }
+    #else    
+    if (locked)
+    {
+        *status = FE_HAS_LOCK;
+    }
+    else
+    {
+        *status = 0;
+    }
+    *ber = 0xffffffff;
+    *strength = 0xffffffff;
+    *snr = 0xffffffff;
     #endif
     return 1;
 }
@@ -377,7 +399,7 @@ int DVBDVRRead(DVBAdapter_t *adapter, char *data, int max, int timeout)
             count += result / 188;
         }
 
-        if (count > 116)
+        if (count > 200)
         {
             usleep(100);
             count = 0;

@@ -53,7 +53,7 @@ int TuningInit(void)
     return 0;
 }
 
-int TuningDeinit(void)
+int TuningDeInit(void)
 {
     ListFree(ChannelChangedCallbacksList,NULL);
     MultiplexRefDec(CurrentMultiplex);

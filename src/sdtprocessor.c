@@ -71,6 +71,7 @@ static void SubTableHandler(void * state, dvbpsi_handle demuxHandle, uint8_t tab
 static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT);
 static void SDTMultiplexChanged(PIDFilter_t *filter, void *arg, Multiplex_t *multiplex);
 static void SDTTSStructureChanged(PIDFilter_t *filter, void *arg);
+static ServiceType ConvertDVBServiceType(int type);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -81,6 +82,17 @@ static List_t *NewSDTCallbacksList = NULL;
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
+int SDTProcessorInit(void)
+{
+    NewSDTCallbacksList = ListCreate();
+    return NewSDTCallbacksList ? 0: -1;
+}
+
+void SDTProcessorDeInit(void)
+{
+    ListFree(NewSDTCallbacksList, NULL);
+}
+
 PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter)
 {
     SDTProcessorState_t *state;
@@ -101,11 +113,6 @@ PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter)
            next one added them all back (?!)
         */
         PIDFilterTSStructureChangeSet(result, SDTTSStructureChanged, state);
-    }
-
-    if (!NewSDTCallbacksList)
-    {
-        NewSDTCallbacksList = ListCreate();
     }
 
     return result;
@@ -158,6 +165,8 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
         if (service)
         {
             dvbpsi_descriptor_t* descriptor = sdtservice->p_first_descriptor;
+            bool ca;
+            
             while(descriptor)
             {
                 if (descriptor->i_tag == DESCRIPTOR_SERVICE)
@@ -166,6 +175,8 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
                     if (servicedesc)
                     {
                         char *name;
+                        ServiceType type = ConvertDVBServiceType(servicedesc->i_service_type);
+                        
                         name = DVBTextToUTF8((char *)servicedesc->i_service_name, servicedesc->i_service_name_length);
 
                         /* Only update the name if it has changed */
@@ -174,16 +185,21 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
                             LogModule(LOG_DEBUG, SDTPROCESSOR, "Updating service 0x%04x = %s\n", sdtservice->i_service_id, name);
                             CacheUpdateServiceName(service, name);
                         }
+                        if (service->type != type)
+                        {
+                            CacheUpdateServiceType(service, type);
+                        }
                     }
                     break;
                 }
                 descriptor = descriptor->p_next;
             }
-            service->conditionalAccess = sdtservice->b_free_ca;
-            service->runningStatus = sdtservice->i_running_status;
-            service->eitPresentFollowing = sdtservice->b_eit_present;
-            service->eitSchedule = sdtservice->b_eit_schedule;
-
+            ca = sdtservice->b_free_ca ? TRUE:FALSE;
+            if (service->conditionalAccess != ca)
+            {
+                CacheUpdateServiceConditionalAccess(service,ca);
+            }
+            
             ServiceRefDec(service);
         }
         sdtservice =sdtservice->p_next;
@@ -215,4 +231,24 @@ static void SDTTSStructureChanged(PIDFilter_t *filter, void *arg)
 {
     SDTProcessorState_t *state = arg;
     filter->multiplexChanged(filter, filter->mcArg, state->multiplex);
+}
+
+static ServiceType ConvertDVBServiceType(int type)
+{
+    ServiceType result = ServiceType_Unknown;
+    switch(type)
+    {
+        case 1: 
+            result = ServiceType_TV;
+            break;
+        case 2:
+            result = ServiceType_Radio;
+            break;
+        case 3:
+        case 12:
+        case 16:
+            result = ServiceType_Data;
+            break;
+    }
+    return result;
 }

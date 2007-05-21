@@ -44,7 +44,19 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 /**
  * Constant for Service Table Column name
  */
+#define SERVICE_SOURCE          "source"
+/**
+ * Constant for Service Table Column name
+ */
+#define SERVICE_CA              "ca"
+/**
+ * Constant for Service Table Column name
+ */
 #define SERVICE_NAME            "name"
+/**
+ * Constant for Service Table Column name
+ */
+#define SERVICE_TYPE            "type"
 /**
  * Constant for Service Table Column name
  */
@@ -349,6 +361,10 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
  */
 #define METADATA_NAME_LNB_SWITCH_FREQ  "lnb.switchfreq"
 
+/**
+ * Constant for Metadata property to scan all multiplexes on startup.
+ */
+#define METADATA_NAME_SCAN_ALL "scan.all"
 /** @} */
 
 /**

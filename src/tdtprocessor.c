@@ -43,9 +43,16 @@ Process Time/Date and Time Offset Tables.
 #include "tdtprocessor.h"
 #include "dvbpsi/tdttot.h"
 
+/*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
 
 #define TABLE_ID_TDT 0x40
 #define TABLE_ID_TOT 0x41
+
+/*******************************************************************************
+* Typedefs                                                                     *
+*******************************************************************************/
 
 typedef struct TDTProcessor_t
 {
@@ -55,10 +62,34 @@ typedef struct TDTProcessor_t
 }
 TDTProcessor_t;
 
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
+
 static void TDTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex);
 static TSPacket_t * TDTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
 static void TDTHandler(void* arg, dvbpsi_tdt_tot_t* newTDT);
+
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
+
 static List_t *NewTDTCallbacksList = NULL;
+
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
+
+int TDTProcessorInit(void)
+{
+    NewTDTCallbacksList = ListCreate(); 
+    return NewTDTCallbacksList ? 0: -1;
+}
+
+void TDTProcessorDeInit(void)
+{
+    ListFree(NewTDTCallbacksList, NULL);
+}
 
 PIDFilter_t *TDTProcessorCreate(TSFilter_t *tsfilter)
 {
@@ -82,10 +113,6 @@ PIDFilter_t *TDTProcessorCreate(TSFilter_t *tsfilter)
         PIDFilterMultiplexChangeSet(result,TDTProcessorMultiplexChanged, state);
     }
 
-    if (!NewTDTCallbacksList)
-    {
-        NewTDTCallbacksList = ListCreate();
-    }
     return result;
 }
 
@@ -117,6 +144,10 @@ void TDTProcessorUnRegisterTDTCallback(PluginTDTProcessor_t callback)
         ListRemove(NewTDTCallbacksList, callback);
     }
 }
+
+/*******************************************************************************
+* Local Functions                                                              *
+*******************************************************************************/
 
 static void TDTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex)
 {

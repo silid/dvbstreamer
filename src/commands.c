@@ -30,6 +30,7 @@ Command Processing and command functions.
 #include <getopt.h>
 #include <ctype.h>
 #include <time.h>
+#include <errno.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 
@@ -49,7 +50,7 @@ Command Processing and command functions.
 #include "patprocessor.h"
 #include "pmtprocessor.h"
 #include "sdtprocessor.h"
-
+#include "psipprocessor.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -87,7 +88,6 @@ static Command_t *FindCommand(Command_t *commands, char *command);
 static char **Tokenise(char *arguments, int *argc);
 static void ParseLine(char *line, char **command, char **argument);
 static char *Trim(char *str);
-static int CommandPrintfImpl(char *fmt, ...);
 
 static void CommandQuit(int argc, char **argv);
 static void CommandListServices(int argc, char **argv);
@@ -95,6 +95,7 @@ static void CommandListMuxes(int argc, char **argv);
 static void CommandSelect(int argc, char **argv);
 static void CommandCurrent(int argc, char **argv);
 static void CommandServiceInfo(int argc, char **argv);
+static void CommandMuxInfo(int argc, char **argv);
 static void CommandPids(int argc, char **argv);
 static void CommandStats(int argc, char **argv);
 static void CommandAddOutput(int argc, char **argv);
@@ -120,13 +121,16 @@ static void ScanMultiplex(Multiplex_t *multiplex);
 static void PATCallback(dvbpsi_pat_t* newpat);
 static void PMTCallback(dvbpsi_pmt_t* newpmt);
 static void SDTCallback(dvbpsi_sdt_t* newsdt);
+static void VCTCallback(dvbpsi_vct_t* newvct);
+
 
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
 
-int (*CommandPrintf)(char *fmt, ...);
+int (*CommandPrintf)(const char *fmt, ...);
 CommandContext_t *CurrentCommandContext;
+static CommandContext_t ConsoleCommandContext = {"console", FALSE, NULL, NULL, TRUE, 0, {0}};
 
 static Command_t coreCommands[] = {
                                   {
@@ -177,6 +181,16 @@ static Command_t coreCommands[] = {
                                       "Displays information about the specified service.",
                                       CommandServiceInfo,
                                   },
+                                  {
+                                      "muxinfo",
+                                      TRUE, 1, 2,
+                                      "Display information about a mux.",
+                                      "muxinfo <frequency> or\n"
+                                      "muxinfo <net id> <ts id>\n"
+                                      "Displays information about the specified service.",
+                                      CommandMuxInfo,
+                                  },
+                                        
                                   {
                                       "pids",
                                       FALSE, 1, 1,
@@ -337,11 +351,11 @@ static pthread_mutex_t commandmutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* Variables used by the scan function */
 static bool scanning = FALSE;
-static bool patreceived = FALSE;
-static bool allpmtsreceived = FALSE;
-static bool sdtreceived = FALSE;
-static int pmtcount = 0;
-static struct PMTReceived_t *pmtsreceived = NULL;
+static bool PATReceived = FALSE;
+static bool AllPMTReceived = FALSE;
+static bool SDTReceived = FALSE;
+static int PMTCount = 0;
+static struct PMTReceived_t *PMTsReceived = NULL;
 static pthread_mutex_t scanningmutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t scanningcond = PTHREAD_COND_INITIALIZER;
 
@@ -364,7 +378,14 @@ int CommandInit(void)
     ListAdd( commandslist, coreCommands);
     PATProcessorRegisterPATCallback(PATCallback);
     PMTProcessorRegisterPMTCallback(PMTCallback);
-    SDTProcessorRegisterSDTCallback(SDTCallback);
+    if (MainIsDVB())
+    {
+        SDTProcessorRegisterSDTCallback(SDTCallback);
+    }
+    else
+    {
+        PSIPProcessorRegisterVCTCallback(VCTCallback);
+    }
     return 0;
 }
 
@@ -374,7 +395,14 @@ void CommandDeInit(void)
     scanning = FALSE;
     PATProcessorUnRegisterPATCallback(PATCallback);
     PMTProcessorUnRegisterPMTCallback(PMTCallback);
-    SDTProcessorUnRegisterSDTCallback(SDTCallback);
+    if (MainIsDVB())
+    {
+        SDTProcessorUnRegisterSDTCallback(SDTCallback);
+    }
+    else
+    {
+        PSIPProcessorUnRegisterVCTCallback(VCTCallback);
+    }
 }
 
 void CommandRegisterCommands(Command_t *commands)
@@ -389,16 +417,7 @@ void CommandUnRegisterCommands(Command_t *commands)
 /**************** Command Loop/Startup file functions ************************/
 void CommandLoop(void)
 {
-    CommandContext_t context;
-    char historyLine[256];
     quit = FALSE;
-
-
-    /* Setup context */
-    context.interface = "console";
-    context.authenticated = TRUE;
-    context.remote = FALSE;
-    context.commands = NULL;
 
     /* Start Command loop */
     while(!quit && !ExitProgram)
@@ -406,21 +425,9 @@ void CommandLoop(void)
         char *line = readline(PROMPT);
         if (line)
         {
-            strcpy(historyLine, line);
-            if (CommandExecute(&context, CommandPrintfImpl, line))
+            if (!CommandExecuteConsole(line))
             {
-                if (context.errorNumber != COMMAND_OK)
-                {
-                    printf("%s\n", context.errorMessage);
-                }
-                add_history(historyLine);
-            }
-            else
-            {
-                if (context.errorNumber == COMMAND_ERROR_UNKNOWN_COMMAND)
-                {
-                    printf("Unknown command \"%s\"\n", line);
-                }
+                printf("Unknown command \"%s\"\n", line);
             }
             free(line);
         }
@@ -434,19 +441,11 @@ int CommandProcessFile(char *file)
     char line[256];
     char *nl;
 
-    CommandContext_t context;
-
     fp = fopen(file, "r");
     if (!fp)
     {
         return 1;
     }
-
-    /* Setup context */
-    context.interface = file;
-    context.authenticated = TRUE;
-    context.remote = FALSE;
-    context.commands = NULL;
 
     quit = FALSE;
     while(!feof(fp) && !quit)
@@ -463,7 +462,7 @@ int CommandProcessFile(char *file)
             *nl = 0;
         }
         lineno ++;
-        if (!CommandExecute(&context, CommandPrintfImpl, line))
+        if (!CommandExecuteConsole(line))
         {
             fprintf(stderr, "%s(%d): Unknown command \"%s\"\n", file, lineno, line);
         }
@@ -473,11 +472,26 @@ int CommandProcessFile(char *file)
     return 0;
 }
 
-bool CommandExecute(CommandContext_t *context, int (*cmdprintf)(char *, ...), char *line)
+bool CommandExecuteConsole(char *line)
 {
-    bool commandFound = FALSE;
-    char *command;
-    char *argument;
+    bool found = FALSE;
+    if (CommandExecute(&ConsoleCommandContext, printf, line))
+    {
+        if (ConsoleCommandContext.errorNumber != COMMAND_OK)
+        {
+            printf("%s\n", ConsoleCommandContext.errorMessage);
+        }
+        add_history(line);
+        found = TRUE;
+    }
+    return found;
+}
+
+bool CommandExecute(CommandContext_t *context, int (*cmdprintf)(const char *, ...), char *line)
+{
+    bool commandFound = TRUE;
+    char *command = NULL;
+    char *argument = NULL;
 
     pthread_mutex_lock(&commandmutex);
     
@@ -486,6 +500,7 @@ bool CommandExecute(CommandContext_t *context, int (*cmdprintf)(char *, ...), ch
 
     CommandError(COMMAND_OK, "OK");
     ParseLine(line, &command, &argument);
+
     if (command && (strlen(command) > 0))
     {
         commandFound = ProcessCommand(command, argument);
@@ -643,11 +658,10 @@ static Command_t *FindCommand(Command_t *commands, char *command)
 
 static void ParseLine(char *line, char **command, char **argument)
 {
-    char *space;
-    char *hash;
-
-    *command = NULL;
-    *argument = NULL;
+    long eol = 0;
+    long eoc = 0;
+    char *resultCmd = NULL;
+    char *resultArg = NULL;
 
     /* Trim leading spaces */
     for (;*line && isspace(*line); line ++);
@@ -659,25 +673,51 @@ static void ParseLine(char *line, char **command, char **argument)
     }
 
     /* Handle end of line comments */
-    hash = strchr(line, '#');
-    if (hash)
-    {
-        *hash = 0;
-    }
-
+    for (eol = 0; line[eol] && (line[eol] != '#'); eol ++);
+    
     /* Find first space after command */
-    space = strchr(line, ' ');
-    if (space)
+    for (eoc = 0; line[eoc] && (eoc < eol); eoc ++)
     {
-        char *tmp;
-        *space = 0;
-        tmp = Trim(space + 1);
-        if (strlen(tmp) > 0)
+        if (isspace(line[eoc]))
         {
-            *argument = strdup(tmp);
+            break;
         }
     }
-    *command = strdup(line);
+
+    if (eoc >= 1)
+    {
+        if (eoc != eol)
+        {
+            long argStart;
+            long argEnd;
+            long argLen;
+                    
+            for (argStart = eoc + 1;(argStart < eol) && isspace(line[argStart]); argStart ++);
+
+            for (argEnd = eol - 1; (argEnd > argStart) && isspace(line[argEnd]); argEnd --);
+
+            argLen = (argEnd - argStart) + 1;
+            if (argLen > 0)
+            {
+                resultArg = malloc(argLen + 1);
+                if (resultArg)
+                {
+                    strncpy(resultArg, line + argStart, argLen);
+                    resultArg[argLen] = 0;
+                }
+            }
+        }
+        
+        resultCmd = malloc(eoc + 1);
+        if (resultCmd)
+        {
+            strncpy(resultCmd, line, eoc);
+            resultCmd[eoc] = 0;
+        }
+    }
+    *command = resultCmd;
+    *argument = resultArg;
+    
 }
 
 static char **Tokenise(char *arguments, int *argc)
@@ -728,19 +768,6 @@ static char *Trim(char *str)
     {
         *end = 0;
     }
-    return result;
-}
-/************************** Output Functions *********************************/
-static int CommandPrintfImpl(char *fmt, ...)
-{
-    int result = 0;
-    char *output;
-    va_list valist;
-    va_start(valist, fmt);
-    result = vasprintf(&output, fmt, valist);
-    fputs(output, stdout);
-    va_end(valist);
-    free(output);
     return result;
 }
 
@@ -875,37 +902,58 @@ static void CommandServiceInfo(int argc, char **argv)
     service = CacheServiceFindName(argv[0], &multiplex);
     if (service)
     {
-        Multiplex_t *currentMultiplex;
-        currentMultiplex = TuningCurrentMultiplexGet();
-        
-        CommandPrintf("ID : 0x%04x (Net ID 0x%04x TS ID 0x%04x)\n", 
-                service->id, multiplex->networkId, multiplex->tsId);
-        if (MultiplexAreEqual(multiplex, currentMultiplex))
-        {
-            char *runningstatus[] = {
-                "Unknown",
-                "Not Running",
-                "Starts in a few seconds",
-                "Pausing",
-                "Running",
-            };
-            CommandPrintf("Free to Air/CA       : %s\n", service->conditionalAccess ? "CA":"Free to Air");
-            CommandPrintf("EPG Present/Following: %s\n", service->eitPresentFollowing ? "Yes":"No");
-            CommandPrintf("EPG Schedule         : %s\n", service->eitSchedule ? "Yes":"No");
-            CommandPrintf("Running Status       : %s\n", runningstatus[service->runningStatus]);
-        }
-        else
-        {
-            CommandPrintf("Not in current multiplex, no further information available.\n");
-        }
-        
+        static const char *serviceType[]= {"Digital TV", "Digital Radio", "Data", "Unknown"};
+            
+        CommandPrintf("Service ID          : 0x%04x\n", service->id);
+        CommandPrintf("Network ID          : 0x%04x\n", multiplex->networkId);
+        CommandPrintf("Transport Stream ID : 0x%04x\n", multiplex->tsId);
+        CommandPrintf("Source              : 0x%04x\n", service->source);
+        CommandPrintf("Conditional Access? : %s\n", service->conditionalAccess ? "CA":"Free to Air");
+        CommandPrintf("Type                : %s\n", serviceType[service->type]);
+        CommandPrintf("PMT PID             : 0x%04x\n", service->pmtPid);
+        CommandPrintf("    Version         : %d\n", service->pmtVersion);
         ServiceRefDec(service);
-        MultiplexRefDec(currentMultiplex);
         MultiplexRefDec(multiplex);
     }
     else
     {
         CommandError(COMMAND_ERROR_GENERIC, "Service not found!");
+    }
+}
+
+static void CommandMuxInfo(int argc, char **argv)
+{
+    Multiplex_t *multiplex = NULL;
+    if (argc == 1)
+    {
+        int freq = atoi(argv[0]);
+        multiplex = MultiplexFindFrequency(freq);
+    }
+    if (argc == 2)
+    {
+        int netId = 0;
+        int tsId = 0;
+        sscanf(argv[0], "%x", &netId);
+        sscanf(argv[1], "%x", &tsId);        
+        multiplex = MultiplexFindId(netId, tsId);
+    }
+    if (multiplex)
+    {
+        char *types[] = {"QPSK", "QAM", "OFDM", "ATSC"};
+        
+        CommandPrintf("Network ID          : 0x%04x\n", multiplex->networkId);
+        CommandPrintf("Transport Stream ID : 0x%04x\n", multiplex->tsId);
+        CommandPrintf("PAT Version         : %d\n", multiplex->patVersion);
+        CommandPrintf("Internal UID        : 0x%08x\n", multiplex->uid);
+        CommandPrintf("Tuning Parameters\n");
+        CommandPrintf("    Frequency       : %d\n", multiplex->freq);
+        CommandPrintf("    Type            : %s\n", types[multiplex->type]);
+        
+        MultiplexRefDec(multiplex);
+    }
+    else
+    {
+        CommandError(COMMAND_ERROR_GENERIC, "Multiplex not found!");
     }
 }
 
@@ -1424,75 +1472,101 @@ static void CommandScan(int argc, char **argv)
 static void ScanMultiplex(Multiplex_t *multiplex)
 {
     struct timespec timeout;
+    bool seenPATReceived = FALSE;
+    bool seenAllPMTReceived = FALSE;
+    bool seenSDTRecieved = FALSE;
+    int ret = 0;
     
     CommandPrintf("Scanning %d\n", multiplex->freq);
 
     TuningCurrentMultiplexSet(multiplex);
 
-    patreceived = FALSE;
-    sdtreceived = FALSE;
-    allpmtsreceived = FALSE;
-    pmtcount = 0;
-    pmtsreceived = NULL;
+    PATReceived = FALSE;
+    SDTReceived = FALSE;
+    AllPMTReceived = FALSE;
+    PMTCount = 0;
+    PMTsReceived = NULL;
     clock_gettime( CLOCK_REALTIME, &timeout);
     timeout.tv_sec += 5;
     scanning = TRUE;
 
-    pthread_mutex_lock(&scanningmutex);
-    pthread_cond_timedwait(&scanningcond, &scanningmutex, &timeout);
-    pthread_mutex_unlock(&scanningmutex);
-    CommandPrintf(" PAT received? %s\n", patreceived ? "YES":"NO");
+    while ( !(seenPATReceived && seenAllPMTReceived && seenSDTRecieved) && (ret != ETIMEDOUT))
+    {
+        pthread_mutex_lock(&scanningmutex);
+        ret = pthread_cond_timedwait(&scanningcond, &scanningmutex, &timeout);
+        pthread_mutex_unlock(&scanningmutex);
+        if (!seenPATReceived && PATReceived)
+        {
+            CommandPrintf(" PAT received? Yes\n");
+            seenPATReceived = TRUE;
+        }
 
-    pthread_mutex_lock(&scanningmutex);
-    pthread_cond_timedwait(&scanningcond, &scanningmutex, &timeout);
-    pthread_mutex_unlock(&scanningmutex);
-    CommandPrintf(" PMT received? %s\n", allpmtsreceived ? "YES":"NO");
+        if (!seenAllPMTReceived && AllPMTReceived)
+        {
+            CommandPrintf(" PMT received? Yes\n");
+            seenAllPMTReceived = TRUE;
+        }
 
-    pthread_mutex_lock(&scanningmutex);
-    pthread_cond_timedwait(&scanningcond, &scanningmutex, &timeout);
-    pthread_mutex_unlock(&scanningmutex);
-    CommandPrintf(" SDT received? %s\n", sdtreceived ? "YES":"NO");
+        if (!seenSDTRecieved && SDTReceived)
+        {
+            CommandPrintf(" %s received? Yes\n", MainIsDVB() ?"SDT":"VCT");
+            seenSDTRecieved = TRUE;
+        }
+    }
+    if (!seenPATReceived)
+    {
+        CommandPrintf(" PAT received? No\n");        
+    }
 
+    if (!seenAllPMTReceived)
+    {
+        CommandPrintf(" PMT received? No\n");
+    }
+
+    if (!seenSDTRecieved)
+    {
+        CommandPrintf(" %s received? No\n", MainIsDVB() ?"SDT":"VCT");
+    }
     scanning = FALSE;
 
-    if (pmtsreceived)
+    if (PMTsReceived)
     {
-        ObjectFree(pmtsreceived);
+        ObjectFree(PMTsReceived);
     }
 
 
 }
 static void PATCallback(dvbpsi_pat_t* newpat)
 {
-    if (scanning && !patreceived)
+    if (scanning && !PATReceived)
     {
         int i;
         dvbpsi_pat_program_t *patentry = newpat->p_first_program;
         TSFilter_t *tsFilter = MainTSFilterGet();
-        pmtcount = 0;
+        PMTCount = 0;
         while(patentry)
         {
             if (patentry->i_number != 0x0000)
             {
-                pmtcount ++;
+                PMTCount ++;
             }
             patentry = patentry->p_next;
         }
-        pmtsreceived = ObjectAlloc(sizeof(struct PMTReceived_t) * pmtcount);
+        PMTsReceived = ObjectAlloc(sizeof(struct PMTReceived_t) * PMTCount);
         patentry = newpat->p_first_program;
         i = 0;
         while(patentry)
         {
             if (patentry->i_number != 0x0000)
             {
-                pmtsreceived[i].id = patentry->i_number;
+                PMTsReceived[i].id = patentry->i_number;
                 i ++;
             }
             patentry = patentry->p_next;
         }
-        patreceived = TRUE;
+        PATReceived = TRUE;
         tsFilter->tsStructureChanged = TRUE; /* Force all PMTs to be received again incase we are scanning a mux we have pids for */
-        if (patreceived)
+        if (PATReceived)
         {
             pthread_mutex_lock(&scanningmutex);
             pthread_cond_signal(&scanningcond);
@@ -1503,27 +1577,27 @@ static void PATCallback(dvbpsi_pat_t* newpat)
 
 static void PMTCallback(dvbpsi_pmt_t* newpmt)
 {
-    if (scanning && patreceived && !allpmtsreceived)
+    if (scanning && !AllPMTReceived)
     {
         bool all = TRUE;
         int i;
-        for (i = 0; i < pmtcount; i ++)
+        for (i = 0; i < PMTCount; i ++)
         {
-            if (pmtsreceived[i].id == newpmt->i_program_number)
+            if (PMTsReceived[i].id == newpmt->i_program_number)
             {
-                pmtsreceived[i].received = TRUE;
+                PMTsReceived[i].received = TRUE;
             }
         }
 
-        for (i = 0; i < pmtcount; i ++)
+        for (i = 0; i < PMTCount; i ++)
         {
-            if (!pmtsreceived[i].received)
+            if (!PMTsReceived[i].received)
             {
                 all = FALSE;
             }
         }
 
-        allpmtsreceived = all;
+        AllPMTReceived = all;
         if (all)
         {
             pthread_mutex_lock(&scanningmutex);
@@ -1535,10 +1609,10 @@ static void PMTCallback(dvbpsi_pmt_t* newpmt)
 
 static void SDTCallback(dvbpsi_sdt_t* newsdt)
 {
-    if (scanning && patreceived && !sdtreceived)
+    if (scanning && !SDTReceived)
     {
-        sdtreceived = TRUE;
-        if (sdtreceived)
+        SDTReceived = TRUE;
+        if (SDTReceived)
         {
             pthread_mutex_lock(&scanningmutex);
             pthread_cond_signal(&scanningcond);
@@ -1546,6 +1620,21 @@ static void SDTCallback(dvbpsi_sdt_t* newsdt)
         }
     }
 }
+
+static void VCTCallback(dvbpsi_vct_t* newvct)
+{
+    if (scanning && !SDTReceived)
+    {
+        SDTReceived = TRUE;
+        if (SDTReceived)
+        {
+            pthread_mutex_lock(&scanningmutex);
+            pthread_cond_signal(&scanningcond);
+            pthread_mutex_unlock(&scanningmutex);
+        }
+    }
+}
+
 
 /************************** Helper Functions *********************************/
 static int ParsePID(char *argument)

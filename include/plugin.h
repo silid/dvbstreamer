@@ -48,6 +48,9 @@ Plugin Interface structures and macros.
 #include "dvbpsi/datetime.h"
 #include "dvbpsi/nit.h"
 #include "dvbpsi/tdttot.h"
+#include "dvbpsi/mgt.h"
+#include "dvbpsi/stt.h"
+#include "dvbpsi/vct.h"
 
 #include "config.h"
 #include "types.h"
@@ -102,6 +105,18 @@ Plugin Interface structures and macros.
  * Constant for a generic PES section processor plugin feature.
  */
 #define PLUGIN_FEATURE_TYPE_PESPROCESSOR     0x0A
+/**
+ * Constant for a MGT processor plugin feature.
+ */
+#define PLUGIN_FEATURE_TYPE_MGTPROCESSOR     0x0B
+/**
+ * Constant for a STT processor plugin feature.
+ */
+#define PLUGIN_FEATURE_TYPE_STTPROCESSOR     0x0C
+/**
+ * Constant for a VCT processor plugin feature.
+ */
+#define PLUGIN_FEATURE_TYPE_VCTPROCESSOR     0x0D
 /**
  * Constant for the plugin installed feature.
  */
@@ -273,6 +288,23 @@ typedef struct Plugin_t
  *                 process and the callback to call when a new PES section arrives.
  */
 #define PLUGIN_FEATURE_PESPROCESSOR(_details) {PLUGIN_FEATURE_TYPE_PESPROCESSOR, (void*)_details}
+/**
+ * Simple macro to define a MGT Processor feature.
+ * @param _processor Function to call when a new MGT arrives.
+ */
+#define PLUGIN_FEATURE_MGTPROCESSOR(_processor) {PLUGIN_FEATURE_TYPE_MGTPROCESSOR, (void*)_processor}
+
+/**
+ * Simple macro to define a STT Processor feature.
+ * @param _processor Function to call when a new STT arrives.
+ */
+#define PLUGIN_FEATURE_STTPROCESSOR(_processor) {PLUGIN_FEATURE_TYPE_STTPROCESSOR, (void*)_processor}
+
+/**
+ * Simple macro to define a VCT Processor feature.
+ * @param _processor Function to call when a new VCT arrives.
+ */
+#define PLUGIN_FEATURE_VCTPROCESSOR(_processor) {PLUGIN_FEATURE_TYPE_VCTPROCESSOR, (void*)_processor}
 
 /**
  * Simple macro to define an install callback.
@@ -328,6 +360,27 @@ typedef void (*PluginNITProcessor_t)(dvbpsi_nit_t* newnit);
  * plugin is expected (allowed).
  */
 typedef void (*PluginTDTProcessor_t)(dvbpsi_tdt_tot_t* newtdttot);
+
+/**
+ * Function pointer to function to call when a new MGT arrives.
+ * For use with the PLUGIN_FEATURE_TYPE_MGTPROCESSOR feature type, only 1 per
+ * plugin is expected (allowed).
+ */
+typedef void (*PluginMGTProcessor_t)(dvbpsi_mgt_t* newmgt);
+
+/**
+ * Function pointer to function to call when a new STT arrives.
+ * For use with the PLUGIN_FEATURE_TYPE_STTPROCESSOR feature type, only 1 per
+ * plugin is expected (allowed).
+ */
+typedef void (*PluginSTTProcessor_t)(dvbpsi_stt_t* newstt);
+
+/**
+ * Function pointer to function to call when a new VCT arrives.
+ * For use with the PLUGIN_FEATURE_TYPE_VCTPROCESSOR feature type, only 1 per
+ * plugin is expected (allowed).
+ */
+typedef void (*PluginVCTProcessor_t)(dvbpsi_vct_t* newvct);
 
 /**
  * Function pointer to function to call when a new section arrives on the specified PID.
