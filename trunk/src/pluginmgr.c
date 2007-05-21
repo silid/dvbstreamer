@@ -126,7 +126,7 @@ extern Plugin_t EPGtoXMLTVPluginInterface;
 int PluginManagerInit(void)
 {
     ListIterator_t iterator;
-    uint8_t isDVBMask;
+    uint8_t isSuitableMask;
     lt_dlinit();
     PluginsList = ListCreate();
     LogModule(LOG_DEBUG, PLUGINMANAGER, "Plugin Manager Initialising...\n");
@@ -151,23 +151,24 @@ int PluginManagerInit(void)
         ListAdd(PluginsList, entry);                
     }
 #endif
-    isDVBMask = MainIsDVB() ? PLUGIN_FOR_DVB:PLUGIN_FOR_ATSC;
+    isSuitableMask = MainIsDVB() ? PLUGIN_FOR_DVB:PLUGIN_FOR_ATSC;
 
     /* Process the plugins */
-    for ( ListIterator_Init(iterator, PluginsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    for ( ListIterator_Init(iterator, PluginsList); ListIterator_MoreEntries(iterator);)
     {
         struct PluginEntry_t *entry = ListIterator_Current(iterator);
-        if ((entry->pluginInterface->pluginFor & isDVBMask) != 0)
+        if ((entry->pluginInterface->pluginFor & isSuitableMask) != 0)
         {
             LogModule(LOG_DEBUG, PLUGINMANAGER,"Installing %s\n", entry->pluginInterface->name);
             PluginManagerInstallPlugin(entry->pluginInterface);
+            ListIterator_Next(iterator);
         }
         else
         {
             LogModule(LOG_DEBUG, PLUGINMANAGER, "Not installing %s as not suitable.\n", entry->pluginInterface->name);
             lt_dlclose(entry->handle);
             free(entry);
-            ListRemoveCurrent(&iterator);
+            ListRemoveCurrent(&iterator); /* Removing an entry automatically moves to the next entry in the list */
         }
     }
 
