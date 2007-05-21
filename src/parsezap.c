@@ -98,8 +98,8 @@ static const Param modulation_list [] =
         { "QAM_128", QAM_128 },
         { "QAM_256", QAM_256 },
         { "QAM_AUTO", QAM_AUTO },
-        { "VSB_8", VSB_8 },
-        { "VSB_16", VSB_16 },
+        { "8VSB", VSB_8 },
+        { "16VSB", VSB_16 },
         { NULL, 0 }
     };
 
