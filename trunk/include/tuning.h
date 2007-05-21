@@ -44,7 +44,7 @@ int TuningInit(void);
  * Deinitialise the Tuning module.
  * @return 0 on success.
  */ 
-int TuningDeinit(void);
+int TuningDeInit(void);
 
 /**
  * Register a Channel Changed callback.

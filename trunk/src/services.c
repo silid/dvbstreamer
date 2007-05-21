@@ -33,6 +33,9 @@ Manage services and PIDs.
 
 #define SERVICE_FIELDS SERVICE_MULTIPLEXUID "," \
                        SERVICE_ID "," \
+                       SERVICE_SOURCE "," \
+                       SERVICE_CA "," \
+                       SERVICE_TYPE "," \
                        SERVICE_NAME "," \
                        SERVICE_PMTVERSION "," \
                        SERVICE_PMTPID ","\
@@ -90,19 +93,23 @@ int ServiceDelete(Service_t  *service)
     return 0;
 }
 
-int ServiceAdd(int uid, char *name, int id, int pmtversion, int pmtpid, int pcrpid)
+int ServiceAdd(int uid, char *name, int id, int source, bool ca, ServiceType type, 
+                    int pmtversion, int pmtpid, int pcrpid)
 {
     STATEMENT_INIT;
 
     STATEMENT_PREPAREVA("INSERT INTO "SERVICES_TABLE "("
                         SERVICE_MULTIPLEXUID ","
                         SERVICE_ID ","
+                        SERVICE_SOURCE ","
+                        SERVICE_CA ","
+                        SERVICE_TYPE ","
                         SERVICE_PMTVERSION ","
                         SERVICE_PMTPID ","
                         SERVICE_PCRPID ","
                         SERVICE_NAME ")"
-                        "VALUES (%d,%d,%d,%d,%d,'%q');",
-                        uid, id, pmtversion, pmtpid, pcrpid, name);
+                        "VALUES (%d,%d,%d,%d,%d,%d,%d,%d,'%q');",
+                        uid, id, source, ca, type, pmtversion, pmtpid, pcrpid, name);
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
@@ -199,6 +206,78 @@ int ServiceNameSet(Service_t  *service, char *name)
     if (rc == SQLITE_DONE)
     {
         service->name = strdup(name);
+        rc = SQLITE_OK;
+    }
+    else
+    {
+        PRINTLOG_SQLITE3ERROR();
+    }
+    STATEMENT_FINALIZE();
+    return rc;
+}
+
+int ServiceSourceSet(Service_t  *service, int source)
+{
+    STATEMENT_INIT;
+
+    STATEMENT_PREPAREVA("UPDATE " SERVICES_TABLE " "
+                        "SET " SERVICE_SOURCE "=%d "
+                        "WHERE " SERVICE_MULTIPLEXUID "=%d AND " SERVICE_ID "=%d;",
+                        source, service->multiplexUID,  service->id);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+    if (rc == SQLITE_DONE)
+    {
+        service->source = source;
+        rc = SQLITE_OK;
+    }
+    else
+    {
+        PRINTLOG_SQLITE3ERROR();
+    }
+    STATEMENT_FINALIZE();
+    return rc;
+}
+
+int ServiceConditionalAccessSet(Service_t  *service, bool ca)
+{
+    STATEMENT_INIT;
+
+    STATEMENT_PREPAREVA("UPDATE " SERVICES_TABLE " "
+                        "SET " SERVICE_CA "=%d "
+                        "WHERE " SERVICE_MULTIPLEXUID "=%d AND " SERVICE_ID "=%d;",
+                        ca, service->multiplexUID,  service->id);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+    if (rc == SQLITE_DONE)
+    {
+        service->conditionalAccess = ca;
+        rc = SQLITE_OK;
+    }
+    else
+    {
+        PRINTLOG_SQLITE3ERROR();
+    }
+    STATEMENT_FINALIZE();
+    return rc;
+}
+
+int ServiceTypeSet(Service_t  *service, ServiceType type)
+{
+    STATEMENT_INIT;
+
+    STATEMENT_PREPAREVA("UPDATE " SERVICES_TABLE " "
+                        "SET " SERVICE_TYPE "=%d "
+                        "WHERE " SERVICE_MULTIPLEXUID "=%d AND " SERVICE_ID "=%d;",
+                        type, service->multiplexUID,  service->id);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+    if (rc == SQLITE_DONE)
+    {
+        service->type = type;
         rc = SQLITE_OK;
     }
     else
@@ -317,14 +396,17 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
         service = ServiceNew();
         service->multiplexUID = STATEMENT_COLUMN_INT( 0);
         service->id = STATEMENT_COLUMN_INT( 1);
-        name = STATEMENT_COLUMN_TEXT( 2);
+        service->source = STATEMENT_COLUMN_INT( 2);
+        service->conditionalAccess = STATEMENT_COLUMN_INT(3) ? TRUE:FALSE;
+        service->type = STATEMENT_COLUMN_INT( 4);
+        name = STATEMENT_COLUMN_TEXT( 5);
         if (name)
         {
             service->name = strdup(name);
         }
-        service->pmtVersion = STATEMENT_COLUMN_INT( 3);
-        service->pmtPid = STATEMENT_COLUMN_INT( 4);
-        service->pcrPid = STATEMENT_COLUMN_INT( 5);
+        service->pmtVersion = STATEMENT_COLUMN_INT( 6);
+        service->pmtPid = STATEMENT_COLUMN_INT( 7);
+        service->pcrPid = STATEMENT_COLUMN_INT( 8);
         return service;
     }
 

@@ -135,6 +135,27 @@ void CacheUpdateService(Service_t *service, int pmtpid);
 void CacheUpdateServiceName(Service_t *service, char *name);
 
 /**
+ * Update the cached service with a new source id.
+ * @param service The service to update.
+ * @param source The new source id.
+ */
+void CacheUpdateServiceSource(Service_t *service, uint16_t source);
+
+/**
+ * Update the cached service with the new CA state of the service.
+ * @param service The service to update.
+ * @param ca The new CA state.
+ */
+void CacheUpdateServiceConditionalAccess(Service_t *service, bool ca);
+
+/**
+ * Update the cached service with the new type of the service.
+ * @param service The service to update.
+ * @param type The new type of the service.
+ */
+void CacheUpdateServiceType(Service_t *service, ServiceType type);
+
+/**
  * Update the PIDs for the specified service.
  * @param service The service to update.
  * @param pcrpid The PID the PCR is being sent on.

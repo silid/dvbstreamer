@@ -198,6 +198,7 @@ static int parsezapline(char * str, fe_type_t fe_type)
     DVBDiSEqCSettings_t diseqcsettings;
     char *name;
     int id;
+    int source;
     int muxUID;
 
     tmp = str;
@@ -313,8 +314,16 @@ static int parsezapline(char * str, fe_type_t fe_type)
     /* service ID */
     NEXTFIELD();
     id = strtoul(field, NULL, 0);
+    if (fe_type == FE_ATSC)
+    {
+        source = -1;
+    }
+    else
+    {
+        source = id;
+    }
     printlog(LOG_DEBUGV, "Adding service \"%s\" %d\n", name, id);
-    if (ServiceAdd(muxUID, name, id, -1, -1, -1))
+    if (ServiceAdd(muxUID, name, id, source, FALSE, ServiceType_Unknown, -1, -1, -1))
     {
         printlog(LOG_ERROR, "Failed to add service \"%s\", possible reason already in database?\n", name);
     }

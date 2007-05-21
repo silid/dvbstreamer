@@ -33,38 +33,37 @@ Manage services and PIDs.
 #include "objects.h"
 #include "multiplexes.h"
 
-
 /**
  * @defgroup Service Service information
  * @{
  */
 
-typedef enum RunningStatus_e
-{
-    RunningStatus_Undefined       = 0,
-    RunningStatus_NotRunning      = 1,
-    RunningStatus_StartsInSeconds = 2,
-    RunningStatus_Pausing         = 3,
-    RunningStatus_Running         = 4,
-}RunningStatus_e;
+/**
+ * Enumeration to describe the type of a service.
+ */
+typedef enum {
+    ServiceType_TV,     /**< Digital TV service type. */
+    ServiceType_Radio,  /**< Digital Radio service type. */
+    ServiceType_Data,   /**< Digital Data service type. */
+    ServiceType_Unknown /**< Service type not known. */
+}ServiceType;
 
 /**
  * Structure desribing a digital TV service.
  */
 typedef struct Service_t
 {
-    char *name;        /**< Name of the service. */
-    int multiplexUID;  /**< Multiplex frequency this service is broadcast on. */
-    int id;            /**< Service/Program ID of the service. */
-    int pmtVersion;    /**< Last processed version of the PMT. */
-    int pmtPid;        /**< PID the PMT for this service is sent on. */
-    int pcrPid;        /**< PID the PCR for this service is sent on. */
-
-    /* Transient Fields - not stored in the database */
-    bool conditionalAccess;        /**< Whether 1 or more streams in for this service are controlled by CA */
-    RunningStatus_e runningStatus; /**< Running status of the service */
-    bool eitPresentFollowing;      /**< Indicates whether EIT Present/Following information is available. */
-    bool eitSchedule;              /**< Indicates whether EIT schedule information is available. */
+    char *name;             /**< Name of the service. */
+    int multiplexUID;       /**< Multiplex frequency this service is broadcast on. */
+    int id;                 /**< Service/Program ID of the service. */
+    int source;             /**< Source id of this service (for DVB this is the same 
+                                 as the service ID for ATSC this is the channels 
+                                 source id) */
+    bool conditionalAccess; /**< Whether 1 or more streams in for this service are controlled by CA */
+    ServiceType type;       /**< The type of this service (TV, Radio, Data ...) */
+    int pmtVersion;         /**< Last processed version of the PMT. */
+    int pmtPid;             /**< PID the PMT for this service is sent on. */
+    int pcrPid;             /**< PID the PCR for this service is sent on. */
 }
 Service_t;
 
@@ -109,17 +108,22 @@ int ServiceForMultiplexCount(int freq);
  * @return 0 on success, otherwise an SQLite error code.
  */
 int ServiceDelete(Service_t  *service);
+
 /**
  * Add a service to the database.
  * @param multiplexuid The multiplex the service is broadcast on.
  * @param name Name of the service.
  * @param id The service/program id of the service.
+ * @param source The service/channels source id.
+ * @param ca Whether the service is conditional access.
+ * @param type The type of the service.
  * @param pmtversion The version of the last PMT processed.
  * @param pmtpid The PID the service's PMT is transmitted on.
  * @param pcrpid The PID the service's PCR is transmitted on.
  * @return 0 on success, otherwise an SQLite error code.
  */
-int ServiceAdd(int multiplexuid, char *name, int id, int pmtversion, int pmtpid, int pcrpid);
+int ServiceAdd(int multiplexuid, char *name, int id, int source, bool ca, 
+                    ServiceType type, int pmtversion, int pmtpid, int pcrpid);
 
 /**
  * Set the PMT version for the given service.
@@ -152,6 +156,30 @@ int ServicePCRPIDSet(Service_t  *service, int pcrpid);
  * @return 0 on success, otherwise an SQLite error code.
  */
 int ServiceNameSet(Service_t  *service, char *name);
+
+/**
+ * Set the service name for the given service.
+ * @param service The service to update.
+ * @param source The new source id of the service.
+ * @return 0 on success, otherwise an SQLite error code.
+ */
+int ServiceSourceSet(Service_t  *service, int source);
+
+/**
+ * Set whether the service is conditional access of not.
+ * @param service The service to update.
+ * @param ca The new state of the service
+ * @return 0 on success, otherwise an SQLite error code.
+ */
+int ServiceConditionalAccessSet(Service_t  *service, bool ca);
+ 
+/**
+ * Set the type of the specified service.
+ * @param service The service to update.
+ * @param type The new type of the service
+ * @return 0 on success, otherwise an SQLite error code.
+ */
+int ServiceTypeSet(Service_t  *service, ServiceType type);
 
 /**
  * Find the service with the given name.

@@ -25,6 +25,9 @@ Process Service Description Tables and update the services information.
 #include "plugin.h"
 #include "ts.h"
 
+int SDTProcessorInit(void);
+void SDTProcessorDeInit(void);
+
 PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter);
 void SDTProcessorDestroy(PIDFilter_t *filter);
 

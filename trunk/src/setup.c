@@ -178,6 +178,8 @@ int main(int argc, char *argv[])
         DBaseMetadataSetInt(METADATA_NAME_LNB_HIGH_FREQ, lnbInfo.highFrequency * 1000);
         DBaseMetadataSetInt(METADATA_NAME_LNB_SWITCH_FREQ, lnbInfo.switchFrequency * 1000);        
     }
+
+    DBaseMetadataSetInt(METADATA_NAME_SCAN_ALL, 1);
     
     sqlite3_exec(DBaseInstance, "COMMIT TRANSACTION;", NULL, NULL, NULL);    
     

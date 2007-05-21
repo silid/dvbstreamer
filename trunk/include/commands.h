@@ -114,13 +114,20 @@ void CommandLoop(void);
 int CommandProcessFile(char *file);
 
 /**
+ * Execute a command in the console command context.
+ * @param line The command line to execute.
+ * @return TRUE if the command was found, FALSE otherwise.
+ */
+bool CommandExecuteConsole(char *line);
+
+/**
  * Execute the command line supplied.
  * @param context The context the command is being executed.
  * @param cmdprintf Function pointer to set CommandPrintf to.
  * @param command The command line to execute.
  * @return true if the command was found, false otherwise.
  */
-bool CommandExecute(CommandContext_t *context, int (*cmdprintf)(char *, ...), char *command);
+bool CommandExecute(CommandContext_t *context, int (*cmdprintf)(const char *, ...), char *command);
 
 /**
  * Printf style output function that should be in command functions to send
@@ -128,7 +135,7 @@ bool CommandExecute(CommandContext_t *context, int (*cmdprintf)(char *, ...), ch
  * @param fmt Printf format.
  * @return Number of bytes printed.
  */
-int (*CommandPrintf)(char *fmt, ...);
+int (*CommandPrintf)(const char *fmt, ...);
 
 /**
  * Context the currently running command is executing in.

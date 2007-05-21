@@ -134,7 +134,7 @@ bool ListInsertBeforeCurrent(ListIterator_t *iterator, void *data);
 bool ListInsertAfterCurrent(ListIterator_t *iterator, void *data);
 /**
  * Remove the current entry in the list pointed to by the iterator.
- * After a this function complete the iterator will point to the next entry in
+ * After this function complete the iterator will point to the next entry in
  * the list.
  * @param iterator Iterator pointer to the current entry in the list to remove.
  */

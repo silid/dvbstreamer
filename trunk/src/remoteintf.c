@@ -75,7 +75,7 @@ static void RemoteInterfaceWho(int argc, char **argv);
 static void RemoteInterfaceLogout(int argc, char **argv);
 static void RemoteInterfaceInfo(int argc, char **argv);
 static void PrintResponse(FILE *fp, uint16_t errno, char * msg);
-static int  RemoteInterfacePrintfImpl(char *format, ...);
+static int  RemoteInterfacePrintfImpl(const char *format, ...);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -396,7 +396,7 @@ static void PrintResponse(FILE *fp, uint16_t errno, char * msg)
     fflush(fp);
 }
 
-static int RemoteInterfacePrintfImpl(char *format, ...)
+static int RemoteInterfacePrintfImpl(const char *format, ...)
 {
     int result = 0;
     Connection_t *connection = (Connection_t*)CurrentCommandContext->privateArg;
