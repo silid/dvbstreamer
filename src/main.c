@@ -20,6 +20,7 @@ main.c
 Entry point to the application.
 
 */
+#define _GNU_SOURCE
 #include "config.h"
 
 #include <limits.h>
@@ -207,6 +208,12 @@ int main(int argc, char *argv[])
 
     if (DaemonMode)
     {
+        if (startupFile && (startupFile[0] != '/'))
+        {
+            char *cwd = getcwd(NULL, 0);
+            asprintf(&startupFile, "%s/%s", cwd, startupFile);
+            free(cwd);
+        }
         InitDaemon( adapterNumber);
     }
 
