@@ -331,11 +331,12 @@ http://sourceforge.net/tracker/?group_id=164687&atid=832723
 
 Credits
 -------
-Adam Charrett- Author
-Tero Pelander- IPv6 support along with several patches and tested DVB-C.
+Adam Charrett    - Author
+Tero Pelander    - IPv6 support along with several patches and tested DVB-C.
 Thomas Sattler   - Lots of testing for 0.5.
 Nicholas Humfrey - Power PC testing and patch.
-Alex Luccisano - DVB-S testing
+Alex Luccisano   - DVB-S testing.
+Jonathon Isom    - ATSC testing.
 
 History
 -------
