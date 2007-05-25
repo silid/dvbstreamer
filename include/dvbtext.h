@@ -23,8 +23,6 @@ DVB Text Conversion functions.
 #ifndef _DVBTEXT_H
 #define _DVBTEXT_H
 #include <sys/types.h>
-#include <linux/dvb/dmx.h>
-#include <linux/dvb/frontend.h>
 
 /**
  * @defgroup DVBText Functions to convert DVB encoded strings to UTF-8.

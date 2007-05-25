@@ -31,6 +31,10 @@ dvbstreamer_SOURCES = \
     cache.c\
     logging.c\
     commands.c\
+    commands/cmd_pids.c\
+    commands/cmd_servicefilter.c\
+    commands/cmd_info.c\
+    commands/cmd_scanning.c\
     remoteintf.c\
     outputs.c\
     list.c\

@@ -52,6 +52,30 @@ typedef struct Command_t
 }Command_t;
 
 /**
+ * Function pointer to call when retrieve a variable.
+ */
+typedef void (*CommandVariableGet_t)(char *name);
+/**
+ * Function pointer to call when setting a variable.
+ */
+typedef void (*CommandVariableSet_t)(char *name, int argc, char **argv);
+
+/**
+ * Structure used to define a variable that can be retrieved/set item.
+ */
+typedef struct CommandVariable_t
+{
+    char *name;               /**< Name of the variable item as passed to the 
+                                   get/set command. This must not include space 
+                                   characters! */
+    CommandVariableGet_t get; /**< Function to call when the get is requested.
+                                   (May be NULL) */
+    CommandVariableSet_t set; /**< Function to call when the get is requested. 
+                                   (May be NULL) */
+}CommandVariable_t;
+
+
+/**
  * Structure used to define the context a command is running in.
  */
 typedef struct CommandContext_t
@@ -75,6 +99,18 @@ typedef struct CommandContext_t
         snprintf(CurrentCommandContext->errorMessage, MAX_ERR_MSG,_msgformat);\
     }while(0)
 
+/**
+ * Macro to make checking a user has authenticated before executing a command
+ * easier and consistent.
+ */
+#define CommandCheckAuthenticated() \
+    do{\
+        if (!CurrentCommandContext->authenticated)\
+        {\
+            CommandError(COMMAND_ERROR_AUTHENTICATION, "Not authenticated!");\
+            return;\
+        }\
+    }while(0)
 
 /**
  * Initialise the command processor.
@@ -141,5 +177,17 @@ int (*CommandPrintf)(const char *fmt, ...);
  * Context the currently running command is executing in.
  */
 extern CommandContext_t *CurrentCommandContext;
+
+/**
+ * Register an info handler that will be invoked by the get/set command.
+ * @param handler The details of the info handler.
+ */
+void CommandRegisterVariable(CommandVariable_t *handler);
+
+/**
+ * UnRegister a variable handler that will be invoked by the get/set command.
+ * @param handler The details of the variable handler.
+ */
+void CommandUnRegisterVariable(CommandVariable_t *handler);
 /** @} */
 #endif

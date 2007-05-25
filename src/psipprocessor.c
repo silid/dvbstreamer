@@ -32,9 +32,9 @@ Process ATSC PSIP tables
 #include <dvbpsi/descriptor.h>
 #include <dvbpsi/dr.h>
 #include <dvbpsi/demux.h>
-#include "dvbpsi/mgt.h"
-#include "dvbpsi/stt.h"
-#include "dvbpsi/vct.h"
+#include "dvbpsi/atsc/mgt.h"
+#include "dvbpsi/atsc/stt.h"
+#include "dvbpsi/atsc/vct.h"
 
 #include "multiplexes.h"
 #include "services.h"
@@ -53,9 +53,11 @@ Process ATSC PSIP tables
 * Prototypes                                                                   *
 *******************************************************************************/
 static void SubTableHandler(void * state, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension);
-static void ProcessMGT(void *arg, dvbpsi_mgt_t *newMGT);
-static void ProcessSTT(void *arg, dvbpsi_stt_t *newSTT);
-static void ProcessVCT(void *arg, dvbpsi_vct_t *newVCT);
+static void ProcessMGT(void *arg, dvbpsi_atsc_mgt_t *newMGT);
+static void ProcessSTT(void *arg, dvbpsi_atsc_stt_t *newSTT);
+static void ProcessVCT(void *arg, dvbpsi_atsc_vct_t *newVCT);
+
+static void DumpDescriptor(char *prefix, dvbpsi_descriptor_t *descriptor);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -170,7 +172,7 @@ static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t table
     {
         /* MGT */
         case 0xC7:
-            dvbpsi_AttachMGT(demuxHandle, tableId, ProcessMGT, arg);
+            dvbpsi_atsc_AttachMGT(demuxHandle, tableId, ProcessMGT, arg);
             break;
         /* TVCT */
         case 0xC8: /* Fall through intended */
@@ -181,7 +183,7 @@ static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t table
                 /* Currently only handle VCT for the current multiplex */
                 if (extension == current->tsId)
                 {
-                    dvbpsi_AttachVCT(demuxHandle, tableId, extension, ProcessVCT, arg);
+                    dvbpsi_atsc_AttachVCT(demuxHandle, tableId, extension, ProcessVCT, arg);
                 }
                 MultiplexRefDec(current);
             }
@@ -191,15 +193,16 @@ static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t table
             break;
         /* STT */
         case 0xCD:
-            dvbpsi_AttachSTT(demuxHandle,tableId, ProcessSTT, arg);
+            dvbpsi_atsc_AttachSTT(demuxHandle,tableId, ProcessSTT, arg);
             break;
     }
 }
 
-static void ProcessMGT(void *arg, dvbpsi_mgt_t *newMGT)
+static void ProcessMGT(void *arg, dvbpsi_atsc_mgt_t *newMGT)
 {
-    dvbpsi_mgt_table_t *table;
+    dvbpsi_atsc_mgt_table_t *table;
     ListIterator_t iterator;
+    dvbpsi_descriptor_t *descriptor;    
     Multiplex_t *current = TuningCurrentMultiplexGet();
     if (current->networkId == -1)
     {
@@ -211,7 +214,19 @@ static void ProcessMGT(void *arg, dvbpsi_mgt_t *newMGT)
     {
         LogModule(LOG_DEBUG, PSIPPROCESSOR, "\tType=%d PID=%d Version=%d number bytes=%d\n",
             table->i_type, table->i_pid, table->i_version, table->i_number_bytes);
+        LogModule(LOG_DEBUG, PSIPPROCESSOR, "\tStart of Descriptors\n");
+        for (descriptor = table->p_first_descriptor; descriptor; descriptor = descriptor->p_next)
+        {
+            DumpDescriptor("\t\t\t",descriptor);
+        }
+        LogModule(LOG_DEBUG, PSIPPROCESSOR, "\tEnd of Descriptors\n");        
     }
+    LogModule(LOG_DEBUG, PSIPPROCESSOR, "\tStart of Descriptors\n");
+    for (descriptor = newMGT->p_first_descriptor; descriptor; descriptor = descriptor->p_next)
+    {
+        DumpDescriptor("\t\t",descriptor);
+    }
+    LogModule(LOG_DEBUG, PSIPPROCESSOR, "\tEnd of Descriptors\n");        
 
 
     for (ListIterator_Init(iterator, NewMGTCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
@@ -220,10 +235,10 @@ static void ProcessMGT(void *arg, dvbpsi_mgt_t *newMGT)
         callback(newMGT);
     }
     
-    dvbpsi_DeleteMGT(newMGT);
+    dvbpsi_atsc_DeleteMGT(newMGT);
 }
 
-static void ProcessSTT(void *arg, dvbpsi_stt_t *newSTT)
+static void ProcessSTT(void *arg, dvbpsi_atsc_stt_t *newSTT)
 {
     ListIterator_t iterator;
     struct tm gpsEpoch;
@@ -248,17 +263,17 @@ static void ProcessSTT(void *arg, dvbpsi_stt_t *newSTT)
         callback(newSTT);
     }
     
-    dvbpsi_DeleteSTT(newSTT);
+    dvbpsi_atsc_DeleteSTT(newSTT);
 }
 
-static void ProcessVCT(void *arg, dvbpsi_vct_t *newVCT)
+static void ProcessVCT(void *arg, dvbpsi_atsc_vct_t *newVCT)
 {
     ListIterator_t iterator;
-
-    dvbpsi_vct_channel_t *channel;
-    LogModule(LOG_DEBUG, PSIPPROCESSOR, "New VCT Recieved! Version %d Protocol %d Cable VCT? %s\n", 
-        newVCT->i_version, newVCT->i_protocol, newVCT->b_cable_vct ? "Yes":"No");
-
+    dvbpsi_descriptor_t *descriptor; 
+    dvbpsi_atsc_vct_channel_t *channel;
+    LogModule(LOG_DEBUG, PSIPPROCESSOR, "New VCT Recieved! Version %d Protocol %d Cable VCT? %s TS Id = 0x%04x\n", 
+        newVCT->i_version, newVCT->i_protocol, newVCT->b_cable_vct ? "Yes":"No", newVCT->i_ts_id);
+    
     for (channel = newVCT->p_first_channel; channel; channel = channel->p_next)
     {
         char serviceName[(7 * 6) + 1];
@@ -267,8 +282,9 @@ static void ProcessVCT(void *arg, dvbpsi_vct_t *newVCT)
         char *outbuf;
         size_t outbytes;
         int ret;
+       
         inbuf = (char *)channel->i_short_name;
-        inbytes = 8;
+        inbytes = 14;
         outbuf = serviceName;
         outbytes = sizeof(serviceName);
         ret = iconv(utf16ToUtf8CD, (char **) &inbuf, &inbytes, &outbuf, &outbytes);
@@ -299,8 +315,19 @@ static void ProcessVCT(void *arg, dvbpsi_vct_t *newVCT)
                 ServiceRefDec(service);
             }
         }
+        LogModule(LOG_DEBUG, PSIPPROCESSOR, "\tStart of Descriptors\n");
+        for (descriptor = channel->p_first_descriptor; descriptor; descriptor = descriptor->p_next)
+        {
+            DumpDescriptor("\t\t\t",descriptor);
+        }
+        LogModule(LOG_DEBUG, PSIPPROCESSOR, "\tEnd of Descriptors\n");
         
     }
+    for (descriptor = newVCT->p_first_descriptor; descriptor; descriptor = descriptor->p_next)
+    {
+        DumpDescriptor("\t\t",descriptor);
+    }
+    LogModule(LOG_DEBUG, PSIPPROCESSOR, "\tEnd of Descriptors\n");
     
     for (ListIterator_Init(iterator, NewVCTCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
@@ -308,7 +335,27 @@ static void ProcessVCT(void *arg, dvbpsi_vct_t *newVCT)
         callback(newVCT);
     }
 
-    dvbpsi_DeleteVCT(newVCT);
+    dvbpsi_atsc_DeleteVCT(newVCT);
         
 }
 
+static void DumpDescriptor(char *prefix, dvbpsi_descriptor_t *descriptor)
+{
+    int i;
+    char line[(16 * 3) + 1];
+    line[0] = 0;
+    LogModule(LOG_DEBUG, PSIPPROCESSOR, "%sTag : 0x%02x (Length %d)\n", prefix, descriptor->i_tag, descriptor->i_length);
+    for (i = 0; i < descriptor->i_length; i ++)
+    {
+        if (i && ((i % 16) == 0))
+        {
+            LogModule(LOG_DEBUG, PSIPPROCESSOR, "%s%s\n", prefix, line);
+            line[0] = 0;
+        }
+        sprintf(line + strlen(line), "%02x ", descriptor->p_data[i]);
+    }
+    if (line[0])
+    {
+        LogModule(LOG_DEBUG, PSIPPROCESSOR, "%s%s\n", prefix, line);
+    }
+}

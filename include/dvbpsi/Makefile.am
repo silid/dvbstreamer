@@ -1,5 +1,7 @@
 dvbpsidir = $(pkgincludedir)/dvbpsi
 
+dvbpsiatscdir = $(pkgincludedir)/dvbpsi/atsc
+
 dvbpsi_DATA = \
 	demux.h \
 	descriptor.h \
@@ -39,6 +41,10 @@ dvbpsi_DATA = \
 	sdt.h \
 	tdttot.h
 
+dvbpsiatsc_DATA =\
+	atsc/mgt.h \
+	atsc/stt.h \
+	atsc/vct.h
 
-EXTRA_DIST = $(dvbpsi_DATA)
+EXTRA_DIST = $(dvbpsi_DATA) $(dvbpsiatsc_DATA)
 
