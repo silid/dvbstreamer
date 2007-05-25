@@ -187,7 +187,7 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
     char filename[256];
     sprintf(filename, "/dev/dvb/adapter%d/%d", adapter->adapter, frontend->frequency);
     pthread_mutex_lock(&tuningMutex);
-    LogModule(LOG_DEBUG, "Attempting to open %s\n", filename);
+    LogModule(LOG_DEBUG, DVBADAPTER, "Attempting to open %s\n", filename);
     if (adapter->dvrFd> -1)
     {
         close(adapter->dvrFd);

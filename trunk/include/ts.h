@@ -180,9 +180,9 @@ typedef struct PIDFilter_s
     void *opArg;                           /**<User defined argument to pass to the outputPacket callback */
 
     /* Variables for statistics */
-    volatile int packetsFiltered;          /**< Number of packets that filterPacket has returned non-zero for. */
-    volatile int packetsProcessed;         /**< Number of packets that processPacket has returned non-NULL for. */
-    volatile int packetsOutput;            /**< Number of packets sent to the output callback */
+    volatile unsigned long long packetsFiltered;          /**< Number of packets that filterPacket has returned non-zero for. */
+    volatile unsigned long long packetsProcessed;         /**< Number of packets that processPacket has returned non-NULL for. */
+    volatile unsigned long long packetsOutput;            /**< Number of packets sent to the output callback */
 }PIDFilter_t;
 
 /**@}*/
@@ -241,8 +241,8 @@ typedef struct TSFilter_t
     Multiplex_t *multiplex;             /**< The multiplex the transport stream is coming from. */
     bool tsStructureChanged;            /**< Whether the underlying TS structure has changed. */
 
-    volatile int totalPackets;          /**< Total number of packets processed by this instance. */
-	volatile int bitrate;               /**< Approximate bit rate of the transport stream being processed. */
+    volatile unsigned long long totalPackets; /**< Total number of packets processed by this instance. */
+    volatile unsigned long long bitrate;      /**< Approximate bit rate of the transport stream being processed. */
 
     List_t *pidFilters;
 }

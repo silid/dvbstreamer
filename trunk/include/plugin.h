@@ -48,9 +48,9 @@ Plugin Interface structures and macros.
 #include "dvbpsi/datetime.h"
 #include "dvbpsi/nit.h"
 #include "dvbpsi/tdttot.h"
-#include "dvbpsi/mgt.h"
-#include "dvbpsi/stt.h"
-#include "dvbpsi/vct.h"
+#include "dvbpsi/atsc/mgt.h"
+#include "dvbpsi/atsc/stt.h"
+#include "dvbpsi/atsc/vct.h"
 
 #include "config.h"
 #include "types.h"
@@ -366,21 +366,21 @@ typedef void (*PluginTDTProcessor_t)(dvbpsi_tdt_tot_t* newtdttot);
  * For use with the PLUGIN_FEATURE_TYPE_MGTPROCESSOR feature type, only 1 per
  * plugin is expected (allowed).
  */
-typedef void (*PluginMGTProcessor_t)(dvbpsi_mgt_t* newmgt);
+typedef void (*PluginMGTProcessor_t)(dvbpsi_atsc_mgt_t* newmgt);
 
 /**
  * Function pointer to function to call when a new STT arrives.
  * For use with the PLUGIN_FEATURE_TYPE_STTPROCESSOR feature type, only 1 per
  * plugin is expected (allowed).
  */
-typedef void (*PluginSTTProcessor_t)(dvbpsi_stt_t* newstt);
+typedef void (*PluginSTTProcessor_t)(dvbpsi_atsc_stt_t* newstt);
 
 /**
  * Function pointer to function to call when a new VCT arrives.
  * For use with the PLUGIN_FEATURE_TYPE_VCTPROCESSOR feature type, only 1 per
  * plugin is expected (allowed).
  */
-typedef void (*PluginVCTProcessor_t)(dvbpsi_vct_t* newvct);
+typedef void (*PluginVCTProcessor_t)(dvbpsi_atsc_vct_t* newvct);
 
 /**
  * Function pointer to function to call when a new section arrives on the specified PID.

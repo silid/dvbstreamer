@@ -32,57 +32,57 @@ Decode PSIP Master Guide Table.
 #include "psi.h"
 #include "descriptor.h"
 #include "demux.h"
-#include "mgt.h"
+#include "atsc/mgt.h"
 
-typedef struct dvbpsi_mgt_decoder_s
+typedef struct dvbpsi_atsc_mgt_decoder_s
 {
-  dvbpsi_mgt_callback           pf_callback;
+  dvbpsi_atsc_mgt_callback      pf_callback;
   void *                        p_cb_data;
 
-  dvbpsi_mgt_t                  current_mgt;
-  dvbpsi_mgt_t *                p_building_mgt;
+  dvbpsi_atsc_mgt_t            current_mgt;
+  dvbpsi_atsc_mgt_t *          p_building_mgt;
 
   int                           b_current_valid;
 
   uint8_t                       i_last_section_number;
   dvbpsi_psi_section_t *        ap_sections [256];
 
-} dvbpsi_mgt_decoder_t;
+} dvbpsi_atsc_mgt_decoder_t;
 
-dvbpsi_descriptor_t *dvbpsi_MGTAddDescriptor(
-                                               dvbpsi_mgt_t *p_mgt,
+dvbpsi_descriptor_t *dvbpsi_atsc_MGTAddDescriptor(
+                                               dvbpsi_atsc_mgt_t *p_mgt,
                                                uint8_t i_tag, uint8_t i_length,
                                                uint8_t *p_data);
 
-dvbpsi_mgt_table_t *dvbpsi_MGTAddTable(dvbpsi_mgt_t* p_mgt,
+dvbpsi_atsc_mgt_table_t *dvbpsi_atsc_MGTAddTable(dvbpsi_atsc_mgt_t* p_mgt,
                                            uint16_t i_type,
                                            uint16_t i_pid,
                                            uint8_t i_version,
                                            uint32_t i_number_bytes);
 
-dvbpsi_descriptor_t *dvbpsi_MGTTableAddDescriptor(
-                                               dvbpsi_mgt_table_t *p_table,
+dvbpsi_descriptor_t *dvbpsi_atsc_MGTTableAddDescriptor(
+                                               dvbpsi_atsc_mgt_table_t *p_table,
                                                uint8_t i_tag, uint8_t i_length,
                                                uint8_t *p_data);
 
-void dvbpsi_GatherMGTSections(dvbpsi_decoder_t * p_psi_decoder,
+void dvbpsi_atsc_GatherMGTSections(dvbpsi_decoder_t * p_psi_decoder,
                               void * p_private_decoder,
                               dvbpsi_psi_section_t * p_section);
 
-void dvbpsi_DecodeMGTSections(dvbpsi_mgt_t* p_mgt,
+void dvbpsi_atsc_DecodeMGTSections(dvbpsi_atsc_mgt_t* p_mgt,
                               dvbpsi_psi_section_t* p_section);
 
 /*****************************************************************************
- * dvbpsi_AttachMGT
+ * dvbpsi_atsc_AttachMGT
  *****************************************************************************
  * Initialize a MGT subtable decoder.
  *****************************************************************************/
-int dvbpsi_AttachMGT(dvbpsi_decoder_t * p_psi_decoder, uint8_t i_table_id, 
-                          dvbpsi_mgt_callback pf_callback, void* p_cb_data)
+int dvbpsi_atsc_AttachMGT(dvbpsi_decoder_t * p_psi_decoder, uint8_t i_table_id, 
+                          dvbpsi_atsc_mgt_callback pf_callback, void* p_cb_data)
 {
   dvbpsi_demux_t* p_demux = (dvbpsi_demux_t*)p_psi_decoder->p_private_decoder;
   dvbpsi_demux_subdec_t* p_subdec;
-  dvbpsi_mgt_decoder_t*  p_mgt_decoder;
+  dvbpsi_atsc_mgt_decoder_t*  p_mgt_decoder;
   unsigned int i;
 
   if(dvbpsi_demuxGetSubDec(p_demux, i_table_id, 0))
@@ -100,7 +100,7 @@ int dvbpsi_AttachMGT(dvbpsi_decoder_t * p_psi_decoder, uint8_t i_table_id,
     return 1;
   }
 
-  p_mgt_decoder = (dvbpsi_mgt_decoder_t*)malloc(sizeof(dvbpsi_mgt_decoder_t));
+  p_mgt_decoder = (dvbpsi_atsc_mgt_decoder_t*)malloc(sizeof(dvbpsi_atsc_mgt_decoder_t));
 
   if(p_mgt_decoder == NULL)
   {
@@ -109,10 +109,10 @@ int dvbpsi_AttachMGT(dvbpsi_decoder_t * p_psi_decoder, uint8_t i_table_id,
   }
 
   /* subtable decoder configuration */
-  p_subdec->pf_callback = &dvbpsi_GatherMGTSections;
+  p_subdec->pf_callback = &dvbpsi_atsc_GatherMGTSections;
   p_subdec->p_cb_data = p_mgt_decoder;
   p_subdec->i_id = (uint32_t)i_table_id << 16;
-  p_subdec->pf_detach = dvbpsi_DetachMGT;
+  p_subdec->pf_detach = dvbpsi_atsc_DetachMGT;
 
   /* Attach the subtable decoder to the demux */
   p_subdec->p_next = p_demux->p_first_subdec;
@@ -132,15 +132,15 @@ int dvbpsi_AttachMGT(dvbpsi_decoder_t * p_psi_decoder, uint8_t i_table_id,
 
 
 /*****************************************************************************
- * dvbpsi_DetachMGT
+ * dvbpsi_atsc_DetachMGT
  *****************************************************************************
  * Close a MGT decoder.
  *****************************************************************************/
-void dvbpsi_DetachMGT(dvbpsi_demux_t * p_demux, uint8_t i_table_id, uint16_t i_extension)
+void dvbpsi_atsc_DetachMGT(dvbpsi_demux_t * p_demux, uint8_t i_table_id, uint16_t i_extension)
 {
   dvbpsi_demux_subdec_t* p_subdec;
   dvbpsi_demux_subdec_t** pp_prev_subdec;
-  dvbpsi_mgt_decoder_t* p_mgt_decoder;
+  dvbpsi_atsc_mgt_decoder_t* p_mgt_decoder;
 
   unsigned int i;
 
@@ -155,7 +155,7 @@ void dvbpsi_DetachMGT(dvbpsi_demux_t * p_demux, uint8_t i_table_id, uint16_t i_e
     return;
   }
 
-  p_mgt_decoder = (dvbpsi_mgt_decoder_t*)p_subdec->p_cb_data;
+  p_mgt_decoder = (dvbpsi_atsc_mgt_decoder_t*)p_subdec->p_cb_data;
 
   free(p_mgt_decoder->p_building_mgt);
 
@@ -179,9 +179,9 @@ void dvbpsi_DetachMGT(dvbpsi_demux_t * p_demux, uint8_t i_table_id, uint16_t i_e
 /*****************************************************************************
  * dvbpsi_InitMGT
  *****************************************************************************
- * Initialize a pre-allocated dvbpsi_mgt_t structure.
+ * Initialize a pre-allocated dvbpsi_atsc_mgt_t structure.
  *****************************************************************************/
-void dvbpsi_InitMGT(dvbpsi_mgt_t* p_mgt,uint8_t i_version, int b_current_next,
+void dvbpsi_atsc_InitMGT(dvbpsi_atsc_mgt_t* p_mgt,uint8_t i_version, int b_current_next,
                        uint8_t i_protocol)
 {
   p_mgt->i_version = i_version;
@@ -195,15 +195,15 @@ void dvbpsi_InitMGT(dvbpsi_mgt_t* p_mgt,uint8_t i_version, int b_current_next,
 /*****************************************************************************
  * dvbpsi_EmptyMGT
  *****************************************************************************
- * Clean a dvbpsi_mgt_t structure.
+ * Clean a dvbpsi_atsc_mgt_t structure.
  *****************************************************************************/
-void dvbpsi_EmptyMGT(dvbpsi_mgt_t* p_mgt)
+void dvbpsi_atsc_EmptyMGT(dvbpsi_atsc_mgt_t* p_mgt)
 {
-  dvbpsi_mgt_table_t* p_table = p_mgt->p_first_table;
+  dvbpsi_atsc_mgt_table_t* p_table = p_mgt->p_first_table;
 
   while(p_table != NULL)
   {
-    dvbpsi_mgt_table_t* p_tmp = p_table->p_next;
+    dvbpsi_atsc_mgt_table_t* p_tmp = p_table->p_next;
     dvbpsi_DeleteDescriptors(p_table->p_first_descriptor);
     free(p_table);
     p_table = p_tmp;
@@ -214,12 +214,12 @@ void dvbpsi_EmptyMGT(dvbpsi_mgt_t* p_mgt)
 }
 
 /*****************************************************************************
- * dvbpsi_MGTAddDescriptor
+ * dvbpsi_atsc_MGTAddDescriptor
  *****************************************************************************
  * Add a descriptor to the MGT table.
  *****************************************************************************/
-dvbpsi_descriptor_t *dvbpsi_MGTAddDescriptor(
-                                               dvbpsi_mgt_t *p_mgt,
+dvbpsi_descriptor_t *dvbpsi_atsc_MGTAddDescriptor(
+                                               dvbpsi_atsc_mgt_t *p_mgt,
                                                uint8_t i_tag, uint8_t i_length,
                                                uint8_t *p_data)
 {
@@ -244,18 +244,18 @@ dvbpsi_descriptor_t *dvbpsi_MGTAddDescriptor(
   return p_descriptor;
 }
 /*****************************************************************************
- * dvbpsi_MGTAddTable
+ * dvbpsi_atsc_MGTAddTable
  *****************************************************************************
  * Add a table description at the end of the MGT.
  *****************************************************************************/
-dvbpsi_mgt_table_t *dvbpsi_MGTAddTable(dvbpsi_mgt_t* p_mgt,
+dvbpsi_atsc_mgt_table_t *dvbpsi_atsc_MGTAddTable(dvbpsi_atsc_mgt_t* p_mgt,
                                            uint16_t i_type,
                                            uint16_t i_pid,
                                            uint8_t i_version,
                                            uint32_t i_number_bytes)
 {
-  dvbpsi_mgt_table_t * p_table
-                = (dvbpsi_mgt_table_t*)malloc(sizeof(dvbpsi_mgt_table_t));
+  dvbpsi_atsc_mgt_table_t * p_table
+                = (dvbpsi_atsc_mgt_table_t*)malloc(sizeof(dvbpsi_atsc_mgt_table_t));
 
   if(p_table)
   {
@@ -272,7 +272,7 @@ dvbpsi_mgt_table_t *dvbpsi_MGTAddTable(dvbpsi_mgt_t* p_mgt,
     }
     else
     {
-      dvbpsi_mgt_table_t * p_last_table = p_mgt->p_first_table;
+      dvbpsi_atsc_mgt_table_t * p_last_table = p_mgt->p_first_table;
       while(p_last_table->p_next != NULL)
         p_last_table = p_last_table->p_next;
       p_last_table->p_next = p_table;
@@ -284,12 +284,12 @@ dvbpsi_mgt_table_t *dvbpsi_MGTAddTable(dvbpsi_mgt_t* p_mgt,
 
 
 /*****************************************************************************
- * dvbpsi_MGTTableAddDescriptor
+ * dvbpsi_atsc_MGTTableAddDescriptor
  *****************************************************************************
  * Add a descriptor in the MGT table description.
  *****************************************************************************/
-dvbpsi_descriptor_t *dvbpsi_MGTTableAddDescriptor(
-                                               dvbpsi_mgt_table_t *p_table,
+dvbpsi_descriptor_t *dvbpsi_atsc_MGTTableAddDescriptor(
+                                               dvbpsi_atsc_mgt_table_t *p_table,
                                                uint8_t i_tag, uint8_t i_length,
                                                uint8_t *p_data)
 {
@@ -316,16 +316,16 @@ dvbpsi_descriptor_t *dvbpsi_MGTTableAddDescriptor(
 
 
 /*****************************************************************************
- * dvbpsi_GatherMGTSections
+ * dvbpsi_atsc_GatherMGTSections
  *****************************************************************************
  * Callback for the subtable demultiplexor.
  *****************************************************************************/
-void dvbpsi_GatherMGTSections(dvbpsi_decoder_t * p_psi_decoder,
+void dvbpsi_atsc_GatherMGTSections(dvbpsi_decoder_t * p_psi_decoder,
                               void * p_private_decoder,
                               dvbpsi_psi_section_t * p_section)
 {
-  dvbpsi_mgt_decoder_t * p_mgt_decoder
-                        = (dvbpsi_mgt_decoder_t*)p_private_decoder;
+  dvbpsi_atsc_mgt_decoder_t * p_mgt_decoder
+                        = (dvbpsi_atsc_mgt_decoder_t*)p_private_decoder;
   int b_append = 1;
   int b_reinit = 0;
   unsigned int i;
@@ -388,7 +388,7 @@ void dvbpsi_GatherMGTSections(dvbpsi_decoder_t * p_psi_decoder,
           if(    (!p_mgt_decoder->current_mgt.b_current_next)
               && (p_section->b_current_next))
           {
-            dvbpsi_mgt_t * p_mgt = (dvbpsi_mgt_t*)malloc(sizeof(dvbpsi_mgt_t));
+            dvbpsi_atsc_mgt_t * p_mgt = (dvbpsi_atsc_mgt_t*)malloc(sizeof(dvbpsi_atsc_mgt_t));
 
             p_mgt_decoder->current_mgt.b_current_next = 1;
             *p_mgt = p_mgt_decoder->current_mgt;
@@ -433,8 +433,8 @@ void dvbpsi_GatherMGTSections(dvbpsi_decoder_t * p_psi_decoder,
     if(!p_mgt_decoder->p_building_mgt)
     {
       p_mgt_decoder->p_building_mgt =
-                                (dvbpsi_mgt_t*)malloc(sizeof(dvbpsi_mgt_t));
-      dvbpsi_InitMGT(p_mgt_decoder->p_building_mgt,
+                                (dvbpsi_atsc_mgt_t*)malloc(sizeof(dvbpsi_atsc_mgt_t));
+      dvbpsi_atsc_InitMGT(p_mgt_decoder->p_building_mgt,
                      p_section->i_version,
                      p_section->b_current_next,
                      p_section->p_payload_start[0]);
@@ -474,7 +474,7 @@ void dvbpsi_GatherMGTSections(dvbpsi_decoder_t * p_psi_decoder,
                                         p_mgt_decoder->ap_sections[i + 1];
       }
       /* Decode the sections */
-      dvbpsi_DecodeMGTSections(p_mgt_decoder->p_building_mgt,
+      dvbpsi_atsc_DecodeMGTSections(p_mgt_decoder->p_building_mgt,
                                p_mgt_decoder->ap_sections[0]);
       /* Delete the sections */
       dvbpsi_ReleasePSISections(p_psi_decoder,p_mgt_decoder->ap_sections[0]);
@@ -495,11 +495,11 @@ void dvbpsi_GatherMGTSections(dvbpsi_decoder_t * p_psi_decoder,
 
 
 /*****************************************************************************
- * dvbpsi_DecodeMGTSection
+ * dvbpsi_atsc_DecodeMGTSection
  *****************************************************************************
  * MGT decoder.
  *****************************************************************************/
-void dvbpsi_DecodeMGTSections(dvbpsi_mgt_t* p_mgt,
+void dvbpsi_atsc_DecodeMGTSections(dvbpsi_atsc_mgt_t* p_mgt,
                               dvbpsi_psi_section_t* p_section)
 {
   uint8_t *p_byte, *p_end;
@@ -515,7 +515,7 @@ void dvbpsi_DecodeMGTSections(dvbpsi_mgt_t* p_mgt,
         ((p_byte + 6) < p_section->p_payload_end) && (i_table_count < i_tables_defined); 
         i_table_count ++)
     {
-        dvbpsi_mgt_table_t* p_table;
+        dvbpsi_atsc_mgt_table_t* p_table;
         uint16_t i_type = ((uint16_t)(p_byte[0] << 8)) | p_byte[1];
         uint16_t i_pid  = ((uint16_t)(p_byte[2] & 0x1f) << 8) | p_byte[3];                                           
         uint8_t i_version = (uint8_t)(p_byte[4] & 0x1f);
@@ -525,7 +525,7 @@ void dvbpsi_DecodeMGTSections(dvbpsi_mgt_t* p_mgt,
                                   p_byte[8];
         i_length = ((uint16_t)(p_byte[9] & 0xf) <<8) | p_byte[10];
 
-        p_table = dvbpsi_MGTAddTable(p_mgt, i_type, i_pid, i_version, i_number_bytes);
+        p_table = dvbpsi_atsc_MGTAddTable(p_mgt, i_type, i_pid, i_version, i_number_bytes);
 
         /* Table descriptors */
         p_byte += 11;
@@ -537,7 +537,7 @@ void dvbpsi_DecodeMGTSections(dvbpsi_mgt_t* p_mgt,
         uint8_t i_tag = p_byte[0];
         uint8_t i_length = p_byte[1];
         if(i_length + 2 <= p_end - p_byte)
-          dvbpsi_MGTTableAddDescriptor(p_table, i_tag, i_length, p_byte + 2);
+          dvbpsi_atsc_MGTTableAddDescriptor(p_table, i_tag, i_length, p_byte + 2);
         p_byte += 2 + i_length;
         }
     }
@@ -552,7 +552,7 @@ void dvbpsi_DecodeMGTSections(dvbpsi_mgt_t* p_mgt,
         uint8_t i_tag = p_byte[0];
         uint8_t i_length = p_byte[1];
         if(i_length + 2 <= p_end - p_byte)
-          dvbpsi_MGTAddDescriptor(p_mgt, i_tag, i_length, p_byte + 2);
+          dvbpsi_atsc_MGTAddDescriptor(p_mgt, i_tag, i_length, p_byte + 2);
         p_byte += 2 + i_length;
     }
     p_section = p_section->p_next;

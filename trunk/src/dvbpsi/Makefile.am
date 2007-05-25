@@ -48,8 +48,9 @@ tables_src =  \
 	tables/sdt.c \
 	tables/nit.c \
 	tables/tdttot.c \
-	tables/mgt.c \
-	tables/stt.c \
-	tables/vct.c
+	tables/atsc_mgt.c \
+	tables/atsc_stt.c \
+	tables/atsc_vct.c \
+	tables/atsc_eit.c
 
 
