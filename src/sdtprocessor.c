@@ -161,47 +161,50 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
     LogModule(LOG_DEBUG, SDTPROCESSOR, "SDT recieved, version %d\n", newSDT->i_version);
     while(sdtservice)
     {
+        dvbpsi_descriptor_t* descriptor = sdtservice->p_first_descriptor;
+        bool ca;
         Service_t *service = CacheServiceFindId(sdtservice->i_service_id);
-        if (service)
+        
+        if (!service)
         {
-            dvbpsi_descriptor_t* descriptor = sdtservice->p_first_descriptor;
-            bool ca;
-            
-            while(descriptor)
-            {
-                if (descriptor->i_tag == DESCRIPTOR_SERVICE)
-                {
-                    dvbpsi_service_dr_t* servicedesc = dvbpsi_DecodeServiceDr(descriptor);
-                    if (servicedesc)
-                    {
-                        char *name;
-                        ServiceType type = ConvertDVBServiceType(servicedesc->i_service_type);
-                        
-                        name = DVBTextToUTF8((char *)servicedesc->i_service_name, servicedesc->i_service_name_length);
-
-                        /* Only update the name if it has changed */
-                        if (strcmp(name, service->name))
-                        {
-                            LogModule(LOG_DEBUG, SDTPROCESSOR, "Updating service 0x%04x = %s\n", sdtservice->i_service_id, name);
-                            CacheUpdateServiceName(service, name);
-                        }
-                        if (service->type != type)
-                        {
-                            CacheUpdateServiceType(service, type);
-                        }
-                    }
-                    break;
-                }
-                descriptor = descriptor->p_next;
-            }
-            ca = sdtservice->b_free_ca ? TRUE:FALSE;
-            if (service->conditionalAccess != ca)
-            {
-                CacheUpdateServiceConditionalAccess(service,ca);
-            }
-            
-            ServiceRefDec(service);
+            CacheServiceAdd(sdtservice->i_service_id);
         }
+        
+        while(descriptor)
+        {
+            if (descriptor->i_tag == DESCRIPTOR_SERVICE)
+            {
+                dvbpsi_service_dr_t* servicedesc = dvbpsi_DecodeServiceDr(descriptor);
+                if (servicedesc)
+                {
+                    char *name;
+                    ServiceType type = ConvertDVBServiceType(servicedesc->i_service_type);
+                    
+                    name = DVBTextToUTF8((char *)servicedesc->i_service_name, servicedesc->i_service_name_length);
+
+                    /* Only update the name if it has changed */
+                    if (strcmp(name, service->name))
+                    {
+                        LogModule(LOG_DEBUG, SDTPROCESSOR, "Updating service 0x%04x = %s\n", sdtservice->i_service_id, name);
+                        CacheUpdateServiceName(service, name);
+                    }
+                    if (service->type != type)
+                    {
+                        CacheUpdateServiceType(service, type);
+                    }
+                }
+                break;
+            }
+            descriptor = descriptor->p_next;
+        }
+        ca = sdtservice->b_free_ca ? TRUE:FALSE;
+        if (service->conditionalAccess != ca)
+        {
+            CacheUpdateServiceConditionalAccess(service,ca);
+        }
+        
+        ServiceRefDec(service);
+
         sdtservice =sdtservice->p_next;
     }
     /* Set the Original Network id, this is a hack should really get and decode the NIT */

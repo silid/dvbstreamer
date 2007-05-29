@@ -48,6 +48,7 @@ Process ATSC PSIP tables
 #include "tuning.h"
 #include "subtableprocessor.h"
 #include "psipprocessor.h"
+#include "atsctext.h"
 
 /*******************************************************************************
 * Prototypes                                                                   *
@@ -276,17 +277,22 @@ static void ProcessVCT(void *arg, dvbpsi_atsc_vct_t *newVCT)
     
     for (channel = newVCT->p_first_channel; channel; channel = channel->p_next)
     {
-        char serviceName[(7 * 6) + 1];
+        char serviceName[10 + (7 * 6) + 1];
         char *inbuf;
         size_t inbytes;
         char *outbuf;
         size_t outbytes;
         int ret;
-       
+        /* Prepend the channels major-minor number to the name to get round 
+         * problems with broadcasters not using a unique name for each channel! 
+         */
+        sprintf(serviceName, "%d-%d ", channel->i_major_number, channel->i_minor_number);
+        
         inbuf = (char *)channel->i_short_name;
         inbytes = 14;
-        outbuf = serviceName;
-        outbytes = sizeof(serviceName);
+        outbuf = serviceName + strlen(serviceName);
+        outbytes = sizeof(serviceName) - 10;
+
         ret = iconv(utf16ToUtf8CD, (char **) &inbuf, &inbytes, &outbuf, &outbytes);
         if (ret == -1)
         {
@@ -296,29 +302,46 @@ static void ProcessVCT(void *arg, dvbpsi_atsc_vct_t *newVCT)
         {
             Service_t *service = CacheServiceFindId(channel->i_program_number);
             *outbuf = 0;
-            if (service)
-            {
-                if (service->source != channel->i_source_id)
-                {
-                    CacheUpdateServiceSource(service, channel->i_source_id);
-                }
-                if (strcmp(service->name, serviceName))
-                {
-                    CacheUpdateServiceName(service, serviceName);
-                }
 
-                LogModule(LOG_DEBUG, PSIPPROCESSOR, "\t%d-%d %s\n", channel->i_major_number, channel->i_minor_number, serviceName);
-                LogModule(LOG_DEBUG, PSIPPROCESSOR, "\t\tTS ID          = %04x\n", channel->i_channel_tsid);
-                LogModule(LOG_DEBUG, PSIPPROCESSOR, "\t\tProgram number = %04x\n", channel->i_program_number);
-                LogModule(LOG_DEBUG, PSIPPROCESSOR, "\t\tSource id      = %04x\n", channel->i_source_id);
-                LogModule(LOG_DEBUG, PSIPPROCESSOR, "\t\tService type   = %d\n", channel->i_service_type);
-                ServiceRefDec(service);
+            if (!service)
+            {
+               service = CacheServiceAdd(channel->i_program_number);
             }
+
+            if (service->source != channel->i_source_id)
+            {
+                CacheUpdateServiceSource(service, channel->i_source_id);
+            }
+            if (strcmp(service->name, serviceName))
+            {
+                CacheUpdateServiceName(service, serviceName);
+            }
+
+            LogModule(LOG_DEBUG, PSIPPROCESSOR, "\t%s\n", serviceName);
+            LogModule(LOG_DEBUG, PSIPPROCESSOR, "\t\tTS ID          = %04x\n", channel->i_channel_tsid);
+            LogModule(LOG_DEBUG, PSIPPROCESSOR, "\t\tProgram number = %04x\n", channel->i_program_number);
+            LogModule(LOG_DEBUG, PSIPPROCESSOR, "\t\tSource id      = %04x\n", channel->i_source_id);
+            LogModule(LOG_DEBUG, PSIPPROCESSOR, "\t\tService type   = %d\n", channel->i_service_type);
+            ServiceRefDec(service);
+
         }
         LogModule(LOG_DEBUG, PSIPPROCESSOR, "\tStart of Descriptors\n");
         for (descriptor = channel->p_first_descriptor; descriptor; descriptor = descriptor->p_next)
         {
             DumpDescriptor("\t\t\t",descriptor);
+            if (descriptor->i_tag == 0xa0)
+            {
+                ATSCMultipleStrings_t *strings = ATSCMultipleStringsConvert(descriptor->p_data, descriptor->i_length);
+                int s;
+                for (s = 0; s < strings->number_of_strings; s ++)
+                {
+                    LogModule(LOG_DEBUG, PSIPPROCESSOR, "\t\t\t\t%d (%c%c%c): %s\n", s,  
+                        strings->strings[s].lang[0],strings->strings[s].lang[1],strings->strings[s].lang[2],
+                        strings->strings[s].text);
+                }
+                ObjectRefDec(strings);
+                
+            }
         }
         LogModule(LOG_DEBUG, PSIPPROCESSOR, "\tEnd of Descriptors\n");
         
