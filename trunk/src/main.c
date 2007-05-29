@@ -63,6 +63,7 @@ Entry point to the application.
 #include "pluginmgr.h"
 #include "plugin.h"
 #include "tuning.h"
+#include "atsctext.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -271,7 +272,9 @@ int main(int argc, char *argv[])
     else
     {
         LogModule(LOG_INFO, MAIN, "Starting ATSC filters\n");        
-        INIT(PSIPProcessorInit(), "PSIP Processor");        
+        INIT(ATSCMultipleStringsInit(), "ATSC Strings");
+        INIT(PSIPProcessorInit(), "PSIP Processor");     
+        
         PIDFilters[PIDFILTER_INDEX_PSIP] = PSIPProcessorCreate(TSFilter);
     }
 
@@ -397,6 +400,7 @@ int main(int argc, char *argv[])
     {
         PSIPProcessorDestroy( PIDFilters[PIDFILTER_INDEX_PSIP]);
         DEINIT(PSIPProcessorDeInit(), "PSIP Processor");
+        DEINIT(ATSCMultipleStringsDeInit(), "ATSC Strings");        
     }
     SectionProcessorDestroyAllProcessors();
     PESProcessorDestroyAllProcessors();

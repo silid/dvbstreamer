@@ -49,7 +49,8 @@ dvbstreamer_SOURCES = \
     nitprocessor.c \
     tdtprocessor.c \
     psipprocessor.c \
-    dvbtext.c
+    dvbtext.c \
+    atsctext.c
 
 dvbstreamer_CFLAGS = -I$(top_srcdir)/include -DLOGGING_CHECK_DAEMON -Wall -Werror
 

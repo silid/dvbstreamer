@@ -502,13 +502,12 @@ void dvbpsi_atsc_DecodeEITSections(dvbpsi_atsc_eit_t* p_eit,
                                        ((uint32_t)(p_byte[4] <<  8)) |
                                        ((uint32_t)(p_byte[5]));
         uint8_t  i_etm_location      = (uint8_t)((p_byte[6] & 0x30) >> 4);
-        uint32_t i_length_seconds    = ((uint32_t)((p_byte[6] & 0x0f) << 24)) |
-                                       ((uint32_t)(p_byte[7] << 16)) |
-                                       ((uint32_t)(p_byte[8] <<  8)) |
-                                       ((uint32_t)(p_byte[9]));
-        uint8_t  i_title_length      = p_byte[10];
+        uint32_t i_length_seconds    = ((uint32_t)((p_byte[6] & 0x0f) << 16)) |
+                                       ((uint32_t)(p_byte[7] << 8)) |
+                                       ((uint32_t)(p_byte[8]));
+        uint8_t  i_title_length      = p_byte[9];
 
-        p_byte += 11;
+        p_byte += 10;
         p_event = dvbpsi_atsc_EITAddEvent(p_eit, i_event_id, i_start_time, 
                                 i_etm_location, i_length_seconds, i_title_length, 
                                 p_byte);
