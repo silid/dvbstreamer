@@ -162,7 +162,7 @@ static void DumpServiceProgrammes(Multiplex_t *multiplex, Service_t *service)
     EPGServiceRef_t serviceRef;
     serviceRef.netId = multiplex->networkId;
     serviceRef.tsId = multiplex->tsId;
-    serviceRef.serviceId = service->id;
+    serviceRef.serviceId = service->source;
 
     enumerator = EPGDBaseEventEnumeratorGetService(&serviceRef);
     do
