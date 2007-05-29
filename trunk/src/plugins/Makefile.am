@@ -15,7 +15,8 @@ plugins_LTLIBRARIES = \
 	nownext.la \
 	datetime.la \
 	schedule.la \
-	epgtoxmltv.la
+	epgtoxmltv.la \
+	atsctoepg.la
 
 udpoutput_la_SOURCES = \
     udp.c \
@@ -62,3 +63,8 @@ epgtoxmltv_la_SOURCES = \
     epgtoxmltv.c
 
 epgtoxmltv_la_LDFLAGS = -module -no-undefined -avoid-version
+
+atsctoepg_la_SOURCES = \
+    atsctoepg.c
+
+atsctoepg_la_LDFLAGS = -module -no-undefined -avoid-version
