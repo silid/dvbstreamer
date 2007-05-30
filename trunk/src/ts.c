@@ -204,8 +204,7 @@ static void *FilterTS(void *arg)
         if (!locked)
         {
             fe_status_t status;
-            unsigned int ber, strength, snr;
-            DVBFrontEndStatus(adapter, &status, &ber, &strength, &snr);
+            DVBFrontEndStatus(adapter, &status, NULL, NULL, NULL, NULL);
 
             if (status & FE_HAS_LOCK)
             {

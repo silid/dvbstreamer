@@ -341,7 +341,7 @@ static void CommandStats(int argc, char **argv)
           ListIterator_Next(iterator))
     {
         Output_t *output = ListIterator_Current(iterator);
-        CommandPrintf("\t%-15s : %d\n", output->name, output->filter->packetsOutput);
+        CommandPrintf("\t%-15s : %lld\n", output->name, output->filter->packetsOutput);
     }
     CommandPrintf("\n");
 
@@ -352,13 +352,13 @@ static void CommandStats(int argc, char **argv)
            ListIterator_Next(iterator))
     {
         Output_t *output = ListIterator_Current(iterator);
-        CommandPrintf("\t%-15s : %d\n", output->name, output->filter->packetsOutput);
+        CommandPrintf("\t%-15s : %lld\n", output->name, output->filter->packetsOutput);
     }
     CommandPrintf("\n");
 
 
 
-    CommandPrintf("Total packets processed: %d\n", tsFilter->totalPackets);
+    CommandPrintf("Total packets processed: %lld\n", tsFilter->totalPackets);
     CommandPrintf("Approximate TS bitrate : %gMbs\n", ((double)tsFilter->bitrate / (1024.0 * 1024.0)));
 }
 
@@ -366,17 +366,18 @@ static void CommandStats(int argc, char **argv)
 static void CommandFEStatus(int argc, char **argv)
 {
     fe_status_t status;
-    unsigned int ber, strength, snr;
-    DVBFrontEndStatus(MainDVBAdapterGet(), &status, &ber, &strength, &snr);
+    unsigned int ber, strength, snr, ucblocks;
+    DVBFrontEndStatus(MainDVBAdapterGet(), &status, &ber, &strength, &snr, &ucblocks);
 
     CommandPrintf("Tuner status:  %s%s%s%s%s%s\n",
-             (status & FE_HAS_SIGNAL)?"Signal, ":"",
-             (status & FE_TIMEDOUT)?"Timed out, ":"",
-             (status & FE_HAS_LOCK)?"Lock, ":"",
-             (status & FE_HAS_CARRIER)?"Carrier, ":"",
-             (status & FE_HAS_VITERBI)?"VITERBI, ":"",
-             (status & FE_HAS_SYNC)?"Sync, ":"");
-    CommandPrintf("BER = %d Signal Strength = %d SNR = %d\n", ber, strength, snr);
+             (status & FE_HAS_SIGNAL)?"Signal ":"",
+             (status & FE_TIMEDOUT)?"Timed out ":"",
+             (status & FE_HAS_LOCK)?"Lock ":"",
+             (status & FE_HAS_CARRIER)?"Carrier ":"",
+             (status & FE_HAS_VITERBI)?"VITERBI ":"",
+             (status & FE_HAS_SYNC)?"Sync ":"");
+    CommandPrintf("Signal Strength = %d%% SNR = %d%% BER = %x Uncorrected Blocks = %x\n",
+        (strength * 100) / 0xffff, (snr * 100) / 0xffff, ber, ucblocks);
 }
 
 /*******************************************************************************

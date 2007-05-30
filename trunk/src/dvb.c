@@ -24,6 +24,7 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdint.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/time.h>
@@ -280,45 +281,86 @@ static int DVBFrontEndDiSEqCSet(DVBAdapter_t *adapter, DVBDiSEqCSettings_t *dise
 #endif   
 
 
-int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status, unsigned int *ber, unsigned int *strength, unsigned int *snr)
+int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status, 
+                            unsigned int *ber, unsigned int *strength,
+                            unsigned int *snr, unsigned int *ucblock)
 {
     #ifndef __CYGWIN__
-    if (ioctl(adapter->frontEndFd, FE_READ_STATUS, status) < 0)
+    uint32_t tempU32;
+    uint16_t tempU16;
+
+    if (status)
     {
-        LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_STATUS: %s\n", strerror(errno));
-        return 0;
+        if (ioctl(adapter->frontEndFd, FE_READ_STATUS, status) < 0)
+        {
+            LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_STATUS: %s\n", strerror(errno));
+            return 0;
+        }
+    }
+    
+    if (ber)
+    {
+        if(ioctl(adapter->frontEndFd,FE_READ_BER, &tempU32) < 0)
+        {
+            LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_BER: %s\n", strerror(errno));
+            return 0;
+        }
+        *ber = tempU32;
+    }
+    if (strength)
+    {
+        if(ioctl(adapter->frontEndFd,FE_READ_SIGNAL_STRENGTH,&tempU16) < 0)
+        {
+            LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_SIGNAL_STRENGTH: %s\n", strerror(errno));
+            return 0;
+        }
+        *strength = tempU16;
     }
 
-    if(ioctl(adapter->frontEndFd,FE_READ_BER, ber) < 0)
+    if (snr)
     {
-        LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_BER: %s\n", strerror(errno));
-        return 0;
+        if(ioctl(adapter->frontEndFd,FE_READ_SNR,&tempU16) < 0)
+        {
+            LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_SNR: %s\n", strerror(errno));
+            return 0;
+        }
+        
+        *snr = tempU16;
     }
-
-    if(ioctl(adapter->frontEndFd,FE_READ_SIGNAL_STRENGTH,strength) < 0)
+    if (ucblock)
     {
-        LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_SIGNAL_STRENGTH: %s\n", strerror(errno));
-        return 0;
+        if(ioctl(adapter->frontEndFd,FE_READ_UNCORRECTED_BLOCKS,&tempU32) < 0)
+        {
+            LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_SNR: %s\n", strerror(errno));
+            return 0;
+        }
+        
+        *ucblock = tempU32;
     }
-
-
-    if(ioctl(adapter->frontEndFd,FE_READ_SNR,snr) < 0)
+    #else
+    if (status)
     {
-        LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_SNR: %s\n", strerror(errno));
-        return 0;
+        if (locked)
+        {
+            *status = FE_HAS_LOCK;
+        }
+        else
+        {
+            *status = 0;
+        }
     }
-    #else    
-    if (locked)
+    if (ber)
     {
-        *status = FE_HAS_LOCK;
+        *ber = 0xffffffff;
     }
-    else
+    if (strength)
     {
-        *status = 0;
+        *strength = 0xffff;
     }
-    *ber = 0xffffffff;
-    *strength = 0xffffffff;
-    *snr = 0xffffffff;
+    if (snr)
+    {
+        *snr = 0xffff;
+    }
     #endif
     return 1;
 }
