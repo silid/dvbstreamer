@@ -236,10 +236,7 @@ void CommandLoop(void)
         char *line = readline(PROMPT);
         if (line)
         {
-            if (!CommandExecuteConsole(line))
-            {
-                printf("Unknown command \"%s\"\n", line);
-            }
+            CommandExecuteConsole(line);
             free(line);
         }
     }
@@ -292,6 +289,7 @@ bool CommandExecuteConsole(char *line)
         {
             printf("%s\n", ConsoleCommandContext.errorMessage);
         }
+
         add_history(line);
         found = TRUE;
     }
@@ -300,7 +298,7 @@ bool CommandExecuteConsole(char *line)
 
 bool CommandExecute(CommandContext_t *context, int (*cmdprintf)(const char *, ...), char *line)
 {
-    bool commandFound = TRUE;
+    bool commandFound = FALSE;
     char *command = NULL;
     char *argument = NULL;
 
