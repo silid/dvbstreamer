@@ -112,13 +112,16 @@ void DVBFrontEndLNBInfoSet(DVBAdapter_t *adapter, int lowFreq, int highFreq, int
 /**
  * Retrieve the status of the frontend of the specified adapter.
  * @param adapter  The adapter to check.
- * @param status   Used to return the status flags.
- * @param ber      Used to return the Bit Error Rate.
- * @param strength Used to return the signal strength.
- * @param snr      Used to return the signal to noise ratio.
+ * @param status   Used to return the status flags (may be NULL).
+ * @param ber      Used to return the Bit Error Rate (may be NULL).
+ * @param strength Used to return the signal strength (may be NULL).
+ * @param snr      Used to return the signal to noise ratio (may be NULL).
+ * @param ucblocks Used to return the uncorrected block count (may be NULL).
  * @return 0 on success, non-zero otherwise.
  */
-int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status, unsigned int *ber, unsigned int *strength, unsigned int *snr);
+int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status, 
+                            unsigned int *ber, unsigned int *strength, 
+                            unsigned int *snr, unsigned int *ucblocks);
 
 /**
  * Set the size of the circular buffer used by the demux.
