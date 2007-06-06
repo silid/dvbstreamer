@@ -21,7 +21,10 @@ pkginclude_DATA = \
     deliverymethod.h \
     sectionprocessor.h \
     pesprocessor.h \
-    subtableprocessor.h
+    subtableprocessor.h \
+    dvbtext.h \
+    atsctext.h \
+    utf8.h
 
 
 EXTRA_DIST = $(pkginclude_DATA)

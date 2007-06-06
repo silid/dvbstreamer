@@ -110,6 +110,9 @@ struct PluginFeatureInfo_t pluginFeatures[] = {
     PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR),
     PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_PESPROCESSOR),
     PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_INSTALL),
+    PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_MGTPROCESSOR),
+    PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_STTPROCESSOR),
+    PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_VCTPROCESSOR),
     PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_NONE)
 
 };
@@ -120,6 +123,7 @@ extern Plugin_t LCNQueryPluginInterface;
 extern Plugin_t NowNextPluginInterface;
 extern Plugin_t DVBSchedulePluginInterface;
 extern Plugin_t EPGtoXMLTVPluginInterface;
+extern Plugin_t ATSCtoEPGPluginInterface;
 #endif
 /*******************************************************************************
 * Global functions                                                             *
@@ -149,6 +153,9 @@ int PluginManagerInit(void)
         ListAdd(PluginsList, entry);        
         entry = calloc(1, sizeof(struct PluginEntry_t));
         entry->pluginInterface = &EPGtoXMLTVPluginInterface;
+        ListAdd(PluginsList, entry);                
+        entry = calloc(1, sizeof(struct PluginEntry_t));
+        entry->pluginInterface = &ATSCtoEPGPluginInterface;
         ListAdd(PluginsList, entry);                
     }
 #endif
@@ -306,6 +313,7 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed channel changed callback.\n", pluginInterface->name);
                     TuningChannelChangedRegisterCallback(pluginInterface->features[i].details);
                     break;
+#if defined(ENABLE_DVB)                    
                 case PLUGIN_FEATURE_TYPE_SDTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed SDT processor.\n", pluginInterface->name);
                     SDTProcessorRegisterSDTCallback(pluginInterface->features[i].details);
@@ -318,6 +326,7 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed TDT processor.\n", pluginInterface->name);
                     TDTProcessorRegisterTDTCallback(pluginInterface->features[i].details);
                     break;
+#endif                    
                 case PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR:
                     {
                         PluginSectionProcessorDetails_t *details = pluginInterface->features[i].details;
@@ -332,6 +341,7 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
                         PESProcessorStartPID(details->pid, details->processor, details->userarg);
                     }
                     break;
+#if defined(ENABLE_ATSC)                    
                 case PLUGIN_FEATURE_TYPE_MGTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed MGT processor.\n", pluginInterface->name);
                     PSIPProcessorRegisterMGTCallback(pluginInterface->features[i].details);
@@ -344,6 +354,7 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed VCT processor.\n", pluginInterface->name);
                     PSIPProcessorRegisterVCTCallback(pluginInterface->features[i].details);
                     break;                    
+#endif
                 case PLUGIN_FEATURE_TYPE_INSTALL:
                     {
                         PluginInstallCallback_t callback = pluginInterface->features[i].details;
@@ -396,6 +407,7 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface)
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled channel changed callback.\n", pluginInterface->name);
                     TuningChannelChangedUnRegisterCallback(pluginInterface->features[i].details);
                     break;
+#if defined(ENABLE_DVB)                    
                 case PLUGIN_FEATURE_TYPE_SDTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled SDT processor.\n", pluginInterface->name);
                     SDTProcessorUnRegisterSDTCallback(pluginInterface->features[i].details);
@@ -408,6 +420,7 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface)
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled TDT processor.\n", pluginInterface->name);
                     TDTProcessorUnRegisterTDTCallback(pluginInterface->features[i].details);
                     break;
+#endif                    
                 case PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR:
                     {
                         PluginSectionProcessorDetails_t *details = pluginInterface->features[i].details;
@@ -422,6 +435,7 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface)
                         PESProcessorStopPID(details->pid, details->processor, details->userarg);
                     }
                     break;
+#if defined(ENABLE_ATSC)                    
                 case PLUGIN_FEATURE_TYPE_MGTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled MGT processor.\n", pluginInterface->name);
                     PSIPProcessorUnRegisterMGTCallback(pluginInterface->features[i].details);
@@ -434,6 +448,7 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface)
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled VCT processor.\n", pluginInterface->name);
                     PSIPProcessorUnRegisterVCTCallback(pluginInterface->features[i].details);
                     break;                    
+#endif
                 case PLUGIN_FEATURE_TYPE_INSTALL:
                     {
                         PluginInstallCallback_t callback = pluginInterface->features[i].details;

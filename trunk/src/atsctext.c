@@ -28,7 +28,7 @@ The tables are copyrighted by (from A/65C Annex C Page 91 footnote 19):
 *********************************************************************
 
 */
-
+#include "config.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
