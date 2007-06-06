@@ -285,14 +285,15 @@ bool CommandExecuteConsole(char *line)
     bool found = FALSE;
     if (CommandExecute(&ConsoleCommandContext, printf, line))
     {
-        if (ConsoleCommandContext.errorNumber != COMMAND_OK)
-        {
-            printf("%s\n", ConsoleCommandContext.errorMessage);
-        }
-
         add_history(line);
         found = TRUE;
     }
+
+    if (ConsoleCommandContext.errorNumber != COMMAND_OK)
+    {
+        printf("%s\n", ConsoleCommandContext.errorMessage);
+    }
+
     return found;
 }
 
