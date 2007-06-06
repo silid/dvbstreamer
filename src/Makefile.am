@@ -45,19 +45,34 @@ dvbstreamer_SOURCES = \
     subtableprocessor.c \
     epgdbase.c \
     utf8.c \
+    $(atsc_src) \
+    $(dvb_src)
+
+
+if ENABLE_ATSC
+atsc_src =\
+    atsctext.c \
+    psipprocessor.c
+else
+atsc_src =
+endif
+
+if ENABLE_ATSC
+dvb_src =\
     sdtprocessor.c\
     nitprocessor.c \
     tdtprocessor.c \
-    psipprocessor.c \
-    dvbtext.c \
-    atsctext.c
-
+    dvbtext.c
+else
+dvb_src =
+endif
+    
 dvbstreamer_CFLAGS = -I$(top_srcdir)/include -DLOGGING_CHECK_DAEMON -Wall -Werror
 
 dvbstreamer_LDFLAGS = -rdynamic -Wl,-whole-archive -Wl,dvbpsi/libdvbpsi.a -Wl,-no-whole-archive 
 
 dvbstreamer_LDADD = \
-	  -lpthread -lsqlite3 -lreadline @GETTIME_LIB@ @READLINE_TERMCAP@ @LIBLTDL@
+	  -lpthread -lsqlite3 -lreadline @GETTIME_LIB@ @ICONV_LIB@ @READLINE_TERMCAP@ @LIBLTDL@
 
 #
 # dvbctrl

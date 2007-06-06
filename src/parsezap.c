@@ -22,6 +22,8 @@ Parse channels.conf file and add services to the database.
 Majority of the parsing code taken from the xine input_dvb plugin code.
 
 */
+#include "config.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -29,6 +31,9 @@ Majority of the parsing code taken from the xine input_dvb plugin code.
 #include "services.h"
 #include "logging.h"
 #include "dvb.h"
+/*******************************************************************************
+* Typedefs                                                                     *
+*******************************************************************************/
 
 typedef struct
 {
@@ -36,6 +41,18 @@ typedef struct
     int value;
 }
 Param;
+
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
+
+static int find_param(const Param *list, const char *name);
+static int findMultiplex(fe_type_t fe_type, int freq, DVBDiSEqCSettings_t *diseqcsettings, int *uid);
+static int parsezapline(char * str, fe_type_t fe_type);
+
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
 
 static const Param inversion_list [] =
     {
@@ -98,8 +115,10 @@ static const Param modulation_list [] =
         { "QAM_128", QAM_128 },
         { "QAM_256", QAM_256 },
         { "QAM_AUTO", QAM_AUTO },
+#if defined(ENABLE_ATSC)            
         { "8VSB", VSB_8 },
         { "16VSB", VSB_16 },
+#endif            
         { NULL, 0 }
     };
 
@@ -110,6 +129,35 @@ static const Param transmissionmode_list [] =
         { "TRANSMISSION_MODE_AUTO", TRANSMISSION_MODE_AUTO },
         { NULL, 0 }
     };
+static const char PARSEZAP[] = "ParseZap";
+
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
+int parsezapfile(char *path, fe_type_t fe_type)
+{
+    FILE      *f;
+    char       str[255];
+    int        result;
+
+    f = fopen(path, "rb");
+    if (!f)
+    {
+        LogModule(LOG_ERROR, PARSEZAP, "Failed to open dvb channel file '%s'\n", path);
+        return 0;
+    }
+
+    while ( fgets (str, sizeof(str), f))
+    {
+        result = parsezapline(str, fe_type);
+    }
+
+    return 1;
+}
+
+/*******************************************************************************
+* Local Functions                                                              *
+*******************************************************************************/
 
 static int find_param(const Param *list, const char *name)
 {
@@ -291,19 +339,21 @@ static int parsezapline(char * str, fe_type_t fe_type)
             NEXTFIELD();
             front_param.u.ofdm.hierarchy_information = find_param(hierarchy_list, field);
             break;
+#if defined(ENABLE_ATSC)            
         case FE_ATSC:
             front_param.frequency = freq;
             front_param.inversion = INVERSION_AUTO;            
             NEXTFIELD();
             front_param.u.vsb.modulation = find_param(modulation_list, field);
             break;
+#endif            
         default:
             break;
     }
 
     if (findMultiplex(fe_type, front_param.frequency, &diseqcsettings, &muxUID))
     {
-        printlog(LOG_DEBUGV,"Adding frequency %d (type %d)\n", front_param.frequency, fe_type);
+        LogModule(LOG_DEBUGV, PARSEZAP, "Adding frequency %d (type %d)\n", front_param.frequency, fe_type);
         MultiplexAdd(fe_type, &front_param, &diseqcsettings, &muxUID);
     }
 
@@ -322,32 +372,13 @@ static int parsezapline(char * str, fe_type_t fe_type)
     {
         source = id;
     }
-    printlog(LOG_DEBUGV, "Adding service \"%s\" %d\n", name, id);
+    LogModule(LOG_DEBUGV, PARSEZAP, "Adding service \"%s\" %d\n", name, id);
     if (ServiceAdd(muxUID, name, id, source, FALSE, ServiceType_Unknown, -1, -1, -1))
     {
-        printlog(LOG_ERROR, "Failed to add service \"%s\", possible reason already in database?\n", name);
+        LogModule(LOG_ERROR, PARSEZAP, "Failed to add service \"%s\", possible reason already in database?\n", name);
     }
     free(name);
     return 0;
 }
 
-int parsezapfile(char *path, fe_type_t fe_type)
-{
-    FILE      *f;
-    char       str[255];
-    int        result;
 
-    f = fopen(path, "rb");
-    if (!f)
-    {
-        fprintf( stderr, "Failed to open dvb channel file '%s'\n", path);
-        return 0;
-    }
-
-    while ( fgets (str, sizeof(str), f))
-    {
-        result = parsezapline(str, fe_type);
-    }
-
-    return 1;
-}
