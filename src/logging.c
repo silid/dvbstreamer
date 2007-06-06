@@ -29,30 +29,49 @@ Logging functions.
 #include "main.h"
 #include "logging.h"
 
-int verbosity = 0;
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
 
 static void LogImpl(int level, const char *module, const char * format, va_list valist);
 
-/*
- * Print out a log message to stderr depending on verbosity
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
+
+/**
+ * Current verbosity level.
+ * Used to determine when to send text from a printlog call to the log output.
  */
-void printlog(int level, const char *format, ...)
+static int verbosity = 0;
+
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
+
+void LogLevelSet(int level)
 {
-    if (level <= verbosity)
-    {
-        va_list valist;
-        va_start(valist, format);
-        LogImpl(level, NULL, format, valist);
-        va_end(valist);
-    }
+    verbosity = level;
 }
 
-void printlogva(int level, const char * format, va_list valist)
+int LogLevelGet(void)
 {
-    if (level <= verbosity)
-    {
-        LogImpl(level, NULL, format, valist);
-    }
+    return verbosity;
+}
+
+void LogLevelInc(void)
+{
+    verbosity ++;
+}
+
+void LogLevelDec(void)
+{
+    verbosity ++;
+}
+
+bool LogLevelIsEnabled(int level)
+{
+    return (level <= verbosity);
 }
 
 void LogModule(int level, const char *module, char *format, ...)
@@ -65,6 +84,9 @@ void LogModule(int level, const char *module, char *format, ...)
         va_end(valist);
     }
 }
+/*******************************************************************************
+* Local Functions                                                              *
+*******************************************************************************/
 
 static void LogImpl(int level, const char *module, const char * format, va_list valist)
 {

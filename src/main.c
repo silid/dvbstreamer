@@ -162,7 +162,7 @@ int main(int argc, char *argv[])
         }
         switch (c)
         {
-                case 'v': verbosity ++;
+                case 'v': LogLevelInc();
                 break;
                 case 'V':
                 version();
@@ -238,6 +238,7 @@ int main(int argc, char *argv[])
     /* Initialise the DVB adapter */
     INIT(!(DVBAdapter = DVBInit(adapterNumber)), "DVB adapter");
 
+#if defined(ENABLE_DVB)
     if (DVBAdapter->info.type == FE_QPSK)
     {
         int lowFreq = 0;
@@ -249,17 +250,19 @@ int main(int argc, char *argv[])
         DBaseMetadataGetInt(METADATA_NAME_LNB_SWITCH_FREQ, &switchFreq);
         DVBFrontEndLNBInfoSet(DVBAdapter, lowFreq, highFreq, switchFreq);
     }
-    
+#endif
+
     /* Create Transport stream filter thread */
     INIT(!(TSFilter = TSFilterCreate(DVBAdapter)), "TS filter");
 
-    /* Create PAT/PMT/SDT filters */
+    /* Create PAT/PMT filters */
     memset(&PIDFilters, 0, sizeof(PIDFilters));
     
     PIDFilters[PIDFILTER_INDEX_PAT] = PATProcessorCreate(TSFilter);
     PIDFilters[PIDFILTER_INDEX_PMT] = PMTProcessorCreate(TSFilter);
     if (MainIsDVB())
     {
+#if defined(ENABLE_DVB)        
         LogModule(LOG_INFO, MAIN, "Starting DVB filters\n");
         INIT(SDTProcessorInit(), "SDT Processor");
         INIT(TDTProcessorInit(), "TDT Processor");
@@ -268,14 +271,17 @@ int main(int argc, char *argv[])
         PIDFilters[PIDFILTER_INDEX_SDT] = SDTProcessorCreate(TSFilter);
         PIDFilters[PIDFILTER_INDEX_NIT] = NITProcessorCreate(TSFilter);
         PIDFilters[PIDFILTER_INDEX_TDT] = TDTProcessorCreate(TSFilter);
+#endif        
     }
     else
     {
+#if defined(ENABLE_ATSC)        
         LogModule(LOG_INFO, MAIN, "Starting ATSC filters\n");        
         INIT(ATSCMultipleStringsInit(), "ATSC Strings");
         INIT(PSIPProcessorInit(), "PSIP Processor");     
         
         PIDFilters[PIDFILTER_INDEX_PSIP] = PSIPProcessorCreate(TSFilter);
+#endif        
     }
 
     /* Enable all the filters */
@@ -389,18 +395,22 @@ int main(int argc, char *argv[])
     PMTProcessorDestroy( PIDFilters[PIDFILTER_INDEX_PMT]);
     if (MainIsDVB())
     {
+#if defined(ENABLE_DVB)        
         SDTProcessorDestroy( PIDFilters[PIDFILTER_INDEX_SDT]);
         NITProcessorDestroy( PIDFilters[PIDFILTER_INDEX_NIT]);
         TDTProcessorDestroy( PIDFilters[PIDFILTER_INDEX_TDT]);
         DEINIT(SDTProcessorDeInit(), "SDT Processor");
         DEINIT(TDTProcessorDeInit(), "TDT Processor");
         DEINIT(NITProcessorDeInit(), "NIT Processor");        
+#endif        
     }
     else
     {
+#if defined(ENABLE_ATSC)        
         PSIPProcessorDestroy( PIDFilters[PIDFILTER_INDEX_PSIP]);
         DEINIT(PSIPProcessorDeInit(), "PSIP Processor");
         DEINIT(ATSCMultipleStringsDeInit(), "ATSC Strings");        
+#endif        
     }
     SectionProcessorDestroyAllProcessors();
     PESProcessorDestroyAllProcessors();
@@ -445,7 +455,23 @@ DVBAdapter_t *MainDVBAdapterGet(void)
 
 bool MainIsDVB()
 {
+#if defined(ENABLE_DVB) && defined(ENABLE_ATSC)
+
     return DVBAdapter->info.type != FE_ATSC;
+
+#elif defined(ENABLE_DVB)
+
+    return TRUE;
+
+#elif defined(ENABLE_ATSC)
+
+    return FALSE:
+
+#else
+
+#error Either ENABLE_DVB or ENABLE_ATSC needs to be defined!
+
+#endif
 }
 
 /*
@@ -458,11 +484,10 @@ static void usage(char *appname)
             "      -v            : Increase the amount of debug output, can be used multiple\n"
             "                      times for more output\n"
             "      -V            : Print version information then exit\n"
-            "      -o <host:port>: Output transport stream via UDP to the given host and port\n"
+            "      -o <mrl>      : Output primary service to the specified mrl.\n"
             "      -a <adapter>  : Use adapter number (ie /dev/dvb/adapter<adapter>/...)\n"
             "      -f <file>     : Run startup script file before starting the command prompt\n"
             "      -d            : Run as a daemon.\n"
-            "      -F <character>: Replace unprintable (non-ASCII) characters with <character>\n"
             "\n"
             "      Remote Interface Options\n"
             "      -r            : Start remote interface as well as console (N/A when a daemon)\n"

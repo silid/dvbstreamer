@@ -32,7 +32,7 @@ Decode Network Information Tables.
 #include "descriptor.h"
 #include "demux.h"
 #include "dvbpsi/nit.h"
-#include "logging.h"
+#include "dvbpsi_private.h"
 
 /*****************************************************************************
  * dvbpsi_nit_decoder_t
@@ -100,7 +100,7 @@ int dvbpsi_AttachNIT(dvbpsi_decoder_t * p_psi_decoder, uint8_t i_table_id,
 
   if(dvbpsi_demuxGetSubDec(p_demux, i_table_id, i_extension))
   {
-    printlog(LOG_ERROR, "NIT decoder:"
+    DVBPSI_ERROR_ARG("NIT decoder",
                      "Already a decoder for (table_id == 0x%02x,"
                      "extension == 0x%02x)",
                      i_table_id, i_extension);
@@ -163,7 +163,7 @@ void dvbpsi_DetachNIT(dvbpsi_demux_t * p_demux, uint8_t i_table_id,
 
   if(p_demux == NULL)
   {
-    printlog(LOG_ERROR, "NIT Decoder: "
+    DVBPSI_ERROR_ARG("NIT decoder",
                      "No such NIT decoder (table_id == 0x%02x,"
                      "extension == 0x%02x)",
                      i_table_id, i_extension);
@@ -254,7 +254,7 @@ void dvbpsi_GatherNITSections(dvbpsi_decoder_t * p_psi_decoder,
   if(!p_section->b_syntax_indicator)
   {
     /* Invalid section_syntax_indicator */
-    printlog(LOG_ERROR, "NIT decoder: "
+    DVBPSI_ERROR("NIT decoder",
                  "invalid section (section_syntax_indicator == 0)");
     b_append = 0;
   }
@@ -276,7 +276,7 @@ void dvbpsi_GatherNITSections(dvbpsi_decoder_t * p_psi_decoder,
         if(p_nit_decoder->p_building_nit->i_network_id != p_section->i_extension)
         {
           /* transport_stream_id */
-          printlog(LOG_ERROR, "NIT decoder: "
+          DVBPSI_ERROR("NIT decoder",
                        "'transport_stream_id' differs"
                        " whereas no TS discontinuity has occured");
           b_reinit = 1;
@@ -285,7 +285,7 @@ void dvbpsi_GatherNITSections(dvbpsi_decoder_t * p_psi_decoder,
                                                 != p_section->i_version)
         {
           /* version_number */
-          printlog(LOG_ERROR, "NIT decoder: "
+          DVBPSI_ERROR("NIT decoder",
                        "'version_number' differs"
                        " whereas no discontinuity has occured");
           b_reinit = 1;
@@ -294,7 +294,7 @@ void dvbpsi_GatherNITSections(dvbpsi_decoder_t * p_psi_decoder,
                                                 p_section->i_last_number)
         {
           /* last_section_number */
-          printlog(LOG_ERROR, "NIT decoder: "
+          DVBPSI_ERROR("NIT decoder",
                        "'last_section_number' differs"
                        " whereas no discontinuity has occured");
           b_reinit = 1;
@@ -365,7 +365,7 @@ void dvbpsi_GatherNITSections(dvbpsi_decoder_t * p_psi_decoder,
     /* Fill the section array */
     if(p_nit_decoder->ap_sections[p_section->i_number] != NULL)
     {
-      printlog(LOG_ERROR, "NIT decoder: overwrite section number %d",
+      DVBPSI_ERROR_ARG("NIT decoder", "NIT decoder: overwrite section number %d",
                        p_section->i_number);
       dvbpsi_ReleasePSISections(p_psi_decoder, p_nit_decoder->ap_sections[p_section->i_number]);
     }

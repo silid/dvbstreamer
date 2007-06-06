@@ -38,7 +38,15 @@ Application to control dvbstreamer in daemon mode.
 #include "logging.h"
 #include "remoteintf.h"
 
+/*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
+
 #define MAX_LINE_LENGTH 256
+
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
 
 static void usage(char *appname);
 static void version(void);
@@ -48,24 +56,33 @@ static void ProcessResponseLine(char *line, char **ver, int *errno, char **errms
 
 static bool SendCommand(FILE *socketfp, char *line, char **version, int *errno, char **errmsg);
 
-static char responselineStart[] = "DVBStreamer/";
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
+
+static const char responselineStart[] = "DVBStreamer/";
+static const char DVBCTRL[] = "DVBCtrl";
 static char *host = "localhost";
 static int adapterNumber = 0;
 static char *username = NULL;
 static char *password = NULL;
 static char line[MAX_LINE_LENGTH];
 
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
+
 int main(int argc, char *argv[])
 {
     int i;
     socklen_t address_len;
-#ifdef __CYGWIN__
-    struct hostent *hostinfo;
-    struct sockaddr_in address;
-#else
+#ifdef USE_GETADDRINFO
     struct sockaddr_storage address;
     struct addrinfo *addrinfo, hints;
     char portnumber[10];    
+#else
+    struct hostent *hostinfo;
+    struct sockaddr_in address;
 #endif    
     char *filename = NULL;
     int socketfd = -1;
@@ -85,7 +102,7 @@ int main(int argc, char *argv[])
         switch (c)
         {
             case 'v':
-                verbosity ++;
+                LogLevelInc();
                 break;
             case 'V':
                 version();
@@ -93,11 +110,11 @@ int main(int argc, char *argv[])
                 break;
             case 'h':
                 host = optarg;
-                printlog(LOG_INFOV, "Will connect to host %s\n", host);
+                LogModule(LOG_INFOV, DVBCTRL, "Will connect to host %s\n", host);
                 break;
             case 'a':
                 adapterNumber = atoi(optarg);
-                printlog(LOG_INFOV, "Using adapter %d\n", adapterNumber);
+                LogModule(LOG_INFOV, DVBCTRL, "Using adapter %d\n", adapterNumber);
                 break;
             case 'u':
                 username = optarg;
@@ -116,22 +133,11 @@ int main(int argc, char *argv[])
     /* Commands follow options */
     if (optind >= argc)
     {
-        printlog(LOG_ERROR, "No commands specified!\n");
+        LogModule(LOG_ERROR, DVBCTRL, "No commands specified!\n");
         exit(1);
     }
     /* Connect to host */
-#ifdef __CYGWIN__
-    address.sin_port = htons(REMOTEINTERFACE_PORT + adapterNumber);
-    hostinfo = gethostbyname(host);
-    if (hostinfo == NULL)
-    {
-        printlog(LOG_ERROR, "Failed to find address for \"%s\"\n", host);
-    }
-    address.sin_family = hostinfo->h_addrtype;
-    memcpy((char *)&(address.sin_addr), hostinfo->h_addr, hostinfo->h_length);
-    address_len = sizeof(address);
-    socketfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-#else
+#ifdef USE_GETADDRINFO
     sprintf(portnumber, "%d", REMOTEINTERFACE_PORT + adapterNumber);
     
     memset((void *)&hints, 0, sizeof(hints));
@@ -139,13 +145,13 @@ int main(int argc, char *argv[])
     hints.ai_flags = AI_ADDRCONFIG;
     if ((getaddrinfo(host, portnumber, &hints, &addrinfo) != 0) || (addrinfo == NULL))
     {
-        printlog(LOG_ERROR, "Failed to get address\n");
+        LogModule(LOG_ERROR, DVBCTRL, "Failed to get address\n");
         exit(1);
     }
 
     if (addrinfo->ai_addrlen > sizeof(struct sockaddr_storage))
     {
-        printlog(LOG_ERROR, "Failed to parse address\n");
+        LogModule(LOG_ERROR, DVBCTRL, "Failed to parse address\n");
         freeaddrinfo(addrinfo);
         exit(1);
     }
@@ -153,26 +159,37 @@ int main(int argc, char *argv[])
     memcpy(&address, addrinfo->ai_addr, addrinfo->ai_addrlen);
     freeaddrinfo(addrinfo);
     socketfd = socket(address.ss_family, SOCK_STREAM, IPPROTO_TCP);
+#else
+    address.sin_port = htons(REMOTEINTERFACE_PORT + adapterNumber);
+    hostinfo = gethostbyname(host);
+    if (hostinfo == NULL)
+    {
+        LogModule(LOG_ERROR, DVBCTRL, "Failed to find address for \"%s\"\n", host);
+    }
+    address.sin_family = hostinfo->h_addrtype;
+    memcpy((char *)&(address.sin_addr), hostinfo->h_addr, hostinfo->h_length);
+    address_len = sizeof(address);
+    socketfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 #endif
     if (socketfd < 0)
     {
-        printlog(LOG_ERROR, "Failed to create socket!\n");
+        LogModule(LOG_ERROR, DVBCTRL, "Failed to create socket!\n");
         exit(1);
     }
 
     if (connect(socketfd, (const struct sockaddr *) &address, address_len))
     {
-        printlog(LOG_ERROR, "Failed to connect to host %s port %d\n",
+        LogModule(LOG_ERROR, DVBCTRL, "Failed to connect to host %s port %d\n",
                  host, REMOTEINTERFACE_PORT + adapterNumber);
         exit(1);
     }
-    printlog(LOG_DEBUG, "Socket connected to host %s port %d\n",
+    LogModule(LOG_DEBUG, DVBCTRL, "Socket connected to host %s port %d\n",
              host, REMOTEINTERFACE_PORT + adapterNumber);
 
     socketfp = fdopen(socketfd, "r+");
     if (!fgets(line , MAX_LINE_LENGTH, socketfp))
     {
-        printlog(LOG_ERROR, "No ready line received from server!\n");
+        LogModule(LOG_ERROR, DVBCTRL, "No ready line received from server!\n");
         fclose(socketfp);
         return 1;
     }
@@ -180,7 +197,7 @@ int main(int argc, char *argv[])
     ProcessResponseLine(line, &ver, &errno, &errmsg);
     if (errno != 0)
     {
-        printlog(LOG_ERROR, "%s\n", errmsg);
+        LogModule(LOG_ERROR, DVBCTRL, "%s\n", errmsg);
         fclose(socketfp);
         return errno;
     }
@@ -189,7 +206,7 @@ int main(int argc, char *argv[])
     {
         if (!Authenticate(socketfp))
         {
-            printlog(LOG_ERROR, "Failed to authenticate!");
+            LogModule(LOG_ERROR, DVBCTRL, "Failed to authenticate!");
             fclose(socketfp);
             return 1;
         }
@@ -202,7 +219,7 @@ int main(int argc, char *argv[])
         FILE *fp = fopen(filename, "r");
         if (!fp)
         {
-            printlog(LOG_ERROR,"Failed to open %s\n", filename);
+            LogModule(LOG_ERROR, DVBCTRL, "Failed to open %s\n", filename);
             fclose(socketfp);
             return 1;
         }
@@ -212,7 +229,7 @@ int main(int argc, char *argv[])
             SendCommand(socketfp, line, &ver, &errno, &errmsg);
             if (errno != 0)
             {
-                printlog(LOG_ERROR, "%s\n", errmsg);
+                LogModule(LOG_ERROR, DVBCTRL, "%s\n", errmsg);
                 fclose(socketfp);
                 return errno;
             }
@@ -233,14 +250,14 @@ int main(int argc, char *argv[])
         SendCommand(socketfp, line, &ver, &errno, &errmsg);
         if (errno != 0)
         {
-            printlog(LOG_ERROR, "%s\n", errmsg);
+            LogModule(LOG_ERROR, DVBCTRL, "%s\n", errmsg);
             fclose(socketfp);
             return errno;
         }
     }
     /* Disconnect from host */
     fclose(socketfp);
-    printlog(LOG_DEBUG, "Socket closed\n");
+    LogModule(LOG_DEBUG, DVBCTRL, "Socket closed\n");
 
     return 0;
 }
@@ -294,7 +311,7 @@ static bool SendCommand(FILE *socketfp, char *cmd, char **ver, int *errno, char 
     bool foundResponse = FALSE;
     char *separator;
 
-    printlog(LOG_DEBUG, "Sending command \"%s\"\n", cmd);
+    LogModule(LOG_DEBUG, DVBCTRL, "Sending command \"%s\"\n", cmd);
     fprintf(socketfp, "%s\n", cmd);
 
     *ver = NULL;
@@ -305,7 +322,7 @@ static bool SendCommand(FILE *socketfp, char *cmd, char **ver, int *errno, char 
         if (fgets(line, MAX_LINE_LENGTH, socketfp))
         {
             StripNewLineFromEnd(line);
-            printlog(LOG_DEBUG, "Got line \"%s\"\n", line);
+            LogModule(LOG_DEBUG, DVBCTRL, "Got line \"%s\"\n", line);
             if (strncmp(line, responselineStart, sizeof(responselineStart) - 1) == 0)
             {
                 separator = strchr(line + sizeof(responselineStart), '/');

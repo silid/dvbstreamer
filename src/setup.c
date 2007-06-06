@@ -39,28 +39,43 @@ Setups the database for the main application.
 #include "logging.h"
 #include "lnb.h"
 
+/*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
 
 #define INIT(_func, _name) \
     do {\
         if (_func) \
         { \
-            printlog(LOG_ERROR, "Failed to initialise %s.\n", _name); \
+            LogModule(LOG_ERROR, SETUP, "Failed to initialise %s.\n", _name); \
             exit(1);\
         }\
-        printlog(LOG_DEBUGV, "Initialised %s.\n", _name);\
+        LogModule(LOG_DEBUGV, SETUP, "Initialised %s.\n", _name);\
     }while(0)
 
 #define DEINIT(_func, _name) \
     do {\
         _func;\
-        printlog(LOG_DEBUGV, "Deinitialised %s\n", _name);\
+        LogModule(LOG_DEBUGV, SETUP, "Deinitialised %s\n", _name);\
     }while(0)
+
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
 
 static void usage(char *appname);
 static void version(void);
 
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
+static const char SETUP[] = "Setup";
 
 char DataDirectory[PATH_MAX];
+
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
 
 int main(int argc, char *argv[])
 {
@@ -84,7 +99,7 @@ int main(int argc, char *argv[])
         switch (c)
         {
             case 'v':
-                verbosity ++;
+                LogLevelInc();
                 break;
             case 'V':
                 version();
@@ -92,29 +107,36 @@ int main(int argc, char *argv[])
                 break;
             case 'a':
                 adapterNumber = atoi(optarg);
-                printlog(LOG_INFOV, "Using adapter %d\n", adapterNumber);
+                LogModule(LOG_INFOV, SETUP, "Using adapter %d\n", adapterNumber);
                 break;
                 /* Database initialisation options*/
+#if defined(ENABLE_DVB)
             case 't':
                 channelsFile = optarg;
                 channelsFileType = FE_OFDM;
-                printlog(LOG_INFOV, "Using DVB-T channels file %s\n", channelsFile);
+                LogModule(LOG_INFOV, SETUP, "Using DVB-T channels file %s\n", channelsFile);
                 break;
             case 's':
                 channelsFile = optarg;
                 channelsFileType = FE_QPSK;
-                printlog(LOG_INFOV, "Using DVB-S channels file %s\n", channelsFile);
+                LogModule(LOG_INFOV, SETUP, "Using DVB-S channels file %s\n", channelsFile);
                 break;
             case 'c':
                 channelsFile = optarg;
                 channelsFileType = FE_QAM;
-                printlog(LOG_INFOV, "Using DVB-C channels file %s\n", channelsFile);
+                LogModule(LOG_INFOV, SETUP, "Using DVB-C channels file %s\n", channelsFile);
                 break;
+#endif
+
+#if defined(ENABLE_ATSC)
             case 'A':
                 channelsFile = optarg;
                 channelsFileType = FE_ATSC;
-                printlog(LOG_INFOV, "Using ATSC channels file %s\n", channelsFile);
+                LogModule(LOG_INFOV, SETUP, "Using ATSC channels file %s\n", channelsFile);
                 break;
+#endif
+
+#if defined(ENABLE_DVB)
             case 'l': /* LNB settings */
                 if (LNBDecode(optarg, &lnbInfo))
                 {
@@ -139,6 +161,7 @@ int main(int argc, char *argv[])
                     exit(1);
                 }
                 break;
+#endif                
             case 'h':
             default:
                 usage(argv[0]);
@@ -146,12 +169,14 @@ int main(int argc, char *argv[])
         }
     }
 
+#if defined(ENABLE_DVB)
     if ((channelsFileType == FE_QPSK) && (lnbInfo.lowFrequency == 0))
     {
         fprintf(stderr, "No LNB information provide for DVB-S channels.conf file!\n");
         exit(1);
     }
-    
+#endif
+
     INIT(ObjectInit(), "objects");
     INIT(MultiplexInit(), "multiplex");
     INIT(ServiceInit(), "service");
@@ -165,12 +190,13 @@ int main(int argc, char *argv[])
 
     sqlite3_exec(DBaseInstance, "BEGIN TRANSACTION;", NULL, NULL, NULL);
     
-    printlog(LOG_INFO,"Importing services from %s\n", channelsFile);
+    LogModule(LOG_INFO, SETUP, "Importing services from %s\n", channelsFile);
     if (!parsezapfile(channelsFile, channelsFileType))
     {
         exit(1);
     }
 
+#if defined(ENABLE_DVB)
     if (channelsFileType == FE_QPSK)
     {
         /* Write out LNB settings. */
@@ -178,6 +204,7 @@ int main(int argc, char *argv[])
         DBaseMetadataSetInt(METADATA_NAME_LNB_HIGH_FREQ, lnbInfo.highFrequency * 1000);
         DBaseMetadataSetInt(METADATA_NAME_LNB_SWITCH_FREQ, lnbInfo.switchFrequency * 1000);        
     }
+#endif
 
     DBaseMetadataSetInt(METADATA_NAME_SCAN_ALL, 1);
     
@@ -206,6 +233,7 @@ static void usage(char *appname)
             "\n"
             "      -a <adapter>  : Use adapter number (ie /dev/dvb/adapter<adapter>/...)\n"
             "\n"
+#if defined(ENABLE_DVB)            
             "      -t <file>     : Terrestrial channels.conf file to import services and \n"
             "                      multiplexes from. (DVB-T)\n"
             "\n"
@@ -218,10 +246,12 @@ static void usage(char *appname)
             "      -c <file>     : Cable channels.conf file to import services and \n"
             "                      multiplexes from. (DVB-C)\n"
             "\n"
+#endif
+#if defined(ENABLE_ATSC)
             "      -A <file>     : ATSC channels.conf file to import services and \n"
-            "                      multiplexes from. (ATSC) (EXPERIMENTAL)\n",
-            appname
-           );
+            "                      multiplexes from. (ATSC) (EXPERIMENTAL)\n"
+#endif           
+            ,appname );
 }
 
 /*
