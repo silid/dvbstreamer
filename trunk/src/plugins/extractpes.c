@@ -146,7 +146,7 @@ static void ProcessPESPacket(void *userarg, uint8_t *packet, uint16_t length)
     {
         return;
     }
-    printlog(LOG_DEBUGV, "Extracted a packet from pid %d length %d\n", pid, length);
+
     dmInstance = pesOutput.opArg;
     dmInstance->SendBlock(dmInstance, packet, length);
     pesOutput.packetsOutput ++;

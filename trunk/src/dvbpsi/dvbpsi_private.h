@@ -33,26 +33,44 @@
  * Error management
  *****************************************************************************/
 #define DVBPSI_ERROR(src, str)                                          \
-        LogModule( LOG_DIARRHEA, "dvbpsi", "libdvbpsi error (" src "): " str "\n");
+        LogModule( LOG_DIARRHEA, "dvbpsi", "Error (" src "): " str "\n");
 #ifdef HAVE_VARIADIC_MACROS
 #  define DVBPSI_ERROR_ARG(src, str, x...)                              \
-        LogModule( LOG_DIARRHEA, "dvbpsi",  "libdvbpsi error (" src "): " str "\n", x);
+        LogModule( LOG_DIARRHEA, "dvbpsi",  "Error (" src "): " str "\n", x);
 #else
    inline void DVBPSI_ERROR_ARG( char *src, const char *str, ... )
-   { va_list ap; char *line; va_start( ap, str );
-       asprintf(&line, str, ap); printlog( LOG_DIARRHEA, "%s\n", line); free(line); va_end( ap ); }
+   {
+        if (LogLevelIsEnabled(LOG_DIARRHEA))
+        {
+            va_list ap; char *line; 
+            va_start( ap, str );
+            asprintf(&line, str, ap); 
+            LogModule( LOG_DIARRHEA, "dvbpsi", "Error (%s): %s\n", src, line); 
+            free(line); 
+            va_end( ap ); 
+        }
+    }
 #endif
 
 #ifdef DEBUG
 #  define DVBPSI_DEBUG(src, str)                                        \
-          LogModule( LOG_DIARRHEA,  "dvbpsi", "libdvbpsi debug (" src "): " str "\n");
+          LogModule( LOG_DIARRHEA,  "dvbpsi", "Debug (" src "): " str "\n");
 #  ifdef HAVE_VARIADIC_MACROS
 #     define DVBPSI_DEBUG_ARG(src, str, x...)                           \
-          LogModule( LOG_DIARRHEA,  "dvbpsi", "libdvbpsi debug (" src "): " str "\n", x);
+          LogModule( LOG_DIARRHEA,  "dvbpsi", "Debug (" src "): " str "\n", x);
 #  else
-      inline void DVBPSI_DEBUG_ARG( char *src, const char *str, ... )
-      { va_list ap; char *line; va_start( ap, str );
-       asprintf(&line, str, ap); printlog( LOG_DIARRHEA, "%s\n", line); free(line); va_end( ap ); }
+       inline void DVBPSI_DEBUG_ARG( char *src, const char *str, ... )
+       {
+            if (LogLevelIsEnabled(LOG_DIARRHEA))
+            {
+                va_list ap; char *line; 
+                va_start( ap, str );
+                asprintf(&line, str, ap); 
+                LogModule( LOG_DIARRHEA, "dvbpsi", "Debug (%s): %s\n", src, line); 
+                free(line); 
+                va_end( ap ); 
+            }
+        }
 #  endif
 #else
 #  define DVBPSI_DEBUG(src, str)
