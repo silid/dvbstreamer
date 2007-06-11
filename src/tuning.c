@@ -245,7 +245,10 @@ static void TuneMultiplex(Multiplex_t *multiplex)
     MultiplexFrontendParametersGet((Multiplex_t*)CurrentMultiplex, &feparams, &diseqc);
 
     LogModule(LOG_DEBUGV, TUNING, "Tuning\n");
-    DVBFrontEndTune(dvbAdapter, &feparams, &diseqc);
+    if (DVBFrontEndTune(dvbAdapter, &feparams, &diseqc))
+    {
+        LogModule(LOG_ERROR, TUNING, "Tuning failed!\n");
+    }
 
     LogModule(LOG_DEBUGV,TUNING, "Informing TSFilter multiplex has changed!\n");
     TSFilterMultiplexChanged(tsFilter, CurrentMultiplex);

@@ -40,6 +40,7 @@ Plugin to display Present/Following (ie Now/Next) EPG information.
 /*******************************************************************************
 * Defines                                                                      *
 *******************************************************************************/
+#define EIT_PID 0x12
 #define TABLE_ID_PF_ACTUAL 0x4e
 #define TABLE_ID_PF_OTHER  0x4f
 
@@ -178,11 +179,19 @@ static void Init0x12Filter(PIDFilter_t *filter)
     filter->name = "Now/Next";
     filter->enabled = TRUE;
     SubTableProcessorInit(filter, 0x12, SubTableHandler, NULL, NULL, NULL);
+    if (filter->tsFilter->adapter->hardwareRestricted)
+    {
+        DVBDemuxAllocateFilter(filter->tsFilter->adapter, EIT_PID, TRUE);
+    }       
 }
 
 static void Deinit0x12Filter(PIDFilter_t *filter)
 {
     filter->enabled = FALSE;
+    if (filter->tsFilter->adapter->hardwareRestricted)
+    {
+        DVBDemuxReleaseFilter(filter->tsFilter->adapter, EIT_PID);
+    }            
     SubTableProcessorDeinit(filter);
     ListFree(serviceNowNextInfoList, free);
 }

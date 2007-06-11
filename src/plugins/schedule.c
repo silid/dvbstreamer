@@ -44,6 +44,7 @@ Plugin to collect EPG schedule information.
 /*******************************************************************************
 * Defines                                                                      *
 *******************************************************************************/
+#define EIT_PID 0x12
 #define MAX_STRING_LEN 256
 
 #define SHORT_EVENT_DR      0x4d
@@ -126,11 +127,19 @@ static void Init0x12Filter(PIDFilter_t *filter)
     filter->enabled = TRUE;
     SubTableProcessorInit(filter, 0x12, SubTableHandler, NULL, NULL, NULL);
     pthread_create(&eitProcessorThread, NULL, EITProcessor, NULL);
+    if (filter->tsFilter->adapter->hardwareRestricted)
+    {
+        DVBDemuxAllocateFilter(filter->tsFilter->adapter, EIT_PID, TRUE);
+    }      
 }
 
 static void Deinit0x12Filter(PIDFilter_t *filter)
 {
     filter->enabled = FALSE;
+    if (filter->tsFilter->adapter->hardwareRestricted)
+    {
+        DVBDemuxReleaseFilter(filter->tsFilter->adapter, EIT_PID);
+    }                
     SubTableProcessorDeinit(filter);
 
     pthread_mutex_lock(&eitQueueMutex);

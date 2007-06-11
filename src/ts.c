@@ -203,7 +203,7 @@ static void *FilterTS(void *arg)
 
         if (!locked)
         {
-            fe_status_t status;
+            fe_status_t status = 0;
             DVBFrontEndStatus(adapter, &status, NULL, NULL, NULL, NULL);
 
             if (status & FE_HAS_LOCK)

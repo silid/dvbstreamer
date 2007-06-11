@@ -22,14 +22,29 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 */
 #ifndef _DVB_H
 #define _DVB_H
-#include <sys/types.h>
+#include <stdint.h>
 #include <linux/dvb/dmx.h>
 #include <linux/dvb/frontend.h>
+#include "types.h"
 
 /**
  * @defgroup DVBAdapter DVB Adapter access
  * @{
  */
+/**
+ * Maximum number of PID filters when running in hardware restricted mode.
+ */
+#define DVB_MAX_PID_FILTERS 15
+
+/**
+ * Structure used to keep track of hardware pid filters.
+ */
+typedef struct DVBAdapterPIDFilter_s
+{
+    int demuxFd;  /**< File descriptor for the demux device. */
+    uint16_t pid; /**< PID that is being filtered. */
+    bool system;  /**< Whether this filter is for a 'system' PID */
+}DVBAdapterPIDFilter_t;
 
 /**
  * Structure representing a DVB Adapter, that is a frontend, a demux and a dvr
@@ -38,21 +53,24 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
  */
 typedef struct DVBAdapter_t
 {
-    int adapter;           /**< The adapter number ie /dev/dvb/adapter<#adapter> */
-    struct dvb_frontend_info info; /**< Information about the front end */
-    // /dev/dvb/adapter#/frontend0
-    char frontEndPath[30]; /**< Path to the frontend device */
-    int frontEndFd;        /**< File descriptor for the frontend device */
-    // /dev/dvb/adapter#/demux0
-    char demuxPath[30];    /**< Path to the demux device */
-    int demuxFd;           /**< File descriptor for the demux device */
-    // /dev/dvb/adapter#/dvr0
-    char dvrPath[30];      /**< Path to the dvr device */
-    int dvrFd;             /**< File descriptor for the dvr device */
+    int adapter;                      /**< The adapter number ie /dev/dvb/adapter<#adapter> */
+    struct dvb_frontend_info info;    /**< Information about the front end */
 
-    int lnbLowFreq;        /**< LNB LO frequency information */
-    int lnbHighFreq;       /**< LNB LO frequency information */
-    int lnbSwitchFreq;     /**< LNB LO frequency information */
+    char frontEndPath[30];            /**< Path to the frontend device */
+    int frontEndFd;                   /**< File descriptor for the frontend device */
+
+    char demuxPath[30];               /**< Path to the demux device */
+    DVBAdapterPIDFilter_t filters[DVB_MAX_PID_FILTERS];/**< File descriptor for the demux device.*/
+
+    char dvrPath[30];                 /**< Path to the dvr device */
+    int dvrFd;                        /**< File descriptor for the dvr device */
+
+    int lnbLowFreq;                   /**< LNB LO frequency information */
+    int lnbHighFreq;                  /**< LNB LO frequency information */
+    int lnbSwitchFreq;                /**< LNB LO frequency information */
+
+    bool hardwareRestricted;          /**< Whether the adapter can only stream a
+                                           portion of the transport stream */
 }
 DVBAdapter_t;
 
@@ -80,9 +98,11 @@ typedef struct DVBDiSEqCSettings_s
  * Open a DVB Adapter.
  * This will open the frontend, demux and dvr devices.
  * @param adapter The adapter number of the devices to open.
+ * @param hwRestricted Whether the adapter can only stream a portion of the 
+ *                     transport stream.
  * @return a DVBAdapter_t structure or NULL if the adapter could not be opened.
  */
-DVBAdapter_t *DVBInit(int adapter);
+DVBAdapter_t *DVBInit(int adapter, bool hwRestricted);
 
 /**
  * Close a DVPAdapter.
@@ -132,6 +152,31 @@ int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status,
 int DVBDemuxSetBufferSize(DVBAdapter_t *adapter, unsigned long size);
 
 /**
+ * Allocate a new PID Filter, indicating whether it is a system PID or not.
+ * @param adapter The adapter to allocate the filter on,
+ * @param pid The PID to filter.
+ * @param system Whether this filter is a 'system' filter or not.
+ * @return 0 on success, non-zero otherwise.
+ */
+int DVBDemuxAllocateFilter(DVBAdapter_t *adapter, uint16_t pid, bool system);
+
+/**
+ * Release a specific PID filter.
+ * @param adapter The adapter to release the filter on.
+ * @param pid The PID of the filter to release.
+ * @return 0 on success, non-zero otherwise.
+ */
+int DVBDemuxReleaseFilter(DVBAdapter_t *adapter, uint16_t pid);
+
+/**
+ * Release all application or system PID filters.
+ * @param adapter The adapter to release the filters on.
+ * @param system Whether to release system or application filters.
+ * @return 0 on success, non-zero otherwise.
+ */ 
+int DVBDemuxReleaseAllFilters(DVBAdapter_t *adapter, bool system);
+
+/**
  * Read upto max bytes from the dvr device belonging to the specified adapter.
  * @param adapter The adapter to read from.
  * @param data Buffer to read into.
@@ -140,6 +185,7 @@ int DVBDemuxSetBufferSize(DVBAdapter_t *adapter, unsigned long size);
  * @return 0 on success, non-zero otherwise.
  */
 int DVBDVRRead(DVBAdapter_t *adapter, char *data, int max, int timeout);
+
 
 /** @} */
 #endif

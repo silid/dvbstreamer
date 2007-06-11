@@ -42,7 +42,6 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
-static int DVBDemuxSetPESFilter(DVBAdapter_t *adapter, ushort pid, int pidtype, int taptype);
 #ifndef __CYGWIN__
 static int DVBFrontEndSatelliteSetup(DVBAdapter_t *adapter, struct dvb_frontend_parameters *frontend, DVBDiSEqCSettings_t *diseqc);
 static int DVBFrontEndDiSEqCSet(DVBAdapter_t *adapter, DVBDiSEqCSettings_t *diseqc, bool tone);
@@ -61,14 +60,20 @@ static pthread_mutex_t tuningMutex;
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
-DVBAdapter_t *DVBInit(int adapter)
+DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
 {
     DVBAdapter_t *result = NULL;
     result = (DVBAdapter_t*)ObjectAlloc(sizeof(DVBAdapter_t));
     if (result)
     {
+        int i;
+        /* Set all filters to be unallocated */
+        for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
+        {
+            result->filters[i].demuxFd = -1;
+        }
+        
         result->frontEndFd = -1;
-        result->demuxFd = -1;
         result->dvrFd = -1;
         result->adapter = adapter;
         sprintf(result->frontEndPath, "/dev/dvb/adapter%d/frontend0", adapter);
@@ -98,13 +103,7 @@ DVBAdapter_t *DVBInit(int adapter)
             result->info.type = FE_ATSC;
         }
 #endif
-        result->demuxFd = open(result->demuxPath, O_RDWR);
-        if (result->demuxFd == -1)
-        {
-            LogModule(LOG_ERROR, DVBADAPTER, "Failed to open %s : %s\n",result->demuxPath, strerror(errno));
-            DVBDispose(result);
-            return NULL;
-        }
+
 #ifndef __CYGWIN__        
         result->dvrFd = open(result->dvrPath, O_RDONLY | O_NONBLOCK);
         if (result->dvrFd == -1)
@@ -116,8 +115,12 @@ DVBAdapter_t *DVBInit(int adapter)
 #else
         result->dvrFd = -1;
 #endif
+        result->hardwareRestricted = hwRestricted;
         /* Stream the entire TS to the DVR device */
-        DVBDemuxSetPESFilter(result, 8192, DMX_PES_OTHER, DMX_OUT_TS_TAP);
+        if (!hwRestricted)
+        {
+            DVBDemuxAllocateFilter(result, 8192, TRUE);
+        }
 #ifdef __CYGWIN__     
         pthread_mutex_init(&tuningMutex, NULL);
 #endif
@@ -131,11 +134,11 @@ void DVBDispose(DVBAdapter_t *adapter)
         LogModule(LOG_DEBUGV, DVBADAPTER, "Closing DVR file descriptor\n");
         close(adapter->dvrFd);
     }
-    if (adapter->demuxFd > -1)
-    {
-        LogModule(LOG_DEBUGV, DVBADAPTER, "Closing Demux file descriptor\n");
-        close(adapter->demuxFd);
-    }
+
+    LogModule(LOG_DEBUGV, DVBADAPTER, "Closing Demux file descriptors\n");
+    DVBDemuxReleaseAllFilters(adapter, FALSE);
+    DVBDemuxReleaseAllFilters(adapter, TRUE);    
+    
     if (adapter->frontEndFd > -1)
     {
         LogModule(LOG_DEBUGV, DVBADAPTER, "Closing Frontend file descriptor\n");
@@ -157,13 +160,16 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
 
     if (adapter->info.type == FE_QPSK)
     {
-        DVBFrontEndSatelliteSetup(adapter, &localFEParams, diseqc);
+        if (DVBFrontEndSatelliteSetup(adapter, &localFEParams, diseqc))
+        {
+            return -1;
+        }
     }
     
     if (ioctl(adapter->frontEndFd, FE_SET_FRONTEND, &localFEParams) < 0)
     {
         LogModule(LOG_ERROR, DVBADAPTER, "setfront front: %s\n", strerror(errno));
-        return 0;
+        return -1;
     }
 
     pfd[0].fd = adapter->frontEndFd;
@@ -176,11 +182,11 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
             if (ioctl(adapter->frontEndFd, FE_GET_EVENT, &event) == -EOVERFLOW)
             {
                 LogModule(LOG_ERROR, DVBADAPTER,"EOVERFLOW");
-                return 0;
+                return -1;
             }
             if (event.parameters.frequency <= 0)
             {
-                return 0;
+                return -1;
             }
         }
     }
@@ -197,7 +203,7 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
     locked = (adapter->dvrFd != -1) ? TRUE:FALSE;
     pthread_mutex_unlock(&tuningMutex);
 #endif       
-    return 1;
+    return 0;
 }
 
 void DVBFrontEndLNBInfoSet(DVBAdapter_t *adapter, int lowFreq, int highFreq, int switchFreq)
@@ -252,31 +258,31 @@ static int DVBFrontEndDiSEqCSet(DVBAdapter_t *adapter, DVBDiSEqCSettings_t *dise
 
    if (ioctl(adapter->frontEndFd, FE_SET_TONE, SEC_TONE_OFF) < 0)
    {
-      return 0;
+      return -1;
    }
    
    if (ioctl(adapter->frontEndFd, FE_SET_VOLTAGE, diseqc->polarisation ? SEC_VOLTAGE_13 : SEC_VOLTAGE_18) < 0)
    {
-      return 0;
+      return -1;
    }
    usleep(15000);
    
    if (ioctl(adapter->frontEndFd, FE_DISEQC_SEND_MASTER_CMD, &cmd) < 0)
    {
-      return 0;
+      return -1;
    }
    usleep(15000);
 
    if (ioctl(adapter->frontEndFd, FE_DISEQC_SEND_BURST, diseqc->satellite_number % 2 ? SEC_MINI_B : SEC_MINI_A) < 0)
    {
-      return 0;
+      return -1;
    }
    usleep(15000);
    if (ioctl(adapter->frontEndFd, FE_SET_TONE, tone ? SEC_TONE_ON : SEC_TONE_OFF) < 0)
    {
-      return 0;
+      return -1;
    }
-   return 1;
+   return 0;
 }
 #endif   
 
@@ -294,7 +300,7 @@ int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status,
         if (ioctl(adapter->frontEndFd, FE_READ_STATUS, status) < 0)
         {
             LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_STATUS: %s\n", strerror(errno));
-            return 0;
+            return -1;
         }
     }
     
@@ -303,7 +309,7 @@ int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status,
         if(ioctl(adapter->frontEndFd,FE_READ_BER, &tempU32) < 0)
         {
             LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_BER: %s\n", strerror(errno));
-            return 0;
+            return -1;
         }
         *ber = tempU32;
     }
@@ -312,7 +318,7 @@ int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status,
         if(ioctl(adapter->frontEndFd,FE_READ_SIGNAL_STRENGTH,&tempU16) < 0)
         {
             LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_SIGNAL_STRENGTH: %s\n", strerror(errno));
-            return 0;
+            return -1;
         }
         *strength = tempU16;
     }
@@ -322,7 +328,7 @@ int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status,
         if(ioctl(adapter->frontEndFd,FE_READ_SNR,&tempU16) < 0)
         {
             LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_SNR: %s\n", strerror(errno));
-            return 0;
+            return -1;
         }
         
         *snr = tempU16;
@@ -332,7 +338,7 @@ int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status,
         if(ioctl(adapter->frontEndFd,FE_READ_UNCORRECTED_BLOCKS,&tempU32) < 0)
         {
             LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_SNR: %s\n", strerror(errno));
-            return 0;
+            return -1;
         }
         
         *ucblock = tempU32;
@@ -362,48 +368,141 @@ int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status,
         *snr = 0xffff;
     }
     #endif
-    return 1;
-}
-
-static int DVBDemuxSetPESFilter(DVBAdapter_t *adapter, ushort pid, int pidtype, int taptype)
-{
-    struct dmx_pes_filter_params pesFilterParam;
-
-    pesFilterParam.pid = pid;
-    pesFilterParam.input = DMX_IN_FRONTEND;
-    pesFilterParam.output = taptype;
-    pesFilterParam.pes_type = pidtype;
-    pesFilterParam.flags = DMX_IMMEDIATE_START;
-    #ifndef __CYGWIN__
-    if (ioctl(adapter->demuxFd, DMX_SET_PES_FILTER, &pesFilterParam) < 0)
-    {
-        LogModule(LOG_ERROR, DVBADAPTER,"set_pid: %s\n", strerror(errno));
-        return 0;
-    }
-    #endif
-    return 1;
+    return 0;
 }
 
 int DVBDemuxSetBufferSize(DVBAdapter_t *adapter, unsigned long size)
 {
     #ifndef __CYGWIN__
-    if (ioctl(adapter->demuxFd, DMX_STOP, 0)< 0)
+    int i;
+    for (i = 0; i < DVB_MAX_PID_FILTERS; i++)
     {
-        LogModule(LOG_ERROR, DVBADAPTER,"DMX_STOP: %s\n", strerror(errno));
-        return 0;
-    }
-    if (ioctl(adapter->demuxFd, DMX_SET_BUFFER_SIZE, size) < 0)
-    {
-        LogModule(LOG_ERROR, DVBADAPTER,"DMX_SET_BUFFER_SIZE: %s\n", strerror(errno));
-        return 0;
-    }
-    if (ioctl(adapter->demuxFd, DMX_START, 0)< 0)
-    {
-        LogModule(LOG_ERROR, DVBADAPTER,"DMX_STOP: %s\n", strerror(errno));
-        return 0;
+        int demuxFd = adapter->filters[0].demuxFd;
+        
+        if (demuxFd == -1)
+        {
+            continue;
+        }
+        
+        if (ioctl(demuxFd, DMX_STOP, 0)< 0)
+        {
+            LogModule(LOG_ERROR, DVBADAPTER,"DMX_STOP: %s\n", strerror(errno));
+            return -1;
+        }
+        if (ioctl(demuxFd, DMX_SET_BUFFER_SIZE, size) < 0)
+        {
+            LogModule(LOG_ERROR, DVBADAPTER,"DMX_SET_BUFFER_SIZE: %s\n", strerror(errno));
+            return -1;
+        }
+        if (ioctl(demuxFd, DMX_START, 0)< 0)
+        {
+            LogModule(LOG_ERROR, DVBADAPTER,"DMX_STOP: %s\n", strerror(errno));
+            return -1;
+        }
     }
     #endif
-    return 1;
+    return 0;
+}
+
+int DVBDemuxAllocateFilter(DVBAdapter_t *adapter, uint16_t pid, bool system)
+{
+    int result = -1;
+    if (adapter->hardwareRestricted || (pid == 8192))
+    {
+        int i;
+        int idxToUse = -1;
+
+        for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
+        {
+            if (adapter->filters[i].demuxFd == -1)
+            {
+                idxToUse = i;
+            }
+            else
+            {
+                if (adapter->filters[i].pid == pid)
+                {
+                    /* Already streaming this PID */
+                    idxToUse = -1;
+                    result = 0;
+                    break;
+                }
+            }
+        }
+        if (idxToUse != -1)
+        {
+            LogModule(LOG_DEBUG, DVBADAPTER, "Allocation filter for pid 0x%x type %s\n", pid, system ? "System":"Service");
+            adapter->filters[idxToUse].demuxFd = open(adapter->demuxPath, O_RDWR);
+            if (adapter->filters[idxToUse].demuxFd == -1)
+            {
+                LogModule(LOG_ERROR, DVBADAPTER, "Failed to open %s : %s when attempting to allocate filter for PID 0x%x\n", adapter->demuxPath, strerror(errno), pid);
+            }
+            else
+            {
+                struct dmx_pes_filter_params pesFilterParam;
+
+                adapter->filters[idxToUse].pid = pid;
+                adapter->filters[idxToUse].system = system;
+
+                pesFilterParam.pid = pid;
+                pesFilterParam.input = DMX_IN_FRONTEND;
+                pesFilterParam.output = DMX_OUT_TS_TAP;
+                pesFilterParam.pes_type = DMX_PES_OTHER;
+                pesFilterParam.flags = DMX_IMMEDIATE_START;
+#ifndef __CYGWIN__
+                if (ioctl(adapter->filters[idxToUse].demuxFd , DMX_SET_PES_FILTER, &pesFilterParam) < 0)
+                {
+                    LogModule(LOG_ERROR, DVBADAPTER,"set_pid: %s\n", strerror(errno));
+                    return 0;
+                }
+#endif
+                            
+                result = 0;
+            }
+        }
+    }
+    return result;
+}
+
+int DVBDemuxReleaseFilter(DVBAdapter_t *adapter, uint16_t pid)
+{
+    int result = -1;
+    if (adapter->hardwareRestricted || (pid == 8192))
+    {
+        int i;
+        for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
+        {
+            if ((adapter->filters[i].demuxFd != -1) && (adapter->filters[i].pid == pid))
+            {
+                LogModule(LOG_DEBUG, DVBADAPTER, "Releasing filter for pid 0x%x type %s\n", 
+                    pid, adapter->filters[i].system ? "System":"Service");
+                close(adapter->filters[i].demuxFd);
+                adapter->filters[i].demuxFd = -1;
+                result = 0;
+                break;
+            }
+        }
+    }
+    return result;
+}
+
+int DVBDemuxReleaseAllFilters(DVBAdapter_t *adapter, bool system)
+{
+    int result = -1;
+    int i;
+    LogModule(LOG_DEBUG, DVBADAPTER, "Releasing all filters for type %s\n",
+        system ? "System":"Service");
+    for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
+    {
+        if ((adapter->filters[i].demuxFd != -1) && (adapter->filters[i].system == system))
+        {
+            close(adapter->filters[i].demuxFd);
+            adapter->filters[i].demuxFd = -1;
+            result = 0;
+        }
+    }
+
+    return result;
 }
 
 int DVBDVRRead(DVBAdapter_t *adapter, char *data, int max, int timeout)
