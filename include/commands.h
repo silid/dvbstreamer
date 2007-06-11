@@ -68,6 +68,7 @@ typedef struct CommandVariable_t
     char *name;               /**< Name of the variable item as passed to the 
                                    get/set command. This must not include space 
                                    characters! */
+    char *description;        /**< Short description of the variable. */
     CommandVariableGet_t get; /**< Function to call when the get is requested.
                                    (May be NULL) */
     CommandVariableSet_t set; /**< Function to call when the get is requested. 

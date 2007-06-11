@@ -133,9 +133,27 @@ static char *FETypesStr[] = {
     "ATSC"
 };
 
-static CommandVariable_t VariableUptime = {"uptime", CommandVariableUptimeGet, NULL};
-static CommandVariable_t VariableUpsecs = {"upsecs", CommandVariableUptimeGet, NULL};
-static CommandVariable_t VariableFetype = {"fetype", CommandVariableFETypeGet, NULL};
+static CommandVariable_t VariableUptime = {
+    "uptime", 
+    "Number of days/hours/minutes/seconds this instance has been running.", 
+    CommandVariableUptimeGet, 
+    NULL
+    };
+
+static CommandVariable_t VariableUpsecs = {
+    "upsecs", 
+    "Number of seconds this instance has been running.",
+    CommandVariableUptimeGet, 
+    NULL
+    };
+
+static CommandVariable_t VariableFetype = {
+    "fetype", 
+    "Type of the tuner this instance is using.",
+    CommandVariableFETypeGet, 
+    NULL
+    };
+
 
 static time_t StartTime;
 /*******************************************************************************
