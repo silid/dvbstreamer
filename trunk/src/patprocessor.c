@@ -87,6 +87,11 @@ PIDFilter_t *PATProcessorCreate(TSFilter_t *tsfilter)
             free(state);
         }
         result->name = "PAT";
+        if (tsfilter->adapter->hardwareRestricted)
+        {
+            DVBDemuxAllocateFilter(tsfilter->adapter, 0, TRUE);
+        }
+            
         PIDFilterMultiplexChangeSet(result, PATProcessorMultiplexChanged, state);
     }
     if (!NewPATCallbacksList)
@@ -100,6 +105,12 @@ void PATProcessorDestroy(PIDFilter_t *filter)
 {
     PATProcessor_t *state= (PATProcessor_t*)filter->ppArg;
     assert(filter->processPacket == PATProcessorProcessPacket);
+
+    if (filter->tsFilter->adapter->hardwareRestricted)
+    {
+        DVBDemuxReleaseFilter(filter->tsFilter->adapter, 0);
+    }
+        
     PIDFilterFree(filter);
     if (state->multiplex)
     {

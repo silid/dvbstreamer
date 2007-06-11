@@ -61,6 +61,7 @@ static void CommandFEStatus(int argc, char **argv);
 
 static void CommandVariableUptimeGet(char *name);
 static void CommandVariableFETypeGet(char *name);
+static void CommandVariableTSModeGet(char *name);
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
@@ -154,6 +155,12 @@ static CommandVariable_t VariableFetype = {
     NULL
     };
 
+static CommandVariable_t VariableTSMode = {
+    "tsmode", 
+    "Whether this instance is running in Full TS or hardware restricted mode.",
+    CommandVariableTSModeGet, 
+    NULL
+    };
 
 static time_t StartTime;
 /*******************************************************************************
@@ -166,6 +173,7 @@ void CommandInstallInfo(void)
     CommandRegisterVariable(&VariableUptime);
     CommandRegisterVariable(&VariableUpsecs);    
     CommandRegisterVariable(&VariableFetype);
+    CommandRegisterVariable(&VariableTSMode);    
     StartTime = time(NULL);
 }
 
@@ -175,6 +183,7 @@ void CommandUnInstallInfo(void)
     CommandUnRegisterVariable(&VariableUptime);
     CommandUnRegisterVariable(&VariableUpsecs);    
     CommandUnRegisterVariable(&VariableFetype);
+    CommandUnRegisterVariable(&VariableTSMode);     
 }
 
 /*******************************************************************************
@@ -385,7 +394,12 @@ static void CommandFEStatus(int argc, char **argv)
 {
     fe_status_t status;
     unsigned int ber, strength, snr, ucblocks;
-    DVBFrontEndStatus(MainDVBAdapterGet(), &status, &ber, &strength, &snr, &ucblocks);
+
+    if (DVBFrontEndStatus(MainDVBAdapterGet(), &status, &ber, &strength, &snr, &ucblocks))
+    {
+        CommandPrintf("Failed to get frontend status!\n");
+        return;
+    }
 
     CommandPrintf("Tuner status:  %s%s%s%s%s%s\n",
              (status & FE_HAS_SIGNAL)?"Signal ":"",
@@ -431,3 +445,12 @@ static void CommandVariableFETypeGet(char *name)
 
     CommandPrintf("%s\n", FETypesStr[adapter->info.type]);
 }
+
+static void CommandVariableTSModeGet(char *name)
+{
+
+    DVBAdapter_t *adapter = MainDVBAdapterGet();
+
+    CommandPrintf("%s\n", adapter->hardwareRestricted ? "H/W Restricted":"Full TS");
+}
+

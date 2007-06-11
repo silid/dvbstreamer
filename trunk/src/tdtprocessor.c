@@ -46,7 +46,7 @@ Process Time/Date and Time Offset Tables.
 /*******************************************************************************
 * Defines                                                                      *
 *******************************************************************************/
-
+#define TDT_PID 0x14
 #define TABLE_ID_TDT 0x40
 #define TABLE_ID_TOT 0x41
 
@@ -111,6 +111,10 @@ PIDFilter_t *TDTProcessorCreate(TSFilter_t *tsfilter)
         }
         result->name = "TDT/TOT";
         PIDFilterMultiplexChangeSet(result,TDTProcessorMultiplexChanged, state);
+        if (tsfilter->adapter->hardwareRestricted)
+        {
+            DVBDemuxAllocateFilter(tsfilter->adapter, TDT_PID, TRUE);
+        }             
     }
 
     return result;
@@ -120,6 +124,10 @@ void TDTProcessorDestroy(PIDFilter_t *filter)
 {
     TDTProcessor_t *state = (TDTProcessor_t *)filter->ppArg;
     assert(filter->processPacket == TDTProcessorProcessPacket);
+    if (filter->tsFilter->adapter->hardwareRestricted)
+    {
+        DVBDemuxReleaseFilter(filter->tsFilter->adapter, TDT_PID);
+    }        
     PIDFilterFree(filter);
 
     if (state->handle)

@@ -40,6 +40,11 @@ the output to only include this service.
 #include "logging.h"
 
 /*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
+#define INVALID_PID 0xffff
+
+/*******************************************************************************
 * Typedefs                                                                     *
 *******************************************************************************/
 typedef struct ServiceFilter_t
@@ -64,6 +69,8 @@ typedef struct ServiceFilter_t
     uint16_t      audioPID;
     uint16_t      subPID;
     TSPacket_t    pmtPacket;
+
+    bool          allocateFilters;
 }ServiceFilter_t;
 
 /*******************************************************************************
@@ -75,6 +82,7 @@ static void ServiceFilterMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Mul
 static void ServiceFilterPATRewrite(ServiceFilter_t *state);
 static void ServiceFilterPMTRewrite(ServiceFilter_t *state);
 static void ServiceFilterInitPacket(TSPacket_t *packet, dvbpsi_psi_section_t* section, char *sectionname);
+static void ServiceFilterAllocateFilters(ServiceFilter_t *state, DVBAdapter_t *adapter);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -110,6 +118,10 @@ void ServiceFilterDestroy(PIDFilter_t *filter)
 {
     ServiceFilter_t *state = (ServiceFilter_t *)filter->ppArg;
     assert(filter->filterPacket == ServiceFilterFilterPacket);
+    if (filter->tsFilter->adapter->hardwareRestricted)
+    {
+        DVBDemuxReleaseAllFilters(filter->tsFilter->adapter, FALSE);    
+    }
     PIDFilterFree(filter);
     if (state->serviceChanged)
     {
@@ -183,13 +195,32 @@ static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t
         state->rewritePAT = TRUE;
         state->rewritePMT = TRUE;
 
+        if (state->avsOnly)
+        {
+            state->audioPID = INVALID_PID;
+            state->videoPID = INVALID_PID;
+            state->subPID   = INVALID_PID;
+        }
+
         pthread_mutex_unlock(&state->serviceChangeMutex);
+        if (pidfilter->tsFilter->adapter->hardwareRestricted)
+        {
+            state->allocateFilters = TRUE && !state->avsOnly;
+        }
     }
 
     if (state->service)
     {
         PIDList_t *pids;
 
+        if (pidfilter->tsFilter->adapter->hardwareRestricted && 
+            (state->allocateFilters || (state->serviceVersion != state->service->pmtVersion)))
+        {
+            ServiceFilterAllocateFilters(state, pidfilter->tsFilter->adapter);
+            state->allocateFilters = FALSE;
+            state->serviceVersion = state->service->pmtVersion;
+        }
+        
         /* Is this service on the current multiplex ? */
         if ((!state->currentMultiplex) || (state->service->multiplexUID != state->currentMultiplex->uid))
         {
@@ -256,6 +287,11 @@ static TSPacket_t *ServiceFilterProcessPacket(PIDFilter_t *pidfilter, void *arg,
             ServiceFilterPMTRewrite(state);
             state->rewritePMT = FALSE;
             state->serviceVersion = state->service->pmtVersion;
+            
+            if (pidfilter->tsFilter->adapter->hardwareRestricted)
+            {
+                state->allocateFilters = TRUE;
+            }
         }
 
         TSPACKET_SETCOUNT(state->pmtPacket, state->pmtPacketCounter ++);
@@ -305,9 +341,9 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t *state)
 
     dvbpsi_InitPMT(&pmt, state->service->id, state->pmtVersion, 1, state->service->pcrPid);
 
-    state->videoPID = 0xffff;
-    state->audioPID = 0xffff;
-    state->subPID = 0xffff;
+    state->videoPID = INVALID_PID;
+    state->audioPID = INVALID_PID;
+    state->subPID = INVALID_PID;
     LogModule(LOG_DEBUG, SERVICEFILTER, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     LogModule(LOG_DEBUG, SERVICEFILTER, "Rewriting PMT on PID %x\n", state->service->pmtPid);
     pids = CachePIDsGet(state->service);
@@ -396,3 +432,42 @@ static void ServiceFilterInitPacket(TSPacket_t *packet, dvbpsi_psi_section_t* se
     }
 }
 
+static void ServiceFilterAllocateFilters(ServiceFilter_t *state, DVBAdapter_t *adapter)
+{
+    DVBDemuxReleaseAllFilters(adapter, FALSE);
+    DVBDemuxAllocateFilter(adapter, state->service->pmtPid, FALSE);
+    /* Make sure we also stream the PCR PID just in case its not the audio/video */
+    DVBDemuxAllocateFilter(adapter, state->service->pcrPid, FALSE);
+    
+    if (state->avsOnly)
+    {
+        if (state->audioPID != INVALID_PID)
+        {
+             DVBDemuxAllocateFilter(adapter, state->audioPID, FALSE);
+        }
+        if (state->videoPID != INVALID_PID)
+        {
+             DVBDemuxAllocateFilter(adapter, state->videoPID, FALSE);
+        }
+        if (state->subPID != INVALID_PID)
+        {
+             DVBDemuxAllocateFilter(adapter, state->subPID, FALSE);
+        }
+    }
+    else
+    {
+        PIDList_t *pids = CachePIDsGet(state->service);
+        if (pids)
+        {
+            int i;
+            for (i = 0; i < pids->count; i ++)
+            {
+                if (state->serviceVersion != state->service->pmtVersion)
+                {
+                     DVBDemuxAllocateFilter(adapter, pids->pids[i].pid, FALSE);
+                }
+            }
+        }
+        CachePIDsRelease();
+    }
+}

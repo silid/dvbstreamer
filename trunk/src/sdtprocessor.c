@@ -49,6 +49,7 @@ Process Service Description Tables and update the services information.
 /*******************************************************************************
 * Defines                                                                      *
 *******************************************************************************/
+#define SDT_PID 0x11
 
 #define TABLE_ID_SDT_ACTUAL 0x42
 #define TABLE_ID_SDT_OTHER  0x46
@@ -99,7 +100,7 @@ PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter)
     PIDFilter_t *result;
     ObjectRegisterType(SDTProcessorState_t);
     state = ObjectCreateType(SDTProcessorState_t);
-    result = SubTableProcessorCreate(tsfilter, 0x11, SubTableHandler, state, SDTMultiplexChanged, state);
+    result = SubTableProcessorCreate(tsfilter, SDT_PID, SubTableHandler, state, SDTMultiplexChanged, state);
 
     if (result)
     {
@@ -113,6 +114,10 @@ PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter)
            next one added them all back (?!)
         */
         PIDFilterTSStructureChangeSet(result, SDTTSStructureChanged, state);
+        if (tsfilter->adapter->hardwareRestricted)
+        {
+            DVBDemuxAllocateFilter(tsfilter->adapter, SDT_PID, TRUE);
+        }
     }
 
     return result;
@@ -121,6 +126,11 @@ PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter)
 void SDTProcessorDestroy(PIDFilter_t *filter)
 {
     SDTProcessorState_t *state = filter->tscArg;
+    if (filter->tsFilter->adapter->hardwareRestricted)
+    {
+        DVBDemuxReleaseFilter(filter->tsFilter->adapter, SDT_PID);
+    }
+    
     SubTableProcessorDestroy(filter);
     MultiplexRefDec(state->multiplex);
     ObjectRefDec(state);

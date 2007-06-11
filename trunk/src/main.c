@@ -143,6 +143,7 @@ int main(int argc, char *argv[])
     char *bindAddress = NULL;
     char *primaryOutput = "null://";
     bool remoteInterface = FALSE;
+    bool hwRestricted = FALSE;
     Output_t *primaryServiceOutput = NULL;
     PIDFilter_t *PIDFilters[MAX_PIDFILTERS];
     
@@ -155,7 +156,7 @@ int main(int argc, char *argv[])
     while (!ExitProgram)
     {
         int c;
-        c = getopt(argc, argv, "vVdro:a:f:u:p:n:F:i:");
+        c = getopt(argc, argv, "vVdro:a:f:u:p:n:F:i:R");
         if (c == -1)
         {
             break;
@@ -172,6 +173,13 @@ int main(int argc, char *argv[])
                 break;
                 case 'a': adapterNumber = atoi(optarg);
                 LogModule(LOG_INFOV, MAIN, "Using adapter %d\n", adapterNumber);
+                break;
+                case 'R': 
+#if defined(ENABLE_DVB)   
+                hwRestricted = TRUE;
+#else
+                LogModule(LOG_ERROR, MAIN, "Hardware restricted mode only supported for DVB!\n");
+#endif
                 break;
                 case 'f': startupFile = optarg;
                 LogModule(LOG_INFOV, MAIN, "Using startup script %s\n", startupFile);
@@ -236,7 +244,7 @@ int main(int argc, char *argv[])
     LogModule(LOG_INFO, MAIN, "%d Services available on %d Multiplexes\n", ServiceCount(), MultiplexCount());
 
     /* Initialise the DVB adapter */
-    INIT(!(DVBAdapter = DVBInit(adapterNumber)), "DVB adapter");
+    INIT(!(DVBAdapter = DVBInit(adapterNumber, hwRestricted)), "DVB adapter");
 
 #if defined(ENABLE_DVB)
     if (DVBAdapter->info.type == FE_QPSK)
@@ -488,9 +496,10 @@ static void usage(char *appname)
             "      -a <adapter>  : Use adapter number (ie /dev/dvb/adapter<adapter>/...)\n"
             "      -f <file>     : Run startup script file before starting the command prompt\n"
             "      -d            : Run as a daemon.\n"
+            "      -R            : Use hardware PID filters, only 1 service filter supported.\n"
             "\n"
             "      Remote Interface Options\n"
-            "      -r            : Start remote interface as well as console (N/A when a daemon)\n"
+            "      -r            : Start remote interface as well as console shell.\n"
             "      -u <username> : Username used to login remotely to control this instance.\n"
             "      -p <password> : Password used to login remotely to control this instance.\n"
             "      -n <name>     : Informational name for this instance.\n"

@@ -58,6 +58,7 @@ Command functions related to scanning multiplex and frequency bands.
 struct PMTReceived_t
 {
     uint16_t id;
+    uint16_t pid;
     bool received;
 };
 
@@ -291,18 +292,20 @@ static void PATCallback(dvbpsi_pat_t* newpat)
             if (patentry->i_number != 0x0000)
             {
                 PMTsReceived[i].id = patentry->i_number;
+                PMTsReceived[i].pid = patentry->i_pid;
                 i ++;
             }
             patentry = patentry->p_next;
         }
         PATReceived = TRUE;
         tsFilter->tsStructureChanged = TRUE; /* Force all PMTs to be received again incase we are scanning a mux we have pids for */
-        if (PATReceived)
+        if (tsFilter->adapter->hardwareRestricted)
         {
-            pthread_mutex_lock(&scanningmutex);
-            pthread_cond_signal(&scanningcond);
-            pthread_mutex_unlock(&scanningmutex);
+            DVBDemuxAllocateFilter(tsFilter->adapter, PMTsReceived[0].pid,FALSE);
         }
+        pthread_mutex_lock(&scanningmutex);
+        pthread_cond_signal(&scanningcond);
+        pthread_mutex_unlock(&scanningmutex);
     }
 }
 
@@ -312,11 +315,20 @@ static void PMTCallback(dvbpsi_pmt_t* newpmt)
     {
         bool all = TRUE;
         int i;
+        DVBAdapter_t *adapter = MainDVBAdapterGet();
         for (i = 0; i < PMTCount; i ++)
         {
             if (PMTsReceived[i].id == newpmt->i_program_number)
             {
                 PMTsReceived[i].received = TRUE;
+                if (adapter->hardwareRestricted)
+                {
+                    DVBDemuxReleaseFilter(adapter,PMTsReceived[i].pid);
+                    if (i + 1 < PMTCount)
+                    {
+                        DVBDemuxAllocateFilter(adapter, PMTsReceived[i + 1].pid,FALSE);
+                    }
+                }
             }
         }
 

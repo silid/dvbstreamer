@@ -140,7 +140,13 @@ void CommandUnInstallServiceFilter(void)
 static void CommandAddSSF(int argc, char **argv)
 {
     Output_t *output = NULL;
-
+    DVBAdapter_t *adapter = MainDVBAdapterGet();
+    if (adapter->hardwareRestricted)
+    {
+        CommandError(COMMAND_ERROR_GENERIC, "Not supported in hardware restricted mode!");
+        return;
+    }
+    
     CommandCheckAuthenticated();
 
     output = OutputAllocate(argv[0], OutputType_Service, argv[1]);

@@ -47,7 +47,7 @@ Process Network Information Tables.
 /*******************************************************************************
 * Defines                                                                      *
 *******************************************************************************/
-
+#define NIT_PID 0x10
 #define TABLE_ID_NIT_ACTUAL 0x40
 #define TABLE_ID_NIT_OTHER  0x41
 
@@ -80,10 +80,14 @@ void NITProcessorDeInit(void)
 
 PIDFilter_t *NITProcessorCreate(TSFilter_t *tsfilter)
 {
-    PIDFilter_t *result = SubTableProcessorCreate(tsfilter, 0x10, SubTableHandler, NULL, NULL, NULL);
+    PIDFilter_t *result = SubTableProcessorCreate(tsfilter, NIT_PID, SubTableHandler, NULL, NULL, NULL);
     if (result)
     {
         result->name = "NIT";
+        if (tsfilter->adapter->hardwareRestricted)
+        {
+            DVBDemuxAllocateFilter(tsfilter->adapter, NIT_PID, TRUE);
+        }        
     }
 
     return result;
@@ -91,6 +95,10 @@ PIDFilter_t *NITProcessorCreate(TSFilter_t *tsfilter)
 
 void NITProcessorDestroy(PIDFilter_t *filter)
 {
+    if (filter->tsFilter->adapter->hardwareRestricted)
+    {
+        DVBDemuxReleaseFilter(filter->tsFilter->adapter, NIT_PID);
+    }    
     SubTableProcessorDestroy(filter);
 }
 
