@@ -94,6 +94,7 @@ static Command_t RemoteInterfaceCommands[] = {
 
 static CommandVariable_t CommandVariableServerName = {
     "name",
+    "Server Name",
     RemoteInterfaceServerNameGet,
     RemoteInterfaceServerNameSet
 };

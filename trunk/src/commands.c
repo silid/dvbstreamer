@@ -749,17 +749,19 @@ static void CommandVars(int argc, char **argv)
          ListIterator_Next(iterator))
     {
         CommandVariable_t *handler = (CommandVariable_t*)ListIterator_Current(iterator);
+        char *mode = "--";
         if (handler->get && handler->set)
         {
-            CommandPrintf(" %s\n", handler->name);
+            mode = "RW";
         }
         else if (handler->get)
         {
-            CommandPrintf(" %s (Read-only)\n", handler->name);            
+            mode = "R-";
         }
         else if (handler->set)
         {
-            CommandPrintf(" %s (Write-only)\n", handler->name);            
+            mode = "-W";
         }
+        CommandPrintf("%-15s  (%s) : %s\n", handler->name, mode, handler->description);
      }
 }
