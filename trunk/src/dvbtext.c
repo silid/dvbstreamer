@@ -22,6 +22,7 @@ Convert DVB text to UTF-8.
 Note: A lot of this code is taken from the tvgrab_dvb source!
     http://www.darkskiez.co.uk/index.php?page=tv_grab_dvb
 */
+#include "config.h"
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -211,7 +212,7 @@ char *DVBTextToUTF8(char *toConvert, size_t toConvertLen)
     outBytes = ResultBuffer;
 
     LogModule(LOG_DEBUG,DVBTEXT,  "Starting conversion. (%d, %d, %d)\n", cd , inBytesLeft, outBytesLeft);
-    ret = iconv(cd, &inBytes, &inBytesLeft, &outBytes, &outBytesLeft);
+    ret = iconv(cd, (ICONV_INPUT_CAST)&inBytes, &inBytesLeft, &outBytes, &outBytesLeft);
     if (ret == -1)
     {
         LogModule(LOG_DEBUG, DVBTEXT, "Conversion failed.\n");
