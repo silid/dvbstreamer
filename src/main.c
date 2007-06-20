@@ -370,7 +370,7 @@ int main(int argc, char *argv[])
 
         CommandLoop();
         LogModule(LOG_DEBUGV, MAIN, "Command loop finished, shutting down\n");
-
+        ExitProgram = TRUE;
         if (remoteInterface)
         {
             RemoteInterfaceDeInit();
