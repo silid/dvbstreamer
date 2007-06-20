@@ -207,6 +207,10 @@ PIDList_t *CachePIDsGet(Service_t *service)
             break;
         }
     }
+    if (!result)
+    {
+        pthread_mutex_unlock(&cacheUpdateMutex);
+    }
     return result;
 }
 
