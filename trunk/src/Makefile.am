@@ -46,8 +46,36 @@ dvbstreamer_SOURCES = \
     epgdbase.c \
     utf8.c \
     $(atsc_src) \
-    $(dvb_src)
+    $(dvb_src) \
+    $(plugin_src) \
+    $(atsc_plugin_src)\
+    $(dvb_plugin_src)
 
+if CYGWIN
+# On cygwin compile in some plugins as Windows isn't as clever as a Unix dynamic loader.
+plugin_src = \
+    plugins/epgtoxmltv.c
+
+if ENABLE_ATSC
+atsc_plugin_src=plugins/atsctoepg.c
+else #ENABLE_ATSC
+atsc_plugin_src=
+endif #ENABLE_ATSC
+
+if ENABLE_DVB
+dvb_plugin_src=\
+    plugins/nownext.c \
+    plugins/schedule.c \
+    plugins/lcnquery.c
+else #ENABLE_DVB
+dvb_plugin_src=
+endif #ENABLE_DVB
+    
+else # CYGWIN
+plugin_src =
+atsc_plugin_src=
+dvb_plugin_src=
+endif # CYGWIN 
 
 if ENABLE_ATSC
 atsc_src =\
@@ -57,7 +85,7 @@ else
 atsc_src =
 endif
 
-if ENABLE_ATSC
+if ENABLE_DVB
 dvb_src =\
     sdtprocessor.c\
     nitprocessor.c \

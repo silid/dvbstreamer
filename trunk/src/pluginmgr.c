@@ -118,12 +118,21 @@ struct PluginFeatureInfo_t pluginFeatures[] = {
 };
 
 static char PLUGINMANAGER[] = "PluginManager";
+
 #ifdef __CYGWIN__    
+
+#if defined(ENABLE_DVB)
 extern Plugin_t LCNQueryPluginInterface;
 extern Plugin_t NowNextPluginInterface;
 extern Plugin_t DVBSchedulePluginInterface;
+#endif
+
 extern Plugin_t EPGtoXMLTVPluginInterface;
+
+#if defined(ENABLE_ATSC)
 extern Plugin_t ATSCtoEPGPluginInterface;
+#endif
+
 #endif
 /*******************************************************************************
 * Global functions                                                             *
@@ -142,6 +151,7 @@ int PluginManagerInit(void)
 #ifdef __CYGWIN__
     {
         struct PluginEntry_t *entry;
+#if defined(ENABLE_DVB)
         entry = calloc(1, sizeof(struct PluginEntry_t));
         entry->pluginInterface = &LCNQueryPluginInterface;
         ListAdd(PluginsList, entry);
@@ -151,12 +161,16 @@ int PluginManagerInit(void)
         entry = calloc(1, sizeof(struct PluginEntry_t));
         entry->pluginInterface = &DVBSchedulePluginInterface;
         ListAdd(PluginsList, entry);        
+#endif
+
         entry = calloc(1, sizeof(struct PluginEntry_t));
         entry->pluginInterface = &EPGtoXMLTVPluginInterface;
         ListAdd(PluginsList, entry);                
+#if defined(ENABLE_ATSC)
         entry = calloc(1, sizeof(struct PluginEntry_t));
         entry->pluginInterface = &ATSCtoEPGPluginInterface;
         ListAdd(PluginsList, entry);                
+#endif        
     }
 #endif
     isSuitableMask = MainIsDVB() ? PLUGIN_FOR_DVB:PLUGIN_FOR_ATSC;
