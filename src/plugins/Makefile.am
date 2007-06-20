@@ -6,17 +6,38 @@ AM_CFLAGS =\
 
 pluginsdir = @DVBSTREAMER_PLUGINDIR@
 
+if CYGWIN
+plugins_LTLIBRARIES = \
+	udpoutput.la \
+	nulloutput.la \
+	fileoutput.la
+else
 plugins_LTLIBRARIES = \
 	udpoutput.la \
 	nulloutput.la \
 	fileoutput.la \
-	lcnquery.la \
 	extractpes.la \
+	epgtoxmltv.la \
+	$(atsc_plugins) \
+	$(dvb_plugins)
+endif
+
+if ENABLE_ATSC
+atsc_plugins=\
+	atsctoepg.la
+else
+atsc_plugins=
+endif
+
+if ENABLE_DVB
+dvb_plugins=\
+	lcnquery.la \
 	nownext.la \
 	datetime.la \
-	schedule.la \
-	epgtoxmltv.la \
-	atsctoepg.la
+	schedule.la
+else
+dvb_plugins=
+endif
 
 udpoutput_la_SOURCES = \
     udp.c \
