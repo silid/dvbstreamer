@@ -604,7 +604,7 @@ static int PurgeOldEvents(void)
             ObjectRefDec(event);
         }
     }
-    while(event);
+    while(event && !ExitProgram);
     sqlite3_exec(EPGDBaseConnection, "COMMIT TRANSACTION;", NULL, NULL, NULL);
     STATEMENT_FINALIZE();
     return 0;
