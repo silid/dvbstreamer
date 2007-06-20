@@ -293,7 +293,7 @@ static void ProcessVCT(void *arg, dvbpsi_atsc_vct_t *newVCT)
         outbuf = serviceName + strlen(serviceName);
         outbytes = sizeof(serviceName) - 10;
 
-        ret = iconv(utf16ToUtf8CD, (char **) &inbuf, &inbytes, &outbuf, &outbytes);
+        ret = iconv(utf16ToUtf8CD, (ICONV_INPUT_CAST) &inbuf, &inbytes, &outbuf, &outbytes);
         if (ret == -1)
         {
             LogModule(LOG_ERROR, PSIPPROCESSOR, "Failed to convert service name\n");
