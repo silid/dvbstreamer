@@ -604,7 +604,7 @@ static int PurgeOldEvents(void)
             ObjectRefDec(event);
         }
     }
-    while(event && !ExitProgram);
+    while(event && !ReaperExit);
     sqlite3_exec(EPGDBaseConnection, "COMMIT TRANSACTION;", NULL, NULL, NULL);
     STATEMENT_FINALIZE();
     return 0;

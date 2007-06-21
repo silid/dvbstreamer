@@ -80,7 +80,7 @@ void OutputsDeInit();
  * @param destination Destination to send the packets filtered by this output.
  * @return an Output_t instance or NULL if an error occured.
  */
-Output_t *OutputAllocate(char *name, OutputType type, char *destination);
+Output_t *OutputAllocate(const char *name, OutputType type, char *destination);
 
 /**
  * Stops the filter and frees the output.
@@ -94,7 +94,7 @@ void OutputFree(Output_t *output);
  * @param type The type of the output to find.
  * @return An existing Output_t instance or NULL if is not found,
  */
-Output_t *OutputFind(char *name, OutputType type);
+Output_t *OutputFind(const char *name, OutputType type);
 
 /**
  * Add a PID to a Manual output.
