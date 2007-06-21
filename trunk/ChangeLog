@@ -6,6 +6,7 @@
 * DVB EPG support, no captures schedule data and can be exported to xmltv format.
 * RTP support and Time To Live setting for UDP and RTP packets useful when sending
   to a multicast address.
+* Turned on -Wall -Werror
 
 0.7
 ---
