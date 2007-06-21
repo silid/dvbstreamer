@@ -10,14 +10,14 @@ Requirements
 ------------
 DVBStreamer requires the following libraries:
 sqlite3 (http://www.sqlite.org/)
-dvbpsi  (http://developers.videolan.org/libdvbpsi/)
 readline 
+
+(libdvbpsi is no longer need as this has been included in DVBStreamer since 0.7)
 
 Installation
 ------------
 
 Before building dvbstreamer you will need the latest version of the following packages:
-libdvbpsi   0.15
 sqlite3     3.3.x
 readline
 
@@ -337,6 +337,8 @@ Thomas Sattler   - Lots of testing for 0.5.
 Nicholas Humfrey - Power PC testing and patch.
 Alex Luccisano   - DVB-S testing.
 Jonathon Isom    - ATSC testing.
+
+VideoLan libdvbpsi Team for the excelent libdvbpsi. (http://www.videolan.org/developers/libdvbpsi.html)
 
 History
 -------
