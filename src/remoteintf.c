@@ -118,15 +118,19 @@ static Command_t ConnectionCommands[] = {
     {NULL, FALSE, 0, 0, NULL, NULL}
 };
 
-static int activeConnections = 0;
-static pthread_mutex_t activeConnectionsMutex = PTHREAD_MUTEX_INITIALIZER;
+static bool remoteIntfExit = FALSE;
+
+static pthread_t acceptThread;
+static pthread_mutex_t connectionsMutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t connectionCondVar = PTHREAD_COND_INITIALIZER;
+
 static int serverSocket;
 static Connection_t connections[MAX_CONNECTIONS];
+
 static char *infoStreamerName;
 static char *authUsername;
 static char *authPassword;
 
-static pthread_t acceptThread;
 
 static time_t serverStartTime;
 static char responselineStart[] = "DVBStreamer/" VERSION "/";
@@ -138,6 +142,7 @@ static char REMOTEINTERFACE[] = "RemoteInterface";
 *******************************************************************************/
 int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char *username, char *password)
 {
+     int i;
 #ifndef __CYGWIN__
     socklen_t address_len;
     struct sockaddr_storage address;
@@ -212,6 +217,12 @@ int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char
     LogModule(LOG_DEBUG, REMOTEINTERFACE, "Password    : %s\n", authPassword);
     LogModule(LOG_DEBUG, REMOTEINTERFACE, "Server Name : %s\n", infoStreamerName);
 
+    for (i = 0; i < MAX_CONNECTIONS; i ++)
+    {
+        connections[i].active = FALSE;
+        pthread_create(&connections[i].thread, NULL, (void*)HandleConnection, (void*)&connections[i]);
+    }
+    
     CommandRegisterCommands(RemoteInterfaceCommands);
     CommandRegisterVariable(&CommandVariableServerName);
     return 0;
@@ -222,7 +233,9 @@ void RemoteInterfaceDeInit(void)
     int i;
     CommandUnRegisterCommands(RemoteInterfaceCommands);
     CommandUnRegisterVariable(&CommandVariableServerName);
-    
+
+    remoteIntfExit = TRUE;
+    pthread_cond_broadcast(&connectionCondVar);
     close(serverSocket);
     for ( i = 0; i < MAX_CONNECTIONS; i ++)
     {
@@ -232,6 +245,7 @@ void RemoteInterfaceDeInit(void)
             close(connections[i].socketfd);
             connections[i].connected = FALSE;
         }
+        pthread_join(connections[i].thread, NULL);
     }
     free(infoStreamerName);
     free(authUsername);
@@ -245,12 +259,14 @@ void RemoteInterfaceAsyncAcceptConnections(void)
 
 void RemoteInterfaceAcceptConnections(void)
 {
+    int i;
+    int found;
     struct pollfd pfd[1];
 
     pfd[0].fd = serverSocket;
     pfd[0].events = POLLIN;
 
-    while (!ExitProgram)
+    while (!remoteIntfExit)
     {
         if (poll(pfd, 1, 200))
         {
@@ -269,48 +285,39 @@ void RemoteInterfaceAcceptConnections(void)
                 }
                 clientfp = fdopen(clientfd, "r+");
 
-                pthread_mutex_lock(&activeConnectionsMutex);
-                if (activeConnections >= MAX_CONNECTIONS)
+                pthread_mutex_lock(&connectionsMutex);
+                found = -1;
+
+                for (i = 0; i < MAX_CONNECTIONS; i ++)
                 {
-                    LogModule(LOG_INFO, REMOTEINTERFACE, "Connection attempt from %s:%d rejected as too many open connections!\n",
+                    if (!connections[i].active)
+                    {
+                        found = i;
+                        break;
+                    }
+                }
+                
+                if (found >= 0)
+                {
+                    connections[i].active = TRUE;
+                    connections[i].connected = TRUE;
+                    connections[i].socketfd = clientfd;
+                    connections[i].socketfp = clientfp;
+                    connections[i].clientAddress = clientAddress;
+                    LogModule(LOG_INFO, REMOTEINTERFACE, "Connection attempt from %s:%d accepted!\n",
+                             inet_ntoa(clientAddress.sin_addr), clientAddress.sin_port);
+                    /* Wake up the connection threads */
+                    pthread_cond_broadcast(&connectionCondVar);
+                }
+                else
+                {
+                    LogModule(LOG_INFO, REMOTEINTERFACE, "Connection attempt from %s:%d rejected as no connections structures left!\n",
                              inet_ntoa(clientAddress.sin_addr), clientAddress.sin_port);
                     PrintResponse(clientfp,COMMAND_ERROR_TOO_MANY_CONNS, "Too many connect clients!");
                     fclose(clientfp);
                 }
-                else
-                {
-                    int found = -1;
-                    int i;
-                    for (i = 0; i < MAX_CONNECTIONS; i ++)
-                    {
-                        if (!connections[i].active)
-                        {
-                            found = i;
-                            break;
-                        }
-                    }
-                    if (found >= 0)
-                    {
-                        connections[i].active = TRUE;
-                        connections[i].connected = TRUE;
-                        connections[i].socketfd = clientfd;
-                        connections[i].socketfp = clientfp;
-                        connections[i].clientAddress = clientAddress;
-                        activeConnections ++;
-                        LogModule(LOG_INFO, REMOTEINTERFACE, "Connection attempt from %s:%d accepted!\n",
-                                 inet_ntoa(clientAddress.sin_addr), clientAddress.sin_port);
-                        pthread_create(&connections[i].thread, NULL, (void*)HandleConnection, (void*)&connections[i]);
-                    }
-                    else
-                    {
-                        LogModule(LOG_INFO, REMOTEINTERFACE, "Connection attempt from %s:%d rejected as no connections structures left!\n",
-                                 inet_ntoa(clientAddress.sin_addr), clientAddress.sin_port);
-                        PrintResponse(clientfp,COMMAND_ERROR_TOO_MANY_CONNS, "Too many connect clients!");
-                        fclose(clientfp);
-                    }
 
-                }
-                pthread_mutex_unlock(&activeConnectionsMutex);
+                pthread_mutex_unlock(&connectionsMutex);
             }
         }
 
@@ -324,68 +331,82 @@ static void HandleConnection(Connection_t *connection)
 {
     struct pollfd pfd[1];
     char line[MAX_LINE_LENGTH];
-    int socketfd = connection->socketfd;
-    FILE *socketfp = connection->socketfp;
+    int socketfd;
+    FILE *socketfp;
     CommandContext_t context;
-    pfd[0].fd = socketfd;
-    pfd[0].events = POLLIN;
 
 
-    /* Setup context */
-    asprintf(&context.interface, "%s:%d",
-        inet_ntoa(connection->clientAddress.sin_addr), connection->clientAddress.sin_port);
-    context.authenticated = FALSE;
-    context.remote = TRUE;
-    context.privateArg = connection;
-    context.commands = ConnectionCommands;
-
-    PrintResponse(socketfp,COMMAND_OK, "Ready");
-
-    while (!ExitProgram && connection->connected)
+    while(!remoteIntfExit)
     {
-        int r;
-        pfd[0].revents = 0;
-        r = poll(pfd, 1, 30000);
-        if (pfd[0].revents & POLLIN)
+        LogModule(LOG_DEBUG, REMOTEINTERFACE, "Waiting for connection (%p)\n", connection);
+
+        pthread_mutex_lock(&connectionsMutex);
+        connection->active = FALSE;
+        pthread_cond_wait(&connectionCondVar, &connectionsMutex);
+        pthread_mutex_unlock(&connectionsMutex);
+        
+        if (!connection->active)
         {
-            char *nl;
-            // Read in the command
-            if (fgets(line, MAX_LINE_LENGTH, socketfp))
+            continue;
+        }
+
+        LogModule(LOG_DEBUG, REMOTEINTERFACE, "Connection accepted (%p)\n", connection);
+        /* Setup context */
+        asprintf(&context.interface, "%s:%d",
+            inet_ntoa(connection->clientAddress.sin_addr), connection->clientAddress.sin_port);
+        context.authenticated = FALSE;
+        context.remote = TRUE;
+        context.privateArg = connection;
+        context.commands = ConnectionCommands;
+
+        socketfd = connection->socketfd;
+        socketfp = connection->socketfp;
+        pfd[0].fd = socketfd;
+        pfd[0].events = POLLIN;
+    
+        PrintResponse(socketfp,COMMAND_OK, "Ready");
+
+        while (!remoteIntfExit && connection->connected)
+        {
+            int r;
+            pfd[0].revents = 0;
+            r = poll(pfd, 1, 30000);
+            if (pfd[0].revents & POLLIN)
             {
-                nl = strchr(line, '\n');
-                if (nl)
+                char *nl;
+                // Read in the command
+                if (fgets(line, MAX_LINE_LENGTH, socketfp))
                 {
-                    *nl = 0;
+                    nl = strchr(line, '\n');
+                    if (nl)
+                    {
+                        *nl = 0;
+                    }
+                    nl = strchr(line, '\r');
+                    if (nl)
+                    {
+                        *nl = 0;
+                    }
+                    LogModule(LOG_DEBUG, REMOTEINTERFACE, "%s: Received Line: \"%s\"\n", context.interface, line);
+                    CommandExecute(&context, RemoteInterfacePrintfImpl, line);
+                    PrintResponse(socketfp,context.errorNumber, context.errorMessage);
                 }
-                nl = strchr(line, '\r');
-                if (nl)
+                else
                 {
-                    *nl = 0;
+                    connection->connected = FALSE;
                 }
-                LogModule(LOG_DEBUG, REMOTEINTERFACE, "%s: Received Line: \"%s\"\n", context.interface, line);
-                CommandExecute(&context, RemoteInterfacePrintfImpl, line);
-                PrintResponse(socketfp,context.errorNumber, context.errorMessage);
             }
             else
             {
                 connection->connected = FALSE;
             }
         }
-        else
-        {
-            connection->connected = FALSE;
-        }
+        LogModule(LOG_INFO, REMOTEINTERFACE, "%s: Connection closed!\n", context.interface);
+        /* Close the socket and free our resources */
+        fclose(socketfp);
+        connection->connected = FALSE;
+        free(context.interface);
     }
-    LogModule(LOG_INFO, REMOTEINTERFACE, "%s: Connection closed!\n", context.interface);
-    /* Close the socket and free our resources */
-    fclose(socketfp);
-    connection->connected = FALSE;
-    free(context.interface);
-
-    pthread_mutex_lock(&activeConnectionsMutex);
-    connection->active = FALSE;
-    activeConnections --;
-    pthread_mutex_unlock(&activeConnectionsMutex);
 }
 
 static void PrintResponse(FILE *fp, uint16_t errno, char * msg)
