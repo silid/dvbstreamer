@@ -53,7 +53,7 @@ void OutputsDeInit()
     ListFree( ServiceOutputsList, (ListDataDestructor_t)OutputFreeImpl);
 }
 
-Output_t *OutputAllocate(char *name, OutputType type, char *destination)
+Output_t *OutputAllocate(const char *name, OutputType type, char *destination)
 {
     Output_t *output = NULL;
     ListIterator_t iterator;
@@ -182,7 +182,8 @@ static void OutputFreeImpl(Output_t *output)
     DeliveryMethodManagerFree(output->filter);
     ObjectRefDec(output);
 }
-Output_t *OutputFind(char *name, OutputType type)
+
+Output_t *OutputFind(const char *name, OutputType type)
 {
     Output_t *result = NULL;
     ListIterator_t iterator;

@@ -113,20 +113,16 @@ static void DeinitDaemon(void);
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
-TSFilter_t *TSFilter;
-DVBAdapter_t *DVBAdapter;
-
 bool ExitProgram = FALSE;
 bool DaemonMode = FALSE;
-bool FilterServiceNames = FALSE;
-char FilterReplacementChar = ' ';
-char PrimaryService[] = "<Primary>";
 
+const char PrimaryService[] = "<Primary>";
 char DataDirectory[PATH_MAX];
 
 static char PidFile[PATH_MAX];
-
-static char MAIN[] = "Main";
+static TSFilter_t *TSFilter;
+static DVBAdapter_t *DVBAdapter;
+static const char MAIN[] = "Main";
 
 /*******************************************************************************
 * Global functions                                                             *
@@ -183,11 +179,6 @@ int main(int argc, char *argv[])
                 break;
                 case 'f': startupFile = optarg;
                 LogModule(LOG_INFOV, MAIN, "Using startup script %s\n", startupFile);
-                break;
-                case 'F':
-                FilterServiceNames = TRUE;
-                FilterReplacementChar = optarg[0];
-                LogModule(LOG_INFOV, MAIN, "Non-printable characters will be replaced with \'%c\'\n", FilterReplacementChar);
                 break;
                 /* Daemon options */
                 case 'd': DaemonMode = TRUE;
