@@ -240,6 +240,7 @@ static void *FilterTS(void *arg)
         }
         pthread_mutex_unlock(&state->mutex);
     }
+    LogModule(LOG_DEBUG, "TSFilter", "Filter thread exiting.\n");
     return NULL;
 }
 

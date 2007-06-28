@@ -426,12 +426,13 @@ int main(int argc, char *argv[])
     DEINIT(EPGDBaseDeInit(), "EPG database");    
     DEINIT(DBaseDeInit(), "database");
 
+    DEINIT(ObjectDeinit(), "objects");
+
     if (DaemonMode)
     {
         DeinitDaemon();
     }
 
-    DEINIT(ObjectDeinit(), "objects");
     return 0;
 }
 
@@ -539,6 +540,7 @@ static void sighandler(int signum)
                 break;
         }
     }
+    LogModule(LOG_DEBUG, MAIN, "Got signal %d exiting\n", signum);
     ExitProgram = TRUE;
 }
 

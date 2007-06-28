@@ -571,11 +571,15 @@ static void *ReaperProcess(void *arg)
     {
         LogModule(LOG_DEBUG, EPGDBASE, "Purging old events!\n");
         PurgeOldEvents();
-        clock_gettime( CLOCK_REALTIME, &timeout);
-        timeout.tv_sec += (24 * 60) * 60;
-        pthread_cond_timedwait(&ReaperCondVar, &EPGMutex, &timeout);
+        if (!ReaperExit)
+        {
+            clock_gettime( CLOCK_REALTIME, &timeout);
+            timeout.tv_sec += (24 * 60) * 60;
+            pthread_cond_timedwait(&ReaperCondVar, &EPGMutex, &timeout);
+        }
     }
     pthread_mutex_unlock(&EPGMutex);    
+    LogModule(LOG_DEBUG, EPGDBASE, "Reaper thread exiting.\n");
     return NULL;
 }
 
