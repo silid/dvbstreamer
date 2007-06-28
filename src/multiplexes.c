@@ -372,8 +372,8 @@ static int QPSKParametersGet(int uid, struct dvb_frontend_parameters *feparams, 
         feparams->u.qpsk.symbol_rate  = STATEMENT_COLUMN_INT(2);
         feparams->u.qpsk.fec_inner    = STATEMENT_COLUMN_INT(3);
 
-        diseqc->polarisation     = STATEMENT_COLUMN_INT(5);
-        diseqc->satellite_number = STATEMENT_COLUMN_INT(6);
+        diseqc->polarisation     = STATEMENT_COLUMN_INT(4);
+        diseqc->satellite_number = STATEMENT_COLUMN_INT(5);
         rc = 0;
     }
     STATEMENT_FINALIZE();
