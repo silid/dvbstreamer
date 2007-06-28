@@ -266,7 +266,7 @@ void RemoteInterfaceAcceptConnections(void)
     pfd[0].fd = serverSocket;
     pfd[0].events = POLLIN;
 
-    while (!remoteIntfExit)
+    while (!remoteIntfExit && !ExitProgram)
     {
         if (poll(pfd, 1, 200))
         {
@@ -320,8 +320,8 @@ void RemoteInterfaceAcceptConnections(void)
                 pthread_mutex_unlock(&connectionsMutex);
             }
         }
-
     }
+    LogModule(LOG_DEBUG,REMOTEINTERFACE,"Accept thread exiting.\n");
 }
 
 /******************************************************************************
@@ -407,6 +407,7 @@ static void HandleConnection(Connection_t *connection)
         connection->connected = FALSE;
         free(context.interface);
     }
+    LogModule(LOG_DEBUG,REMOTEINTERFACE,"Connection thread exiting.\n");
 }
 
 static void PrintResponse(FILE *fp, uint16_t errno, char * msg)

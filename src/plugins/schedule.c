@@ -229,6 +229,7 @@ static void *EITProcessor(void *arg)
             EPGDBaseTransactionCommit();
         }
     }
+    LogModule(LOG_DEBUG, DVBSCHEDULE, "EIT Processor thread exiting.\n");
     return NULL;
 }
 
