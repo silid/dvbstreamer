@@ -177,7 +177,7 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
         
         if (!service)
         {
-            CacheServiceAdd(sdtservice->i_service_id);
+            service = CacheServiceAdd(sdtservice->i_service_id);
         }
         
         while(descriptor)
