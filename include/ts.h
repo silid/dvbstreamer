@@ -242,7 +242,7 @@ typedef struct TSFilter_t
     bool tsStructureChanged;            /**< Whether the underlying TS structure has changed. */
 
     volatile unsigned long long totalPackets; /**< Total number of packets processed by this instance. */
-    volatile unsigned long long bitrate;      /**< Approximate bit rate of the transport stream being processed. */
+    volatile unsigned long bitrate;     /**< Approximate bit rate of the transport stream being processed. */
 
     List_t *pidFilters;
 }

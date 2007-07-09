@@ -171,7 +171,7 @@ static void *FilterTS(void *arg)
 {
     struct timeval now, last;
     int diff;
-    int prevpackets = 0;
+    unsigned long long prevpackets = 0;
     bool locked = FALSE;
 
     TSFilter_t *state = (TSFilter_t*)arg;
@@ -234,7 +234,7 @@ static void *FilterTS(void *arg)
         if (diff > 1000)
         {
             // Work out bit rates
-            state->bitrate = ((state->totalPackets - prevpackets) * (188 * 8));
+            state->bitrate = (unsigned long)((state->totalPackets - prevpackets) * (188 * 8));
             prevpackets = state->totalPackets;
             last = now;
         }
