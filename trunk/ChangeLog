@@ -1,11 +1,13 @@
 0.8 
 ---
 * DVB-S fully supported, thanks to Alex Luccisano.
-* ATSC support, very preliminary should be able to tune to multiplex and stream services
-  but no automatic detection of new channels, names, events etc.
-* DVB EPG support, no captures schedule data and can be exported to xmltv format.
+* ATSC support, including preliminary EPG.
+* DVB EPG support, now captures schedule data and can be exported to xmltv format.
 * RTP support and Time To Live setting for UDP and RTP packets useful when sending
   to a multicast address.
+* All text output by dvbstreamer is now in UTF-8, this includes channel names and EPG data.
+* Lots of clean up in the code structure.
+* Fixed major virtual memory bug.
 * Turned on -Wall -Werror
 
 0.7
