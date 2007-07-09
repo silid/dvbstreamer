@@ -98,12 +98,12 @@ To use a startup file simple add the -f option on the command line specifying th
 
 For example to use the file eitredirect to redirect EIT tables to port 1235 on your local computer you would use the following:
 
-dvbstreamer -o localhost:1234 -f eitredirect
+dvbstreamer -o udp://localhost:1234 -f eitredirect
 
 And in eitredirect you would have
 
 # Redirect EIT tables to port 1235 on localhost
-addoutput eitoutput localhost:1235
+addoutput eitoutput udp://localhost:1235
 addpid eitoutput 0x12
 
 Its as simple as that, you can use all the commands that you can use on the dvbstreamer prompt.
@@ -323,6 +323,9 @@ The commands lsplugins and plugininfo can be used to inspected the loaded plugin
 Documentation for the interfaces into DVBStreamer can be generated using the
 doxygen and the doxygen.config file in the base directory of dvbstreamer.
 
+Help/More Information
+-------------------
+See the wiki at http://dvbstreamer.sourceforge.net/mediawiki/index.php/Main_Page
 
 Bugs
 ----
@@ -337,11 +340,13 @@ Thomas Sattler   - Lots of testing for 0.5.
 Nicholas Humfrey - Power PC testing and patch.
 Alex Luccisano   - DVB-S testing.
 Jonathon Isom    - ATSC testing.
+Ramsey Ammar - DVBStreamer first donor :-) many thanks.
 
 VideoLan libdvbpsi Team for the excelent libdvbpsi. (http://www.videolan.org/developers/libdvbpsi.html)
 
 History
 -------
+0.8 ATSC/DVB-S Release
 0.7 Remote interface Release
 0.6 Stability Release
 0.5 Plugin Release
