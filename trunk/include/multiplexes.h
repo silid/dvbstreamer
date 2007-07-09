@@ -29,7 +29,7 @@ Manage multiplexes and tuning parameters.
 #include "dvb.h"
 /**
  * @defgroup Multiplex Multiplex information
- * {@
+ * @{
  */
 
 /**
