@@ -81,7 +81,7 @@ static void EPGEventDetailDestructor(void *arg);
 static long long int CreateEventUID(EPGServiceRef_t *serviceRef, unsigned int eventId);
 static void *ReaperProcess(void *arg);
 static int PurgeOldEvents(void);
-static void PurgeEvent(EPGEvent_t *event);
+
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
@@ -569,8 +569,9 @@ static void *ReaperProcess(void *arg)
     pthread_mutex_lock(&EPGMutex);
     while(!ReaperExit)
     {
-        LogModule(LOG_DEBUG, EPGDBASE, "Purging old events!\n");
+        LogModule(LOG_INFO, EPGDBASE, "Purging old events!\n");
         PurgeOldEvents();
+ 		LogModule(LOG_INFO, EPGDBASE, "Events purged.\n");
         if (!ReaperExit)
         {
             clock_gettime( CLOCK_REALTIME, &timeout);
@@ -586,37 +587,37 @@ static void *ReaperProcess(void *arg)
 static int PurgeOldEvents(void)
 {
     STATEMENT_INIT;
-    EPGEvent_t *event;
     time_t past24 = time(NULL);
     past24 -= (24*60) * 60; /* Delete everything that finished 24 hours ago */
     sqlite3_exec(EPGDBaseConnection, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 
-    STATEMENT_PREPAREVA("SELECT " EPGEVENT_FIELDS " "
-                        "FROM " EPGEVENTS_TABLE " "
+    LogModule(LOG_DEBUG, EPGDBASE, "Deleting from EPGEvents table.\n");
+    /* Remove events that finished over 24 hours ago */
+    STATEMENT_PREPAREVA("DELETE FROM " EPGEVENTS_TABLE " "
                         "WHERE " EPGEVENT_ENDTIME "<=%d;", 
                         past24);
     RETURN_RC_ON_ERROR;
-    do
-    {
-        event = EPGDBaseEventGetNext(stmt);
-        if (event)
-        {
-            LogModule(LOG_DEBUG, EPGDBASE, "Deleting event %x:%x:%x:%x\n", 
-                event->serviceRef.netId,event->serviceRef.tsId, event->serviceRef.serviceId,
-                event->eventId);
-            PurgeEvent(event);
-            ObjectRefDec(event);
-        }
-    }
-    while(event && !ReaperExit);
+    STATEMENT_STEP();
+    LogModule(LOG_DEBUG, EPGDBASE, "Deleting from EPGDetails table.\n");
+    /* Remove orphaned details and ratings */
+    sqlite3_exec(EPGDBaseConnection, "DELETE FROM " EPGDETAILS_TABLE " WHERE NOT EXISTS"
+                                        "(SELECT * FROM " EPGEVENTS_TABLE " WHERE "
+                                        "netid=((EPGDetails.eventuid>>48) &65535) AND "
+                                        "tsid=((EPGDetails.eventuid >>32) & 65535) AND "
+                                        "serviceid=((EPGDetails.eventuid>>16) & 65535) AND "
+                                        "eventid=(EPGDetails.eventuid & 65535));", 
+                                        NULL, NULL, NULL);
+    LogModule(LOG_DEBUG, EPGDBASE, "Deleting from EPGRatings table.\n");
+    sqlite3_exec(EPGDBaseConnection, "DELETE FROM " EPGRATINGS_TABLE " WHERE NOT EXISTS"
+                                        "(SELECT * FROM " EPGEVENTS_TABLE " WHERE "
+                                        "netid=((EPGDetails.eventuid>>48) &65535) AND "
+                                        "tsid=((EPGDetails.eventuid >>32) & 65535) AND "
+                                        "serviceid=((EPGDetails.eventuid>>16) & 65535) AND "
+                                        "eventid=(EPGDetails.eventuid & 65535));", 
+                                        NULL, NULL, NULL);    
+    LogModule(LOG_DEBUG, EPGDBASE, "Committing.\n");
     sqlite3_exec(EPGDBaseConnection, "COMMIT TRANSACTION;", NULL, NULL, NULL);
     STATEMENT_FINALIZE();
     return 0;
 }
 
-static void PurgeEvent(EPGEvent_t *event)
-{
-    EPGDBaseEventRemove(&event->serviceRef, event->eventId);
-    EPGDBaseRatingRemoveAll(&event->serviceRef, event->eventId);
-    EPGDBaseDetailRemoveAll(&event->serviceRef, event->eventId);    
-}
