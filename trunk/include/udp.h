@@ -46,6 +46,12 @@ Simplify UDP socket creation and packet sending.
 #define UDP_HEADER (2*4)
 
 /**
+ * Constant for maximum UDP packet payload size.
+ * This is a conservative estimate.
+ */
+#define UDP_PAYLOAD_SIZE (MTU - (IP_HEADER + UDP_HEADER))
+
+/**
  * Creates a UDP socket for the given family.
  * The socket family is intended to be either PF_INET or PF_INET6.
  * @param family Either PF_INET or PF_INET6.
