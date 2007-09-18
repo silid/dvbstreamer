@@ -8,7 +8,6 @@ pluginsdir = @DVBSTREAMER_PLUGINDIR@
 
 if CYGWIN
 plugins_LTLIBRARIES = \
-	udpoutput.la \
 	nulloutput.la \
 	fileoutput.la
 else
@@ -41,7 +40,8 @@ endif
 
 udpoutput_la_SOURCES = \
     udp.c \
-    udpoutput.c
+    udpoutput.c \
+    sap.c
 
 udpoutput_la_LDFLAGS = -module -no-undefined -avoid-version
 

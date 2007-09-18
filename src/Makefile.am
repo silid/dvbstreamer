@@ -54,7 +54,10 @@ dvbstreamer_SOURCES = \
 if CYGWIN
 # On cygwin compile in some plugins as Windows isn't as clever as a Unix dynamic loader.
 plugin_src = \
-    plugins/epgtoxmltv.c
+    plugins/epgtoxmltv.c \
+    plugins/udp.c \
+    plugins/udpoutput.c \
+    plugins/sap.c
 
 if ENABLE_ATSC
 atsc_plugin_src=plugins/atsctoepg.c

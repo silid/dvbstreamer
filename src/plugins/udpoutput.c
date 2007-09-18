@@ -24,7 +24,9 @@ UDP Output Delivery Method handler.
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/types.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 #include <sys/time.h>
 
@@ -33,6 +35,7 @@ UDP Output Delivery Method handler.
 #include "udp.h"
 #include "deliverymethod.h"
 #include "logging.h"
+#include "sap.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -63,6 +66,7 @@ struct UDPOutputState_t
     int socket;
     socklen_t addressLen;
     struct sockaddr_storage address;
+    SAPSessionHandle_t sapHandle;
     int datagramFullCount;
     int tsPacketCount;
     uint16_t sequence;
@@ -77,6 +81,7 @@ struct UDPOutputState_t
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
+void UDPOutputInstall(bool installed);
 static bool UDPOutputCanHandle(char *mrl);
 static DeliveryMethodInstance_t *UDPOutputCreate(char *arg);
 static void UDPOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet);
@@ -84,6 +89,7 @@ static void UDPOutputSendBlock(DeliveryMethodInstance_t *this, void *block, unsi
 static void UDPOutputDestroy(DeliveryMethodInstance_t *this);
 static void RTPOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet);
 static void RTPHeaderInit(uint8_t *header, uint16_t sequence);
+static void CreateSAPSession(struct UDPOutputState_t *state, bool rtp, unsigned char ttl);
 
 
 /*******************************************************************************
@@ -107,8 +113,13 @@ const char UDPOUTPUT[] = "UDPOutput";
 *******************************************************************************/
 
 PLUGIN_FEATURES(
-    PLUGIN_FEATURE_DELIVERYMETHOD(UDPOutputHandler)
+    PLUGIN_FEATURE_DELIVERYMETHOD(UDPOutputHandler),
+    PLUGIN_FEATURE_INSTALL(UDPOutputInstall)
 );
+
+#ifdef __CYGWIN__
+#define PluginInterface UDPOutputPluginInterface
+#endif
 
 PLUGIN_INTERFACE_F(
     PLUGIN_FOR_ALL,
@@ -120,6 +131,17 @@ PLUGIN_INTERFACE_F(
     "charrea6@users.sourceforge.net"
 );
 
+void UDPOutputInstall(bool installed)
+{
+    if (installed)
+    {
+        SAPServerInit();
+    }
+    else
+    {
+        SAPServerDeinit();
+    }
+}
 
 /*******************************************************************************
 * Delivery Method Functions                                                    *
@@ -270,10 +292,15 @@ static DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
         free(state);
         return NULL;
     }
-    
-    if (ttl > 1)
+
+    if (IsMulticastAddress(&state->address))
     {
-        setsockopt(state->socket,IPPROTO_IP,IP_MULTICAST_TTL, &ttl,sizeof(ttl));
+        if (ttl > 1)
+        {
+            setsockopt(state->socket,IPPROTO_IP,IP_MULTICAST_TTL, &ttl,sizeof(ttl));
+        }
+        
+       CreateSAPSession(state, rtp, ttl);
     }
     
     state->datagramFullCount = MAX_TS_PACKETS_PER_DATAGRAM;
@@ -284,6 +311,10 @@ static void UDPOutputDestroy(DeliveryMethodInstance_t *this)
 {
     struct UDPOutputState_t *state = (struct UDPOutputState_t *)this;
     close(state->socket);
+    if (state->sapHandle)
+    {
+        SAPServerDeleteSession(state->sapHandle);
+    }
     free(state);
 }
 
@@ -338,11 +369,123 @@ static void RTPHeaderInit(uint8_t *header, uint16_t sequence)
 
     /* Time stamp */
     temp = ((tv.tv_sec%1000000)*1000000 + tv.tv_usec)/11; /* approximately a 90Khz clock (1000000/90000 = 11.1111111...)*/
-    memcpy(&header[4], &temp, 4);
+    header[4] = (temp >> 24) & 0xff;
+    header[5] = (temp >> 16) & 0xff;    
+    header[6] = (temp >>  8) & 0xff;    
+    header[7] =  temp        & 0xff;        
 
     /* SSRC (Not implemented) */
     header[8] = 0x0f;
     header[9] = 0x0f;
     header[10] = 0x0f;
     header[11] = 0x0f;
+}
+
+static void CreateSAPSession(struct UDPOutputState_t *state, bool rtp, unsigned char ttl)
+{
+    char sdp[1000] = {0};
+    char hostname[256];
+    char addrtype[4];
+    char ipaddr[256];
+    char typevalue[256];
+    in_port_t port = 0;
+    
+    gethostname(hostname, sizeof(hostname) - 1);
+    
+#ifdef USE_GETADDRINFO    
+    {
+        struct addrinfo *addrinfo, hints;
+        memset((void *)&hints, 0, sizeof(hints));
+        hints.ai_socktype = SOCK_DGRAM;
+        hints.ai_flags = AI_ADDRCONFIG;
+        if ((getaddrinfo(hostname, NULL, &hints, &addrinfo) != 0) || (addrinfo == NULL))
+        {
+            LogModule(LOG_DEBUG, UDPOUTPUT,"Failed to get host address\n");
+            return;
+        }
+
+        if (addrinfo->ai_addrlen > sizeof(struct sockaddr_storage))
+        {
+            freeaddrinfo(addrinfo);
+            return;
+        }
+
+        if (addrinfo->ai_family == AF_INET)
+        {
+            struct sockaddr_in *inaddr = (struct sockaddr_in *) addrinfo->ai_addr;
+            inet_ntop(AF_INET, &inaddr->sin_addr, ipaddr, sizeof(ipaddr));
+            strcpy(addrtype, "IP4");
+        }
+        else 
+        {
+            struct sockaddr_in6 *in6addr = (struct sockaddr_in6 *) addrinfo->ai_addr;
+            inet_ntop(AF_INET6, &in6addr->sin6_addr, ipaddr, sizeof(ipaddr));            
+            strcpy(addrtype, "IP6");
+        }
+        freeaddrinfo(addrinfo);
+    }
+#else
+    {
+        struct hostent *hostinfo;
+        hostinfo = gethostbyname(hostname);
+        if (hostinfo == NULL)
+        {
+            LogModule(LOG_DEBUG, UDPOUTPUT,"Failed to get host address\n");
+            return;
+        }
+        inet_ntop(hostinfo->h_addrtype, hostinfo->h_addr, ipaddr, sizeof(ipaddr));
+        if (hostinfo->h_addrtype)
+        {
+            strcpy(addrtype, "IP4");
+        }
+        else
+        {
+            strcpy(addrtype, "IP6");
+        }
+    }
+#endif
+
+#define SDPAdd(type,value) \
+    do{\
+        sprintf(typevalue,"%c=" value "\r\n", type);\
+        strcat(sdp,typevalue);\
+    }while(0)
+    
+#define SDPAddf(type,fmt,values...) \
+    do{\
+        sprintf(typevalue,"%c=" fmt "\r\n", type, values);\
+        strcat(sdp,typevalue);\
+    }while(0)
+
+    SDPAdd('v',"0");
+    SDPAddf('o',"- %ld 0 IN %s %s", time(NULL), addrtype, ipaddr);
+    SDPAdd('s'," ");
+    
+    if (state->address.ss_family == AF_INET)
+    {
+        struct sockaddr_in *inaddr = (struct sockaddr_in *) &state->address;
+        inet_ntop(AF_INET, &inaddr->sin_addr, ipaddr, sizeof(ipaddr));
+        SDPAddf('c',"IN IP4 %s/%d", ipaddr,ttl);
+        port = ntohs(inaddr->sin_port);
+    }
+#ifdef USE_GETADDRINFO    
+    else 
+    {
+        struct sockaddr_in6 *in6addr = (struct sockaddr_in6 *) &state->address;
+        inet_ntop(AF_INET6, &in6addr->sin6_addr, ipaddr, sizeof(ipaddr));            
+        SDPAddf('c',"IN IP6 %s", ipaddr);
+        port = ntohs(in6addr->sin6_port);
+    }
+#endif    
+
+    if (rtp)
+    {
+        SDPAddf('m',"video %d RTP/AVP 33", port);
+    }
+    else
+    {
+        SDPAddf('m',"video %d udp 33", port);
+    }
+        
+    state->sapHandle = SAPServerAddSession(&state->address, sdp);
 }

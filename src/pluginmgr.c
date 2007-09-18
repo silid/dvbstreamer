@@ -128,6 +128,7 @@ extern Plugin_t DVBSchedulePluginInterface;
 #endif
 
 extern Plugin_t EPGtoXMLTVPluginInterface;
+extern Plugin_t UDPOutputPluginInterface;
 
 #if defined(ENABLE_ATSC)
 extern Plugin_t ATSCtoEPGPluginInterface;
@@ -166,6 +167,11 @@ int PluginManagerInit(void)
         entry = calloc(1, sizeof(struct PluginEntry_t));
         entry->pluginInterface = &EPGtoXMLTVPluginInterface;
         ListAdd(PluginsList, entry);                
+
+        entry = calloc(1, sizeof(struct PluginEntry_t));
+        entry->pluginInterface = &UDPOutputPluginInterface;
+        ListAdd(PluginsList, entry);                
+        
 #if defined(ENABLE_ATSC)
         entry = calloc(1, sizeof(struct PluginEntry_t));
         entry->pluginInterface = &ATSCtoEPGPluginInterface;
