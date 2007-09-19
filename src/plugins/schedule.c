@@ -310,7 +310,7 @@ static void ConvertToTM(dvbpsi_date_time_t *datetime, dvbpsi_eit_event_duration_
 
     secs = mktime(startTime);
     
-    secs += (datetime->i_hour * 60 * 60) + (datetime->i_minute * 60) + datetime->i_second;
+    secs += (duration->i_hours * 60 * 60) + (duration->i_minutes* 60) + duration->i_seconds;
 
     temp_time = gmtime(&secs);
     *endTime = *temp_time;
