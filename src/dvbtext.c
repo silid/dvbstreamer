@@ -155,7 +155,7 @@ char *DVBTextToUTF8(char *toConvert, size_t toConvertLen)
                 {
                     int toConvertIndex, asciiIndex = 0;
                     /* libiconv doesn't support ISO 6937, but glibc does?! 
-                       so fall back to ASCII and strip out the non spacing 
+                       so fall back to ISO8859-1 and strip out the non spacing 
                        diacritical mark/graphical characters etc.
                     */
                     for (toConvertIndex = 0; toConvertIndex < toConvertLen; toConvertIndex ++)
@@ -169,7 +169,7 @@ char *DVBTextToUTF8(char *toConvert, size_t toConvertLen)
                     }
                     toConvert = asciiBuffer;
                     toConvertLen = asciiIndex;
-                    cd = iconv_open(UTF8, "ASCII");
+                    cd = iconv_open(UTF8, "ISO8859-1");
                 }
 
                 break;
