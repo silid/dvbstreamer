@@ -89,7 +89,7 @@ static void UDPOutputSendBlock(DeliveryMethodInstance_t *this, void *block, unsi
 static void UDPOutputDestroy(DeliveryMethodInstance_t *this);
 static void RTPOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet);
 static void RTPHeaderInit(uint8_t *header, uint16_t sequence);
-static void CreateSAPSession(struct UDPOutputState_t *state, bool rtp, unsigned char ttl);
+static void CreateSAPSession(struct UDPOutputState_t *state, bool rtp, unsigned char ttl, char *sessionName);
 
 
 /*******************************************************************************
@@ -124,10 +124,11 @@ PLUGIN_FEATURES(
 PLUGIN_INTERFACE_F(
     PLUGIN_FOR_ALL,
     "UDPOutput", 
-    "0.2", 
+    "0.3", 
     "UDP Delivery methods.\n"
-    "Use udp://<host>:<port>[:<ttl>] for simple raw TS packets in a UDP datagram.\n"
-    "Use rtp://<host>:<port>[:<ttl>] for RTP encapsulation.", 
+    "Use udp://[<host>:[<port>[:<ttl>[:session name]]]] for simple raw TS packets in a UDP datagram.\n"
+    "Use rtp://[<host>:[<port>[:<ttl>[:session name]]]] for RTP encapsulation.\n"
+    "Default host is localhost, default port is 1234", 
     "charrea6@users.sourceforge.net"
 );
 
@@ -159,12 +160,18 @@ static DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
     unsigned char ttl = 1;
     char hostbuffer[256];
     char portbuffer[6]; /* 65536\0 */
+    char *sessionName= "DVBStreamer";
     bool rtp;
 
     hostbuffer[0] = 0;
     portbuffer[0] = 0;
-    
-    rtp = strncmp(RTPPrefix, arg, PREFIX_LEN) == 0;
+
+    /*
+     * Process the mrl 
+     */
+
+    /* Is this a RTP MRL? */
+    rtp = (strncmp(RTPPrefix, arg, PREFIX_LEN) == 0);
     
     /* Ignore the prefix */
     arg += PREFIX_LEN;
@@ -194,7 +201,7 @@ static DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
         hostbuffer[i] = 0;
         arg += i;
     }
-
+    /* Port */
     if (*arg == ':')
     {
         arg ++;
@@ -206,14 +213,32 @@ static DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
         }
         portbuffer[i] = 0;
         arg += i;
-        if (*arg == ':')
-        {
-            arg ++;
-            LogModule(LOG_DEBUG, UDPOUTPUT, "TTL parameter detected! %s\n", arg);
-            /* process ttl */
-            ttl = (unsigned char)atoi(arg) & 255;
-        }
     }
+    /* TTL */
+    if (*arg == ':')
+    {
+        char ttlbuffer[4];
+        arg ++;
+        LogModule(LOG_DEBUG, UDPOUTPUT, "TTL parameter detected! %s\n", arg);
+
+        for (i = 0;arg[i] && (arg[i] != ':') && (i < 3); i ++)
+        {
+            ttlbuffer[i] = arg[i];
+        }
+        /* process ttl */
+        ttl = (unsigned char)atoi(ttlbuffer) & 255;        
+        arg += i;
+    }
+    /* Anything else is the session name for SAP/SDP */
+    if (*arg == ':')
+    {
+        arg ++;
+        sessionName = arg;
+    }
+
+    /*
+     * Lookup the host name and port
+     */
     if (hostbuffer[0] == 0)
     {
         strcpy(hostbuffer, DEFAULT_HOST);
@@ -300,7 +325,7 @@ static DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
             setsockopt(state->socket,IPPROTO_IP,IP_MULTICAST_TTL, &ttl,sizeof(ttl));
         }
         
-       CreateSAPSession(state, rtp, ttl);
+       CreateSAPSession(state, rtp, ttl, sessionName);
     }
     
     state->datagramFullCount = MAX_TS_PACKETS_PER_DATAGRAM;
@@ -381,7 +406,7 @@ static void RTPHeaderInit(uint8_t *header, uint16_t sequence)
     header[11] = 0x0f;
 }
 
-static void CreateSAPSession(struct UDPOutputState_t *state, bool rtp, unsigned char ttl)
+static void CreateSAPSession(struct UDPOutputState_t *state, bool rtp, unsigned char ttl, char *sessionName)
 {
     char sdp[1000] = {0};
     char hostname[256];
@@ -459,7 +484,7 @@ static void CreateSAPSession(struct UDPOutputState_t *state, bool rtp, unsigned 
 
     SDPAdd('v',"0");
     SDPAddf('o',"- %ld 0 IN %s %s", time(NULL), addrtype, ipaddr);
-    SDPAdd('s'," ");
+    SDPAddf('s',"%s", sessionName);
     
     if (state->address.ss_family == AF_INET)
     {
