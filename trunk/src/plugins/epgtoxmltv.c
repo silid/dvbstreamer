@@ -75,6 +75,7 @@ PLUGIN_INTERFACE_C(
 *******************************************************************************/
 static void CommandDump(int argc, char **argv)
 {
+    CommandPrintf("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n");    
     CommandPrintf("<tv generator-info-name=\"DVBStreamer-EPGSchedule\">\n");
     DumpChannels();
     DumpProgrammes();
@@ -89,8 +90,12 @@ static void DumpChannels(void)
         service = ServiceGetNext(enumerator);
         if (service)
         {
-            CommandPrintf("<channel id=\"%s\">\n", service->name);
-            CommandPrintf("<display-name>%s</display-name>\n", service->name);
+            CommandPrintf("<channel id=\"");
+            PrintXmlified(service->name);
+            CommandPrintf("\">\n");
+            CommandPrintf("<display-name>");
+            PrintXmlified(service->name);
+            CommandPrintf("</display-name>\n", service->name);
             CommandPrintf("</channel>\n");
             ServiceRefDec(service);
         }
@@ -231,6 +236,7 @@ static void PrintXmlified(char *text)
     char temp[10];
     int bufferIndex = 0;
     int i;
+    int utf8CharLen;
     int len = strlen(text);
 
     buffer[0] = 0;
@@ -261,7 +267,8 @@ static void PrintXmlified(char *text)
             case 0x007F:
                 fprintf(stderr, "Illegal char %04x\n", i);
             default:
-                UTF8_wc_toutf8(temp, ch);
+                utf8CharLen = UTF8_wc_toutf8(temp, ch);
+                temp[utf8CharLen] = 0;
                 break;
         } // switch
         if (strlen(temp) + bufferIndex > sizeof(buffer))
