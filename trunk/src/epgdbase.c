@@ -144,6 +144,14 @@ int EPGDBaseInit(int adapter)
             return rc;
         }
 
+        rc = sqlite3_exec(EPGDBaseConnection, "CREATE INDEX IF NOT EXISTS EPGDetails_eventuid_name_index ON "
+                         EPGDETAILS_TABLE" ( " EPGDETAIL_EVENTUID "," EPGDETAIL_NAME ");", 
+                         NULL, NULL, NULL);
+        if (rc)
+        {
+            LogModule(LOG_ERROR, EPGDBASE, "Failed to create EPG details index: %s\n", sqlite3_errmsg(EPGDBaseConnection));
+            return rc;
+        }
         pthread_create(&ReaperThread, NULL, ReaperProcess, NULL);
         
     }
@@ -571,7 +579,7 @@ static void *ReaperProcess(void *arg)
     {
         LogModule(LOG_INFO, EPGDBASE, "Purging old events!\n");
         PurgeOldEvents();
- 		LogModule(LOG_INFO, EPGDBASE, "Events purged.\n");
+        LogModule(LOG_INFO, EPGDBASE, "Events purged.\n");
         if (!ReaperExit)
         {
             clock_gettime( CLOCK_REALTIME, &timeout);
