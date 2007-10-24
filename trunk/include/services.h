@@ -207,7 +207,17 @@ Service_t *ServiceFindId(Multiplex_t *multiplex, int id);
  * @return A service structure or NULL if the service was not found.
  */
 Service_t *ServiceFindFQID(uint16_t networkId, uint16_t tsId, uint16_t serviceId);
-    
+
+/**
+ * Find the service based on the fully qualified ID string.
+ * A fully qualified ID string is in the form "<netId>.<tsId>.<serviceId>", 
+ * where all the IDs are 16bit hex numbers.
+ * The returned service should be released with ServiceRefDec.
+ * @param FQIdStr String to extract the network, ts and service IDs from.
+ * @return A service structure or NULL if the service was not found.
+ */
+Service_t *ServiceFindFQIDStr(char *FQIdStr);
+
 /**
  * Rerieve an enumerator for the entire service table.
  * @return A service enumerator or NULL if there is not enough memory.

@@ -22,6 +22,8 @@ Manage services and PIDs.
 */
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+
 #include "dbase.h"
 #include "multiplexes.h"
 #include "services.h"
@@ -329,6 +331,20 @@ Service_t *ServiceFindFQID(uint16_t networkId, uint16_t tsId, uint16_t serviceId
     {
         service = ServiceFindId(multiplex, serviceId);
         MultiplexRefDec(multiplex);
+    }
+    return service;
+}
+
+Service_t *ServiceFindFQIDStr(char *FQIdStr)
+{
+    uint16_t networkId = 0;
+    uint16_t tsId = 0;
+    uint16_t serviceId = 0;
+    Service_t *service = NULL;
+    
+    if (sscanf(FQIdStr, "%hx.%hx.%hx", &networkId, &tsId, &serviceId) == 3)
+    {
+        service = ServiceFindFQID(networkId, tsId, serviceId);
     }
     return service;
 }
