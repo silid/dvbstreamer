@@ -87,6 +87,7 @@ PIDFilter_t *PATProcessorCreate(TSFilter_t *tsfilter)
             free(state);
         }
         result->name = "PAT";
+        result->type = PSISIPIDFilterType;
         if (tsfilter->adapter->hardwareRestricted)
         {
             DVBDemuxAllocateFilter(tsfilter->adapter, 0, TRUE);

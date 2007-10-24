@@ -97,6 +97,7 @@ PIDFilter_t *PMTProcessorCreate(TSFilter_t *tsfilter)
             ObjectRefDec(state);
         }
         result->name = "PMT";
+        result->type = PSISIPIDFilterType;
         PIDFilterTSStructureChangeSet(result, PMTProcessorTSStructureChanged, state);
         PIDFilterMultiplexChangeSet(result, PMTProcessorMultiplexChanged, state);
     }

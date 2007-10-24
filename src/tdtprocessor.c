@@ -110,6 +110,7 @@ PIDFilter_t *TDTProcessorCreate(TSFilter_t *tsfilter)
             ObjectRefDec(state);
         }
         result->name = "TDT/TOT";
+        result->type = PSISIPIDFilterType;
         PIDFilterMultiplexChangeSet(result,TDTProcessorMultiplexChanged, state);
         if (tsfilter->adapter->hardwareRestricted)
         {
