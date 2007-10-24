@@ -58,6 +58,21 @@ int CacheLoad(Multiplex_t *multiplex);
 void CacheWriteback();
 
 /**
+ * Retrieve the Multiplex that the cache is currently managing the services of.
+ * @return A Multiplex_t instance or NULL if the cache has not be loaded.
+ */
+Multiplex_t *CacheMultiplexGet(void);
+
+/**
+ * Find a service in the cache by either name or fully qualified id (i.e. 
+ * <network id>.<ts id>.<service id> where ids are in hex).
+ *
+ * @param name Name of the service or fully qualified id 
+ * @return A Service_t instance or NULL if not found.
+ */
+Service_t *CacheServiceFind(char *name);
+
+/**
  * Find a service in the cache with the specified id.
  * @param id The service/program id to search for.
  * @return A Service_t instance or NULL if not found.
@@ -65,15 +80,11 @@ void CacheWriteback();
 Service_t *CacheServiceFindId(int id);
 
 /**
- * Find a service with a given name, first searching in the cache and then in
- * the database.
+ * Find a service with a given name in the cache.
  * @param name Name of the service to look for.
- * @param multiplex Used to store the multiplex the service belongs to.
- * @return A Service_t instance, that if multiplex == CurrentMultiplex is in the
- * cache or is from the database and should be free'd. If NULL is returned the
- * service could not be found in the database or the cache.
+ * @return A Service_t instance or NULL if not found in the cache.
  */
-Service_t *CacheServiceFindName(char *name, Multiplex_t **multiplex);
+Service_t *CacheServiceFindName(char *name);
 
 /**
  * Retrieve all the services currently in the cache and locks the cache to

@@ -606,10 +606,15 @@ static void CommandSelect(int argc, char **argv)
 
     CommandCheckAuthenticated();
 
-    service = TuningCurrentServiceSet(argv[0]);
+    UpdateDatabase();
+    service = ServiceFind(argv[0]);
+    
     if (service)
     {
-        Multiplex_t *multiplex = TuningCurrentMultiplexGet();
+        Multiplex_t *multiplex;
+        TuningCurrentServiceSet(service);
+        
+        multiplex = TuningCurrentMultiplexGet();
         
         CommandPrintf("Current Service : \"%s\" (0x%04x) Multiplex: %d\n",
             service->name, service->id, multiplex->freq);

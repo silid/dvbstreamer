@@ -290,6 +290,16 @@ int ServiceTypeSet(Service_t  *service, ServiceType type)
     return rc;
 }
 
+Service_t *ServiceFind(char *name)
+{
+    Service_t *result = ServiceFindName( name);
+    if (!result)
+    {
+        result = ServiceFindFQIDStr(name);
+    }
+    return result;
+}
+
 Service_t *ServiceFindName(char *name)
 {
     STATEMENT_INIT;

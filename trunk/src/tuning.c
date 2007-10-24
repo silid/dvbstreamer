@@ -88,50 +88,42 @@ Service_t *TuningCurrentServiceGet(void)
     return CurrentService;
 }
 
-/*
- * Find the service named <name> and tune to the new frequency for the multiplex the service is
- * on (if required) and then select the new service id to filter packets for.
- */
-Service_t *TuningCurrentServiceSet(char *name)
+void TuningCurrentServiceSet(Service_t *service)
 {
     Multiplex_t *multiplex;
-    Service_t *service;
     TSFilter_t *tsFilter = MainTSFilterGet();
     PIDFilter_t *primaryServiceFilter;
 
-    TSFilterLock(tsFilter);
-    LogModule(LOG_DEBUG, TUNING, "Writing changes back to database.\n");
-    CacheWriteback();
-    TSFilterUnLock(tsFilter);
-
-    service = CacheServiceFindName(name, &multiplex);
     if (!service)
     {
-        return NULL;
+        return;
     }
 
-    LogModule(LOG_DEBUG, TUNING, "Service found id:0x%04x Multiplex:%d\n", service->id, service->multiplexUID);
     if ((CurrentService == NULL) || (!ServiceAreEqual(service,CurrentService)))
     {
         LogModule(LOG_DEBUGV, TUNING, "Disabling filters\n");
         TSFilterEnable(tsFilter, FALSE);
 
-        if (CurrentMultiplex)
+        multiplex = MultiplexFind(service->multiplexUID);
+        primaryServiceFilter = TSFilterFindPIDFilter(tsFilter, PrimaryService, ServicePIDFilterType);
+        
+        if ((CurrentMultiplex!= NULL) && MultiplexAreEqual(multiplex, CurrentMultiplex))
         {
-            LogModule(LOG_DEBUG, TUNING, "Current Multiplex frequency = %d TS id = %d\n",CurrentMultiplex->freq, CurrentMultiplex->tsId);
+            LogModule(LOG_DEBUGV, TUNING, "Same multiplex\n");
+            /* Reset primary service filter stats */
+            primaryServiceFilter->packetsFiltered  = 0;
+            primaryServiceFilter->packetsProcessed = 0;
+            primaryServiceFilter->packetsOutput    = 0;            
         }
         else
         {
-            LogModule(LOG_DEBUG, TUNING, "No current Multiplex!\n");
-        }
+            LogModule(LOG_DEBUG, TUNING, "New Multiplex UID = %d (%04x.%04x)\n", multiplex->uid, 
+                multiplex->networkId & 0xffff, multiplex->tsId & 0xffff);
 
-        if (multiplex)
-        {
-            LogModule(LOG_DEBUG, TUNING, "New Multiplex frequency =%d TS id = %d\n",multiplex->freq, multiplex->tsId);
-        }
-        else
-        {
-            LogModule(LOG_DEBUG, TUNING, "No new Multiplex!\n");
+            TuneMultiplex(multiplex);
+            MultiplexRefDec(multiplex);            
+            /* Reset all stats as this is a new TS */
+            TSFilterZeroStats(tsFilter);            
         }
 
         if (CurrentService)
@@ -139,22 +131,8 @@ Service_t *TuningCurrentServiceSet(char *name)
             ServiceRefDec(CurrentService);
         }
 
-        if ((CurrentMultiplex!= NULL) && MultiplexAreEqual(multiplex, CurrentMultiplex))
-        {
-            LogModule(LOG_DEBUGV, TUNING, "Same multiplex\n");
-            CurrentService = service;
-        }
-        else
-        {
-            TuneMultiplex(multiplex);
-            
-            CurrentService = CacheServiceFindId(service->id);
-            ServiceRefDec(service);
-        }
-
-        TSFilterZeroStats(tsFilter);
-
-        primaryServiceFilter = TSFilterFindPIDFilter(tsFilter, PrimaryService, ServicePIDFilterType);
+        CurrentService = CacheServiceFindId(service->id);
+        ServiceRefInc(CurrentService);
         ServiceFilterServiceSet(primaryServiceFilter, CurrentService);
         
 
@@ -167,13 +145,6 @@ Service_t *TuningCurrentServiceSet(char *name)
         LogModule(LOG_DEBUGV, TUNING, "Enabling filters\n");
         TSFilterEnable(tsFilter, TRUE);
     }
-    else
-    {
-        ServiceRefDec(service);
-    }
-    MultiplexRefDec(multiplex);
-
-    return TuningCurrentServiceGet();
 }
 
 Multiplex_t *TuningCurrentMultiplexGet(void)

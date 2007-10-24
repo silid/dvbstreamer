@@ -210,6 +210,7 @@ static void CommandAddSF(int argc, char **argv)
             instance = DeliveryMethodCreate("null://");
         }
         ServiceFilterDeliveryMethodSet(filter, instance);
+        filter->enabled = TRUE;
     }
 }
 

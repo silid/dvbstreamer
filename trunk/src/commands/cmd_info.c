@@ -334,11 +334,14 @@ static void CommandServiceInfo(int argc, char **argv)
     Service_t *service;
     Multiplex_t *multiplex;
 
-    service = CacheServiceFindName(argv[0], &multiplex);
+    UpdateDatabase();
+    
+    service = ServiceFindName(argv[0]);
+
     if (service)
     {
         static const char *serviceType[]= {"Digital TV", "Digital Radio", "Data", "Unknown"};
-            
+        multiplex = MultiplexFind(service->multiplexUID);            
         CommandPrintf("Service ID          : 0x%04x\n", service->id);
         CommandPrintf("Network ID          : 0x%04x\n", multiplex->networkId);
         CommandPrintf("Transport Stream ID : 0x%04x\n", multiplex->tsId);

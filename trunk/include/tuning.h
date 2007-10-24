@@ -65,11 +65,12 @@ void TuningChannelChangedUnRegisterCallback(PluginChannelChanged_t callback);
 Service_t *TuningCurrentServiceGet(void);
 /** 
  * Set the current (primary) service to the one specified.
- * @param name Name of the service to select.
- * @return The current service or NULL if no service is selected. Service should
- * be released with a call to ServiceRefDec when no longer needed.
+ * Note: Make sure you have called UpdateDatabase() prior to calling this function
+ * otherwise any changes to the multiplex/services will be lost.
+ *
+ * @param service The new service to tune to.
  */
-Service_t *TuningCurrentServiceSet(char *name);
+void TuningCurrentServiceSet(Service_t *service);
 
 /**
  * Retrieve the multiplex the frontend is currently tuned to.

@@ -312,13 +312,13 @@ int main(int argc, char *argv[])
         exit(1);
     }
     primaryServiceFilter->name = (char *)PrimaryService;
-    primaryServiceFilter->enabled = TRUE;
     dmInstance = DeliveryMethodCreate(primaryMRL);
     if (dmInstance == NULL)
     {
         dmInstance = DeliveryMethodCreate("null://");
     }
     ServiceFilterDeliveryMethodSet(primaryServiceFilter, dmInstance);
+    primaryServiceFilter->enabled = TRUE;
     
     if (DaemonMode || remoteInterface)
     {
