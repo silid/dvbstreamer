@@ -31,12 +31,10 @@ dvbstreamer_SOURCES = \
     cache.c\
     logging.c\
     commands.c\
-    commands/cmd_pids.c\
     commands/cmd_servicefilter.c\
     commands/cmd_info.c\
     commands/cmd_scanning.c\
     remoteintf.c\
-    outputs.c\
     list.c\
     deliverymethod.c\
     pluginmgr.c \
@@ -57,8 +55,9 @@ plugin_src = \
     plugins/epgtoxmltv.c \
     plugins/udp.c \
     plugins/udpoutput.c \
-    plugins/sap.c
-
+    plugins/sap.c \
+    plugins/manualfilters.c
+    
 if ENABLE_ATSC
 atsc_plugin_src=plugins/atsctoepg.c
 else #ENABLE_ATSC

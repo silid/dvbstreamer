@@ -26,7 +26,7 @@ Control tuning of the dvb adapter.
 #include "logging.h"
 #include "dvb.h"
 #include "ts.h"
-#include "outputs.h"
+#include "servicefilter.h"
 
 /*******************************************************************************
 * Prototypes                                                                   *
@@ -94,10 +94,10 @@ Service_t *TuningCurrentServiceGet(void)
  */
 Service_t *TuningCurrentServiceSet(char *name)
 {
-    Output_t *primaryServiceOutput;
     Multiplex_t *multiplex;
     Service_t *service;
     TSFilter_t *tsFilter = MainTSFilterGet();
+    PIDFilter_t *primaryServiceFilter;
 
     TSFilterLock(tsFilter);
     LogModule(LOG_DEBUG, TUNING, "Writing changes back to database.\n");
@@ -154,8 +154,9 @@ Service_t *TuningCurrentServiceSet(char *name)
 
         TSFilterZeroStats(tsFilter);
 
-        primaryServiceOutput = OutputFind(PrimaryService, OutputType_Service);
-        OutputSetService(primaryServiceOutput, (Service_t*)CurrentService);
+        primaryServiceFilter = TSFilterFindPIDFilter(tsFilter, PrimaryService, ServicePIDFilterType);
+        ServiceFilterServiceSet(primaryServiceFilter, CurrentService);
+        
 
         /*
          * Inform any interested parties that we have now changed the current
@@ -183,9 +184,9 @@ Multiplex_t *TuningCurrentMultiplexGet(void)
 
 void TuningCurrentMultiplexSet(Multiplex_t *multiplex)
 {
-    Output_t *primaryServiceOutput;
     TSFilter_t *tsFilter = MainTSFilterGet();
-    
+    PIDFilter_t *primaryServiceFilter;
+        
     TSFilterLock(tsFilter);
     LogModule(LOG_DEBUG, TUNING, "Writing changes back to database.\n");
     CacheWriteback();
@@ -194,8 +195,8 @@ void TuningCurrentMultiplexSet(Multiplex_t *multiplex)
     LogModule(LOG_DEBUGV, TUNING, "Disabling filters\n");
     TSFilterEnable(tsFilter, FALSE);
     
-    primaryServiceOutput = OutputFind(PrimaryService, OutputType_Service);
-    OutputSetService(primaryServiceOutput, NULL);
+    primaryServiceFilter = TSFilterFindPIDFilter(tsFilter, PrimaryService, ServicePIDFilterType);
+    ServiceFilterServiceSet(primaryServiceFilter, NULL);
 
     TuneMultiplex(multiplex);
 

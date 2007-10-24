@@ -27,10 +27,6 @@ Delivery Method management functions.
 #include "list.h"
 #include "deliverymethod.h"
 
-/*******************************************************************************
-* Prototypes                                                                   *
-*******************************************************************************/
-static void DeliveryMethodOutputPacket(PIDFilter_t *pidfilter, void *userarg, TSPacket_t* packet);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -68,39 +64,28 @@ void DeliveryMethodManagerUnRegister(DeliveryMethodHandler_t *handler)
 
 bool DeliveryMethodManagerFind(char *mrl, PIDFilter_t *filter)
 {
-    ListIterator_t iterator;
-    for ( ListIterator_Init(iterator, DeliveryMethodsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    DeliveryMethodInstance_t *instance = DeliveryMethodCreate(mrl);
+
+    if (instance)
     {
-        DeliveryMethodHandler_t *handler = ListIterator_Current(iterator);
-        if (handler->CanHandle(mrl))
+        if (filter->enabled)
         {
-            DeliveryMethodInstance_t *instance = handler->CreateInstance(mrl);
-            if (instance)
-            {
-                if (filter->enabled)
-                {
-                    TSFilterLock(filter->tsFilter);
-                }
-                if (filter->outputPacket)
-                {
-                    DeliveryMethodManagerFree(filter);
-                }
-                filter->outputPacket = DeliveryMethodOutputPacket;
-                filter->opArg = instance;
-                if (instance->mrl == NULL)
-                {
-                    instance->mrl = strdup(mrl);
-                }
-                LogModule(LOG_DEBUG, DELIVERYMETHOD, "Created DeliveryMethodInstance(%p) for %s\n",instance, instance->mrl);
-                if (filter->enabled)
-                {
-                    TSFilterUnLock(filter->tsFilter);
-                }
-                return TRUE;
-            }
+            TSFilterLock(filter->tsFilter);
+        }
+        if (filter->outputPacket)
+        {
+            DeliveryMethodManagerFree(filter);
+        }
+        filter->outputPacket = DeliveryMethodOutputPacket;
+        filter->opArg = instance;
+        LogModule(LOG_DEBUG, DELIVERYMETHOD, "Created DeliveryMethodInstance(%p) for %s\n",instance, instance->mrl);
+        if (filter->enabled)
+        {
+            TSFilterUnLock(filter->tsFilter);
         }
     }
-    return FALSE;
+
+    return instance != NULL;
 }
 
 void DeliveryMethodManagerFree(PIDFilter_t *filter)
@@ -108,13 +93,44 @@ void DeliveryMethodManagerFree(PIDFilter_t *filter)
     DeliveryMethodInstance_t *instance = filter->opArg;
     if (instance)
     {
-        char *mrl = instance->mrl;
-        instance->DestroyInstance(instance);
-        filter->opArg = NULL;
-        LogModule(LOG_DEBUG, DELIVERYMETHOD, "Released DeliveryMethodInstance(%p) for %s\n" ,instance, mrl);
-        free(mrl);
+        DeliveryMethodDestroy(instance);
     }
 }
+
+DeliveryMethodInstance_t *DeliveryMethodCreate(char *mrl)
+{
+    ListIterator_t iterator;
+    DeliveryMethodInstance_t *instance = NULL;
+    
+    for ( ListIterator_Init(iterator, DeliveryMethodsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    {
+        DeliveryMethodHandler_t *handler = ListIterator_Current(iterator);
+        if (handler->CanHandle(mrl))
+        {
+            instance = handler->CreateInstance(mrl);
+            if (instance)
+            {
+                if (instance->mrl == NULL)
+                {
+                    instance->mrl = strdup(mrl);
+                }
+                LogModule(LOG_DEBUG, DELIVERYMETHOD, "Created DeliveryMethodInstance(%p) for %s\n",instance, instance->mrl);
+                break;
+            }
+        }
+    }
+    return instance;
+}
+
+void DeliveryMethodDestroy(DeliveryMethodInstance_t *instance)
+{
+    char *mrl = instance->mrl;
+    instance->DestroyInstance(instance);
+    LogModule(LOG_DEBUG, DELIVERYMETHOD, "Released DeliveryMethodInstance(%p) for %s\n" ,instance, mrl);
+    free(mrl);
+}
+
+
 
 char* DeliveryMethodGetMRL(PIDFilter_t *filter)
 {
@@ -122,10 +138,7 @@ char* DeliveryMethodGetMRL(PIDFilter_t *filter)
     return instance->mrl;
 }
 
-/*******************************************************************************
-* Local Functions                                                              *
-*******************************************************************************/
-static void DeliveryMethodOutputPacket(PIDFilter_t *pidfilter, void *userarg, TSPacket_t* packet)
+void DeliveryMethodOutputPacket(PIDFilter_t *pidfilter, void *userarg, TSPacket_t* packet)
 {
     DeliveryMethodInstance_t *instance = userarg;
     if (instance)

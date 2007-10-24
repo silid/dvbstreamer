@@ -41,7 +41,6 @@ Command Processing and command functions.
 #include "ts.h"
 #include "logging.h"
 #include "cache.h"
-#include "outputs.h"
 #include "main.h"
 #include "deliverymethod.h"
 #include "plugin.h"
@@ -63,9 +62,6 @@ Command Processing and command functions.
 * Prototypes                                                                   *
 *******************************************************************************/
 /* External Command Prototypes. */
-void CommandInstallPids(void);
-void CommandUnInstallPids(void);
-
 void CommandInstallInfo(void);
 void CommandUnInstallInfo(void);
 
@@ -184,7 +180,6 @@ int CommandInit(void)
     
     ListAdd( CommandsList, coreCommands);
 
-    CommandInstallPids();
     CommandInstallServiceFilter();
     CommandInstallInfo();    
     CommandInstallScanning();
@@ -194,7 +189,6 @@ int CommandInit(void)
 
 void CommandDeInit(void)
 {
-    CommandUnInstallPids();
     CommandUnInstallServiceFilter();
     CommandUnInstallInfo();    
     CommandUnInstallScanning();
@@ -615,9 +609,12 @@ static void CommandSelect(int argc, char **argv)
     service = TuningCurrentServiceSet(argv[0]);
     if (service)
     {
-        CommandPrintf("Name      = %s\n", service->name);
-        CommandPrintf("ID        = %04x\n", service->id);
+        Multiplex_t *multiplex = TuningCurrentMultiplexGet();
+        
+        CommandPrintf("Current Service : \"%s\" (0x%04x) Multiplex: %d\n",
+            service->name, service->id, multiplex->freq);
         ServiceRefDec(service);
+        MultiplexRefDec(multiplex);
     }
     else
     {

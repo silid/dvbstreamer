@@ -41,7 +41,6 @@ Command functions to supply the user with information about the system.
 #include "ts.h"
 #include "logging.h"
 #include "cache.h"
-#include "outputs.h"
 #include "main.h"
 #include "deliverymethod.h"
 #include "plugin.h"
@@ -53,6 +52,7 @@ Command functions to supply the user with information about the system.
 *******************************************************************************/
 static void CommandListServices(int argc, char **argv);
 static void CommandListMuxes(int argc, char **argv);
+static void CommandListPids(int argc, char **argv);
 static void CommandCurrent(int argc, char **argv);
 static void CommandServiceInfo(int argc, char **argv);
 static void CommandMuxInfo(int argc, char **argv);
@@ -69,21 +69,29 @@ Command_t CommandDetailsInfo[] =
 {
     {
         "lsservices",
-        TRUE, 0, 1,
+        TRUE, 0, 3,
         "List all services or for a specific multiplex.",
-        "lsservies [mux | <multiplex frequency>]\n"
+        "lsservies [mux | <multiplex uid>]\n"
         "Lists all the services currently in the database if no multiplex is specified or"
         "if \"mux\" is specified only the services available of the current mux or if a"
-        " frequency is specified only the services available on that multiplex.",
+        " uid is specified only the services available on that multiplex.",
         CommandListServices
     },
     {
         "lsmuxes",
-        FALSE, 0, 0,
+        TRUE, 0, 1,
         "List multiplexes.",
-        "List all multiplexes.",
+        "List all available multiplex UIDs.",
         CommandListMuxes
     },
+    {
+        "lspids",
+        FALSE, 1, 1,
+        "List the PIDs for a specified service.",
+        "lspids <service name>\n"
+        "List all the PIDs specified in <service name> PMT.",
+        CommandListPids
+    },    
     {
         "current",
         FALSE, 0, 0,
@@ -103,7 +111,8 @@ Command_t CommandDetailsInfo[] =
         "muxinfo",
         TRUE, 1, 2,
         "Display information about a mux.",
-        "muxinfo <frequency> or\n"
+        "muxinfo <uid> or\n"
+        "muxinfo <netid>.<tsid>\n"
         "muxinfo <net id> <ts id>\n"
         "Displays information about the specified service.",
         CommandMuxInfo
@@ -193,16 +202,24 @@ static void CommandListServices(int argc, char **argv)
 {
     ServiceEnumerator_t enumerator = NULL;
     Service_t *service;
-
+    Multiplex_t *multiplex = NULL;
+    int i;
+    bool dvbIds = FALSE;
     /* Make sure the database is up-to-date before displaying the names */
     UpdateDatabase();
 
-    if (argc == 1)
+    for (i = 0; i < argc; i ++)
     {
-        char *mux = argv[0];
-        Multiplex_t *multiplex = NULL;
-        if (strcmp(mux, "mux") == 0)
+        if (strcmp(argv[i], "-id") == 0)
         {
+            dvbIds = TRUE;
+        }
+        else if (strcmp(argv[i], "mux") == 0)
+        {
+            if (multiplex)
+            {
+                MultiplexRefDec(multiplex);
+            }
             multiplex = TuningCurrentMultiplexGet();
             if (!multiplex)
             {
@@ -212,19 +229,27 @@ static void CommandListServices(int argc, char **argv)
         }
         else
         {
-            int freq = atoi(mux);
-            multiplex = MultiplexFindFrequency(freq);
-        }
-        if (multiplex)
-        {
-            enumerator = ServiceEnumeratorForMultiplex(multiplex);
-        }
-        if (enumerator == NULL)
-        {
-            CommandPrintf("Failed to find multiplex \"%s\"\n", mux);
-            return;
+            int uid = atoi(argv[i]);
+            if (multiplex)
+            {
+                MultiplexRefDec(multiplex);
+            }
+            multiplex = MultiplexFind(uid);
+            if (!multiplex)
+            {
+                CommandPrintf("Failed to find multiplex \"%s\"\n", argv[i]);
+                return;                    
+            }
+            
         }
     }
+
+
+    if (multiplex)
+    {
+        enumerator = ServiceEnumeratorForMultiplex(multiplex);
+        MultiplexRefDec(multiplex);
+    }    
     else
     {
         enumerator = ServiceEnumeratorGet();
@@ -237,7 +262,18 @@ static void CommandListServices(int argc, char **argv)
             service = ServiceGetNext(enumerator);
             if (service)
             {
-                CommandPrintf("%s\n", service->name);
+                if (dvbIds)
+                {
+                    multiplex = MultiplexFind(service->multiplexUID);
+                    CommandPrintf("%04x.%04x.%04x : %s\n", 
+                        multiplex->networkId & 0xffff, multiplex->tsId & 0xffff,
+                        service->id, service->name);
+                    MultiplexRefDec(multiplex);
+                }
+                else
+                {
+                    CommandPrintf("%s\n", service->name);
+                }
                 ServiceRefDec(service);
             }
         }
@@ -250,12 +286,25 @@ static void CommandListMuxes(int argc, char **argv)
 {
     MultiplexEnumerator_t enumerator = MultiplexEnumeratorGet();
     Multiplex_t *multiplex;
+    bool ids = FALSE;
+    if ((argc == 1) && (strcmp(argv[0], "-id") == 0))
+    {
+        ids = TRUE;
+    }
     do
     {
         multiplex = MultiplexGetNext(enumerator);
         if (multiplex)
         {
-            CommandPrintf("%d\n", multiplex->freq);
+            if (ids)
+            {
+                CommandPrintf("%04x.%04x : %d \n", 
+                    multiplex->networkId & 0xffff, multiplex->tsId & 0xffff, multiplex->uid);
+            }
+            else
+            {
+                CommandPrintf("%d\n", multiplex->uid);
+            }
             MultiplexRefDec(multiplex);
         }
     }while(multiplex && ! ExitProgram);
@@ -269,8 +318,9 @@ static void CommandCurrent(int argc, char **argv)
     {
         Multiplex_t *multiplex = TuningCurrentMultiplexGet();
         
-        CommandPrintf("Current Service : \"%s\" (0x%04x) Multiplex: %d\n",
-            service->name, service->id, multiplex->freq);
+        CommandPrintf("%04x.%04x.%04x : \"%s\"\n",
+            multiplex->networkId & 0xffff, multiplex->tsId & 0xffff, service->id & 0xffff,
+            service->name);
         ServiceRefDec(service);
         MultiplexRefDec(multiplex);
     }
@@ -292,6 +342,7 @@ static void CommandServiceInfo(int argc, char **argv)
         CommandPrintf("Service ID          : 0x%04x\n", service->id);
         CommandPrintf("Network ID          : 0x%04x\n", multiplex->networkId);
         CommandPrintf("Transport Stream ID : 0x%04x\n", multiplex->tsId);
+        CommandPrintf("Multiplex UID       : %d\n", service->multiplexUID);
         CommandPrintf("Source              : 0x%04x\n", service->source);
         CommandPrintf("Conditional Access? : %s\n", service->conditionalAccess ? "CA":"Free to Air");
         CommandPrintf("Type                : %s\n", serviceType[service->type]);
@@ -311,8 +362,17 @@ static void CommandMuxInfo(int argc, char **argv)
     Multiplex_t *multiplex = NULL;
     if (argc == 1)
     {
-        int freq = atoi(argv[0]);
-        multiplex = MultiplexFindFrequency(freq);
+        int uid = atoi(argv[0]);
+        multiplex = MultiplexFind(uid);
+        if (multiplex == NULL)
+        {
+            int netId = 0;
+            int tsId = 0;
+            if (sscanf(argv[0], "%x.%x", &netId, &tsId) == 2)
+            {
+                multiplex = MultiplexFindId(netId, tsId);
+            }
+        }
     }
     if (argc == 2)
     {
@@ -324,10 +384,10 @@ static void CommandMuxInfo(int argc, char **argv)
     }
     if (multiplex)
     {
+        CommandPrintf("UID                 : %d\n", multiplex->uid);
         CommandPrintf("Network ID          : 0x%04x\n", multiplex->networkId);
         CommandPrintf("Transport Stream ID : 0x%04x\n", multiplex->tsId);
         CommandPrintf("PAT Version         : %d\n", multiplex->patVersion);
-        CommandPrintf("Internal UID        : 0x%08x\n", multiplex->uid);
         CommandPrintf("Tuning Parameters\n");
         CommandPrintf("    Frequency       : %d\n", multiplex->freq);
         CommandPrintf("    Type            : %s\n", FETypesStr[multiplex->type]);
@@ -345,7 +405,7 @@ static void CommandStats(int argc, char **argv)
 {
     ListIterator_t iterator;
     TSFilter_t *tsFilter = MainTSFilterGet();
-    
+
     CommandPrintf("PSI/SI Processor Statistics\n"
                   "---------------------------\n");
 
@@ -354,32 +414,39 @@ static void CommandStats(int argc, char **argv)
           ListIterator_Next(iterator))
     {
         PIDFilter_t *filter = (PIDFilter_t *)ListIterator_Current(iterator);
-        if (filter->outputPacket == NULL)
+        if (strcmp(filter->type, PSISIPIDFilterType) == 0)
         {
-            CommandPrintf("\t%-15s : %d\n", filter->name, filter->packetsProcessed);
+            CommandPrintf("\t%-15s : %lld\n", filter->name, filter->packetsProcessed);
         }
     }
     CommandPrintf("\n");
 
     CommandPrintf("Service Filter Statistics\n"
                   "-------------------------\n");
-    for ( ListIterator_Init(iterator, ServiceOutputsList); 
+    for ( ListIterator_Init(iterator, tsFilter->pidFilters); 
           ListIterator_MoreEntries(iterator); 
           ListIterator_Next(iterator))
     {
-        Output_t *output = ListIterator_Current(iterator);
-        CommandPrintf("\t%-15s : %lld\n", output->name, output->filter->packetsOutput);
+        PIDFilter_t *filter = (PIDFilter_t *)ListIterator_Current(iterator);
+        if (strcmp(filter->type, ServicePIDFilterType) == 0)
+        {
+            CommandPrintf("\t%-15s : %lld\n", filter->name, filter->packetsProcessed);
+        }
     }
     CommandPrintf("\n");
 
-    CommandPrintf("Manual Output Statistics\n"
+    CommandPrintf("Other Filter Statistics\n"
                   "------------------------\n");
-     for ( ListIterator_Init(iterator, ManualOutputsList); 
+     for ( ListIterator_Init(iterator, tsFilter->pidFilters); 
            ListIterator_MoreEntries(iterator); 
            ListIterator_Next(iterator))
     {
-        Output_t *output = ListIterator_Current(iterator);
-        CommandPrintf("\t%-15s : %lld\n", output->name, output->filter->packetsOutput);
+        PIDFilter_t *filter = (PIDFilter_t *)ListIterator_Current(iterator);
+        if ((strcmp(filter->type, PSISIPIDFilterType) != 0) &&
+            (strcmp(filter->type, ServicePIDFilterType) != 0))
+        {
+            CommandPrintf("\t%-15s : %lld (%s)\n", filter->name, filter->packetsProcessed, filter->type);
+        }
     }
     CommandPrintf("\n");
 
@@ -412,6 +479,52 @@ static void CommandFEStatus(int argc, char **argv)
         (strength * 100) / 0xffff, (snr * 100) / 0xffff, ber, ucblocks);
 }
 
+
+static void CommandListPids(int argc, char **argv)
+{
+    Service_t *service;
+
+    service = ServiceFindName(argv[0]);
+    if (service)
+    {
+        bool cached = TRUE;
+        int i;
+        PIDList_t *pids;
+        pids = CachePIDsGet(service);
+        if (pids == NULL)
+        {
+            pids = PIDListGet(service);
+            cached = FALSE;
+        }
+
+        if (pids)
+        {
+            CommandPrintf("%d PIDs for \"%s\"%s\n", pids->count, argv[0], cached ? " (Cached)":"");
+            for (i = 0; i < pids->count; i ++)
+            {
+                CommandPrintf("%d %d %d\n",pids->pids[i].pid, pids->pids[i].type, pids->pids[i].subType);
+            }
+
+            if (cached)
+            {
+                CachePIDsRelease();
+            }
+            else
+            {
+                PIDListFree(pids);
+            }
+        }
+        else
+        {
+            CommandPrintf("0 PIDs for \"%s\"\n",argv[0]);
+        }
+        ServiceRefDec(service);
+    }
+    else
+    {
+        CommandError(COMMAND_ERROR_GENERIC, "Service not found!");
+    }
+}
 /*******************************************************************************
 * Variable Functions                                                           *
 *******************************************************************************/

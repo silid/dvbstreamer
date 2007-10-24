@@ -38,6 +38,7 @@ the output to only include this service.
 #include "main.h"
 #include "cache.h"
 #include "logging.h"
+#include "deliverymethod.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -87,12 +88,14 @@ static void ServiceFilterAllocateFilters(ServiceFilter_t *state, DVBAdapter_t *a
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
+char ServicePIDFilterType[] ="Service";
 static char SERVICEFILTER[] = "ServiceFilter";
+
 
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
-PIDFilter_t *ServiceFilterCreate(TSFilter_t *tsfilter, PacketOutput outputpacket,void *oparg)
+PIDFilter_t *ServiceFilterCreate(TSFilter_t *tsfilter)
 {
     PIDFilter_t *result = NULL;
     ServiceFilter_t *state;
@@ -103,12 +106,13 @@ PIDFilter_t *ServiceFilterCreate(TSFilter_t *tsfilter, PacketOutput outputpacket
         result = PIDFilterSetup(tsfilter,
                     ServiceFilterFilterPacket, state,
                     ServiceFilterProcessPacket, state,
-                    outputpacket, oparg);
+                    NULL, NULL);
         if (result == NULL)
         {
             ObjectRefDec(state);
         }
         PIDFilterMultiplexChangeSet(result, ServiceFilterMultiplexChanged, state);
+        result->type = ServicePIDFilterType;
         pthread_mutex_init(&state->serviceChangeMutex, NULL);
     }
     return result;
@@ -175,6 +179,16 @@ bool ServiceFilterAVSOnlyGet(PIDFilter_t *filter)
     return state->avsOnly;
 }
 
+void ServiceFilterDeliveryMethodSet(PIDFilter_t *filter, DeliveryMethodInstance_t *instance)
+{
+    PIDFilterOutputPacketSet(filter, DeliveryMethodOutputPacket, instance);
+}
+
+DeliveryMethodInstance_t * ServiceFilterDeliveryMethodGet(PIDFilter_t *filter)
+{
+    return filter->opArg;
+}
+
 /*******************************************************************************
 * Local Functions                                                              *
 *******************************************************************************/
@@ -232,7 +246,13 @@ static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t
         {
             return 1;
         }
-
+        
+        /* Handle CAT if service uses encrypted/CA streams */
+        if ((state->service->conditionalAccess) && (pid == 1))
+        {
+            return 1;
+        }
+        
         if (state->avsOnly)
         {
             if ((state->videoPID == pid) || (state->audioPID == pid) || (state->subPID == pid))
@@ -471,3 +491,5 @@ static void ServiceFilterAllocateFilters(ServiceFilter_t *state, DVBAdapter_t *a
         CachePIDsRelease();
     }
 }
+
+

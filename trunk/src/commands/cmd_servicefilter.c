@@ -41,7 +41,6 @@ Command functions for service filter related tasks
 #include "ts.h"
 #include "logging.h"
 #include "cache.h"
-#include "outputs.h"
 #include "main.h"
 #include "deliverymethod.h"
 #include "plugin.h"
@@ -51,17 +50,34 @@ Command functions for service filter related tasks
 #include "pmtprocessor.h"
 #include "sdtprocessor.h"
 #include "psipprocessor.h"
+/*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
+
+#define FIND_SERVICE_FILTER(_name) \
+    filter = TSFilterFindPIDFilter(MainTSFilterGet(), (_name), ServicePIDFilterType); \
+    if (filter == NULL) \
+    {\
+        CommandError(COMMAND_ERROR_GENERIC, "Service filter not found!"); \
+        return; \
+    }
 
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
 
-static void CommandAddSSF(int argc, char **argv);
-static void CommandRemoveSSF(int argc, char **argv);
-static void CommandSSFS(int argc, char **argv);
+static void CommandAddSF(int argc, char **argv);
+static void CommandRemoveSF(int argc, char **argv);
+static void CommandListSF(int argc, char **argv);
+
 static void CommandSetSFAVSOnly(int argc, char **argv);
-static void CommandSetSSF(int argc, char **argv);
+static void CommandGetSFAVSOnly(int argc, char **argv);
+
+static void CommandSetSFService(int argc, char **argv);
+static void CommandGetSFService(int argc, char **argv);
+
 static void CommandSetSFMRL(int argc, char **argv);
+static void CommandGetSFMRL(int argc, char **argv);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -72,52 +88,79 @@ Command_t CommandDetailsServiceFilter[] =
     {
         "addsf",
         TRUE, 2, 2,
-        "Add a service filter for secondary services.",
-        "addsf <output name> <mrl>\n"
+        "Add a service filter.",
+        "addsf <service filter name> <mrl>\n"
         "Adds a new destination for sending a secondary service to.",
-        CommandAddSSF
+        CommandAddSF
     },
     {
         "rmsf",
         TRUE, 1, 1,
-        "Remove a service filter for secondary services.",
-        "rmsf <output name>\n"
+        "Remove a service filter.",
+        "rmsf <service filter name>\n"
         "Remove a destination for sending secondary services to.",
-        CommandRemoveSSF
+        CommandRemoveSF
     },
     {
         "lssfs",
         FALSE,0,0,
-        "List all secondary service filters.",
-        "List all secondary service filters their names, destinations and currently selected service.",
-        CommandSSFS
+        "List all service filters.",
+        "List all service filters their names, destinations and currently selected service.",
+        CommandListSF
     },
     {
         "setsf",
         FALSE, 1, 1,
-        "Select a service to stream to a secondary service output.",
-        "setsf <output name> <service name>\n"
-        "Stream the specified service to the secondary service output.",
-        CommandSetSSF
+        "Set the service to be filtered by a service filter.",
+        "setsf <service filter name> <service name>\n"
+        "Selects the service to be filtered by the service filter.\n"
+        "Cannot be used for the primary service filter (<Primary>), use \'select\' instead",
+        CommandSetSFService
     },
+{
+        "getsf",
+        FALSE, 1, 1,
+        "Get the service to stream to a secondary service output.",
+        "setsf <service filter name> <service name>\n"
+        "Stream the specified service to the secondary service output.",
+        CommandGetSFService
+    },    
     {
         "setsfmrl",
         TRUE, 2, 2,
         "Set the service filter's MRL.",
-        "setsfmrl <output name> <mrl>\n"
+        "setsfmrl <service filter name> <mrl>\n"
         "Change the destination for packets sent to this service filters output."
         "If the MRL cannot be parsed no change will be made to the service filter.",
         CommandSetSFMRL
     },
     {
+        "getsfmrl",
+        TRUE, 2, 2,
+        "Get the service filter's MRL.",
+        "getsfmrl <service filter name>\n"
+        "Retrieve the current MRL for the specified service filter.",
+        CommandGetSFMRL
+    },    
+    {
         "setsfavsonly",
         TRUE, 2, 2,
         "Enable/disable streaming of Audio/Video/Subtitles only.",
-        "setsfavsonly <output name> on|off\n"
+        "setsfavsonly <service filter name> on|off\n"
         "Enabling AVS Only cause the PMT to be rewritten to only include the first "
-        "video stream, normal audio stream and the subtitles stream only.",
+        "video stream, normal audio stream and the subtitles stream only.\n"
+        "(Default: off)",
         CommandSetSFAVSOnly
     },
+    {
+        "getsfavsonly",
+        TRUE, 1, 1,
+        "Get whether Audio/Video/Subtitles only streaming is enabled.",
+        "getsfavsonly <service filter name>\n"
+        "Retrieves whether Audio/Video/Subtitles only streaming is enabled.",
+        CommandGetSFAVSOnly
+    },
+    
     {NULL, FALSE, 0, 0, NULL,NULL}
 };
 /*******************************************************************************
@@ -137,10 +180,12 @@ void CommandUnInstallServiceFilter(void)
 * Local Functions                                                              *
 *******************************************************************************/
 
-static void CommandAddSSF(int argc, char **argv)
+static void CommandAddSF(int argc, char **argv)
 {
-    Output_t *output = NULL;
     DVBAdapter_t *adapter = MainDVBAdapterGet();
+    TSFilter_t *tsFilter = MainTSFilterGet();
+    PIDFilter_t *filter;
+
     if (adapter->hardwareRestricted)
     {
         CommandError(COMMAND_ERROR_GENERIC, "Not supported in hardware restricted mode!");
@@ -148,18 +193,31 @@ static void CommandAddSSF(int argc, char **argv)
     }
     
     CommandCheckAuthenticated();
-
-    output = OutputAllocate(argv[0], OutputType_Service, argv[1]);
-    if (!output)
+    filter = TSFilterFindPIDFilter(tsFilter, argv[0], ServicePIDFilterType);
+    if (filter)
     {
-        CommandError(COMMAND_ERROR_GENERIC, OutputErrorStr);
+        CommandError(COMMAND_ERROR_GENERIC, "Service Filter of that name already exists!");
+    }
+    else
+    {
+        DeliveryMethodInstance_t *instance;
+        filter = ServiceFilterCreate(tsFilter);
+        filter->name = strdup(argv[0]);
+
+        instance = DeliveryMethodCreate(argv[1]);
+        if (!instance)
+        {
+            instance = DeliveryMethodCreate("null://");
+        }
+        ServiceFilterDeliveryMethodSet(filter, instance);
     }
 }
 
-static void CommandRemoveSSF(int argc, char **argv)
+static void CommandRemoveSF(int argc, char **argv)
 {
-    Output_t *output = NULL;
+    PIDFilter_t *filter;
     Service_t *oldService;
+    char *name;
 
     CommandCheckAuthenticated();
 
@@ -169,37 +227,40 @@ static void CommandRemoveSSF(int argc, char **argv)
         return;
     }
 
-    output = OutputFind(argv[0], OutputType_Service);
-    if (output == NULL)
-    {
-        return;
-    }
-    OutputGetService(output, &oldService);
-    OutputFree(output);
+    FIND_SERVICE_FILTER(argv[0]);
+    
+    oldService = ServiceFilterServiceGet(filter);
+    name = filter->name;
+    ServiceFilterDestroy(filter);
     if (oldService)
     {
         ServiceRefDec(oldService);
     }
+    free(name);
 
 }
 
-static void CommandSSFS(int argc, char **argv)
+static void CommandListSF(int argc, char **argv)
 {
+    TSFilter_t *tsFilter = MainTSFilterGet();
     ListIterator_t iterator;
-    for ( ListIterator_Init(iterator, ServiceOutputsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    
+    for ( ListIterator_Init(iterator, tsFilter->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
-        Output_t *output = ListIterator_Current(iterator);
-        Service_t *service;
-        OutputGetService(output, &service);
-        CommandPrintf("%10s : %s (%s)\n",output->name,
-                DeliveryMethodGetMRL(output->filter),
-                service ? service->name:"<NONE>");
+        PIDFilter_t *filter = (PIDFilter_t *)ListIterator_Current(iterator);
+        if (strcmp(filter->type, ServicePIDFilterType) == 0)
+        {
+            Service_t *service = ServiceFilterServiceGet(filter);
+            CommandPrintf("%10s : %s (%s)\n",filter->name,
+                    DeliveryMethodGetMRL(filter),
+                    service ? service->name:"<NONE>");
+        }
     }
 }
 
-static void CommandSetSSF(int argc, char **argv)
+static void CommandSetSFService(int argc, char **argv)
 {
-    Output_t *output = NULL;
+    PIDFilter_t *filter;
     char *outputName = argv[0];
     char *serviceName;
     Service_t *service;
@@ -223,44 +284,57 @@ static void CommandSetSSF(int argc, char **argv)
         return;
     }
 
-    output = OutputFind(outputName, OutputType_Service);
-    if (output == NULL)
-    {
-        CommandError(COMMAND_ERROR_GENERIC,"Failed to find output!");
-        return;
-    }
+    FIND_SERVICE_FILTER(outputName);
 
     service = ServiceFindName(serviceName);
     if (service == NULL)
     {
-        CommandPrintf("Failed to find service %s\n", serviceName);
+        /* Attempt to look up the service using the fully qualified name */
+        service = ServiceFindFQIDStr(serviceName);
+    }
+    
+    if (service == NULL)
+    {
+        CommandError(COMMAND_ERROR_GENERIC,"Service not found!");
         return;
     }
 
-    if (OutputSetService(output, service))
-    {
-        ServiceRefDec(service);
-        CommandError(COMMAND_ERROR_GENERIC,"Failed to find multiplex for service");
-        return;
-    }
+    ServiceFilterServiceSet(filter,service);
 
     ServiceRefDec(service);
 }
 
-static void CommandSetSFMRL(int argc, char **argv)
+static void CommandGetSFService(int argc, char **argv)
 {
-    Output_t *output = NULL;
-
+    PIDFilter_t *filter;
+    Service_t *service;
+    Multiplex_t *multiplex;
     CommandCheckAuthenticated();
 
-    output = OutputFind(argv[0], OutputType_Service);
-    if (output == NULL)
+    FIND_SERVICE_FILTER(argv[0]);
+    service = ServiceFilterServiceGet(filter);
+    multiplex = MultiplexFind(service->multiplexUID);
+    
+    CommandPrintf("%04x.%04x.%04x : \"%s\"\n",
+        multiplex->networkId & 0xffff, multiplex->tsId & 0xffff, service->id & 0xffff,
+        service->name);
+    
+    MultiplexRefDec(multiplex);
+}
+
+static void CommandSetSFMRL(int argc, char **argv)
+{
+    PIDFilter_t *filter;
+    DeliveryMethodInstance_t *instance;
+    CommandCheckAuthenticated();
+
+    FIND_SERVICE_FILTER(argv[0]);
+
+    instance = DeliveryMethodCreate(argv[1]);
+    if (instance)
     {
-        return;
-    }
-    if (DeliveryMethodManagerFind(argv[1], output->filter))
-    {
-        CommandPrintf("MRL set to \"%s\" for %s\n", DeliveryMethodGetMRL(output->filter), argv[0]);
+        ServiceFilterDeliveryMethodSet(filter, instance);
+        CommandPrintf("MRL set to \"%s\" for %s\n", DeliveryMethodGetMRL(filter), argv[0]);
     }
     else
     {
@@ -268,29 +342,47 @@ static void CommandSetSFMRL(int argc, char **argv)
     }
 }
 
-static void CommandSetSFAVSOnly(int argc, char **argv)
+static void CommandGetSFMRL(int argc, char **argv)
 {
-    Output_t *output = NULL;
-
+    PIDFilter_t *filter;
     CommandCheckAuthenticated();
 
-    output = OutputFind(argv[0], OutputType_Service);
-    if (output == NULL)
-    {
-        return;
-    }
+    FIND_SERVICE_FILTER(argv[0]);
+
+    CommandPrintf("%s\n", DeliveryMethodGetMRL(filter));
+}
+
+static void CommandSetSFAVSOnly(int argc, char **argv)
+{
+    PIDFilter_t *filter;
+    CommandCheckAuthenticated();
+
+    FIND_SERVICE_FILTER(argv[0]);
+
     if (strcasecmp(argv[1], "on") == 0)
     {
-        ServiceFilterAVSOnlySet(output->filter, TRUE);
+        ServiceFilterAVSOnlySet(filter, TRUE);
     }
     else if (strcasecmp(argv[1], "off") == 0)
     {
-        ServiceFilterAVSOnlySet(output->filter, FALSE);
+        ServiceFilterAVSOnlySet(filter, FALSE);
     }
     else
     {
-        CommandError(COMMAND_ERROR_WRONG_ARGS,"Need to specify on or off.\n");
+        CommandError(COMMAND_ERROR_WRONG_ARGS, "Need to specify on or off.\n");
     }
 }
 
+static void CommandGetSFAVSOnly(int argc, char **argv)
+{
+    PIDFilter_t *filter;
+    bool avsOnly;
+    CommandCheckAuthenticated();
+
+    FIND_SERVICE_FILTER(argv[0]);
+
+    avsOnly = ServiceFilterAVSOnlyGet(filter);
+
+    CommandPrintf("%s : A/V/S Only = %s", avsOnly ? "On":"Off");
+}
 
