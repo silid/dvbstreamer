@@ -24,8 +24,11 @@ the output to only include this service.
 #ifndef _SERVICFILTER_H
 #define _SERVICFILTER_H
 #include "ts.h"
+#include "deliverymethod.h"
 
-PIDFilter_t *ServiceFilterCreate(TSFilter_t *tsfilter, PacketOutput outputpacket,void *oparg);
+extern char ServicePIDFilterType[];
+
+PIDFilter_t *ServiceFilterCreate(TSFilter_t *tsfilter);
 void ServiceFilterDestroy(PIDFilter_t *filter);
 
 void ServiceFilterServiceSet(PIDFilter_t *filter, Service_t *service);
@@ -33,4 +36,6 @@ Service_t *ServiceFilterServiceGet(PIDFilter_t *filter);
 
 void ServiceFilterAVSOnlySet(PIDFilter_t *filter, bool enable);
 bool ServiceFilterAVSOnlyGet(PIDFilter_t *filter);
+void ServiceFilterDeliveryMethodSet(PIDFilter_t *filter, DeliveryMethodInstance_t *instance);
+DeliveryMethodInstance_t * ServiceFilterDeliveryMethodGet(PIDFilter_t *filter);
 #endif

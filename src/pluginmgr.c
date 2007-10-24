@@ -127,6 +127,7 @@ extern Plugin_t NowNextPluginInterface;
 extern Plugin_t DVBSchedulePluginInterface;
 #endif
 
+extern Plugin_t ManualFilterPluginInterface;
 extern Plugin_t EPGtoXMLTVPluginInterface;
 extern Plugin_t UDPOutputPluginInterface;
 
@@ -163,7 +164,10 @@ int PluginManagerInit(void)
         entry->pluginInterface = &DVBSchedulePluginInterface;
         ListAdd(PluginsList, entry);        
 #endif
-
+        entry = calloc(1, sizeof(struct PluginEntry_t));
+        entry->pluginInterface = &ManualFilterPluginInterface;
+        ListAdd(PluginsList, entry);                
+        
         entry = calloc(1, sizeof(struct PluginEntry_t));
         entry->pluginInterface = &EPGtoXMLTVPluginInterface;
         ListAdd(PluginsList, entry);                

@@ -135,5 +135,28 @@ void DeliveryMethodManagerFree(PIDFilter_t *filter);
  */
 char* DeliveryMethodGetMRL(PIDFilter_t *filter);
 
+/**
+ * Create a new DeliveryMethodInstance_t that can handle the supplied MRL.
+ * @param mrl The MRL the delivery method should handle.
+ * @return A DeliveryMethodInstance_t if the supplied MRL can be handled or NULL.
+ */
+DeliveryMethodInstance_t *DeliveryMethodCreate(char *mrl);
+
+/**
+ * Destory a DeliveryMethodInstance_t previously created by
+ * DeliveryMethodCreate().
+ * @param instance The instance to free.
+ */
+void DeliveryMethodDestroy(DeliveryMethodInstance_t *instance);
+
+/**
+ * Function to use with a PIDFilter as the PacketOutput function. 
+ * The oparg variable of the PIDFilter structure should be set to a valid 
+ * DeliveryMethodInstance_t.
+ * @param filter The pid filter that is output a packet.
+ * @param userarg Must be a valid DeliveryMethodInstance_t.
+ * @param packet The packet to output.
+ */
+void DeliveryMethodOutputPacket(PIDFilter_t *pidfilter, void *userarg, TSPacket_t* packet);
 /** @} */
 #endif

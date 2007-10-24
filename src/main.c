@@ -57,7 +57,6 @@ Entry point to the application.
 #include "cache.h"
 #include "logging.h"
 #include "commands.h"
-#include "outputs.h"
 #include "remoteintf.h"
 #include "deliverymethod.h"
 #include "pluginmgr.h"
@@ -137,10 +136,11 @@ int main(int argc, char *argv[])
     char *password = "control";
     char *serverName = NULL;
     char *bindAddress = NULL;
-    char *primaryOutput = "null://";
+    char *primaryMRL = "null://";
     bool remoteInterface = FALSE;
     bool hwRestricted = FALSE;
-    Output_t *primaryServiceOutput = NULL;
+    PIDFilter_t *primaryServiceFilter = NULL;
+    DeliveryMethodInstance_t *dmInstance;
     PIDFilter_t *PIDFilters[MAX_PIDFILTERS];
     
     /* Create the data directory */
@@ -165,7 +165,7 @@ int main(int argc, char *argv[])
                 version();
                 exit(0);
                 break;
-                case 'o': primaryOutput = optarg;
+                case 'o': primaryMRL = optarg;
                 break;
                 case 'a': adapterNumber = atoi(optarg);
                 LogModule(LOG_INFOV, MAIN, "Using adapter %d\n", adapterNumber);
@@ -218,7 +218,7 @@ int main(int argc, char *argv[])
         InitDaemon( adapterNumber);
     }
 
-    if (primaryOutput == NULL)
+    if (primaryMRL == NULL)
     {
         LogModule(LOG_ERROR, MAIN, "No output set!\n");
         usage(argv[0]);
@@ -293,7 +293,6 @@ int main(int argc, char *argv[])
     }
     LogModule(LOG_DEBUGV, MAIN, "PID filters started\n");
 
-    INIT(OutputsInit(), "outputs");
     INIT(CommandInit(), "commands");
 
     INIT(TuningInit(), "tuning");
@@ -306,13 +305,21 @@ int main(int argc, char *argv[])
     INIT(PluginManagerInit(), "plugin manager");
 
     /* Create Service filter */
-    primaryServiceOutput = OutputAllocate(PrimaryService, OutputType_Service, primaryOutput);
-    if (!primaryServiceOutput)
+    primaryServiceFilter = ServiceFilterCreate(TSFilter);
+    if (!primaryServiceFilter)
     {
-        LogModule(LOG_ERROR, MAIN, "Failed to create primary service output, reason %s\n", OutputErrorStr);
+        LogModule(LOG_ERROR, MAIN, "Failed to create primary service filter\n");
         exit(1);
     }
-
+    primaryServiceFilter->name = (char *)PrimaryService;
+    primaryServiceFilter->enabled = TRUE;
+    dmInstance = DeliveryMethodCreate(primaryMRL);
+    if (dmInstance == NULL)
+    {
+        dmInstance = DeliveryMethodCreate("null://");
+    }
+    ServiceFilterDeliveryMethodSet(primaryServiceFilter, dmInstance);
+    
     if (DaemonMode || remoteInterface)
     {
         char serverNameBuffer[40];
@@ -368,8 +375,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    DEINIT(OutputsDeInit(), "outputs");
-
     /*
      * Deinit Plugins after outputs so all delivery methods are properly torn
      * down.
@@ -379,6 +384,8 @@ int main(int argc, char *argv[])
     DEINIT(TuningDeInit(), "tuning");
 
     DEINIT(CommandDeInit(), "commands");
+
+    ServiceFilterDestroy(primaryServiceFilter);
 
     /* Disable all the filters */
     for (i = 0; i < MAX_PIDFILTERS; i ++)
@@ -397,7 +404,7 @@ int main(int argc, char *argv[])
 #if defined(ENABLE_DVB)        
         SDTProcessorDestroy( PIDFilters[PIDFILTER_INDEX_SDT]);
         NITProcessorDestroy( PIDFilters[PIDFILTER_INDEX_NIT]);
-        TDTProcessorDestroy( PIDFilters[PIDFILTER_INDEX_TDT]);
+        TDTProcessorDestroy( PIDFilters[PIDFILTER_INDEX_TDT]); 
         DEINIT(SDTProcessorDeInit(), "SDT Processor");
         DEINIT(TDTProcessorDeInit(), "TDT Processor");
         DEINIT(NITProcessorDeInit(), "NIT Processor");        
