@@ -30,6 +30,7 @@ dvbpsi_DATA = \
 	dr_56.h \
 	dr_59.h \
 	dr_62.h \
+	dr_69.h \
 	dr_83.h \
 	dr.h \
 	dvbpsi.h \
@@ -39,7 +40,8 @@ dvbpsi_DATA = \
 	pmt.h \
 	psi.h \
 	sdt.h \
-	tdttot.h
+	tdttot.h \
+	cat.h
 
 dvbpsiatsc_DATA =\
 	atsc/mgt.h \

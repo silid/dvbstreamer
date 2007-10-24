@@ -1,9 +1,9 @@
 /*****************************************************************************
- * dr_04.c
- * (c)2001-2002 VideoLAN
- * $Id: dr_04.c 88 2004-02-24 14:31:18Z sam $
+ * dr_69.c
+ * (c)2007 VideoLAN
+ * $Id: dr_69.c 153 2007-10-12 21:05:05Z jpsaman $
  *
- * Authors: Arnaud de Bossoreille de Ribou <bozo@via.ecp.fr>
+ * Authors: Jiri Pinkava <master_up@post.cz>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -38,21 +38,20 @@
 #include "../dvbpsi_private.h"
 #include "descriptor.h"
 
-#include "dr_04.h"
+#include "dr_69.h"
 
 
 /*****************************************************************************
- * dvbpsi_DecodeHierarchyDr
+ * dvbpsi_DecodePDCDr
  *****************************************************************************/
-dvbpsi_hierarchy_dr_t * dvbpsi_DecodeHierarchyDr(
-                                        dvbpsi_descriptor_t * p_descriptor)
+dvbpsi_PDC_dr_t * dvbpsi_DecodePDCDr(dvbpsi_descriptor_t * p_descriptor)
 {
-  dvbpsi_hierarchy_dr_t * p_decoded;
+  dvbpsi_PDC_dr_t * p_decoded;
 
   /* Check the tag */
-  if(p_descriptor->i_tag != 0x04)
+  if(p_descriptor->i_tag != 0x69)
   {
-    DVBPSI_ERROR_ARG("dr_04 decoder", "bad tag (0x%x)", p_descriptor->i_tag);
+    DVBPSI_ERROR_ARG("dr_69 decoder", "bad tag (0x%x)", p_descriptor->i_tag);
     return NULL;
   }
 
@@ -60,27 +59,28 @@ dvbpsi_hierarchy_dr_t * dvbpsi_DecodeHierarchyDr(
   if(p_descriptor->p_decoded)
     return p_descriptor->p_decoded;
 
+  /* Decode data and check the length */
+  if( p_descriptor->i_length != 3)
+  {
+    DVBPSI_ERROR_ARG("dr_69 decoder", "bad length (%d)",
+                     p_descriptor->i_length);
+    return NULL;
+  }
+
   /* Allocate memory */
-  p_decoded = (dvbpsi_hierarchy_dr_t*)malloc(sizeof(dvbpsi_hierarchy_dr_t));
+  p_decoded = (dvbpsi_PDC_dr_t*)malloc(sizeof(dvbpsi_PDC_dr_t));
   if(!p_decoded)
   {
-    DVBPSI_ERROR("dr_04 decoder", "out of memory");
+    DVBPSI_ERROR("dr_69 decoder", "out of memory");
     return NULL;
   }
 
-  /* Decode data and check the length */
-  if(p_descriptor->i_length != 4)
-  {
-    DVBPSI_ERROR_ARG("dr_04 decoder", "bad length (%d)",
-                     p_descriptor->i_length);
-    free(p_decoded);
-    return NULL;
-  }
-
-  p_decoded->i_h_type = p_descriptor->p_data[0] & 0x0f;
-  p_decoded->i_h_layer_index = p_descriptor->p_data[1] & 0x3f;
-  p_decoded->i_h_embedded_layer = p_descriptor->p_data[2] & 0x3f;
-  p_decoded->i_h_priority = p_descriptor->p_data[3] & 0x3f;
+  p_decoded->i_PDC[0] = ((p_descriptor->p_data[0] & 0x0f) << 1) |
+      (p_descriptor->p_data[1] >> 7);
+  p_decoded->i_PDC[1] = ((p_descriptor->p_data[1] >> 3) & 0x0f);
+  p_decoded->i_PDC[2] = ((p_descriptor->p_data[1] << 2) & 0x1c) | 
+      (p_descriptor->p_data[2] >> 6);
+  p_decoded->i_PDC[3] = p_descriptor->p_data[2] & 0x3f;
 
   p_descriptor->p_decoded = (void*)p_decoded;
 
@@ -89,29 +89,31 @@ dvbpsi_hierarchy_dr_t * dvbpsi_DecodeHierarchyDr(
 
 
 /*****************************************************************************
- * dvbpsi_GenHierarchyDr
+ * dvbpsi_GenPDCDr
  *****************************************************************************/
-dvbpsi_descriptor_t * dvbpsi_GenHierarchyDr(dvbpsi_hierarchy_dr_t * p_decoded,
-                                            int b_duplicate)
+dvbpsi_descriptor_t * dvbpsi_GenPDCDr(dvbpsi_PDC_dr_t * p_decoded,
+                                          int b_duplicate)
 {
   /* Create the descriptor */
-  dvbpsi_descriptor_t * p_descriptor = dvbpsi_NewDescriptor(0x04, 4, NULL);
+  dvbpsi_descriptor_t * p_descriptor =
+                dvbpsi_NewDescriptor(0x69, 3, NULL);
 
   if(p_descriptor)
   {
     /* Encode data */
-    p_descriptor->p_data[0] = 0xf0 | p_decoded->i_h_type;
-    p_descriptor->p_data[1] = 0xc0 | p_decoded->i_h_layer_index;
-    p_descriptor->p_data[2] = 0xc0 | p_decoded->i_h_embedded_layer;
-    p_descriptor->p_data[3] = 0xc0 | p_decoded->i_h_priority;
+    p_descriptor->p_data[0] = 0xf0 | (p_decoded->i_PDC[0] >> 1);
+    p_descriptor->p_data[1] = (p_decoded->i_PDC[0] << 7) | 
+        (p_decoded->i_PDC[1] << 3) | (p_decoded->i_PDC[2] >> 2);
+    p_descriptor->p_data[2] = (p_decoded->i_PDC[2] << 6 ) | 
+        p_decoded->i_PDC[3];
 
     if(b_duplicate)
     {
       /* Duplicate decoded data */
-      dvbpsi_hierarchy_dr_t * p_dup_decoded =
-                (dvbpsi_hierarchy_dr_t*)malloc(sizeof(dvbpsi_hierarchy_dr_t));
+      dvbpsi_PDC_dr_t * p_dup_decoded =
+                (dvbpsi_PDC_dr_t*)malloc(sizeof(dvbpsi_PDC_dr_t));
       if(p_dup_decoded)
-        memcpy(p_dup_decoded, p_decoded, sizeof(dvbpsi_hierarchy_dr_t));
+        memcpy(p_dup_decoded, p_decoded, sizeof(dvbpsi_PDC_dr_t));
 
       p_descriptor->p_decoded = (void*)p_dup_decoded;
     }
