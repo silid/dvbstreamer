@@ -59,13 +59,15 @@ dvb_descriptors_src = \
 	descriptors/dr_55.c \
 	descriptors/dr_56.c \
 	descriptors/dr_59.c \
-	descriptors/dr_62.c
+	descriptors/dr_62.c \
+	descriptors/dr_69.c
 
 atsc_descriptors_src =
 
 mpeg2_tables_src =  \
 	tables/pat.c \
-	tables/pmt.c
+	tables/pmt.c \
+	tables/cat.c
 	
 dvb_tables_src = \
 	tables/eit.c \

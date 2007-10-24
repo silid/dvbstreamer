@@ -1,7 +1,7 @@
 /*****************************************************************************
  * dr.h
  * (c)2001-2002 VideoLAN
- * $Id: dr.h 105 2005-03-23 17:02:48Z fenrir $
+ * $Id: dr.h 157 2007-10-16 18:01:15Z jpsaman $
  *
  * Authors: Arnaud de Bossoreille de Ribou <bozo@via.ecp.fr>
  *
@@ -56,6 +56,7 @@
 #include "dr_56.h"
 #include "dr_59.h"
 #include "dr_62.h"
+#include "dr_69.h"
 #include "dr_83.h"
 
 #endif

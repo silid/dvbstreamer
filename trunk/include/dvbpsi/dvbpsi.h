@@ -1,7 +1,7 @@
 /*****************************************************************************
  * dvbpsi.h
  * (c)2001-2002 VideoLAN
- * $Id: dvbpsi.h 88 2004-02-24 14:31:18Z sam $
+ * $Id: dvbpsi.h 138 2007-01-22 18:03:13Z massiot $
  *
  * Authors: Arnaud de Bossoreille de Ribou <bozo@via.ecp.fr>
  *
@@ -32,6 +32,9 @@
 
 #ifndef _DVBPSI_DVBPSI_H_
 #define _DVBPSI_DVBPSI_H_
+
+#define DVBPSI_VERSION      0.1.6
+#define DVBPSI_VERSION_INT  ((0<<16)+(1<<8)+6)
 
 #ifdef __cplusplus
 extern "C" {
