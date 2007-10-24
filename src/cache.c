@@ -133,6 +133,33 @@ int CacheLoad(Multiplex_t *multiplex)
     return result;
 }
 
+Multiplex_t *CacheMultiplexGet(void)
+{
+     return cachedServicesMultiplex;
+}
+
+Service_t *CacheServiceFind(char *name)
+{
+    Service_t *result = NULL;
+    int netId;
+    int tsId;
+    int serviceId;
+
+    result = CacheServiceFindName(name);
+    if (!result)
+    {
+        if (sscanf(name,"%x.%x.%x", &netId, &tsId, &serviceId) == 3)
+        {
+            if ((cachedServicesMultiplex->networkId == netId) &&
+                (cachedServicesMultiplex->tsId== tsId))
+            {
+                result = CacheServiceFindId(serviceId);
+            }
+        }
+    }
+    return result;
+}
+
 Service_t *CacheServiceFindId(int id)
 {
     Service_t *result = NULL;
@@ -151,7 +178,7 @@ Service_t *CacheServiceFindId(int id)
     return result;
 }
 
-Service_t *CacheServiceFindName(char *name, Multiplex_t **multiplex)
+Service_t *CacheServiceFindName(char *name)
 {
     Service_t *result = NULL;
     int i;
@@ -162,9 +189,7 @@ Service_t *CacheServiceFindName(char *name, Multiplex_t **multiplex)
         if (strcmp(cachedServices[i]->name, name) == 0)
         {
             result = cachedServices[i];
-            ServiceRefInc(result);
-            *multiplex = cachedServicesMultiplex;
-            MultiplexRefInc(*multiplex);
+			ServiceRefInc(result);
             LogModule(LOG_DEBUGV, CACHE, "Found in cached services!\n");
             break;
         }
@@ -173,11 +198,6 @@ Service_t *CacheServiceFindName(char *name, Multiplex_t **multiplex)
     if (result == NULL)
     {
         LogModule(LOG_DEBUGV, CACHE, "Not found in cached services\n");
-        result = ServiceFindName(name);
-        if (result)
-        {
-            *multiplex = MultiplexFind(result->multiplexUID);
-        }
     }
     return result;
 }

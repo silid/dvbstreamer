@@ -187,10 +187,15 @@ void *ObjectCreateImpl(char *classname, char *file, int line)
 void ObjectRefIncImpl(void *ptr, char *file, int line)
 {
     Object_t *object;
+    char *clazzName = "<Malloc>";
     pthread_mutex_lock(&objectMutex);
     object = DataToObject(ptr);
     object->refCount ++;
-    LogModule(LOG_DEBUGV, OBJECT, "(%p) Incrementing ref count, now %d (%s:%d)\n", object, object->refCount, file, line);
+    if (object->clazz)
+    {
+        clazzName = object->clazz->name;
+    }
+    LogModule(LOG_DEBUGV, OBJECT, "(%p:%s) Incrementing ref count, now %d (%s:%d)\n", object, clazzName, object->refCount, file, line);
     pthread_mutex_unlock(&objectMutex);
 }
 
@@ -198,12 +203,20 @@ bool ObjectRefDecImpl(void *ptr, char *file, int line)
 {
     bool result = TRUE;
     Object_t *object;
+    char *clazzName = "<Malloc>";
+    
     pthread_mutex_lock(&objectMutex);
     object = DataToObject(ptr);
+
+    if (object->clazz)
+    {
+        clazzName = object->clazz->name;
+    }
+    
     if (object->refCount > 0)
     {
         object->refCount --;
-        LogModule(LOG_DEBUGV, OBJECT, "(%p) Decrementing ref count, now %d (%s:%d)\n", object, object->refCount, file, line);        
+        LogModule(LOG_DEBUGV, OBJECT, "(%p:%s) Decrementing ref count, now %d (%s:%d)\n", object, clazzName, object->refCount, file, line);        
     }
 
     if (object->refCount == 0)

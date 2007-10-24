@@ -182,6 +182,15 @@ int ServiceConditionalAccessSet(Service_t  *service, bool ca);
 int ServiceTypeSet(Service_t  *service, ServiceType type);
 
 /**
+ * Find a service based either on service name or fully qualified id.
+ * @see ServiceFindName()
+ * @see ServiceFindFQIDStr()
+ * @param name Service name or fully qualified id.
+ * @return A service structure or NULL if the service was not found.
+ */
+Service_t *ServiceFind(char *name);
+
+/**
  * Find the service with the given name.
  * The returned service should be released with ServiceRefDec.
  * @param name The name of the service to find.

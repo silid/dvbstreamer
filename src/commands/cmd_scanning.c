@@ -41,7 +41,6 @@ Command functions related to scanning multiplex and frequency bands.
 #include "ts.h"
 #include "logging.h"
 #include "cache.h"
-#include "outputs.h"
 #include "main.h"
 #include "deliverymethod.h"
 #include "plugin.h"
@@ -139,20 +138,10 @@ static void CommandScan(int argc, char **argv)
 {
     Service_t *currentService;    
     Multiplex_t *multiplex;
-    char *currservice;
 
     CommandCheckAuthenticated();
     currentService = TuningCurrentServiceGet();
-    if (currentService)
-    {
-        currservice = strdup(currentService->name);
-        ServiceRefDec(currentService);
-    }
-    else
-    {
-        currservice = NULL;
-    }
-    
+
     if (strcmp(argv[0], "all") == 0)
     {
         int count = MultiplexCount();
@@ -193,10 +182,10 @@ static void CommandScan(int argc, char **argv)
         }
     }
 
-    if (currservice)
+    if (currentService)
     {
-        TuningCurrentServiceSet(currservice);
-        free(currservice);
+        TuningCurrentServiceSet(currentService);
+        ServiceRefDec(currentService);
     }
 }
 /************************** Scan Callback Functions **************************/

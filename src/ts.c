@@ -279,7 +279,8 @@ static void ProcessPacket(TSFilter_t *state, TSPacket_t *packet)
     for (ListIterator_Init(iterator, state->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         PIDFilter_t *filter =(PIDFilter_t *)ListIterator_Current(iterator);
-        if (filter->filterPacket && filter->filterPacket(filter, filter->fpArg, pid, packet))
+        if (filter->enabled && filter->filterPacket && 
+            filter->filterPacket(filter, filter->fpArg, pid, packet))
         {
             bool output = TRUE;
             TSPacket_t *outputPacket = packet;
