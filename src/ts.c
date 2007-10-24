@@ -35,10 +35,19 @@ Transport stream processing and filter management.
 #include "ts.h"
 #include "logging.h"
 
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
 static void *FilterTS(void *arg);
 static void ProcessPacket(TSFilter_t *state, TSPacket_t *packet);
 static void InformTSStructureChanged(TSFilter_t *state);
 static void InformMultiplexChanged(TSFilter_t *state);
+
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
+
+char PSISIPIDFilterType[] = "PSI/SI";
 
 /*******************************************************************************
 * Transport Stream Filter Functions                                            *
@@ -101,6 +110,23 @@ void TSFilterMultiplexChanged(TSFilter_t *tsfilter, Multiplex_t *newmultiplex)
     pthread_mutex_unlock(&tsfilter->mutex);
 }
 
+PIDFilter_t* TSFilterFindPIDFilter(TSFilter_t *tsfilter, const char *name, const char *type)
+{
+    ListIterator_t iterator;
+    PIDFilter_t *result = NULL;
+    pthread_mutex_lock(&tsfilter->mutex);
+    for (ListIterator_Init(iterator, tsfilter->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    {
+        PIDFilter_t *filter = (PIDFilter_t *)ListIterator_Current(iterator);
+        if ((strcmp(filter->name, name) == 0) && (strcmp(filter->type, type) == 0))
+        {
+            result = filter;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&tsfilter->mutex);
+    return result;
+}
 /*******************************************************************************
 * PID Filter Functions                                                         *
 *******************************************************************************/
@@ -112,6 +138,7 @@ PIDFilter_t* PIDFilterAllocate(TSFilter_t* tsfilter)
     {
         ListAdd(tsfilter->pidFilters, result);
         result->tsFilter = tsfilter;
+        result->type = "";
     }
     pthread_mutex_unlock(&tsfilter->mutex);
     return result;

@@ -161,6 +161,7 @@ typedef void (*PacketOutput)(struct PIDFilter_s *pidfilter, void *userarg, TSPac
 typedef struct PIDFilter_s
 {
     char *name;                            /**< Name of this instance */
+    char *type;                            /**< Type of this instance */
     struct TSFilter_t *tsFilter;           /**< TS Filter instance this filter belongs to. */
     volatile bool enabled;                 /**< Boolean indicating whether this filter is enabled and should process packets */
 
@@ -184,6 +185,11 @@ typedef struct PIDFilter_s
     volatile unsigned long long packetsProcessed;         /**< Number of packets that processPacket has returned non-NULL for. */
     volatile unsigned long long packetsOutput;            /**< Number of packets sent to the output callback */
 }PIDFilter_t;
+
+/**
+ * PIDFilter type that processes PSI/SI data.
+ */
+extern char PSISIPIDFilterType[];
 
 /**@}*/
 
@@ -295,6 +301,14 @@ void TSFilterMultiplexChanged(TSFilter_t *tsfilter, Multiplex_t *newmultiplex);
  */
 #define TSFilterUnLock(tsfilter) pthread_mutex_unlock(&(tsfilter)->mutex)
 
+/**
+ * Find a PIDFilter_t of the given name and type associated with this TSFilter.
+ * @param tsfilter TSFilter to search.
+ * @param name Name of the PIDFilter to find.
+ * @param type Type of the PIDFilter to find.
+ * @return a PIDFilter_t instance or NULL if not found.
+ */
+PIDFilter_t* TSFilterFindPIDFilter(TSFilter_t *tsfilter, const char *name, const char *type);
 
 /**@}*/
 
