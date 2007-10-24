@@ -84,6 +84,7 @@ PIDFilter_t *NITProcessorCreate(TSFilter_t *tsfilter)
     if (result)
     {
         result->name = "NIT";
+        result->type = PSISIPIDFilterType;
         if (tsfilter->adapter->hardwareRestricted)
         {
             DVBDemuxAllocateFilter(tsfilter->adapter, NIT_PID, TRUE);

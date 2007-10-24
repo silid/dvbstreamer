@@ -312,6 +312,7 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
                         pluginFilter->filter = PIDFilterAllocate(MainTSFilterGet());
                         if (pluginFilter->filter)
                         {
+                            pluginFilter->filter->type = "Plugin";
                             LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed filter.\n", pluginInterface->name);
                             pluginFilter->InitFilter(pluginFilter->filter);
                         }

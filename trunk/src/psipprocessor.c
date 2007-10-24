@@ -104,6 +104,7 @@ PIDFilter_t *PSIPProcessorCreate(TSFilter_t *tsfilter)
     if (result)
     {
         result->name = "PSIP";
+        result->type = PSISIPIDFilterType;
     }
     
     return result;

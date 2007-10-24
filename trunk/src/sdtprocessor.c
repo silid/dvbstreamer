@@ -105,6 +105,7 @@ PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter)
     if (result)
     {
         result->name = "SDT";
+        result->type = PSISIPIDFilterType;
         /* If the PAT changes we want to pick up the SDT again as otherwise we 
            may have services with no names.
            Seen this with the UK multiplexes where there have been PAT changes 

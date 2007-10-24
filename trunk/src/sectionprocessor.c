@@ -148,6 +148,7 @@ static PIDFilter_t *SectionProcessorCreate(TSFilter_t *tsfilter, uint16_t pid)
             ObjectRefDec(state);
         }
         asprintf( &result->name, "Section(PID 0x%04x)", pid);
+        result->type = "Section";
         PIDFilterMultiplexChangeSet(result,SectionProcessorMultiplexChanged, state);
     }
 
