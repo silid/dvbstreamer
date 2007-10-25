@@ -88,7 +88,7 @@ static void CommandDateTime(int argc, char **argv)
 {
     if (lastReceived)
     {
-        CommandPrintf("UTC Date/Time (YYYY/MM/DD hh:mm:ss) %4d/%2d/%2d %02d:%02d:%02d",
+        CommandPrintf("UTC Date/Time (YYYY/MM/DD hh:mm:ss) %4d/%2d/%2d %02d:%02d:%02d\n",
             lastDateTime.t_date_time.i_year, lastDateTime.t_date_time.i_month, lastDateTime.t_date_time.i_day,
             lastDateTime.t_date_time.i_hour, lastDateTime.t_date_time.i_minute, lastDateTime.t_date_time.i_second);
         
