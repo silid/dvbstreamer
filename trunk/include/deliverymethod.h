@@ -54,23 +54,46 @@ typedef struct DeliveryMethodInstance_t
      */
     char *mrl;
     /**
-         * Send a packet.
-         * @param this The instance of the DeliveryMethodInstance_t to send the packet using.
-         * @param packet The packet to send.
-         */
+     * Send a packet.
+     * @param this The instance of the DeliveryMethodInstance_t to send the packet using.
+     * @param packet The packet to send.
+     */
     void(*SendPacket)(struct DeliveryMethodInstance_t *this, TSPacket_t *packet);
     /**
-         * Send an opaque block of data.
-         * @param this The instance of the DeliveryMethodInstance_t to send the packet using.
-         * @param block Pointer to the data to send.
-         * @param block_len The length of the data in bytes to send.
-         */
+     * Send an opaque block of data.
+     * @param this The instance of the DeliveryMethodInstance_t to send the packet using.
+     * @param block Pointer to the data to send.
+     * @param block_len The length of the data in bytes to send.
+     */
     void(*SendBlock)(struct DeliveryMethodInstance_t *this, void *block, unsigned long blockLen);
     /**
-         * Destroy an instace of DeliveryMethodInstance_t.
-         * @param this The instance of the DeliveryMethodInstance_t to free.
-         */
+     * Destroy an instace of DeliveryMethodInstance_t.
+     * @param this The instance of the DeliveryMethodInstance_t to free.
+     */
     void(*DestroyInstance)(struct DeliveryMethodInstance_t *this);
+    /**
+     * Reserves space for the specified number of packets at the start of the 
+     * stream.
+     * Until the header is set with SetHeader(), the header packets will be 
+     * stuffing packets.
+     * This function must be called before any packets have been sent to this 
+     * instance.
+     * 
+     * @param this The instance of the DeliveryMethodInstance_t to apply this to. 
+     * @param packets The number of packets to reserve space for.
+     */
+     void (*ReserveHeaderSpace)(struct DeliveryMethodInstance_t *this, int packets);
+
+    /**
+     * Set the PAT and PMT header packets. This function can be called any time 
+     * after a call to ReserveHeaderSpace().
+     * @param this The instance of the DeliveryMethodInstance_t to apply this to.
+     * @param packets The packets to write as the header.
+     * @param count The number of packets to write.
+     */
+     void (*SetHeader)(struct DeliveryMethodInstance_t *this, 
+                        TSPacket_t *packets, int count);
+    
 }
 DeliveryMethodInstance_t;
 

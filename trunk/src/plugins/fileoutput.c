@@ -35,10 +35,11 @@ File Delivery Method handler, all packets are written to the file of choosing.
 *******************************************************************************/
 struct FileOutputInstance_t
 {
-    char *mrl;
-    void(*SendPacket)(DeliveryMethodInstance_t *this, TSPacket_t *packet);
-    void(*SendBlock)(DeliveryMethodInstance_t *this, void *block, unsigned long blockLen);
-    void(*DestroyInstance)(DeliveryMethodInstance_t *this);
+    /* !!! MUST BE THE FIRST FIELD IN THE STRUCTURE !!!
+     * As the address of this field will be passed to all delivery method 
+     * functions and a 0 offset is assumed!
+     */    
+    DeliveryMethodInstance_t instance;
 
     FILE *fp;
 };
@@ -52,6 +53,9 @@ DeliveryMethodInstance_t *FileOutputCreate(char *arg);
 void FileOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet);
 void FileOutputSendBlock(DeliveryMethodInstance_t *this, void *block, unsigned long blockLen);
 void FileOutputDestroy(DeliveryMethodInstance_t *this);
+void FileReserveHeaderSpace(DeliveryMethodInstance_t *this, int packets);
+void FileSetHeader(struct DeliveryMethodInstance_t *this, 
+                        TSPacket_t *packets, int count);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -98,21 +102,25 @@ DeliveryMethodInstance_t *FileOutputCreate(char *arg)
 {
     struct FileOutputInstance_t *instance = calloc(1, sizeof(struct FileOutputInstance_t));
 
-    if (instance)
+    if (instance == NULL)
     {
-        instance->SendPacket = FileOutputSendPacket;
-        instance->SendBlock = FileOutputSendBlock;
-        instance->DestroyInstance = FileOutputDestroy;
-
-        instance->fp = fopen((char*)(arg + PREFIX_LEN), "wb");
-
-        if (!instance->fp)
-        {
-            free(instance);
-            return NULL;
-        }
+        return NULL;
     }
-    return (DeliveryMethodInstance_t*)instance;
+    instance->instance.SendPacket = FileOutputSendPacket;
+    instance->instance.SendBlock = FileOutputSendBlock;
+    instance->instance.DestroyInstance = FileOutputDestroy;
+    instance->instance.ReserveHeaderSpace = FileReserveHeaderSpace;
+    instance->instance.SetHeader = FileSetHeader;
+    
+    instance->fp = fopen((char*)(arg + PREFIX_LEN), "wb");
+
+    if (!instance->fp)
+    {
+        free(instance);
+        return NULL;
+    }
+
+    return &instance->instance;
 }
 
 void FileOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet)
@@ -131,4 +139,35 @@ void FileOutputDestroy(DeliveryMethodInstance_t *this)
     struct FileOutputInstance_t *instance = (struct FileOutputInstance_t*)this;
     fclose(instance->fp);
     free(this);
+}
+
+void FileReserveHeaderSpace(DeliveryMethodInstance_t *this, int packets)
+{
+    struct FileOutputInstance_t *instance = (struct FileOutputInstance_t*)this;
+    TSPacket_t nullPacket;
+    int i;
+    nullPacket.header[0] = 0x47;
+    nullPacket.header[1] = 0x00;
+    nullPacket.header[2] = 0x00;
+    nullPacket.header[3] = 0x00;
+    TSPACKET_SETPID(nullPacket, 0x1fff);
+
+    for (i=0; i< packets; i ++)
+    {
+        fwrite(&nullPacket, TSPACKET_SIZE, 1, instance->fp);
+    }
+}
+
+void FileSetHeader(struct DeliveryMethodInstance_t *this, 
+                        TSPacket_t *packets, int count)
+{
+    struct FileOutputInstance_t *instance = (struct FileOutputInstance_t*)this;
+    fpos_t current;
+    fgetpos(instance->fp, &current);
+
+    rewind(instance->fp);
+
+    fwrite(packets, TSPACKET_SIZE, count, instance->fp);
+
+    fsetpos(instance->fp, &current);    
 }
