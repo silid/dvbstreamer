@@ -31,6 +31,8 @@ dvbpsi_DATA = \
 	dr_59.h \
 	dr_62.h \
 	dr_69.h \
+	dr_73.h \	
+	dr_76.h \
 	dr_83.h \
 	dr.h \
 	dvbpsi.h \

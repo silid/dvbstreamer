@@ -60,7 +60,9 @@ dvb_descriptors_src = \
 	descriptors/dr_56.c \
 	descriptors/dr_59.c \
 	descriptors/dr_62.c \
-	descriptors/dr_69.c
+	descriptors/dr_69.c \
+	descriptors/dr_73.c \
+	descriptors/dr_76.c
 
 atsc_descriptors_src =
 
