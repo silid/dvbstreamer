@@ -224,6 +224,7 @@ static void CommandListServices(int argc, char **argv)
     bool filterData  = FALSE;
     bool filterUnknown = FALSE;
     char *provider = NULL;
+    char *providerStr = "provider=";
 
     /* Make sure the database is up-to-date before displaying the names */
     UpdateDatabase();
@@ -267,9 +268,9 @@ static void CommandListServices(int argc, char **argv)
             filterOnType = TRUE;
             filterUnknown = TRUE;
         }
-        else if (strncmp(argv[i], "provider=", 9) == 0)
+        else if (strncmp(argv[i], providerStr, strlen(providerStr)) == 0)
         {
-            provider = argv[i] + 9;
+            provider = argv[i] + strlen(providerStr);
         }
         else
         {
@@ -357,7 +358,7 @@ static bool FilterService(Service_t *service, bool filterOnType, bool tv, bool r
 
     if (provider)
     {
-        display = display && (strcmp(provider, service->provider) == 0);
+        display = display && service->provider && (strcmp(provider, service->provider) == 0);
     }    
     return display;
 }
