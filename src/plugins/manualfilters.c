@@ -201,6 +201,7 @@ static void CommandAddMF(int argc, char **argv)
     
     filter->name = strdup(argv[0]);
     filter->type = ManualPIDFilterType;
+    filter->enabled = TRUE;
 }
 
 static void CommandRemoveMF(int argc, char **argv)
@@ -271,7 +272,7 @@ static void CommandAddMFPID(int argc, char **argv)
         PIDFilterSimpleFilter_t *simplePIDFilter = filter->fpArg;
         
         pid = ParsePID(argv[1]);
-        if ((pid < 0) || (pid > 0x1fff))
+        if ((pid < 0) || (pid > 0x2000))
         {
             CommandError(COMMAND_ERROR_GENERIC, "Invalid PID!");
             return;
@@ -301,7 +302,7 @@ static void CommandRemoveMFPID(int argc, char **argv)
         int pid, i;
         PIDFilterSimpleFilter_t *simplePIDFilter = filter->fpArg;
         pid = ParsePID(argv[1]);
-        if ((pid < 0) || (pid > 0x1fff))
+        if ((pid < 0) || (pid > 0x2000))
         {
             CommandError(COMMAND_ERROR_GENERIC, "Invalid PID!");
             return;
