@@ -20,6 +20,7 @@ multiplexes.c
 Manage multiplexes and tuning parameters.
 
 */
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -84,7 +85,32 @@ int MultiplexCount()
     return result;
 }
 
-Multiplex_t *MultiplexFind(int uid)
+Multiplex_t *MultiplexFind(char *mux)
+{
+    Multiplex_t *result = NULL;
+    int netId, tsId;
+    /* Although the description says we check UID first it is simple to check
+       for netid.tsid because it has the '.' and will pass the following if
+       where as a simple number won't.
+    */
+    if (sscanf(mux, "%x.%x", &netId, &tsId) == 2)
+    {
+        result = MultiplexFindId(netId, tsId);
+    }
+    else
+    {
+        int n = atoi(mux);
+        result = MultiplexFindUID(n);
+        if (!result)
+        {
+            result = MultiplexFindFrequency(n);
+        }
+    }
+    
+    return result;
+}
+
+Multiplex_t *MultiplexFindUID(int uid)
 {
     Multiplex_t *result = NULL;
     STATEMENT_INIT;

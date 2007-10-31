@@ -73,12 +73,28 @@ int MultiplexDeinit(void);
 int MultiplexCount();
 
 /**
+ * Retrieve a Multiplex_t structure for the string mux.
+ * mux is tried as (in order) UID, netid.tsid and finally frequency.
+ * @return A Mulitplex_t or NULL if the frequency could not be found.
+ */
+Multiplex_t *MultiplexFind(char *mux);
+
+/**
  * Retrieve the Multiplex_t structure for the UID.
  * The returned structured should be released using MultiplexRefDec.
  * @param UID Unique ID of the multiplex to retrieve.
  * @return A Mulitplex_t or NULL if the frequency could not be found.
  */
-Multiplex_t *MultiplexFind(int freq);
+Multiplex_t *MultiplexFindUID(int uid);
+
+/**
+ * Retrieve the Multiplex_t structure for the network and TS id.
+ * The returned structured should be released using MultiplexRefDec.
+ * @param netid Network id to find.
+ * @param tsid Transport stream id to find.
+ * @return A Mulitplex_t or NULL if the frequency could not be found.
+ */
+Multiplex_t *MultiplexFindId(int netid, int tsid);
 
 /**
  * Retrieve the first Multiplex_t structure for the given frequency.
@@ -150,14 +166,6 @@ int MultiplexTSIdSet(Multiplex_t *multiplex, int tsid);
  */
 int MultiplexNetworkIdSet(Multiplex_t *multiplex, int netid);
 
-/**
- * Retrieve the Multiplex_t structure for the network and TS id.
- * The returned structured should be released using MultiplexRefDec.
- * @param netid Network id to find.
- * @param tsid Transport stream id to find.
- * @return A Mulitplex_t or NULL if the frequency could not be found.
- */
-Multiplex_t *MultiplexFindId(int netid, int tsid);
 
 /**
  * Create a new multiplex object.

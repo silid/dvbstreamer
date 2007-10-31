@@ -55,6 +55,7 @@ Process Service Description Tables and update the services information.
 #define TABLE_ID_SDT_OTHER  0x46
 
 #define DESCRIPTOR_SERVICE  0x48
+#define DESCRIPTOR_DEFAUTH  0x73
 
 /*******************************************************************************
 * Typedefs                                                                     *
@@ -199,12 +200,31 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
                         LogModule(LOG_DEBUG, SDTPROCESSOR, "Updating service 0x%04x = %s\n", sdtservice->i_service_id, name);
                         CacheUpdateServiceName(service, name);
                     }
+                    name = DVBTextToUTF8((char *)servicedesc->i_service_provider_name, servicedesc->i_service_provider_name_length);
+                    LogModule(LOG_DEBUG, SDTPROCESSOR, "service provider 0x%04x = %s\n", sdtservice->i_service_id, name);                    
+                    if ((service->provider==NULL) || strcmp(name, service->provider))
+                    {
+                        LogModule(LOG_DEBUG, SDTPROCESSOR, "Updating service provider 0x%04x = %s\n", sdtservice->i_service_id, name);
+                        CacheUpdateServiceProvider(service, name);                        
+                    }
                     if (service->type != type)
                     {
                         CacheUpdateServiceType(service, type);
                     }
                 }
-                break;
+            }
+            if (descriptor->i_tag == DESCRIPTOR_DEFAUTH)
+            {
+                dvbpsi_default_authority_dr_t *defAuthDesc = dvbpsi_DecodeDefaultAuthorityDr(descriptor);
+
+                if (defAuthDesc)
+                {
+                    if ((service->defaultAuthority == NULL) || strcmp((char*)defAuthDesc->authority, service->defaultAuthority))
+                    {
+                        LogModule(LOG_DEBUG, SDTPROCESSOR, "Updating service default authority 0x%04x = %s\n", sdtservice->i_service_id, defAuthDesc->authority);
+                        CacheUpdateServiceDefaultAuthority(service, (char*)defAuthDesc->authority);                        
+                    }
+                }
             }
             descriptor = descriptor->p_next;
         }

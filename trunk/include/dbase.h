@@ -69,6 +69,14 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
  * Constant for Service Table Column name
  */
 #define SERVICE_PCRPID          "pcrpid"
+/**
+ * Constant for Service Table Column name
+ */
+#define SERVICE_PROVIDER        "provider"
+/**
+ * Constant for Service Table Column name
+ */
+#define SERVICE_DEFAUTHORITY    "defauthority"
 
 /**
  * Constant for the Multiplexes table name.

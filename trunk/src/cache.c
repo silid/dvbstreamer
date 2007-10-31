@@ -46,14 +46,16 @@ Caches service and PID information from the database for the current multiplex.
 
 enum CacheFlags
 {
-    CacheFlag_Clean         = 0x00,
-    CacheFlag_Dirty_PMTPID  = 0x01,
-    CacheFlag_Dirty_PIDs    = 0x02, /* Also means PMT Version and PCR PID needs to be updated */
-    CacheFlag_Dirty_Name    = 0x04,
-    CacheFlag_Dirty_Source  = 0x08,    
-    CacheFlag_Dirty_CA      = 0x10,
-    CacheFlag_Dirty_Type    = 0x20,    
-    CacheFlag_Dirty_Added   = 0x80,
+    CacheFlag_Clean         = 0x0000,
+    CacheFlag_Dirty_PMTPID  = 0x0001,
+    CacheFlag_Dirty_PIDs    = 0x0002, /* Also means PMT Version and PCR PID needs to be updated */
+    CacheFlag_Dirty_Name    = 0x0004,
+    CacheFlag_Dirty_Source  = 0x0008,    
+    CacheFlag_Dirty_CA      = 0x0010,
+    CacheFlag_Dirty_Type    = 0x0020,
+    CacheFlag_Dirty_Provider= 0x0040,
+    CacheFlag_Dirty_DefAuth = 0x0060,
+    CacheFlag_Dirty_Added   = 0x8000,
 };
 
 /*******************************************************************************
@@ -313,6 +315,64 @@ void CacheUpdateServiceName(Service_t *service, char *name)
     pthread_mutex_unlock(&cacheUpdateMutex);
 }
 
+void CacheUpdateServiceProvider(Service_t *service, char *provider)
+{
+    int i;
+    pthread_mutex_lock(&cacheUpdateMutex);
+
+    for (i = 0; i < cachedServicesCount; i ++)
+    {
+        if ((cachedServices[i]) && ServiceAreEqual(service, cachedServices[i]))
+        {
+            if (cachedServices[i]->provider)
+            {
+                free(cachedServices[i]->provider);
+            }
+            if (provider)
+            {
+                cachedServices[i]->provider = strdup(provider);
+            }
+            else
+            {
+                cachedServices[i]->provider = NULL;
+            }
+            cacheFlags[i] |= CacheFlag_Dirty_Provider;
+            break;
+        }
+    }
+
+    pthread_mutex_unlock(&cacheUpdateMutex);
+}
+
+void CacheUpdateServiceDefaultAuthority(Service_t *service, char *defaultAuthority)
+{
+    int i;
+    pthread_mutex_lock(&cacheUpdateMutex);
+
+    for (i = 0; i < cachedServicesCount; i ++)
+    {
+        if ((cachedServices[i]) && ServiceAreEqual(service, cachedServices[i]))
+        {
+            if (cachedServices[i]->defaultAuthority)
+            {
+                free(cachedServices[i]->defaultAuthority);
+            }
+            if (defaultAuthority)
+            {
+                cachedServices[i]->defaultAuthority = strdup(defaultAuthority);
+            }
+            else
+            {
+                cachedServices[i]->defaultAuthority = NULL;
+            }
+            cacheFlags[i] |= CacheFlag_Dirty_DefAuth;
+            break;
+        }
+    }
+
+    pthread_mutex_unlock(&cacheUpdateMutex);
+}
+
 void CacheUpdateServiceSource(Service_t *service, uint16_t source)
 {
     int i;
@@ -556,6 +616,16 @@ void CacheWriteback()
             LogModule(LOG_DEBUG, CACHE, "Updating Type for 0x%04x new Type %d\n", cachedServices[i]->id, cachedServices[i]->type);
             ServiceTypeSet(cachedServices[i], cachedServices[i]->type);
         }        
+        if (cacheFlags[i] & CacheFlag_Dirty_Provider)
+        {
+            LogModule(LOG_DEBUG, CACHE, "Updating provider for 0x%04x new provider %s\n", cachedServices[i]->id, cachedServices[i]->provider);
+            ServiceProviderSet(cachedServices[i], cachedServices[i]->provider);
+        }
+        if (cacheFlags[i] & CacheFlag_Dirty_DefAuth)
+        {
+            LogModule(LOG_DEBUG, CACHE, "Updating default authority for 0x%04x new authority %s\n", cachedServices[i]->id, cachedServices[i]->defaultAuthority);
+            ServiceDefaultAuthoritySet(cachedServices[i], cachedServices[i]->defaultAuthority);
+        }
         cacheFlags[i] = 0;
     }
 

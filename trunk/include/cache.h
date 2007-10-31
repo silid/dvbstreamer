@@ -146,6 +146,20 @@ void CacheUpdateService(Service_t *service, int pmtpid);
 void CacheUpdateServiceName(Service_t *service, char *name);
 
 /**
+ * Update the cached service with a new provider.
+ * @param service The service to update.
+ * @param provider The new provider name.
+ */
+void CacheUpdateServiceProvider(Service_t *service, char *provider);
+
+/**
+ * Update the cached service with a new default authority, used by TVAnytime.
+ * @param service The service to update.
+ * @param defaultAuthority The new default authority.
+ */
+void CacheUpdateServiceDefaultAuthority(Service_t *service, char *defaultAuthority);
+
+/**
  * Update the cached service with a new source id.
  * @param service The service to update.
  * @param source The new source id.

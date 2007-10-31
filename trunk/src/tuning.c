@@ -104,7 +104,7 @@ void TuningCurrentServiceSet(Service_t *service)
         LogModule(LOG_DEBUGV, TUNING, "Disabling filters\n");
         TSFilterEnable(tsFilter, FALSE);
 
-        multiplex = MultiplexFind(service->multiplexUID);
+        multiplex = MultiplexFindUID(service->multiplexUID);
         primaryServiceFilter = TSFilterFindPIDFilter(tsFilter, PrimaryService, ServicePIDFilterType);
         
         if ((CurrentMultiplex!= NULL) && MultiplexAreEqual(multiplex, CurrentMultiplex))

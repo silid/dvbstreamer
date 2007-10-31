@@ -279,7 +279,7 @@ static ServiceNowNextInfo_t *FindServiceName(char *name)
         return NULL;
     }
 
-    multiplex = MultiplexFind(service->multiplexUID);
+    multiplex = MultiplexFindUID(service->multiplexUID);
     if (!multiplex)
     {
         CommandError(COMMAND_ERROR_GENERIC, "Failed to find multiplex!");
