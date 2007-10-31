@@ -59,10 +59,11 @@ UDP Output Delivery Method handler.
 *******************************************************************************/
 struct UDPOutputState_t
 {
-    char *mrl;
-    void(*SendPacket)(DeliveryMethodInstance_t *this, TSPacket_t *packet);
-    void(*SendBlock)(DeliveryMethodInstance_t *this, void *block, unsigned long blockLen);
-    void(*DestroyInstance)(DeliveryMethodInstance_t *this);
+    /* !!! MUST BE THE FIRST FIELD IN THE STRUCTURE !!!
+     * As the address of this field will be passed to all delivery method 
+     * functions and a 0 offset is assumed!
+     */
+    DeliveryMethodInstance_t instance; 
     int socket;
     socklen_t addressLen;
     struct sockaddr_storage address;
@@ -257,15 +258,15 @@ static DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
     
     if (rtp)
     {
-        state->SendPacket = RTPOutputSendPacket;
-        state->SendBlock = NULL;        
+        state->instance.SendPacket = RTPOutputSendPacket;
+        state->instance.SendBlock = NULL;        
     }
     else
     {
-        state->SendPacket = UDPOutputSendPacket;
-        state->SendBlock = UDPOutputSendBlock;
+        state->instance.SendPacket = UDPOutputSendPacket;
+        state->instance.SendBlock = UDPOutputSendBlock;
     }
-    state->DestroyInstance = UDPOutputDestroy;
+    state->instance.DestroyInstance = UDPOutputDestroy;
 
     LogModule(LOG_DEBUG, UDPOUTPUT, "UDP Host \"%s\" Port \"%s\" TTL %d\n", hostbuffer, portbuffer, ttl);
 #ifdef USE_GETADDRINFO    
@@ -329,7 +330,7 @@ static DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
     }
     
     state->datagramFullCount = MAX_TS_PACKETS_PER_DATAGRAM;
-    return (DeliveryMethodInstance_t *)state;
+    return &state->instance;
 }
 
 static void UDPOutputDestroy(DeliveryMethodInstance_t *this)

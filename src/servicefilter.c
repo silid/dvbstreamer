@@ -26,6 +26,7 @@ the output to only include this service.
 #include <unistd.h>
 #include <stdint.h>
 #include <assert.h>
+#include <string.h>
 #include <dvbpsi/dvbpsi.h>
 #include <dvbpsi/psi.h>
 #include <dvbpsi/pat.h>
@@ -44,6 +45,12 @@ the output to only include this service.
 * Defines                                                                      *
 *******************************************************************************/
 #define INVALID_PID 0xffff
+#define PAT_PACKETS    1
+#define PMT_PACKETS    6
+#define HEADER_PACKETS (PAT_PACKETS + PMT_PACKETS)
+
+#define PACKETS_INDEX_PAT 0
+#define PACKETS_INDEX_PMT 1 /* Start of PMT */
 
 /*******************************************************************************
 * Typedefs                                                                     *
@@ -55,12 +62,13 @@ typedef struct ServiceFilter_t
     Service_t    *nextService;
     bool          serviceChanged;
     pthread_mutex_t serviceChangeMutex;
-    
+
+    /* PAT */
     bool          rewritePAT;
     uint16_t      patVersion;
     uint8_t       patPacketCounter;
-    TSPacket_t    patPacket;
 
+    /* PMT */
     bool          avsOnly;
     bool          rewritePMT;
     uint16_t      serviceVersion;
@@ -69,9 +77,18 @@ typedef struct ServiceFilter_t
     uint16_t      videoPID;
     uint16_t      audioPID;
     uint16_t      subPID;
-    TSPacket_t    pmtPacket;
+    int           pmtPacketCount;
+    TSPacket_t    pmtPackets[PMT_PACKETS];
 
+    /* H/W Filters */
     bool          allocateFilters;
+
+    /* Header */
+    bool          setHeader;
+    int           headerCount;
+    bool          headerGotPAT;
+    bool          headerGotPMT;
+    TSPacket_t    packets[HEADER_PACKETS];
 }ServiceFilter_t;
 
 /*******************************************************************************
@@ -181,7 +198,17 @@ bool ServiceFilterAVSOnlyGet(PIDFilter_t *filter)
 
 void ServiceFilterDeliveryMethodSet(PIDFilter_t *filter, DeliveryMethodInstance_t *instance)
 {
+    ServiceFilter_t *state = (ServiceFilter_t *)filter->fpArg;
+    if (instance->ReserveHeaderSpace)
+    {
+        instance->ReserveHeaderSpace(instance, HEADER_PACKETS); 
+    }
     PIDFilterOutputPacketSet(filter, DeliveryMethodOutputPacket, instance);
+
+    if (instance->ReserveHeaderSpace)
+    {
+        state->setHeader = TRUE;
+    }
 }
 
 DeliveryMethodInstance_t * ServiceFilterDeliveryMethodGet(PIDFilter_t *filter)
@@ -209,6 +236,11 @@ static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t
         state->rewritePAT = TRUE;
         state->rewritePMT = TRUE;
 
+        state->headerGotPAT = FALSE;
+        state->headerGotPMT = FALSE;
+        state->headerCount  = 0;
+        state->pmtPacketCount = 0;
+
         if (state->avsOnly)
         {
             state->audioPID = INVALID_PID;
@@ -222,7 +254,7 @@ static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t
             state->allocateFilters = TRUE && !state->avsOnly;
         }
     }
-
+    
     if (state->service)
     {
         PIDList_t *pids;
@@ -292,32 +324,64 @@ static TSPacket_t *ServiceFilterProcessPacket(PIDFilter_t *pidfilter, void *arg,
             state->patVersion ++;
             ServiceFilterPATRewrite(state);
             state->rewritePAT = FALSE;
-
+            state->headerGotPAT = TRUE;
+            state->headerCount = 1;
         }
 
-        TSPACKET_SETCOUNT(state->patPacket, state->patPacketCounter ++);
-        packet = &state->patPacket;
+        TSPACKET_SETCOUNT(state->packets[PACKETS_INDEX_PAT], state->patPacketCounter ++);
+        packet = &state->packets[PACKETS_INDEX_PAT];
     }
 
-    if (state->avsOnly && (pid == state->service->pmtPid))
+    if (pid == state->service->pmtPid)
     {
-        if (state->rewritePMT || (state->serviceVersion != state->service->pmtVersion))
+        if (state->avsOnly)
         {
-            state->pmtVersion ++;
-            ServiceFilterPMTRewrite(state);
-            state->rewritePMT = FALSE;
-            state->serviceVersion = state->service->pmtVersion;
-            
-            if (pidfilter->tsFilter->adapter->hardwareRestricted)
+            if (state->rewritePMT || (state->serviceVersion != state->service->pmtVersion))
             {
-                state->allocateFilters = TRUE;
-            }
-        }
+                state->pmtVersion ++;
+                ServiceFilterPMTRewrite(state);
+                state->rewritePMT = FALSE;
+                state->serviceVersion = state->service->pmtVersion;
 
-        TSPACKET_SETCOUNT(state->pmtPacket, state->pmtPacketCounter ++);
-        packet = &state->pmtPacket;
+                state->headerGotPMT = TRUE;
+                state->headerCount = 2;
+                
+                if (pidfilter->tsFilter->adapter->hardwareRestricted)
+                {
+                    state->allocateFilters = TRUE;
+                }
+            }
+
+            TSPACKET_SETCOUNT(state->packets[PACKETS_INDEX_PMT], state->pmtPacketCounter ++);
+            packet = &state->packets[PACKETS_INDEX_PMT];
+        }
+        else
+        {
+            if (TSPACKET_ISPAYLOADUNITSTART(*packet))
+            {
+                if (state->pmtPacketCount > 0)
+                {
+                    state->headerGotPMT = TRUE;
+                    state->headerCount = 1 + state->pmtPacketCount;
+                    memcpy(&state->packets[PACKETS_INDEX_PMT], &state->pmtPackets, TSPACKET_SIZE * state->pmtPacketCount);
+                }
+                state->pmtPacketCount = 0;
+            }
+            memcpy(&state->pmtPackets[state->pmtPacketCount], packet, TSPACKET_SIZE);
+            state->pmtPacketCount ++;
+        }
     }
 
+    if (state->setHeader && state->headerGotPAT && state->headerGotPMT)
+    {
+        DeliveryMethodInstance_t *dmInstance = ServiceFilterDeliveryMethodGet(pidfilter);
+        if (dmInstance->SetHeader)
+        {
+            dmInstance->SetHeader(dmInstance, state->packets, state->headerCount);
+        }
+        state->setHeader = FALSE;
+        
+    }
     return packet;
 }
 
@@ -342,7 +406,7 @@ static void ServiceFilterPATRewrite(ServiceFilter_t *state)
     dvbpsi_PATAddProgram(&pat, state->service->id, state->service->pmtPid);
 
     section = dvbpsi_GenPATSections(&pat, 1);
-    ServiceFilterInitPacket(&state->patPacket, section, "PAT");
+    ServiceFilterInitPacket(&state->packets[PACKETS_INDEX_PAT], section, "PAT");
 
     dvbpsi_DeletePSISections(section);
     dvbpsi_EmptyPAT(&pat);
@@ -416,8 +480,8 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t *state)
     LogModule(LOG_DEBUG, SERVICEFILTER, "videopid = %x audiopid = %x subpid = %x\n", state->videoPID,state->audioPID,state->subPID);
 
     section = dvbpsi_GenPMTSections(&pmt);
-    ServiceFilterInitPacket(&state->pmtPacket, section, "PMT");
-    TSPACKET_SETPID(state->pmtPacket, state->service->pmtPid);
+    ServiceFilterInitPacket(&state->packets[PACKETS_INDEX_PMT], section, "PMT");
+    TSPACKET_SETPID(state->packets[PACKETS_INDEX_PMT], state->service->pmtPid);
     LogModule(LOG_DEBUG, SERVICEFILTER, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     dvbpsi_DeletePSISections(section);
     dvbpsi_EmptyPMT(&pmt);
