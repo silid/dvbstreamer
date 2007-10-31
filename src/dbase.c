@@ -38,7 +38,7 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 
 /* This is the version of the database not the application!*/
 #define METADATA_DBASE_VERSION "dbase_version"
-#define DBASE_VERSION 0.5
+#define DBASE_VERSION 0.6
 
 /*******************************************************************************
 * Prototypes                                                                   *
@@ -259,6 +259,24 @@ static int DBaseCreateTables(double version)
             LogModule(LOG_ERROR, DBASE, "Failed to create VSBParameters table: %s\n", sqlite3_errmsg(DBaseInstance));
             return rc;
         }
+    }
+    if (version < 0.6)
+    {
+        rc = sqlite3_exec(DBaseInstance, "ALTER TABLE " SERVICES_TABLE " ADD " SERVICE_PROVIDER";", NULL, NULL, NULL);
+
+        if (rc)
+        {
+            LogModule(LOG_ERROR, DBASE, "Failed to add provider column to services table: %s\n", sqlite3_errmsg(DBaseInstance));
+            return rc;
+        }
+
+        rc = sqlite3_exec(DBaseInstance, "ALTER TABLE " SERVICES_TABLE " ADD " SERVICE_DEFAUTHORITY ";", NULL, NULL, NULL);
+
+        if (rc)
+        {
+            LogModule(LOG_ERROR, DBASE, "Failed to add default authority column to services table: %s\n", sqlite3_errmsg(DBaseInstance));
+            return rc;
+        }        
     }
 
     DBaseMetadataSetDouble(METADATA_DBASE_VERSION,DBASE_VERSION);

@@ -51,6 +51,7 @@ Command functions to supply the user with information about the system.
 * Prototypes                                                                   *
 *******************************************************************************/
 static void CommandListServices(int argc, char **argv);
+static bool FilterService(Service_t *service, bool filter, bool tv, bool radio, bool data, bool unknown, char* provider);
 static void CommandListMuxes(int argc, char **argv);
 static void CommandListPids(int argc, char **argv);
 static void CommandCurrent(int argc, char **argv);
@@ -69,19 +70,31 @@ Command_t CommandDetailsInfo[] =
 {
     {
         "lsservices",
-        TRUE, 0, 3,
+        TRUE, 0, 6,
         "List all services or for a specific multiplex.",
-        "lsservies [mux | <multiplex uid>]\n"
-        "Lists all the services currently in the database if no multiplex is specified or"
-        "if \"mux\" is specified only the services available of the current mux or if a"
-        " uid is specified only the services available on that multiplex.",
+        "lsservices [-id] [filters] [multiplex]\n"
+        "Lists selected services, by default all services on all multiplex are displayed.\n"
+        "\n"
+        "-id\n"
+        "List the services fully quailified id.\n"
+        "\n"
+        "filters (tv, radio, data, unknown)\n"
+        "Multiple filters can be specified or if no filters are specified all selected"
+        " services will be displayed\n"
+        "\n"
+        "multiplex (\'mux\'| uid | netid.tsid | frequency)\n"
+        "Select only services on the specified multiplex, where \'mux\' indiciated the current multiplex.",
         CommandListServices
     },
     {
         "lsmuxes",
         TRUE, 0, 1,
         "List multiplexes.",
-        "List all available multiplex UIDs.",
+        "lsmuxes [-id]\n"
+        "List all available multiplex UIDs.\n"
+        "\n"
+        "-id\n"
+        "List the multiplexes network id.ts id",
         CommandListMuxes
     },
     {
@@ -205,6 +218,13 @@ static void CommandListServices(int argc, char **argv)
     Multiplex_t *multiplex = NULL;
     int i;
     bool dvbIds = FALSE;
+    bool filterOnType = FALSE;
+    bool filterTV = FALSE;
+    bool filterRadio = FALSE;
+    bool filterData  = FALSE;
+    bool filterUnknown = FALSE;
+    char *provider = NULL;
+
     /* Make sure the database is up-to-date before displaying the names */
     UpdateDatabase();
 
@@ -227,14 +247,37 @@ static void CommandListServices(int argc, char **argv)
                 return;
             }
         }
+        else if (strcmp(argv[i], "tv") == 0)
+        {
+            filterOnType = TRUE;
+            filterTV = TRUE;
+        }
+        else if (strcmp(argv[i], "radio") == 0)
+        {
+            filterOnType = TRUE;
+            filterRadio= TRUE;
+        }
+        else if (strcmp(argv[i], "data") == 0)
+        {
+            filterOnType = TRUE;
+            filterData = TRUE;
+        }
+        else if (strcmp(argv[i], "unknown") == 0)
+        {
+            filterOnType = TRUE;
+            filterUnknown = TRUE;
+        }
+        else if (strncmp(argv[i], "provider=", 9) == 0)
+        {
+            provider = argv[i] + 9;
+        }
         else
         {
-            int uid = atoi(argv[i]);
             if (multiplex)
             {
                 MultiplexRefDec(multiplex);
             }
-            multiplex = MultiplexFind(uid);
+            multiplex = MultiplexFind(argv[i]);
             if (!multiplex)
             {
                 CommandPrintf("Failed to find multiplex \"%s\"\n", argv[i]);
@@ -262,17 +305,20 @@ static void CommandListServices(int argc, char **argv)
             service = ServiceGetNext(enumerator);
             if (service)
             {
-                if (dvbIds)
+                if (FilterService(service, filterOnType, filterTV, filterRadio, filterData, filterUnknown, provider))
                 {
-                    multiplex = MultiplexFind(service->multiplexUID);
-                    CommandPrintf("%04x.%04x.%04x : %s\n", 
-                        multiplex->networkId & 0xffff, multiplex->tsId & 0xffff,
-                        service->id, service->name);
-                    MultiplexRefDec(multiplex);
-                }
-                else
-                {
-                    CommandPrintf("%s\n", service->name);
+                    if (dvbIds)
+                    {
+                        multiplex = MultiplexFindUID(service->multiplexUID);
+                        CommandPrintf("%04x.%04x.%04x : %s\n", 
+                            multiplex->networkId & 0xffff, multiplex->tsId & 0xffff,
+                            service->id, service->name);
+                        MultiplexRefDec(multiplex);
+                    }
+                    else
+                    {
+                        CommandPrintf("%s\n", service->name);
+                    }
                 }
                 ServiceRefDec(service);
             }
@@ -280,6 +326,40 @@ static void CommandListServices(int argc, char **argv)
         while(service && !ExitProgram);
         ServiceEnumeratorDestroy(enumerator);
     }
+}
+
+static bool FilterService(Service_t *service, bool filterOnType, bool tv, bool radio, bool data, bool unknown, char *provider)
+{
+    bool display = FALSE;
+    if (filterOnType)
+    {
+        if (tv && (service->type == ServiceType_TV))
+        {
+            display = TRUE;
+        }
+        if (radio && (service->type == ServiceType_Radio))
+        {
+            display = TRUE;
+        }
+        if (data && (service->type == ServiceType_Data))
+        {
+            display = TRUE;
+        }
+        if (unknown && (service->type == ServiceType_Unknown))
+        {
+            display = TRUE;
+        }
+    }
+    else
+    {
+        display = TRUE;
+    }
+
+    if (provider)
+    {
+        display = display && (strcmp(provider, service->provider) == 0);
+    }    
+    return display;
 }
 
 static void CommandListMuxes(int argc, char **argv)
@@ -341,14 +421,15 @@ static void CommandServiceInfo(int argc, char **argv)
     if (service)
     {
         static const char *serviceType[]= {"Digital TV", "Digital Radio", "Data", "Unknown"};
-        multiplex = MultiplexFind(service->multiplexUID);            
-        CommandPrintf("Service ID          : 0x%04x\n", service->id);
-        CommandPrintf("Network ID          : 0x%04x\n", multiplex->networkId);
-        CommandPrintf("Transport Stream ID : 0x%04x\n", multiplex->tsId);
+        multiplex = MultiplexFindUID(service->multiplexUID);            
+        CommandPrintf("Name                : %s\n", service->name);
+        CommandPrintf("Provider            : %s\n", service->provider);
+        CommandPrintf("Type                : %s\n", serviceType[service->type]);
+        CommandPrintf("Conditional Access? : %s\n", service->conditionalAccess ? "CA":"Free to Air");
+        CommandPrintf("ID                  : %04x.%04x.%04x\n", multiplex->networkId, multiplex->tsId, service->id);
         CommandPrintf("Multiplex UID       : %d\n", service->multiplexUID);
         CommandPrintf("Source              : 0x%04x\n", service->source);
-        CommandPrintf("Conditional Access? : %s\n", service->conditionalAccess ? "CA":"Free to Air");
-        CommandPrintf("Type                : %s\n", serviceType[service->type]);
+        CommandPrintf("Default Authority   : %s\n", service->defaultAuthority);
         CommandPrintf("PMT PID             : 0x%04x\n", service->pmtPid);
         CommandPrintf("    Version         : %d\n", service->pmtVersion);
         ServiceRefDec(service);
@@ -365,17 +446,7 @@ static void CommandMuxInfo(int argc, char **argv)
     Multiplex_t *multiplex = NULL;
     if (argc == 1)
     {
-        int uid = atoi(argv[0]);
-        multiplex = MultiplexFind(uid);
-        if (multiplex == NULL)
-        {
-            int netId = 0;
-            int tsId = 0;
-            if (sscanf(argv[0], "%x.%x", &netId, &tsId) == 2)
-            {
-                multiplex = MultiplexFindId(netId, tsId);
-            }
-        }
+        multiplex = MultiplexFind(argv[0]);
     }
     if (argc == 2)
     {
@@ -388,8 +459,7 @@ static void CommandMuxInfo(int argc, char **argv)
     if (multiplex)
     {
         CommandPrintf("UID                 : %d\n", multiplex->uid);
-        CommandPrintf("Network ID          : 0x%04x\n", multiplex->networkId);
-        CommandPrintf("Transport Stream ID : 0x%04x\n", multiplex->tsId);
+        CommandPrintf("ID                  : %04x.%04x\n", multiplex->networkId, multiplex->tsId);
         CommandPrintf("PAT Version         : %d\n", multiplex->patVersion);
         CommandPrintf("Tuning Parameters\n");
         CommandPrintf("    Frequency       : %d\n", multiplex->freq);

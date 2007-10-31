@@ -64,6 +64,9 @@ typedef struct Service_t
     int pmtVersion;         /**< Last processed version of the PMT. */
     int pmtPid;             /**< PID the PMT for this service is sent on. */
     int pcrPid;             /**< PID the PCR for this service is sent on. */
+
+    char *provider;
+    char *defaultAuthority;
 }
 Service_t;
 
@@ -97,10 +100,10 @@ int ServiceCount();
 
 /**
  * Retrieve the number of services on the specified multplex.
- * @param freq The multiplex to retrieve the service count for.
+ * @param uid The multiplex to retrieve the service count for.
  * @return The number of services on the specified multiplex.
  */
-int ServiceForMultiplexCount(int freq);
+int ServiceForMultiplexCount(int multiplexuid);
 
 /**
  * Remove a service from the database.
@@ -180,6 +183,21 @@ int ServiceConditionalAccessSet(Service_t  *service, bool ca);
  * @return 0 on success, otherwise an SQLite error code.
  */
 int ServiceTypeSet(Service_t  *service, ServiceType type);
+/**
+ * Set the service provider name for the given service.
+ * @param service The service to update.
+ * @param provider The new provider name of the service.
+ * @return 0 on success, otherwise an SQLite error code.
+ */
+int ServiceProviderSet(Service_t  *service, char *provider);
+
+/**
+ * Set the default authority for the given service.
+ * @param service The service to update.
+ * @param defaultAuthority The new authority of the service.
+ * @return 0 on success, otherwise an SQLite error code.
+ */
+int ServiceDefaultAuthoritySet(Service_t  *service, char *defaultAuthority);
 
 /**
  * Find a service based either on service name or fully qualified id.

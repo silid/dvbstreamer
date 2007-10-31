@@ -314,7 +314,7 @@ static void CommandGetSFService(int argc, char **argv)
 
     FIND_SERVICE_FILTER(argv[0]);
     service = ServiceFilterServiceGet(filter);
-    multiplex = MultiplexFind(service->multiplexUID);
+    multiplex = MultiplexFindUID(service->multiplexUID);
     
     CommandPrintf("%04x.%04x.%04x : \"%s\"\n",
         multiplex->networkId & 0xffff, multiplex->tsId & 0xffff, service->id & 0xffff,

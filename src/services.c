@@ -41,7 +41,10 @@ Manage services and PIDs.
                        SERVICE_NAME "," \
                        SERVICE_PMTVERSION "," \
                        SERVICE_PMTPID ","\
-                       SERVICE_PCRPID " "
+                       SERVICE_PCRPID "," \
+                       SERVICE_PROVIDER "," \
+                       SERVICE_DEFAUTHORITY " "
+
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
@@ -207,7 +210,14 @@ int ServiceNameSet(Service_t  *service, char *name)
     STATEMENT_STEP();
     if (rc == SQLITE_DONE)
     {
-        service->name = strdup(name);
+        if (name != service->name)
+        {
+            if (service->name)
+            {
+                free(service->name);
+            }
+            service->name = strdup(name);
+        }
         rc = SQLITE_OK;
     }
     else
@@ -280,6 +290,68 @@ int ServiceTypeSet(Service_t  *service, ServiceType type)
     if (rc == SQLITE_DONE)
     {
         service->type = type;
+        rc = SQLITE_OK;
+    }
+    else
+    {
+        PRINTLOG_SQLITE3ERROR();
+    }
+    STATEMENT_FINALIZE();
+    return rc;
+}
+
+int ServiceProviderSet(Service_t  *service, char *provider)
+{
+    STATEMENT_INIT;
+
+    STATEMENT_PREPAREVA("UPDATE " SERVICES_TABLE " "
+                        "SET " SERVICE_PROVIDER "='%q' "
+                        "WHERE " SERVICE_MULTIPLEXUID "=%d AND " SERVICE_ID "=%d;",
+                        provider, service->multiplexUID,  service->id);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+    if (rc == SQLITE_DONE)
+    {
+        if (provider != service->provider)
+        {
+            if (service->provider)
+            {
+                free(service->provider);
+            }
+            service->provider = strdup(provider);
+        }
+        rc = SQLITE_OK;
+    }
+    else
+    {
+        PRINTLOG_SQLITE3ERROR();
+    }
+    STATEMENT_FINALIZE();
+    return rc;
+}
+
+int ServiceDefaultAuthoritySet(Service_t  *service, char *defaultAuthority)
+{
+    STATEMENT_INIT;
+
+    STATEMENT_PREPAREVA("UPDATE " SERVICES_TABLE " "
+                        "SET " SERVICE_DEFAUTHORITY "='%q' "
+                        "WHERE " SERVICE_MULTIPLEXUID "=%d AND " SERVICE_ID "=%d;",
+                        defaultAuthority, service->multiplexUID,  service->id);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+    if (rc == SQLITE_DONE)
+    {
+        if (defaultAuthority != service->defaultAuthority)
+        {
+            if (service->defaultAuthority)
+            {
+                free(service->defaultAuthority);
+            }
+            service->defaultAuthority = strdup(defaultAuthority);
+        }
         rc = SQLITE_OK;
     }
     else
@@ -433,6 +505,16 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
         service->pmtVersion = STATEMENT_COLUMN_INT( 6);
         service->pmtPid = STATEMENT_COLUMN_INT( 7);
         service->pcrPid = STATEMENT_COLUMN_INT( 8);
+        name = STATEMENT_COLUMN_TEXT( 9);
+        if (name)
+        {
+            service->provider = strdup(name);
+        }
+        name = STATEMENT_COLUMN_TEXT( 10);
+        if (name)
+        {
+            service->defaultAuthority= strdup(name);
+        }
         return service;
     }
 
@@ -452,6 +534,14 @@ static void ServiceDestructor(void * arg)
     if (service->name)
     {
         free(service->name);
+    }
+    if (service->provider)
+    {
+        free(service->provider);
+    }
+    if (service->defaultAuthority)
+    {
+        free(service->defaultAuthority);
     }
 }
 

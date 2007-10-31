@@ -173,8 +173,7 @@ static void CommandScan(int argc, char **argv)
     }
     else
     {
-        int muxfreq = atoi(argv[0]);
-        multiplex = MultiplexFindFrequency(muxfreq);
+        multiplex = MultiplexFind(argv[0]);
         if (multiplex)
         {
             ScanMultiplex(multiplex);
@@ -198,7 +197,7 @@ static void ScanMultiplex(Multiplex_t *multiplex)
     bool seenSDTRecieved = FALSE;
     int ret = 0;
     
-    CommandPrintf("Scanning %d\n", multiplex->freq);
+    CommandPrintf("Scanning %d\n", multiplex->uid);
 
     TuningCurrentMultiplexSet(multiplex);
 
