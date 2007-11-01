@@ -195,14 +195,14 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
                     name = DVBTextToUTF8((char *)servicedesc->i_service_name, servicedesc->i_service_name_length);
 
                     /* Only update the name if it has changed */
-                    if (strcmp(name, service->name))
+                    if (name && strcmp(name, service->name))
                     {
                         LogModule(LOG_DEBUG, SDTPROCESSOR, "Updating service 0x%04x = %s\n", sdtservice->i_service_id, name);
                         CacheUpdateServiceName(service, name);
                     }
                     name = DVBTextToUTF8((char *)servicedesc->i_service_provider_name, servicedesc->i_service_provider_name_length);
                     LogModule(LOG_DEBUG, SDTPROCESSOR, "service provider 0x%04x = %s\n", sdtservice->i_service_id, name);                    
-                    if ((service->provider==NULL) || strcmp(name, service->provider))
+                    if ((service->provider==NULL) || (name && strcmp(name, service->provider)))
                     {
                         LogModule(LOG_DEBUG, SDTPROCESSOR, "Updating service provider 0x%04x = %s\n", sdtservice->i_service_id, name);
                         CacheUpdateServiceProvider(service, name);                        
