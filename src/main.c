@@ -374,6 +374,7 @@ int main(int argc, char *argv[])
             RemoteInterfaceDeInit();
         }
     }
+    ServiceFilterDestroy(primaryServiceFilter);
 
     /*
      * Deinit Plugins after outputs so all delivery methods are properly torn
@@ -384,8 +385,6 @@ int main(int argc, char *argv[])
     DEINIT(TuningDeInit(), "tuning");
 
     DEINIT(CommandDeInit(), "commands");
-
-    ServiceFilterDestroy(primaryServiceFilter);
 
     /* Disable all the filters */
     for (i = 0; i < MAX_PIDFILTERS; i ++)
