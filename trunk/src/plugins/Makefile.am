@@ -18,6 +18,7 @@ plugins_LTLIBRARIES = \
 	extractpes.la \
 	epgtoxmltv.la \
 	manualfilters.la \
+	queryepg.la \
 	$(atsc_plugins) \
 	$(dvb_plugins)
 endif
@@ -95,4 +96,9 @@ manualfilters_la_SOURCES = \
     manualfilters.c
 
 manualfilters_la_LDFLAGS = -module -no-undefined -avoid-version
+
+queryepg_la_SOURCES = \
+    queryepg.c
+
+queryepg_la_LDFLAGS = -module -no-undefined -avoid-version
 
