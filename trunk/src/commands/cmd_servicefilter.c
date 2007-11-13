@@ -65,6 +65,9 @@ Command functions for service filter related tasks
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
+static void CommandSelect(int argc, char **argv);
+static void CommandSetMRL(int argc, char **argv);
+static void CommandGetMRL(int argc, char **argv);
 
 static void CommandAddSF(int argc, char **argv);
 static void CommandRemoveSF(int argc, char **argv);
@@ -85,6 +88,33 @@ static void CommandGetSFMRL(int argc, char **argv);
 
 Command_t CommandDetailsServiceFilter[] = 
 {
+    {
+        "select",
+        FALSE, 1, 1,
+        "Select a new service to stream.",
+        "select <service name>\n"
+        "Sets <service name> as the current service, this may mean tuning to a different "
+        "multiplex.",
+        CommandSelect
+    },
+    {
+        "setmrl",
+        TRUE, 1,1,
+        "Set the MRL of the primary service filter.",
+        "setmrl <MRL>\n"
+        "Set the MRL of the primary service filter.\n"
+        "NOTE: This is actually an alias of setsfmrl called with <Primary> as the service filter name.",
+        CommandSetMRL
+    },
+    {
+        "getmrl",
+        TRUE, 0,0,
+        "Get the primary service filter MRL.",
+        "getmrl\n"
+        "Get the MRL of the primary service filter.\n"
+        "NOTE: This is actually an alias of getsfmrl called with <Primary> as the service filter name.",
+        CommandGetMRL
+    },    
     {
         "addsf",
         TRUE, 2, 2,
@@ -179,6 +209,49 @@ void CommandUnInstallServiceFilter(void)
 /*******************************************************************************
 * Local Functions                                                              *
 *******************************************************************************/
+
+static void CommandSelect(int argc, char **argv)
+{
+    Service_t *service;
+
+    CommandCheckAuthenticated();
+
+    UpdateDatabase();
+    service = ServiceFind(argv[0]);
+    
+    if (service)
+    {
+        Multiplex_t *multiplex;
+        TuningCurrentServiceSet(service);
+        
+        multiplex = TuningCurrentMultiplexGet();
+        
+        CommandPrintf("Current Service : \"%s\" (0x%04x) Multiplex: %d\n",
+            service->name, service->id, multiplex->freq);
+        ServiceRefDec(service);
+        MultiplexRefDec(multiplex);
+    }
+    else
+    {
+        CommandError(COMMAND_ERROR_GENERIC, "Service not found!");
+    }
+}
+
+static void CommandSetMRL(int argc, char **argv)
+{
+    char *tmpArgs[2];
+    tmpArgs[0] = (char*)PrimaryService;
+    tmpArgs[1] = argv[0];
+    CommandSetSFMRL(2, tmpArgs);
+}
+
+static void CommandGetMRL(int argc, char **argv)
+{
+    char *tmpArgs[1];
+    tmpArgs[0] = (char*)PrimaryService;
+    CommandGetSFMRL(1, tmpArgs);
+}
+
 
 static void CommandAddSF(int argc, char **argv)
 {

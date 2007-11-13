@@ -81,7 +81,7 @@ static void ParseLine(char *line, char **command, char **argument);
 
 
 static void CommandQuit(int argc, char **argv);
-static void CommandSelect(int argc, char **argv);
+
 static void CommandHelp(int argc, char **argv);
 static void CommandGet(int argc, char **argv);
 static void CommandSet(int argc, char **argv);
@@ -105,15 +105,7 @@ static Command_t coreCommands[] =
         "Exit the program, can be used in the startup file to stop further processing.",
         CommandQuit
     },
-    {
-        "select",
-        FALSE, 1, 1,
-        "Select a new service to stream.",
-        "select <service name>\n"
-        "Sets <service name> as the current service, this may mean tuning to a different "
-        "multiplex.",
-        CommandSelect
-    },
+
     {
         "help",
         TRUE, 0, 1,
@@ -596,34 +588,6 @@ static void CommandQuit(int argc, char **argv)
     else
     {
         quit = TRUE;
-    }
-}
-
-
-static void CommandSelect(int argc, char **argv)
-{
-    Service_t *service;
-
-    CommandCheckAuthenticated();
-
-    UpdateDatabase();
-    service = ServiceFind(argv[0]);
-    
-    if (service)
-    {
-        Multiplex_t *multiplex;
-        TuningCurrentServiceSet(service);
-        
-        multiplex = TuningCurrentMultiplexGet();
-        
-        CommandPrintf("Current Service : \"%s\" (0x%04x) Multiplex: %d\n",
-            service->name, service->id, multiplex->freq);
-        ServiceRefDec(service);
-        MultiplexRefDec(multiplex);
-    }
-    else
-    {
-        CommandError(COMMAND_ERROR_GENERIC, "Service not found!");
     }
 }
 
