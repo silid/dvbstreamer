@@ -20,6 +20,7 @@ schedule.c
 Plugin to collect EPG schedule information.
 
 */
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -34,6 +35,7 @@ Plugin to collect EPG schedule information.
 #include "dvbpsi/eit.h"
 #include "dvbpsi/dr_4d.h"
 #include "dvbpsi/dr_55.h"
+#include "dvbpsi/dr_76.h"
 
 #include "list.h"
 #include "logging.h"
@@ -49,6 +51,10 @@ Plugin to collect EPG schedule information.
 
 #define SHORT_EVENT_DR      0x4d
 #define PARENTAL_RATINGS_DR 0x55
+#define CRID_DR             0x76
+
+#define UK_FREEVIEW_CONTENT 49
+#define UK_FREEVIEW_SERIES  50
 
 /*******************************************************************************
 * Prototypes                                                                   *
@@ -70,11 +76,15 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *event)
 static void ConvertToTM(dvbpsi_date_time_t *datetime, dvbpsi_eit_event_duration_t *duration,
     struct tm *startTime, struct tm *endTime);
 
+static char *ResolveCRID(EPGServiceRef_t *serviceRef, char *relativeCRID);
+
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
 static PluginFilter_t filter = {NULL, Init0x12Filter, Deinit0x12Filter};
 static const char DVBSCHEDULE[] = "DVBSchedule";
+
+static const char ISO639NoLinguisticContent[] = "zxx";
 
 static List_t *eitQueue = NULL;
 static pthread_mutex_t eitQueueMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -259,39 +269,109 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *eiteve
         
     for (descriptor = eitevent->p_first_descriptor; descriptor; descriptor = descriptor->p_next)
     {
-        if (descriptor->i_tag == SHORT_EVENT_DR)
+        switch(descriptor->i_tag)
         {
-            char lang[4];
-            char *temp;
-            dvbpsi_short_event_dr_t * sed = dvbpsi_DecodeShortEventDr(descriptor);
-            lang[0] = sed->i_iso_639_code[0];
-            lang[1] = sed->i_iso_639_code[1];
-            lang[2] = sed->i_iso_639_code[2];
-            lang[3] = 0;
-            temp = DVBTextToUTF8((char *)sed->i_event_name, sed->i_event_name_length);
-            EPGDBaseDetailAdd(serviceRef, epgevent.eventId, lang, EPG_EVENT_DETAIL_TITLE, temp);
-            temp = DVBTextToUTF8((char *)sed->i_text, sed->i_text_length);
-            EPGDBaseDetailAdd(serviceRef, epgevent.eventId, lang, EPG_EVENT_DETAIL_DESCRIPTION, temp);
-        }
-        if (descriptor->i_tag == PARENTAL_RATINGS_DR)
-        {
-            dvbpsi_parental_rating_dr_t * prd = dvbpsi_DecodeParentalRatingDr(descriptor);
-            char cc[4];
-            int i;
-            cc[3] = 0;
-            
-            for (i=0; i < prd->i_ratings_number; i ++)
-            {
-                cc[0] = prd->p_parental_rating[i].i_country_code >> 16;
-                cc[1] = prd->p_parental_rating[i].i_country_code >> 8;
-                cc[2] = prd->p_parental_rating[i].i_country_code >> 0;
-                if (prd->p_parental_rating[i].i_rating < 0x0f)
+            case SHORT_EVENT_DR:
                 {
-                    char *rating =  RatingsTable[prd->p_parental_rating[i].i_rating];
-                    EPGDBaseRatingAdd(serviceRef, epgevent.eventId, cc,rating);
+                    char lang[4];
+                    char *temp;
+                    dvbpsi_short_event_dr_t * sed = dvbpsi_DecodeShortEventDr(descriptor);
+                    lang[0] = sed->i_iso_639_code[0];
+                    lang[1] = sed->i_iso_639_code[1];
+                    lang[2] = sed->i_iso_639_code[2];
+                    lang[3] = 0;
+                    temp = DVBTextToUTF8((char *)sed->i_event_name, sed->i_event_name_length);
+                    if (temp)
+                    {
+                        EPGDBaseDetailAdd(serviceRef, epgevent.eventId, lang, EPG_EVENT_DETAIL_TITLE, temp);
+                        free(temp);
+                    }
+                    temp = DVBTextToUTF8((char *)sed->i_text, sed->i_text_length);
+                    if (temp)
+                    {
+                        EPGDBaseDetailAdd(serviceRef, epgevent.eventId, lang, EPG_EVENT_DETAIL_DESCRIPTION, temp);
+                        free(temp);
+                    }
                 }
-            }
+                break;
+            case PARENTAL_RATINGS_DR:
+                {
+                    dvbpsi_parental_rating_dr_t * prd = dvbpsi_DecodeParentalRatingDr(descriptor);
+                    char cc[4];
+                    int i;
+                    cc[3] = 0;
+                    
+                    for (i=0; i < prd->i_ratings_number; i ++)
+                    {
+                        cc[0] = prd->p_parental_rating[i].i_country_code >> 16;
+                        cc[1] = prd->p_parental_rating[i].i_country_code >> 8;
+                        cc[2] = prd->p_parental_rating[i].i_country_code >> 0;
+                        if (prd->p_parental_rating[i].i_rating < 0x0f)
+                        {
+                            char *rating =  RatingsTable[prd->p_parental_rating[i].i_rating];
+                            EPGDBaseRatingAdd(serviceRef, epgevent.eventId, cc,rating);
+                        }
+                    }
+                }
+                break;
+            case CRID_DR:
+                {
+                    dvbpsi_content_id_dr_t * cridd = dvbpsi_DecodeContentIdDr(descriptor);
+                    int i;
+                    char *type = NULL;
+                    LogModule(LOG_DEBUG, DVBSCHEDULE, "CRID Descriptor with %d entries\n", cridd->i_number_of_entries);
+                    for (i = 0;i < cridd->i_number_of_entries; i ++)
+                    {
+                        LogModule(LOG_DEBUG, DVBSCHEDULE, "%d) Type    : %d\n", i, cridd->p_entries[i].i_type);
+                        switch (cridd->p_entries[i].i_type)
+                        {
+                            case UK_FREEVIEW_CONTENT:
+                            case CRID_TYPE_CONTENT:
+                                type = "content";
+                                break;
+                            case UK_FREEVIEW_SERIES:
+                            case CRID_TYPE_SERIES:
+                                type = "series";
+                                break;                                
+                            default:
+                                type = NULL;
+                                break;
+                        }
+                        LogModule(LOG_DEBUG, DVBSCHEDULE, "%d) Location: %d\n", i, cridd->p_entries[i].i_location);                        
+
+                        if (cridd->p_entries[i].i_location == CRID_LOCATION_DESCRIPTOR)
+                        {
+                            LogModule(LOG_DEBUG, DVBSCHEDULE, "%d) Path    : %s\n", i, cridd->p_entries[i].value.path);
+                            if (type)
+                            {
+                                if (cridd->p_entries[i].value.path[0] == '/')
+                                {
+                                    char *crid = ResolveCRID(serviceRef, (char*)cridd->p_entries[i].value.path);
+                                    if (crid)
+                                    {
+                                        EPGDBaseDetailAdd(serviceRef, epgevent.eventId, (char*)ISO639NoLinguisticContent, 
+                                        type, crid);
+                                        free(crid);
+                                    }
+                                    
+                                }
+                                else
+                                {
+                                    EPGDBaseDetailAdd(serviceRef, epgevent.eventId, (char*)ISO639NoLinguisticContent, 
+                                        type, (char *)cridd->p_entries[i].value.path);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            LogModule(LOG_DEBUG, DVBSCHEDULE, "%d) Ref     : %d\n", i, cridd->p_entries[i].value.ref);
+                        }
+                    }
+                    
+                }
+                break;
         }
+            
     }
 }
 
@@ -314,4 +394,21 @@ static void ConvertToTM(dvbpsi_date_time_t *datetime, dvbpsi_eit_event_duration_
 
     temp_time = gmtime(&secs);
     *endTime = *temp_time;
+}
+
+static char *ResolveCRID(EPGServiceRef_t *serviceRef, char *relativeCRID)
+{
+    char *result = NULL;
+    Service_t *service;
+    service = ServiceFindFQID(serviceRef->netId, serviceRef->tsId, serviceRef->serviceId);
+    if (service)
+    {
+        if (service->defaultAuthority)
+        {
+            asprintf(&result, "%s%s", service->defaultAuthority,relativeCRID);
+        }
+        ServiceRefDec(service);
+    }
+
+    return result;
 }
