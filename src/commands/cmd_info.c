@@ -48,12 +48,26 @@ Command functions to supply the user with information about the system.
 #include "tuning.h"
 
 /*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
+#define FILTER_TYPE_NOT_USED 0
+#define FILTER_TYPE_TV       1
+#define FILTER_TYPE_RADIO    2
+#define FILTER_TYPE_DATA     4
+#define FILTER_TYPE_UNKNOWN  8
+
+#define FILTER_ACCESS_NOT_USED 0
+#define FILTER_ACCESS_FTA      1
+#define FILTER_ACCESS_CA       2
+
+/*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
 static void CommandListServices(int argc, char **argv);
-static bool FilterService(Service_t *service, bool filter, bool tv, bool radio, bool data, bool unknown, char* provider);
+static bool FilterService(Service_t *service, uint32_t filterByType, uint32_t filterByAccess, char* provider);
 static void CommandListMuxes(int argc, char **argv);
 static void CommandListPids(int argc, char **argv);
+static char *GetStreamTypeString(int type);
 static void CommandCurrent(int argc, char **argv);
 static void CommandServiceInfo(int argc, char **argv);
 static void CommandMuxInfo(int argc, char **argv);
@@ -99,7 +113,7 @@ Command_t CommandDetailsInfo[] =
     },
     {
         "lspids",
-        FALSE, 1, 1,
+        TRUE, 1, 2,
         "List the PIDs for a specified service.",
         "lspids <service name>\n"
         "List all the PIDs specified in <service name> PMT.",
@@ -218,11 +232,8 @@ static void CommandListServices(int argc, char **argv)
     Multiplex_t *multiplex = NULL;
     int i;
     bool dvbIds = FALSE;
-    bool filterOnType = FALSE;
-    bool filterTV = FALSE;
-    bool filterRadio = FALSE;
-    bool filterData  = FALSE;
-    bool filterUnknown = FALSE;
+    uint32_t filterByType = FILTER_TYPE_NOT_USED;
+    uint32_t filterByAccess = FILTER_ACCESS_NOT_USED;
     char *provider = NULL;
     char *providerStr = "provider=";
 
@@ -250,23 +261,27 @@ static void CommandListServices(int argc, char **argv)
         }
         else if (strcmp(argv[i], "tv") == 0)
         {
-            filterOnType = TRUE;
-            filterTV = TRUE;
+            filterByType |= FILTER_TYPE_TV;
         }
         else if (strcmp(argv[i], "radio") == 0)
         {
-            filterOnType = TRUE;
-            filterRadio= TRUE;
+            filterByType |= FILTER_TYPE_RADIO;
         }
         else if (strcmp(argv[i], "data") == 0)
         {
-            filterOnType = TRUE;
-            filterData = TRUE;
+            filterByType |= FILTER_TYPE_DATA;
         }
         else if (strcmp(argv[i], "unknown") == 0)
         {
-            filterOnType = TRUE;
-            filterUnknown = TRUE;
+            filterByType |= FILTER_TYPE_UNKNOWN;
+        }
+        else if (strcmp(argv[i], "fta") == 0)
+        {
+            filterByAccess |= FILTER_ACCESS_FTA;
+        }
+        else if (strcmp(argv[i], "ca") == 0)
+        {
+            filterByAccess |= FILTER_ACCESS_CA;
         }
         else if (strncmp(argv[i], providerStr, strlen(providerStr)) == 0)
         {
@@ -306,7 +321,7 @@ static void CommandListServices(int argc, char **argv)
             service = ServiceGetNext(enumerator);
             if (service)
             {
-                if (FilterService(service, filterOnType, filterTV, filterRadio, filterData, filterUnknown, provider))
+                if (FilterService(service, filterByType, filterByAccess, provider))
                 {
                     if (dvbIds)
                     {
@@ -329,38 +344,61 @@ static void CommandListServices(int argc, char **argv)
     }
 }
 
-static bool FilterService(Service_t *service, bool filterOnType, bool tv, bool radio, bool data, bool unknown, char *provider)
+static bool FilterService(Service_t *service, uint32_t filterByType, uint32_t filterByAccess, char* provider)
 {
-    bool display = FALSE;
-    if (filterOnType)
+    bool filterByTypeResult = FALSE;
+    bool filterByAccessResult = FALSE;
+    bool filterByProviderResult = FALSE;
+    
+    if (filterByType)
     {
-        if (tv && (service->type == ServiceType_TV))
+        if ((filterByType & FILTER_TYPE_TV )&& (service->type == ServiceType_TV))
         {
-            display = TRUE;
+            filterByTypeResult = TRUE;
         }
-        if (radio && (service->type == ServiceType_Radio))
+        if ((filterByType & FILTER_TYPE_RADIO)&& (service->type == ServiceType_Radio))
         {
-            display = TRUE;
+            filterByTypeResult = TRUE;
         }
-        if (data && (service->type == ServiceType_Data))
+        if ((filterByType & FILTER_TYPE_DATA)&& (service->type == ServiceType_Data))
         {
-            display = TRUE;
+            filterByTypeResult = TRUE;
         }
-        if (unknown && (service->type == ServiceType_Unknown))
+        if ((filterByType & FILTER_TYPE_UNKNOWN)&& (service->type == ServiceType_Unknown))
         {
-            display = TRUE;
+            filterByTypeResult = TRUE;
         }
     }
     else
     {
-        display = TRUE;
+        filterByTypeResult = TRUE;
+    }
+
+    if (filterByAccess)
+    {
+        if ((filterByAccess & FILTER_ACCESS_FTA) && !service->conditionalAccess)
+        {
+            filterByAccessResult = TRUE;
+        }        
+        if ((filterByAccess & FILTER_ACCESS_CA) && service->conditionalAccess)
+        {
+            filterByAccessResult = TRUE;
+        }
+    }
+    else
+    {
+        filterByAccessResult = TRUE;
     }
 
     if (provider)
     {
-        display = display && service->provider && (strcmp(provider, service->provider) == 0);
+        filterByProviderResult = service->provider && (strcmp(provider, service->provider) == 0);
     }    
-    return display;
+    else
+    {
+        filterByProviderResult = TRUE;
+    }
+    return filterByTypeResult && filterByAccessResult && filterByProviderResult;
 }
 
 static void CommandListMuxes(int argc, char **argv)
@@ -564,6 +602,13 @@ static void CommandListPids(int argc, char **argv)
         bool cached = TRUE;
         int i;
         PIDList_t *pids;
+        bool numericOutput = FALSE;
+            
+        if ((argc == 2) && (strcmp(argv[1], "-n") == 0))
+        {
+            numericOutput =TRUE;
+        }
+        
         pids = CachePIDsGet(service);
         if (pids == NULL)
         {
@@ -576,7 +621,15 @@ static void CommandListPids(int argc, char **argv)
             CommandPrintf("%d PIDs for \"%s\"%s\n", pids->count, argv[0], cached ? " (Cached)":"");
             for (i = 0; i < pids->count; i ++)
             {
+                if (numericOutput)
+                {
                 CommandPrintf("%d %d %d\n",pids->pids[i].pid, pids->pids[i].type, pids->pids[i].subType);
+            }
+                else
+                {
+                    CommandPrintf("%d %s\n", pids->pids[i].pid, GetStreamTypeString(pids->pids[i].type));
+                }
+
             }
 
             if (cached)
@@ -598,6 +651,40 @@ static void CommandListPids(int argc, char **argv)
     {
         CommandError(COMMAND_ERROR_GENERIC, "Service not found!");
     }
+}
+
+static char *GetStreamTypeString(int type)
+{
+    char *result= "Unknown";
+    switch(type)
+    {
+        case 0x00 : result ="ITU-T | ISO/IEC Reserved"; break;
+        case 0x01 : result ="ISO/IEC 11172 Video"; break;
+        case 0x02 : result ="ITU-T Rec. H.262 | ISO/IEC 13818-2 Video or ISO/IEC 11172-2 constrained parameter video stream"; break;
+        case 0x03 : result ="ISO/IEC 11172 Audio"; break;
+        case 0x04 : result ="ISO/IEC 13818-3 Audio"; break;
+        case 0x05 : result ="ITU-T Rec. H.222.0 | ISO/IEC 13818-1 private_sections"; break;
+        case 0x06 : result ="ITU-T Rec. H.222.0 | ISO/IEC 13818-1 PES packets containing private data"; break;
+        case 0x07 : result ="ISO/IEC 13522 MHEG"; break;
+        case 0x08 : result ="ITU-T Rec. H.222.0 | ISO/IEC 13818-1 Annex A DSM-CC"; break;
+        case 0x09 : result ="ITU-T Rec. H.222.1"; break;
+        case 0x0A : result ="ISO/IEC 13818-6 type A"; break;
+        case 0x0B : result ="ISO/IEC 13818-6 type B"; break;
+        case 0x0C : result ="ISO/IEC 13818-6 type C"; break;
+        case 0x0D : result ="ISO/IEC 13818-6 type D"; break;
+        case 0x0E : result ="ITU-T Rec. H.222.0 | ISO/IEC 13818-1 auxiliary"; break;
+        case 0x0F : result ="ISO/IEC 13818-7 Audio with ADTS transport syntax"; break;
+        case 0x10 : result ="ISO/IEC 14496-2 Visual"; break;
+        case 0x11 : result ="ISO/IEC 14496-3 Audio with the LATM transport syntax as defined in ISO/IEC 14496-3 / AMD 1"; break;
+        case 0x12 : result ="ISO/IEC 14496-1 SL-packetized stream or FlexMux stream carried in PES packets"; break;
+        case 0x13 : result ="ISO/IEC 14496-1 SL-packetized stream or FlexMux stream carried in ISO/IEC14496_sections."; break;
+        case 0x14 : result ="ISO/IEC 13818-6 Synchronized Download Protocol"; break;
+        case 0x15 ... 0x7F : result ="ITU-T Rec. H.222.0 | ISO/IEC 13818-1 Reserved"; break;
+        case 0x80 ... 0xFF : result ="User Private"; break;
+        default:
+            break;
+    }
+    return result;
 }
 /*******************************************************************************
 * Variable Functions                                                           *
