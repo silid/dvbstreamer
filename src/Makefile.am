@@ -56,7 +56,8 @@ plugin_src = \
     plugins/udp.c \
     plugins/udpoutput.c \
     plugins/sap.c \
-    plugins/manualfilters.c
+    plugins/manualfilters.c \
+    plugins/queryepg.c
     
 if ENABLE_ATSC
 atsc_plugin_src=plugins/atsctoepg.c
