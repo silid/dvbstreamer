@@ -434,6 +434,10 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t *state)
     for (i = 0; (pids != NULL) && (i < pids->count) && (!vfound || !afound || !sfound); i ++)
     {
         LogModule(LOG_DEBUG, SERVICEFILTER, "\tpid = %x type =%d subtype = %d\n", pids->pids[i].pid, pids->pids[i].type, pids->pids[i].subType);
+        /* Look for:
+         * 0x01 = ISO/IEC 11172 Video
+         * 0x02 = ITU-T Rec. H.262 | ISO/IEC 13818-2 Video or ISO/IEC 11172-2 constrained parameter video stream
+         */
         if (!vfound && ((pids->pids[i].type == 1) || (pids->pids[i].type == 2)))
         {
             vfound = TRUE;
@@ -441,13 +445,21 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t *state)
             es = dvbpsi_PMTAddES(&pmt, pids->pids[i].type,  pids->pids[i].pid);
         }
 
-        if (!afound && ((pids->pids[i].type == 3) || (pids->pids[i].type == 4)))
+        /* Look for:
+         * 0x03 = ISO/IEC 11172 Audio
+         * 0x04 = ISO/IEC 13818-3 Audio
+         * 0x81 = ATSC AC-3 (User Private in ISO 13818-1 : 2000)
+         */
+        if (!afound && ((pids->pids[i].type == 3) || (pids->pids[i].type == 4) || 
+                        (pids->pids[i].type == 0x81)))
         {
             afound = TRUE;
             state->audioPID = pids->pids[i].pid;
             es = dvbpsi_PMTAddES(&pmt, pids->pids[i].type,  pids->pids[i].pid);
         }
-
+        /* For DVB, we look at type 0x06 = ITU-T Rec. H.222.0 | ISO/IEC 13818-1 PES packets containing private data
+         * which is used for DVB subtitles and AC-3 streams.
+         */
         if (pids->pids[i].type == 6)
         {
             dvbpsi_descriptor_t *desc = pids->pids[i].descriptors;
