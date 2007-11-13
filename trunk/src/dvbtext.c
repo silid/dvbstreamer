@@ -25,6 +25,8 @@ Note: A lot of this code is taken from the tvgrab_dvb source!
 #include "config.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
+#include <pthread.h>
 
 #include <iconv.h>
 
@@ -52,6 +54,7 @@ enum CS {
 *******************************************************************************/
 static enum CS cs_old = CS_UNKNOWN;
 static iconv_t cd;
+static pthread_mutex_t ResultBufferMutex = PTHREAD_MUTEX_INITIALIZER;
 static char ResultBuffer[256 * 6];
 static char UTF8[] = "UTF-8";
 static char DVBTEXT[] = "DVBText";
@@ -69,6 +72,7 @@ char *DVBTextToUTF8(char *toConvert, size_t toConvertLen)
     char *outBytes;
     char *inBytes;
     size_t ret;
+    char *result;
 
     switch ((unsigned char)*toConvert) 
     {
@@ -136,6 +140,7 @@ char *DVBTextToUTF8(char *toConvert, size_t toConvertLen)
         case 0x00:
             return "";
     }
+    pthread_mutex_lock(&ResultBufferMutex);    
     LogModule(LOG_DEBUG, DVBTEXT, "Selected %d to convert to utf-8\n", cs_new);
     if ((cs_old != cs_new) || (cs_old == CS_UNKNOWN))
     {
@@ -213,14 +218,17 @@ char *DVBTextToUTF8(char *toConvert, size_t toConvertLen)
 
     LogModule(LOG_DEBUG,DVBTEXT,  "Starting conversion. (%d, %d, %d)\n", cd , inBytesLeft, outBytesLeft);
     ret = iconv(cd, (ICONV_INPUT_CAST)&inBytes, &inBytesLeft, &outBytes, &outBytesLeft);
+
     if (ret == -1)
     {
         LogModule(LOG_DEBUG, DVBTEXT, "Conversion failed.\n");
+        pthread_mutex_unlock(&ResultBufferMutex);    
         return NULL;
     }
     *outBytes = 0;
-
+    result = strdup(ResultBuffer);
+    pthread_mutex_unlock(&ResultBufferMutex);
     LogModule(LOG_DEBUG, DVBTEXT, "Conversion successful.\n");
-    return ResultBuffer;
+    return result;
 }
 
