@@ -29,6 +29,7 @@ Logical Channel Number Query Plugin.
 #include "logging.h"
 #include "plugin.h"
 #include "dbase.h"
+#include "tuning.h"
 #include "services.h"
 #include "multiplexes.h"
 #include "dvbpsi/nit.h"
@@ -77,9 +78,8 @@ static void ProcessNIT(dvbpsi_nit_t *nit);
 static void LCNQueryInstalled(bool installed );
 static void CommandListLCN(int argc, char **argv);
 static void CommandFindLCN(int argc, char **argv);
+static void CommandSelectLCN(int argc, char **argv);
 static LCNEntry_t *GetEntry(int lcn);
-static Service_t *FindService(uint16_t networkId , uint16_t tsId , uint16_t serviceId);
-
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -108,7 +108,14 @@ PLUGIN_COMMANDS(
         "Find the service for a logical channel number.",
         "Given a logical channel number return the service name it refers to.",
         CommandFindLCN
-    }
+    },
+    {
+        "selectlcn",
+        TRUE, 1, 1,
+        "Select the service from a logical channel number.",
+        "Select service refered to by the logical channel number as the primary service.",
+        CommandSelectLCN
+    } 
 );
 #ifdef __CYGWIN__
 #define PluginInterface LCNQueryPluginInterface
@@ -117,7 +124,7 @@ PLUGIN_COMMANDS(
 PLUGIN_INTERFACE_CF(
     PLUGIN_FOR_DVB,
     "LCNQuery", 
-    "0.1", 
+    "0.2", 
     "Logical Channel Number look-up/list", 
     "charrea6@users.sourceforge.net"
 );
@@ -255,7 +262,7 @@ static void CommandListLCN(int argc, char **argv)
     {
         if (entries[i].networkId != ONETID_INVALID)
         {
-            Service_t *service = FindService(entries[i].networkId, entries[i].tsId, entries[i].serviceId);
+            Service_t *service = ServiceFindFQID(entries[i].networkId, entries[i].tsId, entries[i].serviceId);
             if (service)
             {
                 if (entries[i].visible)
@@ -288,7 +295,7 @@ static void CommandFindLCN(int argc, char **argv)
         return;
     }
 
-    service = FindService(entry->networkId, entry->tsId, entry->serviceId);
+    service = ServiceFindFQID(entry->networkId, entry->tsId, entry->serviceId);
     if (service)
     {
         CommandPrintf("%s\n", service->name);
@@ -297,21 +304,37 @@ static void CommandFindLCN(int argc, char **argv)
     
 }
 
+static void CommandSelectLCN(int argc, char **argv)
+{
+    int lcn = atoi(argv[0]);
+    Service_t *service;
+    LCNEntry_t *entry;
+    if (lcn == 0)
+    {
+        CommandError(COMMAND_ERROR_WRONG_ARGS, "Unknown Logical Channel Number.");
+        return;
+    }
+    entry = GetEntry(lcn);
+    if (entry->networkId == ONETID_INVALID)
+    {
+        CommandError(COMMAND_ERROR_GENERIC, "No such Logical Channel Number.");
+        return;
+    }
+
+    service = ServiceFindFQID(entry->networkId, entry->tsId, entry->serviceId);
+    if (service)
+    {
+        TuningCurrentServiceSet(service);
+        CommandPrintf("%04x.%04x.%04x : \"%s\"\n", entry->networkId, entry->tsId, entry->serviceId, service->name);
+        ServiceRefDec(service);
+    }
+    else
+    {
+        CommandError(COMMAND_ERROR_GENERIC, "Failed to find service!");        
+    }
+}
 static LCNEntry_t *GetEntry(int lcn)
 {
     return &entries[lcn - 1];
 }
 
-static Service_t *FindService(uint16_t networkId, uint16_t tsId, uint16_t serviceId)
-{
-    Multiplex_t *multiplex;
-    Service_t *service;
-    multiplex = MultiplexFindId((int) networkId, (int) tsId);
-    if (!multiplex)
-    {
-        return NULL;
-    }
-    service = ServiceFindId(multiplex, (int)serviceId);
-    MultiplexRefDec(multiplex);
-    return service;
-}
