@@ -315,8 +315,21 @@ int main(int argc, char *argv[])
     dmInstance = DeliveryMethodCreate(primaryMRL);
     if (dmInstance == NULL)
     {
-        dmInstance = DeliveryMethodCreate("null://");
+        if (strcmp(primaryMRL, "null://"))
+        {
+            printf("Failed to create delivery method for mrl (%s) falling back to null://\n", primaryMRL);
+            dmInstance = DeliveryMethodCreate("null://");
+        }
+        if (dmInstance == NULL)
+        {
+            fprintf(stderr,
+                "Failed to create fallback (null://) delivery method\n"
+                "Check that you have installed dvbstreamer plugins to the correct place!\n"
+                "Plugin path: %s\n", DVBSTREAMER_PLUGINDIR);
+            exit(1);
+        }
     }
+    
     ServiceFilterDeliveryMethodSet(primaryServiceFilter, dmInstance);
     primaryServiceFilter->enabled = TRUE;
     
