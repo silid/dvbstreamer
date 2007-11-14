@@ -225,9 +225,8 @@ static void CommandSelect(int argc, char **argv)
         TuningCurrentServiceSet(service);
         
         multiplex = TuningCurrentMultiplexGet();
-        
-        CommandPrintf("Current Service : \"%s\" (0x%04x) Multiplex: %d\n",
-            service->name, service->id, multiplex->freq);
+        CommandPrintf("%04x.%04x.%04x : \"%s\"\n", 
+            multiplex->networkId, multiplex->tsId, service->id, service->name);
         ServiceRefDec(service);
         MultiplexRefDec(multiplex);
     }
