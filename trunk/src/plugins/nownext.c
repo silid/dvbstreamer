@@ -270,7 +270,7 @@ static void UpdateEvent(Event_t *event, dvbpsi_eit_event_t *eitevent)
 *******************************************************************************/
 static ServiceNowNextInfo_t *FindServiceName(char *name)
 {
-    Service_t *service = ServiceFindName(name);
+    Service_t *service = ServiceFind(name);
     Multiplex_t *multiplex;
     ServiceNowNextInfo_t *info;
     if (!service)
