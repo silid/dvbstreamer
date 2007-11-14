@@ -74,6 +74,11 @@ char *DVBTextToUTF8(char *toConvert, size_t toConvertLen)
     size_t ret;
     char *result;
 
+    if (toConvertLen == 0)
+    {
+        return NULL;
+    }
+
     switch ((unsigned char)*toConvert) 
     {
         /* if the first byte of the text field has a value in the range of "0x20"
@@ -138,7 +143,7 @@ char *DVBTextToUTF8(char *toConvert, size_t toConvertLen)
             return NULL;
 
         case 0x00:
-            return "";
+            return NULL;
     }
     pthread_mutex_lock(&ResultBufferMutex);    
     LogModule(LOG_DEBUG, DVBTEXT, "Selected %d to convert to utf-8\n", cs_new);
