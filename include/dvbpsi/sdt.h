@@ -168,7 +168,7 @@ void dvbpsi_InitSDT(dvbpsi_sdt_t *p_sdt, uint16_t i_ts_id, uint8_t i_version,
 
 /*!
  * \def dvbpsi_NewSDT(p_sdt, i_ts_id, i_version, b_current_next, i_network_id)
- * \brief Allocate and initialize a new dvbpsi_sdt_t structure.
+ * \brief Allocate and initialize a new dvbpsi_sdt_t structure. Use ObjectRefDec to release delete it.
  * \param p_sdt pointer to the SDT structure
  * \param i_ts_id transport stream ID
  * \param i_version SDT version
@@ -178,14 +178,15 @@ void dvbpsi_InitSDT(dvbpsi_sdt_t *p_sdt, uint16_t i_ts_id, uint8_t i_version,
  */
 #define dvbpsi_NewSDT(p_sdt, i_ts_id, i_version, b_current_next,i_network_id) \
 do {                                                                    \
-  p_sdt = (dvbpsi_sdt_t*)malloc(sizeof(dvbpsi_sdt_t));                  \
+  ObjectRegisterTypeDestructor(dvbpsi_sdt_t, (ObjectDestructor_t)dvbpsi_EmptySDT);          \
+  p_sdt = (dvbpsi_sdt_t*)ObjectCreateType(dvbpsi_sdt_t);                \
   if(p_sdt != NULL)                                                     \
     dvbpsi_InitSDT(p_sdt, i_ts_id, i_version, b_current_next, i_network_id); \
 } while(0);
 
 
 /*****************************************************************************
- * dvbpsi_EmptySDT/dvbpsi_DeleteSDT
+ * dvbpsi_EmptySDT
  *****************************************************************************/
 /*!
  * \fn void dvbpsi_EmptySDT(dvbpsi_sdt_t* p_sdt)
@@ -194,19 +195,6 @@ do {                                                                    \
  * \return nothing.
  */
 void dvbpsi_EmptySDT(dvbpsi_sdt_t *p_sdt);
-
-/*!
- * \def dvbpsi_DeleteSDT(p_sdt)
- * \brief Clean and free a dvbpsi_sdt_t structure.
- * \param p_sdt pointer to the SDT structure
- * \return nothing.
- */
-#define dvbpsi_DeleteSDT(p_sdt)                                         \
-do {                                                                    \
-  dvbpsi_EmptySDT(p_sdt);                                               \
-  free(p_sdt);                                                          \
-} while(0);
-
 
 /*****************************************************************************
  * dvbpsi_SDTAddService

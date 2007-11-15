@@ -161,7 +161,7 @@ void dvbpsi_InitPMT(dvbpsi_pmt_t* p_pmt, uint16_t i_program_number,
 /*!
  * \def dvbpsi_NewPMT(p_pmt, i_program_number,
                       i_version, b_current_next, i_pcr_pid)
- * \brief Allocate and initialize a new dvbpsi_pmt_t structure.
+ * \brief Allocate and initialize a new dvbpsi_pmt_t structure. Use ObjectRefDec to release delete it.
  * \param p_pmt pointer to the PMT structure
  * \param i_program_number program number
  * \param i_version PMT version
@@ -172,7 +172,8 @@ void dvbpsi_InitPMT(dvbpsi_pmt_t* p_pmt, uint16_t i_program_number,
 #define dvbpsi_NewPMT(p_pmt, i_program_number,                          \
                       i_version, b_current_next, i_pcr_pid)             \
 do {                                                                    \
-  p_pmt = (dvbpsi_pmt_t*)malloc(sizeof(dvbpsi_pmt_t));                  \
+  ObjectRegisterTypeDestructor(dvbpsi_pmt_t, (ObjectDestructor_t)dvbpsi_EmptyPMT);          \
+  p_pmt = (dvbpsi_pmt_t*)ObjectCreateType(dvbpsi_pmt_t);                \
   if(p_pmt != NULL)                                                     \
     dvbpsi_InitPMT(p_pmt, i_program_number, i_version, b_current_next,  \
                    i_pcr_pid);                                          \
@@ -180,7 +181,7 @@ do {                                                                    \
 
 
 /*****************************************************************************
- * dvbpsi_EmptyPMT/dvbpsi_DeletePMT
+ * dvbpsi_EmptyPMT
  *****************************************************************************/
 /*!
  * \fn void dvbpsi_EmptyPMT(dvbpsi_pmt_t* p_pmt)
@@ -189,18 +190,6 @@ do {                                                                    \
  * \return nothing.
  */
 void dvbpsi_EmptyPMT(dvbpsi_pmt_t* p_pmt);
-
-/*!
- * \def dvbpsi_DeletePMT(p_pmt)
- * \brief Clean and free a dvbpsi_pmt_t structure.
- * \param p_pmt pointer to the PMT structure
- * \return nothing.
- */
-#define dvbpsi_DeletePMT(p_pmt)                                         \
-do {                                                                    \
-  dvbpsi_EmptyPMT(p_pmt);                                               \
-  free(p_pmt);                                                          \
-} while(0);
 
 
 /*****************************************************************************

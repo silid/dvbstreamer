@@ -119,7 +119,8 @@ void dvbpsi_InitTDTTOT(dvbpsi_tdt_tot_t *p_tdt_tot,
 #define dvbpsi_NewTDTTOT(p_tdt_tot, i_year, i_month, i_day,         \
                          i_hour, i_minute, i_second)                \
 do {                                                                \
-  p_tdt_tot = (dvbpsi_tdt_tot_t*)malloc(sizeof(dvbpsi_tdt_tot_t));  \
+  ObjectRegisterTypeDestructor(dvbpsi_tdt_tot_t, (ObjectDestructor_t)dvbpsi_EmptyTDTTOT);\
+  p_tdt_tot = (dvbpsi_tdt_tot_t*)ObjectCreateType(dvbpsi_tdt_tot_t);\
   if(p_tdt_tot != NULL)                                             \
     dvbpsi_InitTDTTOT(p_tdt_tot, i_year, i_month, i_day,            \
                       i_hour, i_minute, i_second);                  \
@@ -127,7 +128,7 @@ do {                                                                \
 
 
 /*****************************************************************************
- * dvbpsi_EmptyTDTTOT/dvbpsi_DeleteTDTTOT
+ * dvbpsi_EmptyTDTTOT
  *****************************************************************************/
 /*!
  * \fn void dvbpsi_EmptyTDTTOT(dvbpsi_tdt_tot_t* p_tdt_tot)
@@ -136,18 +137,6 @@ do {                                                                \
  * \return nothing.
  */
 void dvbpsi_EmptyTDTTOT(dvbpsi_tdt_tot_t *p_tdt_tot);
-
-/*!
- * \def dvbpsi_DeleteTDTTOT(p_nit)
- * \brief Clean and free a dvbpsi_nit_t structure.
- * \param p_nit pointer to the NIT structure
- * \return nothing.
- */
-#define dvbpsi_DeleteTDTTOT(p_tdt_tot)                                  \
-do {                                                                    \
-  dvbpsi_EmptyTDTTOT(p_tdt_tot);                                        \
-  free(p_tdt_tot);                                                      \
-} while(0);
 
 /*****************************************************************************
  * dvbpsi_TOTAddDescriptor

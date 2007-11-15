@@ -149,7 +149,7 @@ void dvbpsi_InitPAT(dvbpsi_pat_t* p_pat, uint16_t i_ts_id, uint8_t i_version,
 
 /*!
  * \def dvbpsi_NewPAT(p_pat, i_ts_id, i_version, b_current_next)
- * \brief Allocate and initialize a new dvbpsi_pat_t structure.
+ * \brief Allocate and initialize a new dvbpsi_pat_t structure. Use ObjectRefDec to release delete it.
  * \param p_pat pointer to the PAT structure
  * \param i_ts_id transport stream ID
  * \param i_version PAT version
@@ -158,14 +158,15 @@ void dvbpsi_InitPAT(dvbpsi_pat_t* p_pat, uint16_t i_ts_id, uint8_t i_version,
  */
 #define dvbpsi_NewPAT(p_pat, i_ts_id, i_version, b_current_next)        \
 do {                                                                    \
-  p_pat = (dvbpsi_pat_t*)malloc(sizeof(dvbpsi_pat_t));                  \
+  ObjectRegisterTypeDestructor(dvbpsi_pat_t, (ObjectDestructor_t)dvbpsi_EmptyPAT);          \
+  p_pat = (dvbpsi_pat_t*)ObjectCreateType(dvbpsi_pat_t);                \
   if(p_pat != NULL)                                                     \
     dvbpsi_InitPAT(p_pat, i_ts_id, i_version, b_current_next);          \
 } while(0);
 
 
 /*****************************************************************************
- * dvbpsi_EmptyPAT/dvbpsi_DeletePAT
+ * dvbpsi_EmptyPAT
  *****************************************************************************/
 /*!
  * \fn void dvbpsi_EmptyPAT(dvbpsi_pat_t* p_pat)
@@ -174,18 +175,6 @@ do {                                                                    \
  * \return nothing.
  */
 void dvbpsi_EmptyPAT(dvbpsi_pat_t* p_pat);
-
-/*!
- * \def dvbpsi_DeletePAT(p_pat)
- * \brief Clean and free a dvbpsi_pat_t structure.
- * \param p_pat pointer to the PAT structure
- * \return nothing.
- */
-#define dvbpsi_DeletePAT(p_pat)                                         \
-do {                                                                    \
-  dvbpsi_EmptyPAT(p_pat);                                               \
-  free(p_pat);                                                          \
-} while(0);
 
 
 /*****************************************************************************

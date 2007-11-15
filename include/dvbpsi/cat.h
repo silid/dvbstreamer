@@ -125,7 +125,7 @@ void dvbpsi_InitCAT(dvbpsi_cat_t* p_cat,
 /*!
  * \def dvbpsi_NewCAT(p_cat,
                       i_version, b_current_next)
- * \brief Allocate and initialize a new dvbpsi_cat_t structure.
+ * \brief Allocate and initialize a new dvbpsi_cat_t structure. Use ObjectRefDec to release delete it.
  * \param p_cat pointer to the CAT structure
  * \param i_version CAT version
  * \param b_current_next current next indicator
@@ -134,14 +134,15 @@ void dvbpsi_InitCAT(dvbpsi_cat_t* p_cat,
 #define dvbpsi_NewCAT(p_cat,                                            \
                       i_version, b_current_next)                        \
 do {                                                                    \
-  p_cat = (dvbpsi_cat_t*)malloc(sizeof(dvbpsi_cat_t));                  \
+  ObjectRegisterTypeDestructor(dvbpsi_cat_t, (ObjectDestructor_t)dvbpsi_EmptyCAT);          \
+  p_cat = (dvbpsi_cat_t*)ObjectCreateType(dvbpsi_cat_t);                \
   if(p_cat != NULL)                                                     \
     dvbpsi_InitCAT(p_cat, i_version, b_current_next);                   \
 } while(0);
 
 
 /*****************************************************************************
- * dvbpsi_EmptyCAT/dvbpsi_DeleteCAT
+ * dvbpsi_EmptyCAT
  *****************************************************************************/
 /*!
  * \fn void dvbpsi_EmptyCAT(dvbpsi_cat_t* p_cat)
@@ -150,19 +151,6 @@ do {                                                                    \
  * \return nothing.
  */
 void dvbpsi_EmptyCAT(dvbpsi_cat_t* p_cat);
-
-/*!
- * \def dvbpsi_DeleteCAT(p_cat)
- * \brief Clean and free a dvbpsi_cat_t structure.
- * \param p_cat pointer to the CAT structure
- * \return nothing.
- */
-#define dvbpsi_DeleteCAT(p_cat)                                         \
-do {                                                                    \
-  dvbpsi_EmptyCAT(p_cat);                                               \
-  free(p_cat);                                                          \
-} while(0);
-
 
 /*****************************************************************************
  * dvbpsi_CATAddDescriptor

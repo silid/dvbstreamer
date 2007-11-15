@@ -141,7 +141,7 @@ void dvbpsi_atsc_InitEIT(dvbpsi_atsc_eit_t* p_eit,uint8_t i_version, int b_curre
 /*!
  * \def dvbpsi_atsc_NewEIT(p_eit, i_network_id, i_version, b_current_next, 
           i_protocol i_source_id)
- * \brief Allocate and initialize a new dvbpsi_eit_t structure.
+ * \brief Allocate and initialize a new dvbpsi_eit_t structure. Use ObjectRefDec to delete it.
  * \param p_eit pointer to the EIT structure
  * \param i_network_id network id
  * \param i_version EIT version
@@ -153,7 +153,8 @@ void dvbpsi_atsc_InitEIT(dvbpsi_atsc_eit_t* p_eit,uint8_t i_version, int b_curre
 #define dvbpsi_atsc_NewEIT(p_eit, i_version, b_current_next, i_protocol,\
             i_source_id)                                                \
 do {                                                                    \
-  p_eit = (dvbpsi_atsc_eit_t*)malloc(sizeof(dvbpsi_atsc_eit_t));        \
+  ObjectRegisterTypeDestructor(dvbpsi_atsc_eit_t, (ObjectDestructor_t)dvbpsi_atsc_EmptyEIT);\
+  p_eit = (dvbpsi_atsc_eit_t*)ObjectCreateType(dvbpsi_atsc_eit_t);      \
   if(p_eit != NULL)                                                     \
     dvbpsi_atsc_InitEIT(p_eit, i_version, b_current_next, i_protocol,   \
         i_source_id);                                                   \
@@ -161,7 +162,7 @@ do {                                                                    \
 
 
 /*****************************************************************************
- * dvbpsi_atsc_EmptyEIT/dvbpsi_atsc_DeleteEIT
+ * dvbpsi_atsc_EmptyEIT
  *****************************************************************************/
 /*!
  * \fn void dvbpsi_atsc_EmptyEIT(dvbpsi_atsc_eit_t* p_eit)
@@ -170,19 +171,6 @@ do {                                                                    \
  * \return nothing.
  */
 void dvbpsi_atsc_EmptyEIT(dvbpsi_atsc_eit_t *p_eit);
-
-/*!
- * \def dvbpsi_atsc_DeleteEIT(p_eit)
- * \brief Clean and free a dvbpsi_eit_t structure.
- * \param p_eit pointer to the EIT structure
- * \return nothing.
- */
-#define dvbpsi_atsc_DeleteEIT(p_eit)                                         \
-do {                                                                    \
-  dvbpsi_atsc_EmptyEIT(p_eit);                                               \
-  free(p_eit);                                                          \
-} while(0);
-
 
 #endif
 

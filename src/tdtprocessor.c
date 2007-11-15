@@ -211,7 +211,7 @@ static void TDTHandler(void* arg, dvbpsi_tdt_tot_t* newTDT)
         PluginTDTProcessor_t callback = ListIterator_Current(iterator);
         callback(newTDT);
     }
-    dvbpsi_DeleteTDTTOT(newTDT);
+    ObjectRefDec(newTDT);
 }
 
 

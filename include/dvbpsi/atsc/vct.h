@@ -165,18 +165,19 @@ void dvbpsi_atsc_InitVCT(dvbpsi_atsc_vct_t* p_vct,uint8_t i_version, int b_curre
  * \param b_cable_vct Whether this is CVCT or a TVCT. 
  * \return nothing.
  */
-#define dvbpsi_atsc_NewVCT(p_vct, i_version, b_current_next, i_protocol,     \
-            i_ts_id, b_cable_vct)                                       \
-do {                                                                    \
-  p_vct = (dvbpsi_atsc_vct_t*)malloc(sizeof(dvbpsi_atsc_vct_t));                  \
-  if(p_vct != NULL)                                                     \
-    dvbpsi_atsc_InitVCT(p_vct, i_version, b_current_next, i_protocol,        \
-        i_ts_id, b_cable_vct);                                          \
+#define dvbpsi_atsc_NewVCT(p_vct, i_version, b_current_next, i_protocol, \
+            i_ts_id, b_cable_vct)                                        \
+do {                                                                     \
+  ObjectRegisterTypeDestructor(dvbpsi_atsc_vct_t, (ObjectDestructor_t)dvbpsi_atsc_EmptyVCT); \
+  p_vct = (dvbpsi_atsc_vct_t*)ObjectCreateType(dvbpsi_atsc_vct_t);       \
+  if(p_vct != NULL)                                                      \
+    dvbpsi_atsc_InitVCT(p_vct, i_version, b_current_next, i_protocol,    \
+        i_ts_id, b_cable_vct);                                           \
 } while(0);
 
 
 /*****************************************************************************
- * dvbpsi_atsc_EmptyVCT/dvbpsi_atsc_DeleteVCT
+ * dvbpsi_atsc_EmptyVCT
  *****************************************************************************/
 /*!
  * \fn void dvbpsi_atsc_EmptyVCT(dvbpsi_atsc_vct_t* p_vct)
@@ -185,19 +186,6 @@ do {                                                                    \
  * \return nothing.
  */
 void dvbpsi_atsc_EmptyVCT(dvbpsi_atsc_vct_t *p_vct);
-
-/*!
- * \def dvbpsi_atsc_DeleteVCT(p_vct)
- * \brief Clean and free a dvbpsi_vct_t structure.
- * \param p_vct pointer to the VCT structure
- * \return nothing.
- */
-#define dvbpsi_atsc_DeleteVCT(p_vct)                                         \
-do {                                                                    \
-  dvbpsi_atsc_EmptyVCT(p_vct);                                               \
-  free(p_vct);                                                          \
-} while(0);
-
 
 #endif
 
