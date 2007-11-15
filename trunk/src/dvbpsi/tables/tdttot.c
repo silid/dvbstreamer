@@ -29,7 +29,10 @@ Decode Time Date Table and Time Offset Table.
 #include <dvbpsi/descriptor.h>
 #include "dvbpsi/datetime.h"
 #include "dvbpsi/tdttot.h"
+
 #include "logging.h"
+#include "objects.h"
+
 /*****************************************************************************
  * dvbpsi_tdt_tot_decoder_s
  *****************************************************************************

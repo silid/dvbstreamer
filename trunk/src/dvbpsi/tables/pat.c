@@ -42,6 +42,8 @@
 #include "pat.h"
 #include "pat_private.h"
 
+#include "objects.h"
+
 
 /*****************************************************************************
  * dvbpsi_AttachPAT
@@ -99,8 +101,10 @@ void dvbpsi_DetachPAT(dvbpsi_handle h_dvbpsi)
   dvbpsi_pat_decoder_t* p_pat_decoder
                         = (dvbpsi_pat_decoder_t*)h_dvbpsi->p_private_decoder;
   unsigned int i;
-
-  free(p_pat_decoder->p_building_pat);
+  if (p_pat_decoder->p_building_pat)
+  {
+    ObjectRefDec(p_pat_decoder->p_building_pat);
+  }
 
   for(i = 0; i <= 255; i++)
   {
@@ -274,7 +278,7 @@ void dvbpsi_GatherPATSections(dvbpsi_decoder_t* p_decoder,
           if(    (!p_pat_decoder->current_pat.b_current_next)
               && (p_section->b_current_next))
           {
-            dvbpsi_pat_t* p_pat = (dvbpsi_pat_t*)malloc(sizeof(dvbpsi_pat_t));
+            dvbpsi_pat_t* p_pat = (dvbpsi_pat_t*)ObjectCreateType(dvbpsi_pat_t);
 
             p_pat_decoder->current_pat.b_current_next = 1;
             *p_pat = p_pat_decoder->current_pat;
@@ -296,7 +300,7 @@ void dvbpsi_GatherPATSections(dvbpsi_decoder_t* p_decoder,
     /* Free structures */
     if(p_pat_decoder->p_building_pat)
     {
-      free(p_pat_decoder->p_building_pat);
+      ObjectRefDec(p_pat_decoder->p_building_pat);
       p_pat_decoder->p_building_pat = NULL;
     }
     /* Clear the section array */
@@ -320,7 +324,7 @@ void dvbpsi_GatherPATSections(dvbpsi_decoder_t* p_decoder,
     {
       p_pat_decoder->p_building_pat =
                                 (dvbpsi_pat_t*)malloc(sizeof(dvbpsi_pat_t));
-      dvbpsi_InitPAT(p_pat_decoder->p_building_pat,
+      dvbpsi_NewPAT(p_pat_decoder->p_building_pat,
                      p_section->i_extension,
                      p_section->i_version,
                      p_section->b_current_next);

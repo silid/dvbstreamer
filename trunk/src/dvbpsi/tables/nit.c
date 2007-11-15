@@ -34,6 +34,8 @@ Decode Network Information Tables.
 #include "dvbpsi/nit.h"
 #include "dvbpsi_private.h"
 
+#include "objects.h"
+
 /*****************************************************************************
  * dvbpsi_nit_decoder_t
  *****************************************************************************
@@ -171,8 +173,10 @@ void dvbpsi_DetachNIT(dvbpsi_demux_t * p_demux, uint8_t i_table_id,
   }
 
   p_nit_decoder = (dvbpsi_nit_decoder_t*)p_subdec->p_cb_data;
-
-  free(p_nit_decoder->p_building_nit);
+  if (p_nit_decoder->p_building_nit)
+  {
+    ObjectRefDec(p_nit_decoder->p_building_nit);
+  }
 
   for(i = 0; i <= 255; i++)
   {
@@ -309,7 +313,7 @@ void dvbpsi_GatherNITSections(dvbpsi_decoder_t * p_psi_decoder,
           if(    (!p_nit_decoder->current_nit.b_current_next)
               && (p_section->b_current_next))
           {
-            dvbpsi_nit_t * p_nit = (dvbpsi_nit_t*)malloc(sizeof(dvbpsi_nit_t));
+            dvbpsi_nit_t * p_nit = (dvbpsi_nit_t*)ObjectCreateType(dvbpsi_nit_t);
 
             p_nit_decoder->current_nit.b_current_next = 1;
             *p_nit = p_nit_decoder->current_nit;
@@ -331,7 +335,7 @@ void dvbpsi_GatherNITSections(dvbpsi_decoder_t * p_psi_decoder,
     /* Free structures */
     if(p_nit_decoder->p_building_nit)
     {
-      free(p_nit_decoder->p_building_nit);
+      ObjectRefDec(p_nit_decoder->p_building_nit);
       p_nit_decoder->p_building_nit = NULL;
     }
     /* Clear the section array */
@@ -353,9 +357,7 @@ void dvbpsi_GatherNITSections(dvbpsi_decoder_t * p_psi_decoder,
     /* Initialize the structures if it's the first section received */
     if(!p_nit_decoder->p_building_nit)
     {
-      p_nit_decoder->p_building_nit =
-                                (dvbpsi_nit_t*)malloc(sizeof(dvbpsi_nit_t));
-      dvbpsi_InitNIT(p_nit_decoder->p_building_nit,
+      dvbpsi_NewNIT(p_nit_decoder->p_building_nit,
                      p_section->i_extension,
                      p_section->i_version,
                      p_section->b_current_next);

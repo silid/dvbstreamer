@@ -46,6 +46,8 @@
 #include "cat.h"
 #include "cat_private.h"
 
+#include "objects.h"
+
 
 /*****************************************************************************
  * dvbpsi_AttachCAT
@@ -104,7 +106,10 @@ void dvbpsi_DetachCAT(dvbpsi_handle h_dvbpsi)
                         = (dvbpsi_cat_decoder_t*)h_dvbpsi->p_private_decoder;
   unsigned int i;
 
-  free(p_cat_decoder->p_building_cat);
+  if (p_cat_decoder->p_building_cat)
+  {
+    ObjectRefDec(p_cat_decoder->p_building_cat);
+  }
 
   for(i = 0; i <= 255; i++)              
   {
@@ -257,7 +262,7 @@ void dvbpsi_GatherCATSections(dvbpsi_decoder_t* p_decoder,
           if(    (!p_cat_decoder->current_cat.b_current_next)
               && (p_section->b_current_next))
           {
-            dvbpsi_cat_t* p_cat = (dvbpsi_cat_t*)malloc(sizeof(dvbpsi_cat_t));
+            dvbpsi_cat_t* p_cat = (dvbpsi_cat_t*)ObjectCreateType(dvbpsi_cat_t);
 
             p_cat_decoder->current_cat.b_current_next = 1;
             *p_cat = p_cat_decoder->current_cat;
@@ -279,7 +284,7 @@ void dvbpsi_GatherCATSections(dvbpsi_decoder_t* p_decoder,
     /* Free structures */
     if(p_cat_decoder->p_building_cat)
     {
-      free(p_cat_decoder->p_building_cat);
+      ObjectRefDec(p_cat_decoder->p_building_cat);
       p_cat_decoder->p_building_cat = NULL;
     }
     /* Clear the section array */
@@ -301,9 +306,7 @@ void dvbpsi_GatherCATSections(dvbpsi_decoder_t* p_decoder,
     /* Initialize the structures if it's the first section received */
     if(!p_cat_decoder->p_building_cat)
     {
-      p_cat_decoder->p_building_cat =
-                                (dvbpsi_cat_t*)malloc(sizeof(dvbpsi_cat_t));
-      dvbpsi_InitCAT(p_cat_decoder->p_building_cat,
+      dvbpsi_NewCAT(p_cat_decoder->p_building_cat,
                      p_section->i_version,
                      p_section->b_current_next);
       p_cat_decoder->i_last_section_number = p_section->i_last_number;

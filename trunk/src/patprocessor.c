@@ -263,5 +263,5 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
         PluginPATProcessor_t callback = ListIterator_Current(iterator);
         callback(newpat);
     }
-    dvbpsi_DeletePAT(newpat);
+    ObjectRefDec(newpat);
 }

@@ -180,6 +180,10 @@ void *ObjectCreateImpl(char *classname, char *file, int line)
     {
         LogModule(LOG_DEBUGV, OBJECT, "(%p) Created object of class \"%s\" app ptr %p (%s:%d)\n", DataToObject(result), classname, result, file, line);
     }
+    else
+    {
+        LogModule(LOG_ERROR, OBJECT, "Failed to create object of class \"%s\"\n", classname);
+    }
     pthread_mutex_unlock(&objectMutex);
     return result;
 }

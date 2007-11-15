@@ -237,7 +237,7 @@ static void ProcessMGT(void *arg, dvbpsi_atsc_mgt_t *newMGT)
         callback(newMGT);
     }
     
-    dvbpsi_atsc_DeleteMGT(newMGT);
+    ObjectRefDec(newMGT);
 }
 
 static void ProcessSTT(void *arg, dvbpsi_atsc_stt_t *newSTT)
@@ -265,7 +265,7 @@ static void ProcessSTT(void *arg, dvbpsi_atsc_stt_t *newSTT)
         callback(newSTT);
     }
     
-    dvbpsi_atsc_DeleteSTT(newSTT);
+    ObjectRefDec(newSTT);
 }
 
 static void ProcessVCT(void *arg, dvbpsi_atsc_vct_t *newVCT)
@@ -359,7 +359,7 @@ static void ProcessVCT(void *arg, dvbpsi_atsc_vct_t *newVCT)
         callback(newVCT);
     }
 
-    dvbpsi_atsc_DeleteVCT(newVCT);
+    ObjectRefDec(newVCT);
         
 }
 

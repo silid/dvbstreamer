@@ -47,6 +47,7 @@
 #include "eit.h"
 #include "eit_private.h"
 
+#include "objects.h"
 
 /*****************************************************************************
  * dvbpsi_AttachEIT
@@ -136,7 +137,10 @@ void dvbpsi_DetachEIT(dvbpsi_demux_t * p_demux, uint8_t i_table_id,
 
   p_eit_decoder = (dvbpsi_eit_decoder_t*)p_subdec->p_cb_data;
 
-  free(p_eit_decoder->p_building_eit);
+  if (p_eit_decoder->p_building_eit)
+  {
+    ObjectRefDec(p_eit_decoder->p_building_eit);
+  }
 
   for(i = 0; i <= 255; i++)
   {
@@ -184,7 +188,6 @@ void dvbpsi_InitEIT(dvbpsi_eit_t* p_eit, uint16_t i_service_id, uint8_t i_versio
 void dvbpsi_EmptyEIT(dvbpsi_eit_t* p_eit)
 {
   dvbpsi_eit_event_t* p_event = p_eit->p_first_event;
-
   while(p_event != NULL)
   {
     dvbpsi_eit_event_t* p_tmp = p_event->p_next;
@@ -350,7 +353,7 @@ void dvbpsi_GatherEITSections(dvbpsi_decoder_t * p_psi_decoder,
           if(    (!p_eit_decoder->current_eit.b_current_next)
               && (p_section->b_current_next))
           {
-            dvbpsi_eit_t* p_eit = (dvbpsi_eit_t*)malloc(sizeof(dvbpsi_eit_t));
+            dvbpsi_eit_t* p_eit = (dvbpsi_eit_t*)ObjectCreateType(dvbpsi_eit_t);
 
             p_eit_decoder->current_eit.b_current_next = 1;
             *p_eit = p_eit_decoder->current_eit;
@@ -372,7 +375,7 @@ void dvbpsi_GatherEITSections(dvbpsi_decoder_t * p_psi_decoder,
     /* Free structures */
     if(p_eit_decoder->p_building_eit)
     {
-      free(p_eit_decoder->p_building_eit);
+      ObjectRefDec(p_eit_decoder->p_building_eit);
       p_eit_decoder->p_building_eit = NULL;
     }
     /* Clear the section array */
@@ -394,9 +397,7 @@ void dvbpsi_GatherEITSections(dvbpsi_decoder_t * p_psi_decoder,
     /* Initialize the structures if it's the first section received */
     if(!p_eit_decoder->p_building_eit)
     {
-      p_eit_decoder->p_building_eit =
-                                (dvbpsi_eit_t*)malloc(sizeof(dvbpsi_eit_t));
-      dvbpsi_InitEIT(p_eit_decoder->p_building_eit,
+      dvbpsi_NewEIT(p_eit_decoder->p_building_eit,
                      p_section->i_extension,
                      p_section->i_version,
                      p_section->b_current_next,

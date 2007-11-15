@@ -158,7 +158,7 @@ static void DeinitEITFilter(PIDFilter_t *filter)
 static void FreeEIT(void *arg)
 {
     dvbpsi_atsc_eit_t *eit = arg;
-    dvbpsi_atsc_DeleteEIT(eit);
+    ObjectRefDec(eit);
 }
 
 static void ClearEITInfo(void)
@@ -280,7 +280,7 @@ static void *EITProcessor(void *arg)
             {
                 ProcessEvent(&serviceRef, event);
             }
-            dvbpsi_atsc_DeleteEIT(eit);
+            ObjectRefDec(eit);
             EPGDBaseTransactionCommit();
         }
         MultiplexRefDec(multiplex);

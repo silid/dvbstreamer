@@ -44,6 +44,8 @@
 #include "pmt.h"
 #include "pmt_private.h"
 
+#include "objects.h"
+
 
 /*****************************************************************************
  * dvbpsi_AttachPMT
@@ -104,7 +106,10 @@ void dvbpsi_DetachPMT(dvbpsi_handle h_dvbpsi)
                         = (dvbpsi_pmt_decoder_t*)h_dvbpsi->p_private_decoder;
   unsigned int i;
 
-  free(p_pmt_decoder->p_building_pmt);
+  if (p_pmt_decoder->p_building_pmt)
+  {
+    ObjectRefDec(p_pmt_decoder->p_building_pmt);
+  }
 
   for(i = 0; i <= 255; i++)              
   {
@@ -347,7 +352,7 @@ void dvbpsi_GatherPMTSections(dvbpsi_decoder_t* p_decoder,
           if(    (!p_pmt_decoder->current_pmt.b_current_next)
               && (p_section->b_current_next))
           {
-            dvbpsi_pmt_t* p_pmt = (dvbpsi_pmt_t*)malloc(sizeof(dvbpsi_pmt_t));
+            dvbpsi_pmt_t* p_pmt = (dvbpsi_pmt_t*)ObjectCreateType(dvbpsi_pmt_t);
 
             p_pmt_decoder->current_pmt.b_current_next = 1;
             *p_pmt = p_pmt_decoder->current_pmt;
@@ -369,7 +374,7 @@ void dvbpsi_GatherPMTSections(dvbpsi_decoder_t* p_decoder,
     /* Free structures */
     if(p_pmt_decoder->p_building_pmt)
     {
-      free(p_pmt_decoder->p_building_pmt);
+      ObjectRefDec(p_pmt_decoder->p_building_pmt);
       p_pmt_decoder->p_building_pmt = NULL;
     }
     /* Clear the section array */
@@ -391,9 +396,7 @@ void dvbpsi_GatherPMTSections(dvbpsi_decoder_t* p_decoder,
     /* Initialize the structures if it's the first section received */
     if(!p_pmt_decoder->p_building_pmt)
     {
-      p_pmt_decoder->p_building_pmt =
-                                (dvbpsi_pmt_t*)malloc(sizeof(dvbpsi_pmt_t));
-      dvbpsi_InitPMT(p_pmt_decoder->p_building_pmt,
+      dvbpsi_NewPMT(p_pmt_decoder->p_building_pmt,
                      p_pmt_decoder->i_program_number,
                      p_section->i_version,
                      p_section->b_current_next,

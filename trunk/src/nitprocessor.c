@@ -140,6 +140,6 @@ static void NITHandler(void* arg, dvbpsi_nit_t* newNIT)
         PluginNITProcessor_t callback = ListIterator_Current(iterator);
         callback(newNIT);
     }
-    dvbpsi_DeleteNIT(newNIT);
+    ObjectRefDec(newNIT);
 }
 
