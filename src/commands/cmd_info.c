@@ -623,8 +623,8 @@ static void CommandListPids(int argc, char **argv)
             {
                 if (numericOutput)
                 {
-                CommandPrintf("%d %d %d\n",pids->pids[i].pid, pids->pids[i].type, pids->pids[i].subType);
-            }
+                    CommandPrintf("%d %d %d\n",pids->pids[i].pid, pids->pids[i].type, pids->pids[i].subType);
+                }
                 else
                 {
                     CommandPrintf("%d %s\n", pids->pids[i].pid, GetStreamTypeString(pids->pids[i].type));
