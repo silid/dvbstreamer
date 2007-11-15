@@ -388,7 +388,7 @@ int main(int argc, char *argv[])
         }
     }
     ServiceFilterDestroy(primaryServiceFilter);
-
+    TSFilterEnable(TSFilter, FALSE);
     /*
      * Deinit Plugins after outputs so all delivery methods are properly torn
      * down.
