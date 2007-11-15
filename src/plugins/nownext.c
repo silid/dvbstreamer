@@ -126,7 +126,7 @@ PLUGIN_FEATURES(
 
 PLUGIN_INTERFACE_CF(
     PLUGIN_FOR_DVB,
-    "NowNext", "0.1", 
+    "NowNext", "0.2", 
     "Plugin to display present/following EPG information.", 
     "charrea6@users.sourceforge.net"
     );
@@ -241,7 +241,7 @@ static void ProcessEIT(void *arg, dvbpsi_eit_t *newEIT)
         }
     }
 
-    dvbpsi_DeleteEIT(newEIT);
+    ObjectRefDec(newEIT);
 }
 
 static void UpdateEvent(Event_t *event, dvbpsi_eit_event_t *eitevent)

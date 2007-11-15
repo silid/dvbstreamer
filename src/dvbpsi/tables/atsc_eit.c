@@ -34,6 +34,8 @@ Decode PSIP Virtual Channel Table.
 #include "demux.h"
 #include "atsc/eit.h"
 
+#include "objects.h"
+
 typedef struct dvbpsi_atsc_eit_decoder_s
 {
   dvbpsi_atsc_eit_callback      pf_callback;
@@ -155,7 +157,7 @@ void dvbpsi_atsc_DetachEIT(dvbpsi_demux_t * p_demux, uint8_t i_table_id, uint16_
 
   p_eit_decoder = (dvbpsi_atsc_eit_decoder_t*)p_subdec->p_cb_data;
 
-  free(p_eit_decoder->p_building_eit);
+  ObjectRefDec(p_eit_decoder->p_building_eit);
 
   for(i = 0; i <= 255; i++)
   {
@@ -368,7 +370,7 @@ void dvbpsi_atsc_GatherEITSections(dvbpsi_decoder_t * p_psi_decoder,
           if(    (!p_eit_decoder->current_eit.b_current_next)
               && (p_section->b_current_next))
           {
-            dvbpsi_atsc_eit_t * p_eit = (dvbpsi_atsc_eit_t*)malloc(sizeof(dvbpsi_atsc_eit_t));
+            dvbpsi_atsc_eit_t * p_eit = (dvbpsi_atsc_eit_t*)ObjectCreateType(dvbpsi_atsc_eit_t);
 
             p_eit_decoder->current_eit.b_current_next = 1;
             *p_eit = p_eit_decoder->current_eit;
@@ -390,7 +392,7 @@ void dvbpsi_atsc_GatherEITSections(dvbpsi_decoder_t * p_psi_decoder,
     /* Free structures */
     if(p_eit_decoder->p_building_eit)
     {
-      free(p_eit_decoder->p_building_eit);
+      ObjectRefDec(p_eit_decoder->p_building_eit);
       p_eit_decoder->p_building_eit = NULL;
     }
     /* Clear the section array */
@@ -412,9 +414,7 @@ void dvbpsi_atsc_GatherEITSections(dvbpsi_decoder_t * p_psi_decoder,
     /* Initialize the structures if it's the first section received */
     if(!p_eit_decoder->p_building_eit)
     {
-      p_eit_decoder->p_building_eit =
-                                (dvbpsi_atsc_eit_t*)malloc(sizeof(dvbpsi_atsc_eit_t));
-      dvbpsi_atsc_InitEIT(p_eit_decoder->p_building_eit,
+      dvbpsi_atsc_NewEIT(p_eit_decoder->p_building_eit,
                      p_section->i_version,
                      p_section->b_current_next,
                      p_section->p_payload_start[0],

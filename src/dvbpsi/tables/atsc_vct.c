@@ -34,6 +34,8 @@ Decode PSIP Virtual Channel Table.
 #include "demux.h"
 #include "atsc/vct.h"
 
+#include "objects.h"
+
 typedef struct dvbpsi_atsc_vct_decoder_s
 {
   dvbpsi_atsc_vct_callback      pf_callback;
@@ -168,7 +170,7 @@ void dvbpsi_atsc_DetachVCT(dvbpsi_demux_t * p_demux, uint8_t i_table_id, uint16_
 
   p_vct_decoder = (dvbpsi_atsc_vct_decoder_t*)p_subdec->p_cb_data;
 
-  free(p_vct_decoder->p_building_vct);
+  ObjectRefDec(p_vct_decoder->p_building_vct);
 
   for(i = 0; i <= 255; i++)
   {
@@ -432,7 +434,7 @@ void dvbpsi_atsc_GatherVCTSections(dvbpsi_decoder_t * p_psi_decoder,
           if(    (!p_vct_decoder->current_vct.b_current_next)
               && (p_section->b_current_next))
           {
-            dvbpsi_atsc_vct_t * p_vct = (dvbpsi_atsc_vct_t*)malloc(sizeof(dvbpsi_atsc_vct_t));
+            dvbpsi_atsc_vct_t * p_vct = (dvbpsi_atsc_vct_t*)ObjectCreateType(dvbpsi_atsc_vct_t);
 
             p_vct_decoder->current_vct.b_current_next = 1;
             *p_vct = p_vct_decoder->current_vct;
@@ -454,7 +456,7 @@ void dvbpsi_atsc_GatherVCTSections(dvbpsi_decoder_t * p_psi_decoder,
     /* Free structures */
     if(p_vct_decoder->p_building_vct)
     {
-      free(p_vct_decoder->p_building_vct);
+      ObjectRefDec(p_vct_decoder->p_building_vct);
       p_vct_decoder->p_building_vct = NULL;
     }
     /* Clear the section array */
@@ -476,9 +478,7 @@ void dvbpsi_atsc_GatherVCTSections(dvbpsi_decoder_t * p_psi_decoder,
     /* Initialize the structures if it's the first section received */
     if(!p_vct_decoder->p_building_vct)
     {
-      p_vct_decoder->p_building_vct =
-                                (dvbpsi_atsc_vct_t*)malloc(sizeof(dvbpsi_atsc_vct_t));
-      dvbpsi_atsc_InitVCT(p_vct_decoder->p_building_vct,
+      dvbpsi_atsc_NewVCT(p_vct_decoder->p_building_vct,
                      p_section->i_version,
                      p_section->b_current_next,
                      p_section->p_payload_start[0],

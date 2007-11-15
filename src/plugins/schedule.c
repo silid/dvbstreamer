@@ -122,7 +122,7 @@ PLUGIN_FEATURES(
 
 PLUGIN_INTERFACE_F(
     PLUGIN_FOR_DVB,
-    "DVBSchedule", "0.1", 
+    "DVBSchedule", "0.2", 
     "Plugin to capture DVB EPG schedule information.", 
     "charrea6@users.sourceforge.net"
     );
@@ -165,7 +165,7 @@ static void Deinit0x12Filter(PIDFilter_t *filter)
 static void FreeEIT(void *arg)
 {
     dvbpsi_eit_t *eit = arg;
-    dvbpsi_DeleteEIT(eit);
+    ObjectRefDec(eit);
 }
 
 static void EnqueueEIT(dvbpsi_eit_t *newEIT)
@@ -235,7 +235,7 @@ static void *EITProcessor(void *arg)
             {
                 ProcessEvent(&serviceRef, event);
             }
-            dvbpsi_DeleteEIT(eit);
+            ObjectRefDec(eit);
             EPGDBaseTransactionCommit();
         }
     }

@@ -34,6 +34,8 @@ Decode PSIP Master Guide Table.
 #include "demux.h"
 #include "atsc/mgt.h"
 
+#include "objects.h"
+
 typedef struct dvbpsi_atsc_mgt_decoder_s
 {
   dvbpsi_atsc_mgt_callback      pf_callback;
@@ -157,7 +159,7 @@ void dvbpsi_atsc_DetachMGT(dvbpsi_demux_t * p_demux, uint8_t i_table_id, uint16_
 
   p_mgt_decoder = (dvbpsi_atsc_mgt_decoder_t*)p_subdec->p_cb_data;
 
-  free(p_mgt_decoder->p_building_mgt);
+  ObjectRefDec(p_mgt_decoder->p_building_mgt);
 
   for(i = 0; i <= 255; i++)
   {
@@ -388,7 +390,7 @@ void dvbpsi_atsc_GatherMGTSections(dvbpsi_decoder_t * p_psi_decoder,
           if(    (!p_mgt_decoder->current_mgt.b_current_next)
               && (p_section->b_current_next))
           {
-            dvbpsi_atsc_mgt_t * p_mgt = (dvbpsi_atsc_mgt_t*)malloc(sizeof(dvbpsi_atsc_mgt_t));
+            dvbpsi_atsc_mgt_t * p_mgt = (dvbpsi_atsc_mgt_t*)ObjectCreateType(dvbpsi_atsc_mgt_t);
 
             p_mgt_decoder->current_mgt.b_current_next = 1;
             *p_mgt = p_mgt_decoder->current_mgt;
@@ -410,7 +412,7 @@ void dvbpsi_atsc_GatherMGTSections(dvbpsi_decoder_t * p_psi_decoder,
     /* Free structures */
     if(p_mgt_decoder->p_building_mgt)
     {
-      free(p_mgt_decoder->p_building_mgt);
+      ObjectRefDec(p_mgt_decoder->p_building_mgt);
       p_mgt_decoder->p_building_mgt = NULL;
     }
     /* Clear the section array */
@@ -432,9 +434,7 @@ void dvbpsi_atsc_GatherMGTSections(dvbpsi_decoder_t * p_psi_decoder,
     /* Initialize the structures if it's the first section received */
     if(!p_mgt_decoder->p_building_mgt)
     {
-      p_mgt_decoder->p_building_mgt =
-                                (dvbpsi_atsc_mgt_t*)malloc(sizeof(dvbpsi_atsc_mgt_t));
-      dvbpsi_atsc_InitMGT(p_mgt_decoder->p_building_mgt,
+      dvbpsi_atsc_NewMGT(p_mgt_decoder->p_building_mgt,
                      p_section->i_version,
                      p_section->b_current_next,
                      p_section->p_payload_start[0]);

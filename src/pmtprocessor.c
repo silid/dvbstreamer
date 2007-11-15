@@ -330,5 +330,5 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
         esentry->p_first_descriptor = NULL;
         esentry = esentry->p_next;
     }
-    dvbpsi_DeletePMT(newpmt);
+    ObjectRefDec(newpmt);
 }

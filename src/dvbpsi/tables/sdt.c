@@ -45,6 +45,8 @@
 #include "sdt.h"
 #include "sdt_private.h"
 
+#include "objects.h"
+
 
 /*****************************************************************************
  * dvbpsi_AttachSDT
@@ -133,8 +135,10 @@ void dvbpsi_DetachSDT(dvbpsi_demux_t * p_demux, uint8_t i_table_id,
   }
 
   p_sdt_decoder = (dvbpsi_sdt_decoder_t*)p_subdec->p_cb_data;
-
-  free(p_sdt_decoder->p_building_sdt);
+  if (p_sdt_decoder->p_building_sdt)
+  {
+    ObjectRefDec(p_sdt_decoder->p_building_sdt);
+  }
 
   for(i = 0; i <= 255; i++)
   {
@@ -345,7 +349,7 @@ void dvbpsi_GatherSDTSections(dvbpsi_decoder_t * p_psi_decoder,
           if(    (!p_sdt_decoder->current_sdt.b_current_next)
               && (p_section->b_current_next))
           {
-            dvbpsi_sdt_t * p_sdt = (dvbpsi_sdt_t*)malloc(sizeof(dvbpsi_sdt_t));
+            dvbpsi_sdt_t * p_sdt = (dvbpsi_sdt_t*)ObjectCreateType(dvbpsi_sdt_t);
 
             p_sdt_decoder->current_sdt.b_current_next = 1;
             *p_sdt = p_sdt_decoder->current_sdt;
@@ -367,7 +371,7 @@ void dvbpsi_GatherSDTSections(dvbpsi_decoder_t * p_psi_decoder,
     /* Free structures */
     if(p_sdt_decoder->p_building_sdt)
     {
-      free(p_sdt_decoder->p_building_sdt);
+      ObjectRefDec(p_sdt_decoder->p_building_sdt);
       p_sdt_decoder->p_building_sdt = NULL;
     }
     /* Clear the section array */
@@ -389,9 +393,7 @@ void dvbpsi_GatherSDTSections(dvbpsi_decoder_t * p_psi_decoder,
     /* Initialize the structures if it's the first section received */
     if(!p_sdt_decoder->p_building_sdt)
     {
-      p_sdt_decoder->p_building_sdt =
-                                (dvbpsi_sdt_t*)malloc(sizeof(dvbpsi_sdt_t));
-      dvbpsi_InitSDT(p_sdt_decoder->p_building_sdt,
+      dvbpsi_NewSDT(p_sdt_decoder->p_building_sdt,
                      p_section->i_extension,
                      p_section->i_version,
                      p_section->b_current_next,

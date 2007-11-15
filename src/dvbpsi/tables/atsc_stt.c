@@ -34,6 +34,8 @@ Decode PSIP System Time Table.
 #include "demux.h"
 #include "atsc/stt.h"
 
+#include "objects.h"
+
 typedef struct dvbpsi_atsc_stt_decoder_s
 {
   dvbpsi_atsc_stt_callback      pf_callback;

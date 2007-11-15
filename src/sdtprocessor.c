@@ -257,7 +257,7 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
         callback(newSDT);
     }
 
-    dvbpsi_DeleteSDT(newSDT);
+    ObjectRefDec(newSDT);
 }
 
 static void SDTMultiplexChanged(PIDFilter_t *filter, void *arg, Multiplex_t *multiplex)
