@@ -109,21 +109,22 @@ void dvbpsi_atsc_InitSTT(dvbpsi_atsc_stt_t *p_stt,uint8_t i_protocol);
 
 /*!
  * \def dvbpsi_NewSTT(p_stt, i_network_id, i_version, b_current_next)
- * \brief Allocate and initialize a new dvbpsi_atsc_stt_t structure.
+ * \brief Allocate and initialize a new dvbpsi_atsc_stt_t structure. Use ObjectRefDec to delete it.
  * \param p_stt pointer to the STT structure
  * \param i_protocol PSIP Protocol version.
  * \return nothing.
  */
-#define dvbpsi_atsc_NewSTT(p_stt, i_protocol)                                \
-do {                                                                    \
-  p_stt = (dvbpsi_atsc_stt_t*)malloc(sizeof(dvbpsi_atsc_stt_t));                  \
-  if(p_stt != NULL)                                                     \
-    dvbpsi_atsc_InitSTT(p_stt, i_protocol);                                  \
+#define dvbpsi_atsc_NewSTT(p_stt, i_protocol)                            \
+do {                                                                     \
+  ObjectRegisterTypeDestructor(dvbpsi_atsc_stt_t, (ObjectDestructor_t)dvbpsi_atsc_EmptySTT); \
+  p_stt = (dvbpsi_atsc_stt_t*)ObjectCreateType(dvbpsi_atsc_stt_t);       \
+  if(p_stt != NULL)                                                      \
+    dvbpsi_atsc_InitSTT(p_stt, i_protocol);                              \
 } while(0);
 
 
 /*****************************************************************************
- * dvbpsi_atsc_EmptySTT/dvbpsi_atsc_DeleteSTT
+ * dvbpsi_atsc_EmptySTT
  *****************************************************************************/
 /*!
  * \fn void dvbpsi_atsc_EmptySTT(dvbpsi_atsc_stt_t* p_stt)
@@ -132,19 +133,6 @@ do {                                                                    \
  * \return nothing.
  */
 void dvbpsi_atsc_EmptySTT(dvbpsi_atsc_stt_t *p_stt);
-
-/*!
- * \def dvbpsi_atsc_DeleteSTT(p_stt)
- * \brief Clean and free a dvbpsi_atsc_stt_t structure.
- * \param p_stt pointer to the STT structure
- * \return nothing.
- */
-#define dvbpsi_atsc_DeleteSTT(p_stt)                                         \
-do {                                                                    \
-  dvbpsi_atsc_EmptySTT(p_stt);                                               \
-  free(p_stt);                                                          \
-} while(0);
-
 
 #endif
 

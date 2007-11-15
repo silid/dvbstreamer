@@ -184,7 +184,7 @@ void dvbpsi_InitEIT(dvbpsi_eit_t* p_eit, uint16_t i_service_id, uint8_t i_versio
 
 /*!
  * \def dvbpsi_NewEIT(p_eit, i_ts_id, i_version, b_current_next, i_network_id)
- * \brief Allocate and initialize a new dvbpsi_eit_t structure.
+ * \brief Allocate and initialize a new dvbpsi_eit_t structure. Use ObjectRefDec to release delete it.
  * \param p_eit pointer to the EIT structure
  * \param i_ts_id transport stream ID
  * \param i_version EIT version
@@ -194,14 +194,15 @@ void dvbpsi_InitEIT(dvbpsi_eit_t* p_eit, uint16_t i_service_id, uint8_t i_versio
  */
 #define dvbpsi_NewEIT(p_eit, i_service_id, i_version, b_current_next, i_ts_id, i_network_id, i_segment_last_section_number, i_last_table_id) \
 do {                                                                    \
-  p_eit = (dvbpsi_eit_t*)malloc(sizeof(dvbpsi_eit_t));                  \
+  ObjectRegisterTypeDestructor(dvbpsi_eit_t, (ObjectDestructor_t)dvbpsi_EmptyEIT);          \
+  p_eit = (dvbpsi_eit_t*)ObjectCreateType(dvbpsi_eit_t);                \
   if(p_eit != NULL)                                                     \
     dvbpsi_InitEIT(p_eit, i_service_id, i_version, b_current_next, i_ts_id, i_network_id, i_segment_last_section_number, i_last_table_id); \
 } while(0);
 
 
 /*****************************************************************************
- * dvbpsi_EmptyEIT/dvbpsi_DeleteEIT
+ * dvbpsi_EmptyEIT
  *****************************************************************************/
 /*!
  * \fn void dvbpsi_EmptyEIT(dvbpsi_eit_t* p_eit)
@@ -210,19 +211,6 @@ do {                                                                    \
  * \return nothing.
  */
 void dvbpsi_EmptyEIT(dvbpsi_eit_t* p_eit);
-
-/*!
- * \def dvbpsi_DeleteEIT(p_eit)
- * \brief Clean and free a dvbpsi_eit_t structure.
- * \param p_eit pointer to the EIT structure
- * \return nothing.
- */
-#define dvbpsi_DeleteEIT(p_eit)                                         \
-do {                                                                    \
-  dvbpsi_EmptyEIT(p_eit);                                               \
-  free(p_eit);                                                          \
-} while(0);
-
 
 /*****************************************************************************
  * dvbpsi_EITAddEvent

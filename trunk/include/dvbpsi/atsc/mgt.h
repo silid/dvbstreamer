@@ -135,7 +135,7 @@ void dvbpsi_atsc_InitMGT(dvbpsi_atsc_mgt_t *p_mgt, uint8_t i_version,
 
 /*!
  * \def dvbpsi_atsc_NewMGT(p_mgt, i_network_id, i_version, b_current_next)
- * \brief Allocate and initialize a new dvbpsi_mgt_t structure.
+ * \brief Allocate and initialize a new dvbpsi_mgt_t structure. Use ObjectRefDec to delete it.
  * \param p_mgt pointer to the MGT structure
  * \param i_network_id network id
  * \param i_version MGT version
@@ -143,15 +143,16 @@ void dvbpsi_atsc_InitMGT(dvbpsi_atsc_mgt_t *p_mgt, uint8_t i_version,
  * \return nothing.
  */
 #define dvbpsi_atsc_NewMGT(p_mgt, i_version, b_current_next, i_protocol) \
-do {                                                                    \
-  p_mgt = (dvbpsi_atsc_mgt_t*)malloc(sizeof(dvbpsi_atsc_mgt_t));                  \
-  if(p_mgt != NULL)                                                     \
-    dvbpsi_atsc_InitMGT(p_mgt, i_version, b_current_next, i_protocol); \
+do {                                                                     \
+  ObjectRegisterTypeDestructor(dvbpsi_atsc_mgt_t, (ObjectDestructor_t)dvbpsi_atsc_EmptyMGT); \
+  p_mgt = (dvbpsi_atsc_mgt_t*)ObjectCreateType(dvbpsi_atsc_mgt_t);       \
+  if(p_mgt != NULL)                                                      \
+    dvbpsi_atsc_InitMGT(p_mgt, i_version, b_current_next, i_protocol);   \
 } while(0);
 
 
 /*****************************************************************************
- * dvbpsi_EmptyMGT/dvbpsi_DeleteMGT
+ * dvbpsi_EmptyMGT
  *****************************************************************************/
 /*!
  * \fn void dvbpsi_EmptyMGT(dvbpsi_mgt_t* p_mgt)
@@ -160,18 +161,6 @@ do {                                                                    \
  * \return nothing.
  */
 void dvbpsi_atsc_EmptyMGT(dvbpsi_atsc_mgt_t *p_mgt);
-
-/*!
- * \def dvbpsi_atsc_DeleteMGT(p_mgt)
- * \brief Clean and free a dvbpsi_mgt_t structure.
- * \param p_mgt pointer to the MGT structure
- * \return nothing.
- */
-#define dvbpsi_atsc_DeleteMGT(p_mgt)                                         \
-do {                                                                    \
-  dvbpsi_atsc_EmptyMGT(p_mgt);                                               \
-  free(p_mgt);                                                          \
-} while(0);
 
 
 #endif
