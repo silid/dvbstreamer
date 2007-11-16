@@ -26,7 +26,6 @@ Plugin to collect EPG schedule information from ATSC/PSIP.
 #include <string.h>
 #include <stdint.h>
 #include <time.h>
-#include <pthread.h>
 
 #include "plugin.h"
 #include "epgdbase.h"
@@ -38,6 +37,7 @@ Plugin to collect EPG schedule information from ATSC/PSIP.
 #include "subtableprocessor.h"
 #include "atsctext.h"
 #include "tuning.h"
+#include "deferredproc.h"
 
 
 /*******************************************************************************
@@ -67,14 +67,10 @@ static TSPacket_t * ATSCtoEPGProcessPacket(PIDFilter_t *pidfilter, void *arg, TS
 static void ATSCtoEPGMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex);
 
 static void ClearEITInfo(void);
-static void FreeEIT(void *arg);
-static void EnqueueEIT(dvbpsi_atsc_eit_t *newEIT);
-static dvbpsi_atsc_eit_t * DequeueEIT(void);
 
 static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension);
 static void ProcessEIT(void *arg, dvbpsi_atsc_eit_t *newEIT);
-
-static void *EITProcessor(void *arg);
+static void DeferredProcessEIT(void *arg);
 
 static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_atsc_eit_event_t *event);
 static void DumpDescriptor(char *prefix, dvbpsi_descriptor_t *descriptor);
@@ -86,12 +82,6 @@ static void ConvertToTM(uint32_t startSeconds, uint32_t duration,
 *******************************************************************************/
 static PluginFilter_t filter = {NULL, InitEITFilter, DeinitEITFilter};
 static const char ATSCTOEPG[] = "ATSCtoEPG";
-
-static List_t *eitQueue = NULL;
-static pthread_mutex_t eitQueueMutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t eitAvailableCond = PTHREAD_COND_INITIALIZER;
-static pthread_t eitProcessorThread;
-static bool eitProcessorExit = FALSE;
 
 static int EITCount = 0;
 static EITInfo_t EITInfo[MAX_EITS];
@@ -121,14 +111,12 @@ PLUGIN_INTERFACE_F(
 static void InitEITFilter(PIDFilter_t *filter)
 {
     struct tm temp;
-    eitQueue = ListCreate();
 
     filter->name = "ATSC to EPG";
     filter->enabled = TRUE;
     PIDFilterFilterPacketSet(filter, ATSCtoEPGFilterPacket, NULL);
     PIDFilterMultiplexChangeSet(filter, ATSCtoEPGMultiplexChanged, NULL);
     PIDFilterProcessPacketSet(filter, ATSCtoEPGProcessPacket, NULL);
-    pthread_create(&eitProcessorThread, NULL, EITProcessor, NULL);
 
     memset(&temp, 0, sizeof(temp));
     temp.tm_year = 80;
@@ -143,23 +131,9 @@ static void DeinitEITFilter(PIDFilter_t *filter)
 {
     filter->enabled = FALSE;
 
-    pthread_mutex_lock(&eitQueueMutex);
-    eitProcessorExit = TRUE;
-    pthread_cond_signal(&eitAvailableCond);
-    pthread_mutex_unlock(&eitQueueMutex); 
-
-    pthread_join(eitProcessorThread, NULL);
-    
-    ListFree(eitQueue, FreeEIT );
-
     ClearEITInfo();
 }
 
-static void FreeEIT(void *arg)
-{
-    dvbpsi_atsc_eit_t *eit = arg;
-    ObjectRefDec(eit);
-}
 
 static void ClearEITInfo(void)
 {
@@ -226,68 +200,33 @@ static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t table
 
 static void ProcessEIT(void *arg, dvbpsi_atsc_eit_t *newEIT)
 {
-    EnqueueEIT( newEIT);
+    DeferredProcessingAddJob(DeferredProcessEIT, newEIT);
 }
 
-static void EnqueueEIT(dvbpsi_atsc_eit_t *newEIT)
+static void DeferredProcessEIT(void *arg)
 {
-    pthread_mutex_lock(&eitQueueMutex);
-    ListAdd(eitQueue, newEIT);
-    pthread_cond_signal(&eitAvailableCond);
-    pthread_mutex_unlock(&eitQueueMutex);    
-}
+    dvbpsi_atsc_eit_t *eit = (dvbpsi_atsc_eit_t *)arg;
+    Multiplex_t *multiplex = TuningCurrentMultiplexGet();
+    EPGServiceRef_t serviceRef;
+    dvbpsi_atsc_eit_event_t *event;
 
-static dvbpsi_atsc_eit_t * DequeueEIT(void)
-{
-    dvbpsi_atsc_eit_t *eit = NULL;
-    pthread_mutex_lock(&eitQueueMutex);
-    if (ListCount(eitQueue) == 0)
+    LogModule(LOG_DEBUG, ATSCTOEPG, "Processing EIT (version %d) source id %x\n",
+    eit->i_version, eit->i_source_id);
+    
+    EPGDBaseTransactionStart();
+
+    serviceRef.netId = multiplex->networkId;
+    serviceRef.tsId = multiplex->tsId;
+    serviceRef.serviceId = eit->i_source_id;
+    for (event = eit->p_first_event; event; event = event->p_next)
     {
-        pthread_cond_wait(&eitAvailableCond, &eitQueueMutex);
+        ProcessEvent(&serviceRef, event);
     }
+    ObjectRefDec(eit);
+    EPGDBaseTransactionCommit();
 
-    if (!eitProcessorExit)
-    {
-        ListIterator_t iterator;
-        ListIterator_Init(iterator, eitQueue);
-        eit = ListIterator_Current(iterator);
-        ListRemoveCurrent(&iterator);
-    }
-
-    pthread_mutex_unlock(&eitQueueMutex);  
-    return eit;
+    MultiplexRefDec(multiplex);
 }
-static void *EITProcessor(void *arg)
-{
-    while (!eitProcessorExit)
-    {
-        dvbpsi_atsc_eit_t *eit = DequeueEIT();
-        Multiplex_t *multiplex = TuningCurrentMultiplexGet();
-        if (eit)
-        {
-            EPGServiceRef_t serviceRef;
-            dvbpsi_atsc_eit_event_t *event;
-
-            LogModule(LOG_DEBUG, ATSCTOEPG, "Processing EIT (version %d) source id %x\n",
-            eit->i_version, eit->i_source_id);
-            
-            EPGDBaseTransactionStart();
-
-            serviceRef.netId = multiplex->networkId;
-            serviceRef.tsId = multiplex->tsId;
-            serviceRef.serviceId = eit->i_source_id;
-            for (event = eit->p_first_event; event; event = event->p_next)
-            {
-                ProcessEvent(&serviceRef, event);
-            }
-            ObjectRefDec(eit);
-            EPGDBaseTransactionCommit();
-        }
-        MultiplexRefDec(multiplex);
-    }
-    return NULL;
-}
-
 /*******************************************************************************
 * Helper Functions                                                             *
 *******************************************************************************/

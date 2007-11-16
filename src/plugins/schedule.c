@@ -27,7 +27,6 @@ Plugin to collect EPG schedule information.
 #include <string.h>
 #include <stdint.h>
 #include <time.h>
-#include <pthread.h>
 
 #include "plugin.h"
 #include "epgdbase.h"
@@ -41,6 +40,7 @@ Plugin to collect EPG schedule information.
 #include "logging.h"
 #include "subtableprocessor.h"
 #include "dvbtext.h"
+#include "deferredproc.h"
 
 
 /*******************************************************************************
@@ -61,15 +61,9 @@ Plugin to collect EPG schedule information.
 *******************************************************************************/
 static void Init0x12Filter(PIDFilter_t *filter);
 static void Deinit0x12Filter(PIDFilter_t *filter);
-
-static void FreeEIT(void *arg);
-static void EnqueueEIT(dvbpsi_eit_t *newEIT);
-static dvbpsi_eit_t * DequeueEIT(void);
-
 static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension);
 static void ProcessEIT(void *arg, dvbpsi_eit_t *newEIT);
-
-static void *EITProcessor(void *arg);
+static void DeferredProcessEIT(void *arg);
 
 static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *event);
 
@@ -86,11 +80,6 @@ static const char DVBSCHEDULE[] = "DVBSchedule";
 
 static const char ISO639NoLinguisticContent[] = "zxx";
 
-static List_t *eitQueue = NULL;
-static pthread_mutex_t eitQueueMutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t eitAvailableCond = PTHREAD_COND_INITIALIZER;
-static pthread_t eitProcessorThread;
-static bool eitProcessorExit = FALSE;
 static char *RatingsTable[] = {
     "Undefined",
     "4",
@@ -131,12 +120,10 @@ PLUGIN_INTERFACE_F(
 *******************************************************************************/
 static void Init0x12Filter(PIDFilter_t *filter)
 {
-    eitQueue = ListCreate();
-
     filter->name = "DVB Schedule";
     filter->enabled = TRUE;
+
     SubTableProcessorInit(filter, 0x12, SubTableHandler, NULL, NULL, NULL);
-    pthread_create(&eitProcessorThread, NULL, EITProcessor, NULL);
     if (filter->tsFilter->adapter->hardwareRestricted)
     {
         DVBDemuxAllocateFilter(filter->tsFilter->adapter, EIT_PID, TRUE);
@@ -151,50 +138,6 @@ static void Deinit0x12Filter(PIDFilter_t *filter)
         DVBDemuxReleaseFilter(filter->tsFilter->adapter, EIT_PID);
     }                
     SubTableProcessorDeinit(filter);
-
-    pthread_mutex_lock(&eitQueueMutex);
-    eitProcessorExit = TRUE;
-    pthread_cond_signal(&eitAvailableCond);
-    pthread_mutex_unlock(&eitQueueMutex); 
-
-    pthread_join(eitProcessorThread, NULL);
-    
-    ListFree(eitQueue, FreeEIT );
-}
-
-static void FreeEIT(void *arg)
-{
-    dvbpsi_eit_t *eit = arg;
-    ObjectRefDec(eit);
-}
-
-static void EnqueueEIT(dvbpsi_eit_t *newEIT)
-{
-    pthread_mutex_lock(&eitQueueMutex);
-    ListAdd(eitQueue, newEIT);
-    pthread_cond_signal(&eitAvailableCond);
-    pthread_mutex_unlock(&eitQueueMutex);    
-}
-
-static dvbpsi_eit_t * DequeueEIT(void)
-{
-    dvbpsi_eit_t *eit = NULL;
-    pthread_mutex_lock(&eitQueueMutex);
-    if (ListCount(eitQueue) == 0)
-    {
-        pthread_cond_wait(&eitAvailableCond, &eitQueueMutex);
-    }
-
-    if (!eitProcessorExit)
-    {
-        ListIterator_t iterator;
-        ListIterator_Init(iterator, eitQueue);
-        eit = ListIterator_Current(iterator);
-        ListRemoveCurrent(&iterator);
-    }
-
-    pthread_mutex_unlock(&eitQueueMutex);  
-    return eit;
 }
 
 static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension)
@@ -211,36 +154,29 @@ static void ProcessEIT(void *arg, dvbpsi_eit_t *newEIT)
 {
     LogModule(LOG_DEBUG, DVBSCHEDULE, "EIT received (version %d) net id %x ts id %x service id %x\n",
         newEIT->i_version, newEIT->i_network_id, newEIT->i_ts_id, newEIT->i_service_id);
-    EnqueueEIT( newEIT);
+    DeferredProcessingAddJob(DeferredProcessEIT, newEIT );
+    ObjectRefDec(newEIT);
 }
 
-static void *EITProcessor(void *arg)
+static void DeferredProcessEIT(void *arg)
 {
-    while (!eitProcessorExit)
-    {
-        dvbpsi_eit_t *eit = DequeueEIT();
-        if (eit)
-        {
-            EPGServiceRef_t serviceRef;
-            dvbpsi_eit_event_t *event;
+    dvbpsi_eit_t *eit = (dvbpsi_eit_t *)arg;
+    EPGServiceRef_t serviceRef;
+    dvbpsi_eit_event_t *event;
 
-            LogModule(LOG_DEBUG, DVBSCHEDULE, "Processing EIT (version %d) net id %x ts id %x service id %x\n",
-            eit->i_version, eit->i_network_id, eit->i_ts_id, eit->i_service_id);
-            
-            EPGDBaseTransactionStart();
-            serviceRef.netId = eit->i_network_id;
-            serviceRef.tsId = eit->i_ts_id;
-            serviceRef.serviceId = eit->i_service_id;
-            for (event = eit->p_first_event; event; event = event->p_next)
-            {
-                ProcessEvent(&serviceRef, event);
-            }
-            ObjectRefDec(eit);
-            EPGDBaseTransactionCommit();
-        }
+    LogModule(LOG_DEBUG, DVBSCHEDULE, "Processing EIT (version %d) net id %x ts id %x service id %x\n",
+    eit->i_version, eit->i_network_id, eit->i_ts_id, eit->i_service_id);
+    
+    EPGDBaseTransactionStart();
+    serviceRef.netId = eit->i_network_id;
+    serviceRef.tsId = eit->i_ts_id;
+    serviceRef.serviceId = eit->i_service_id;
+    for (event = eit->p_first_event; event; event = event->p_next)
+    {
+        ProcessEvent(&serviceRef, event);
     }
-    LogModule(LOG_DEBUG, DVBSCHEDULE, "EIT Processor thread exiting.\n");
-    return NULL;
+    ObjectRefDec(eit);
+    EPGDBaseTransactionCommit();
 }
 
 /*******************************************************************************
