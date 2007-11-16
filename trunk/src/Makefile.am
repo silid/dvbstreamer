@@ -43,6 +43,8 @@ dvbstreamer_SOURCES = \
     subtableprocessor.c \
     epgdbase.c \
     utf8.c \
+    threading/messageq.c \
+    threading/deferredproc.c \    
     $(atsc_src) \
     $(dvb_src) \
     $(plugin_src) \
