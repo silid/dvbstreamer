@@ -132,7 +132,6 @@ void TuningCurrentServiceSet(Service_t *service)
         }
 
         CurrentService = CacheServiceFindId(service->id);
-        ServiceRefInc(CurrentService);
         ServiceFilterServiceSet(primaryServiceFilter, CurrentService);
         
 
