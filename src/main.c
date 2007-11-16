@@ -63,6 +63,7 @@ Entry point to the application.
 #include "plugin.h"
 #include "tuning.h"
 #include "atsctext.h"
+#include "deferredproc.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -231,6 +232,7 @@ int main(int argc, char *argv[])
     INIT(ServiceInit(), "service");
     INIT(CacheInit(), "cache");
     INIT(DeliveryMethodManagerInit(), "delivery method manager");
+    INIT(DeferredProcessingInit(), "deferred processing");
 
     LogModule(LOG_INFO, MAIN, "%d Services available on %d Multiplexes\n", ServiceCount(), MultiplexCount());
 
@@ -437,6 +439,7 @@ int main(int argc, char *argv[])
     /* Close the adapter and shutdown the filter etc*/
     DEINIT(TSFilterDestroy(TSFilter), "TS filter");
     DEINIT(DVBDispose(DVBAdapter), "DVB adapter");
+    DEINIT(DeferredProcessingDeinit(), "deferred processing");
     DEINIT(DeliveryMethodManagerDeInit(), "delivery method manager");
     DEINIT(CacheDeInit(), "cache");    
 

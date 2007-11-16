@@ -6,10 +6,13 @@
 
 
 pkginclude_DATA = \
+    types.h \
     cache.h \
     objects.h \
     services.h \
     multiplexes.h \
+    pids.h \
+    dbase.h \
     dvb.h \
     main.h \
     plugin.h \
@@ -24,7 +27,9 @@ pkginclude_DATA = \
     subtableprocessor.h \
     dvbtext.h \
     atsctext.h \
-    utf8.h
+    utf8.h \
+    messageq.h \
+    deferredproc.h
 
 
 EXTRA_DIST = $(pkginclude_DATA)
