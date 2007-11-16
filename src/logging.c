@@ -28,6 +28,7 @@ Logging functions.
 
 #include "main.h"
 #include "logging.h"
+#include "pthread.h"
 
 /*******************************************************************************
 * Prototypes                                                                   *
@@ -44,6 +45,7 @@ static void LogImpl(int level, const char *module, const char * format, va_list 
  * Used to determine when to send text from a printlog call to the log output.
  */
 static int verbosity = 0;
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /*******************************************************************************
 * Global functions                                                             *
@@ -90,7 +92,7 @@ void LogModule(int level, const char *module, char *format, ...)
 
 static void LogImpl(int level, const char *module, const char * format, va_list valist)
 {
-    
+    pthread_mutex_lock(&mutex);
 #ifdef LOGGING_CHECK_DAEMON
     if (DaemonMode)
     {
@@ -107,7 +109,7 @@ static void LogImpl(int level, const char *module, const char * format, va_list 
     }
 #endif
 
-    fprintf(stderr, "%-15s : ", module ? module:"<Unknown>");
+    fprintf(stderr, "%-15s : %2d : ", module ? module:"<Unknown>", level);
 
     vfprintf(stderr, format, valist);
 
@@ -117,4 +119,5 @@ static void LogImpl(int level, const char *module, const char * format, va_list 
         fflush(stderr);
     }
 #endif        
+    pthread_mutex_unlock(&mutex);
 }
