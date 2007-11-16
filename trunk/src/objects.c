@@ -208,6 +208,12 @@ bool ObjectRefDecImpl(void *ptr, char *file, int line)
     bool result = TRUE;
     Object_t *object;
     char *clazzName = "<Malloc>";
+
+    if (ptr == NULL)
+    {
+        LogModule(LOG_ERROR, OBJECT, "Attempt to decrement the reference of NULL! Offending code %s:%d\n", ptr, file, line);        
+        return FALSE;
+    }
     
     pthread_mutex_lock(&objectMutex);
     object = DataToObject(ptr);
