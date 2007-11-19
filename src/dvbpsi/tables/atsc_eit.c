@@ -156,8 +156,10 @@ void dvbpsi_atsc_DetachEIT(dvbpsi_demux_t * p_demux, uint8_t i_table_id, uint16_
   }
 
   p_eit_decoder = (dvbpsi_atsc_eit_decoder_t*)p_subdec->p_cb_data;
-
-  ObjectRefDec(p_eit_decoder->p_building_eit);
+  if (p_eit_decoder->p_building_eit)
+  {
+    ObjectRefDec(p_eit_decoder->p_building_eit);
+  }
 
   for(i = 0; i <= 255; i++)
   {

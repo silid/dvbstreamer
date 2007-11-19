@@ -169,8 +169,10 @@ void dvbpsi_atsc_DetachVCT(dvbpsi_demux_t * p_demux, uint8_t i_table_id, uint16_
   }
 
   p_vct_decoder = (dvbpsi_atsc_vct_decoder_t*)p_subdec->p_cb_data;
-
-  ObjectRefDec(p_vct_decoder->p_building_vct);
+  if (p_vct_decoder->p_building_vct)
+  {
+    ObjectRefDec(p_vct_decoder->p_building_vct);
+  }
 
   for(i = 0; i <= 255; i++)
   {
