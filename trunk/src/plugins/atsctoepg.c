@@ -201,6 +201,7 @@ static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t table
 static void ProcessEIT(void *arg, dvbpsi_atsc_eit_t *newEIT)
 {
     DeferredProcessingAddJob(DeferredProcessEIT, newEIT);
+    ObjectRefDec(newEIT);
 }
 
 static void DeferredProcessEIT(void *arg)

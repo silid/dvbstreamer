@@ -159,7 +159,10 @@ void dvbpsi_atsc_DetachMGT(dvbpsi_demux_t * p_demux, uint8_t i_table_id, uint16_
 
   p_mgt_decoder = (dvbpsi_atsc_mgt_decoder_t*)p_subdec->p_cb_data;
 
-  ObjectRefDec(p_mgt_decoder->p_building_mgt);
+  if (p_mgt_decoder->p_building_mgt)
+  {
+    ObjectRefDec(p_mgt_decoder->p_building_mgt);
+  }
 
   for(i = 0; i <= 255; i++)
   {
