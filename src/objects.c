@@ -56,6 +56,7 @@ typedef struct Class_s {
     char *name;
     unsigned int size;
     ObjectDestructor_t destructor;
+    unsigned int allocatedCount;
 }Class_t;
 
 typedef struct Object_s {
@@ -124,11 +125,12 @@ int ObjectDeinit(void)
     {
         unsigned int i;
         LogModule(LOG_DEBUG, OBJECT, "Registered Classes:\n");
-        LogModule(LOG_DEBUG, OBJECT, "\tClass Name                       | Size       | Destructor?\n");
-        LogModule(LOG_DEBUG, OBJECT, "\t---------------------------------|------------|------------\n");
+        LogModule(LOG_DEBUG, OBJECT, "\tClass Name                       | Size       | Count      |Destructor?\n");
+        LogModule(LOG_DEBUG, OBJECT, "\t---------------------------------|------------|------------|------------\n");
         for (i = 0; i < classesCount; i ++)
         {
-            LogModule(LOG_DEBUG, OBJECT, "\t%-32s | %10d | %s\n", classes[i].name, classes[i].size, classes[i].destructor ? "Yes":"No");
+            LogModule(LOG_DEBUG, OBJECT, "\t%-32s | %10d | %10d | %s\n", 
+                classes[i].name, classes[i].size, classes[i].allocatedCount,classes[i].destructor ? "Yes":"No");
         }
     }
     pthread_mutex_destroy(&objectMutex);
@@ -156,6 +158,7 @@ int ObjectRegisterClass(char *classname, unsigned int size, ObjectDestructor_t d
     classes[classesCount].name = strdup(classname);
     classes[classesCount].size = size;
     classes[classesCount].destructor = destructor;
+    classes[classesCount].allocatedCount = 0;
     classesCount ++;
     LogModule(LOG_DEBUGV, OBJECT, "Registered class \"%s\" size %d destructor? %s\n", classname, size, destructor? "Yes":"No");
     pthread_mutex_unlock(&objectMutex);
@@ -184,6 +187,7 @@ void *ObjectCreateImpl(char *classname, char *file, int line)
     {
         LogModule(LOG_ERROR, OBJECT, "Failed to create object of class \"%s\"\n", classname);
     }
+    clazz->allocatedCount ++;
     pthread_mutex_unlock(&objectMutex);
     return result;
 }
@@ -211,7 +215,7 @@ bool ObjectRefDecImpl(void *ptr, char *file, int line)
 
     if (ptr == NULL)
     {
-        LogModule(LOG_ERROR, OBJECT, "Attempt to decrement the reference of NULL! Offending code %s:%d\n", ptr, file, line);        
+        LogModule(LOG_ERROR, OBJECT, "Attempt to decrement the reference of NULL! Offending code %s:%d\n", file, line);        
         return FALSE;
     }
     
