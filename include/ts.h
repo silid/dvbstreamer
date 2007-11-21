@@ -94,7 +94,14 @@ TSPacket_t;
  */
 #define TSPACKET_ISPAYLOADUNITSTART(packet) \
     (((packet).header[1] & 0x40) == 0x40)
-
+/**
+ * Boolean test to determine whether this packet is valid, transport_error_indicator 
+ * is not set.
+ * @param packet The packet to check.
+ */
+#define TSPACKET_ISVALID(packet) \
+    (((packet).header[1] & 0x80) == 0x00)
+    
 /**@}*/
 
 /**
