@@ -54,7 +54,7 @@ Plugin to collect EPG schedule information.
 #undef PRINTLOG_SQLITE3ERROR
 #define PRINTLOG_SQLITE3ERROR() \
     do{\
-        LogModule(LOG_DEBUG, "dbase", "%s(%d): Failed with error code 0x%x = %s\n",__FUNCTION__,__LINE__, rc, sqlite3_errmsg(EPGDBaseConnection));\
+        LogModule(LOG_DEBUG, EPGDBASE, "%s(%d): Failed with error code 0x%x = %s\n",__FUNCTION__,__LINE__, rc, sqlite3_errmsg(EPGDBaseConnection));\
     }while(0)
 
 #define EPGEVENT_FIELDS EPGEVENT_NETID "," EPGEVENT_TSID "," EPGEVENT_SERVICEID "," \
@@ -191,7 +191,7 @@ int EPGDBaseEventAdd(EPGEvent_t *event)
     startTime = mktime(&event->startTime);
     endTime = mktime(&event->endTime);  
 
-    STATEMENT_PREPAREVA("INSERT INTO " EPGEVENTS_TABLE"("EPGEVENT_FIELDS") "
+    STATEMENT_PREPAREVA("INSERT OR REPLACE INTO " EPGEVENTS_TABLE"("EPGEVENT_FIELDS") "
                         "VALUES (%d,%d,%d,%d,%d,%d,%d);",
                         event->serviceRef.netId,event->serviceRef.tsId,event->serviceRef.serviceId,
                         event->eventId, startTime, endTime, event->ca);
@@ -330,7 +330,7 @@ int EPGDBaseRatingAdd(EPGServiceRef_t *serviceRef, unsigned int eventId, char *s
     STATEMENT_INIT;
     eventUID  = CreateEventUID(serviceRef, eventId);
     
-    STATEMENT_PREPAREVA("INSERT INTO " EPGRATINGS_TABLE "(" EPGRATING_FIELDS_NOID ") "
+    STATEMENT_PREPAREVA("INSERT OR REPLACE INTO " EPGRATINGS_TABLE "(" EPGRATING_FIELDS_NOID ") "
                         "VALUES (%lld,'%q','%q');",
                         eventUID, system, rating);
     RETURN_RC_ON_ERROR;
@@ -427,7 +427,7 @@ int EPGDBaseDetailAdd(EPGServiceRef_t *serviceRef, unsigned int eventId, char *l
     STATEMENT_INIT;
     eventUID  = CreateEventUID(serviceRef, eventId);
     
-    STATEMENT_PREPAREVA("INSERT INTO " EPGDETAILS_TABLE "(" EPGDETAIL_FIELDS_NOID ") "
+    STATEMENT_PREPAREVA("INSERT OR REPLACE INTO " EPGDETAILS_TABLE "(" EPGDETAIL_FIELDS_NOID ") "
                         "VALUES (%lld,'%q','%q','%q');",
                         eventUID, lang, name, value);
     RETURN_RC_ON_ERROR;
