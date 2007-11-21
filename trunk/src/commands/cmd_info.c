@@ -557,7 +557,7 @@ static void CommandStats(int argc, char **argv)
         if ((strcmp(filter->type, PSISIPIDFilterType) != 0) &&
             (strcmp(filter->type, ServicePIDFilterType) != 0))
         {
-            CommandPrintf("\t%-15s : %lld (%s)\n", filter->name, filter->packetsProcessed, filter->type);
+            CommandPrintf("\t%-15s : %lld (%s)\n", filter->name, filter->packetsFiltered, filter->type);
         }
     }
     CommandPrintf("\n");

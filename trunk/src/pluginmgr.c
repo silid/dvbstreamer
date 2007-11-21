@@ -131,6 +131,7 @@ extern Plugin_t ManualFilterPluginInterface;
 extern Plugin_t EPGtoXMLTVPluginInterface;
 extern Plugin_t UDPOutputPluginInterface;
 extern Plugin_t QueryEPGPluginInterface;
+extern Plugin_t SICapturePluginInterface;
 
 #if defined(ENABLE_ATSC)
 extern Plugin_t ATSCtoEPGPluginInterface;
@@ -181,6 +182,9 @@ int PluginManagerInit(void)
         entry->pluginInterface = &QueryEPGPluginInterface;
         ListAdd(PluginsList, entry);                
         
+        entry = calloc(1, sizeof(struct PluginEntry_t));
+        entry->pluginInterface = &SICapturePluginInterface;
+        ListAdd(PluginsList, entry);   
 #if defined(ENABLE_ATSC)
         entry = calloc(1, sizeof(struct PluginEntry_t));
         entry->pluginInterface = &ATSCtoEPGPluginInterface;
