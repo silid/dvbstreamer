@@ -94,6 +94,7 @@ void DeliveryMethodManagerFree(PIDFilter_t *filter)
     if (instance)
     {
         DeliveryMethodDestroy(instance);
+        filter->opArg = NULL;
     }
 }
 
