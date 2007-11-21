@@ -276,6 +276,10 @@ static void ProcessPacket(TSFilter_t *state, TSPacket_t *packet)
     uint16_t pid = TSPACKET_GETPID(*packet);
 
     ListIterator_t iterator;
+    if (!TSPACKET_ISVALID(*packet))
+    {
+        return;
+    }
     for (ListIterator_Init(iterator, state->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         PIDFilter_t *filter =(PIDFilter_t *)ListIterator_Current(iterator);
