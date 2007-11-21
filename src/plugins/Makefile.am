@@ -19,6 +19,7 @@ plugins_LTLIBRARIES = \
 	epgtoxmltv.la \
 	manualfilters.la \
 	queryepg.la \
+	sicapture.la \
 	$(atsc_plugins) \
 	$(dvb_plugins)
 endif
@@ -102,3 +103,7 @@ queryepg_la_SOURCES = \
 
 queryepg_la_LDFLAGS = -module -no-undefined -avoid-version
 
+sicapture_la_SOURCES = \
+    sicapture.c
+
+sicapture_la_LDFLAGS = -module -no-undefined -avoid-version
