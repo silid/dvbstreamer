@@ -102,6 +102,7 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
         {
             result->info.type = FE_ATSC;
         }
+        strcpy(result->info.name, "Simulation");
 #endif
 
 #ifndef __CYGWIN__        

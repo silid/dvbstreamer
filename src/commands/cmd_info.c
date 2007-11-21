@@ -76,6 +76,7 @@ static void CommandFEStatus(int argc, char **argv);
 
 static void CommandVariableUptimeGet(char *name);
 static void CommandVariableFETypeGet(char *name);
+static void CommandVariableFENameGet(char *name);
 static void CommandVariableTSModeGet(char *name);
 /*******************************************************************************
 * Global variables                                                             *
@@ -184,10 +185,17 @@ static CommandVariable_t VariableUpsecs = {
     NULL
     };
 
-static CommandVariable_t VariableFetype = {
+static CommandVariable_t VariableFEType = {
     "fetype", 
     "Type of the tuner this instance is using.",
     CommandVariableFETypeGet, 
+    NULL
+    };
+
+static CommandVariable_t VariableFEName = {
+    "fename", 
+    "Name of the tuner this instance is using.",
+    CommandVariableFENameGet, 
     NULL
     };
 
@@ -208,7 +216,8 @@ void CommandInstallInfo(void)
     
     CommandRegisterVariable(&VariableUptime);
     CommandRegisterVariable(&VariableUpsecs);    
-    CommandRegisterVariable(&VariableFetype);
+    CommandRegisterVariable(&VariableFEType);
+    CommandRegisterVariable(&VariableFEName);    
     CommandRegisterVariable(&VariableTSMode);    
     StartTime = time(NULL);
 }
@@ -218,7 +227,8 @@ void CommandUnInstallInfo(void)
     CommandUnRegisterCommands(CommandDetailsInfo); 
     CommandUnRegisterVariable(&VariableUptime);
     CommandUnRegisterVariable(&VariableUpsecs);    
-    CommandUnRegisterVariable(&VariableFetype);
+    CommandUnRegisterVariable(&VariableFEType);
+    CommandUnRegisterVariable(&VariableFEName);    
     CommandUnRegisterVariable(&VariableTSMode);     
 }
 
@@ -718,6 +728,14 @@ static void CommandVariableFETypeGet(char *name)
     DVBAdapter_t *adapter = MainDVBAdapterGet();
 
     CommandPrintf("%s\n", FETypesStr[adapter->info.type]);
+}
+
+static void CommandVariableFENameGet(char *name)
+{
+
+    DVBAdapter_t *adapter = MainDVBAdapterGet();
+
+    CommandPrintf("%s\n", adapter->info.name);
 }
 
 static void CommandVariableTSModeGet(char *name)
