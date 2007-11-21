@@ -32,7 +32,7 @@ The tables are copyrighted by (from A/65C Annex C Page 91 footnote 19):
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
+#include <pthread.h>
 #include <iconv.h>
 
 #include "logging.h"
@@ -328,6 +328,8 @@ static iconv_t *Utf16ToUtf8CD;
 static iconv_t *Ucs2ToUtf8CD;
 static iconv_t *AsciiToUtf8CD;
 
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
 static const char ATSCTEXT[] = "ATSCText";
 
 /*******************************************************************************
@@ -367,7 +369,8 @@ ATSCMultipleStrings_t *ATSCMultipleStringsConvert(uint8_t *data, uint8_t len)
     ATSCMultipleStrings_t *result;
     int stringIndex;
     uint8_t *pos = data + 1;
-    
+
+    pthread_mutex_lock(&mutex);
     result = ObjectCreateType(ATSCMultipleStrings_t);
     result->number_of_strings = data[0];
     result->strings = calloc( result->number_of_strings, sizeof(ATSCString_t));
@@ -405,6 +408,7 @@ ATSCMultipleStrings_t *ATSCMultipleStringsConvert(uint8_t *data, uint8_t len)
         
     }
     LogModule(LOG_DEBUG, ATSCTEXT, "End of conversion\n");
+    pthread_mutex_unlock(&mutex);    
     return result;    
 }
 
