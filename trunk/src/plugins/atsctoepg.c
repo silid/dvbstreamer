@@ -61,6 +61,7 @@ static void InitEITFilter(PIDFilter_t *filter);
 static void DeinitEITFilter(PIDFilter_t *filter);
 
 static void NewMGT(dvbpsi_atsc_mgt_t *newMGT);
+static void NewSTT(dvbpsi_atsc_stt_t *newSTT);
 
 static int ATSCtoEPGFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet);
 static TSPacket_t * ATSCtoEPGProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
@@ -83,6 +84,8 @@ static void ConvertToTM(uint32_t startSeconds, uint32_t duration,
 static PluginFilter_t filter = {NULL, InitEITFilter, DeinitEITFilter};
 static const char ATSCTOEPG[] = "ATSCtoEPG";
 
+static uint8_t GPStoUTCSecondsOffset = 14; /* From the test streams 24th May 2007 */
+
 static int EITCount = 0;
 static EITInfo_t EITInfo[MAX_EITS];
 static time_t UnixEpochOffset;
@@ -96,7 +99,8 @@ static time_t UnixEpochOffset;
 
 PLUGIN_FEATURES(
     PLUGIN_FEATURE_FILTER(filter),
-    PLUGIN_FEATURE_MGTPROCESSOR(NewMGT)
+    PLUGIN_FEATURE_MGTPROCESSOR(NewMGT),
+    PLUGIN_FEATURE_STTPROCESSOR(NewSTT)
     );
 
 PLUGIN_INTERFACE_F(
@@ -159,6 +163,11 @@ static void NewMGT(dvbpsi_atsc_mgt_t *newMGT)
             EITCount ++;
         }
     }
+}
+
+static void NewSTT(dvbpsi_atsc_stt_t *newSTT)
+{
+    GPStoUTCSecondsOffset = newSTT->i_gps_utc_offset;
 }
 
 static int ATSCtoEPGFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet)
@@ -247,9 +256,9 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_atsc_eit_event_t *e
     epgevent.ca = FALSE;
     strftime(startTimeStr, sizeof(startTimeStr), "%Y-%m-%d %T", &epgevent.startTime);
     strftime(endTimeStr, sizeof(startTimeStr), "%Y-%m-%d %T", &epgevent.endTime);
-    LogModule(LOG_DEBUG, ATSCTOEPG, "(%x:%x:%x) Event %x Start Time %s (%d) End Time %s (duration %d) Title Length %d\n",
+    LogModule(LOG_DEBUG, ATSCTOEPG, "(%x:%x:%x) Event %x Start Time %s (%d) End Time %s (duration %d) Title Length %d ETM location=%d\n",
         serviceRef->netId, serviceRef->tsId, serviceRef->serviceId, epgevent.eventId,
-        startTimeStr,eitevent->i_start_time, endTimeStr,eitevent->i_length_seconds, eitevent->i_title_length);
+        startTimeStr,eitevent->i_start_time, endTimeStr,eitevent->i_length_seconds, eitevent->i_title_length, eitevent->i_etm_location);
     
     if (EPGDBaseEventAdd(&epgevent) != 0)
     {
@@ -285,7 +294,7 @@ static void ConvertToTM(uint32_t startSeconds, uint32_t duration,
     struct tm *temp_time;
     time_t secs;
 
-    secs = startSeconds + UnixEpochOffset;
+    secs = startSeconds + UnixEpochOffset - GPStoUTCSecondsOffset;
     temp_time = gmtime(&secs);
     *startTime = *temp_time;
     
