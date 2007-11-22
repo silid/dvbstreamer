@@ -81,7 +81,8 @@ atsc_tables_src =\
 	tables/atsc_mgt.c \
 	tables/atsc_stt.c \
 	tables/atsc_vct.c \
-	tables/atsc_eit.c
+	tables/atsc_eit.c \
+	tables/atsc_ett.c
 
 
 

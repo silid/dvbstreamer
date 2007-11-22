@@ -49,7 +49,8 @@ dvbpsiatsc_DATA =\
 	atsc/mgt.h \
 	atsc/stt.h \
 	atsc/vct.h \
-	atsc/eit.h
+	atsc/eit.h \
+	atsc/ett.h
 
 EXTRA_DIST = $(dvbpsi_DATA) $(dvbpsiatsc_DATA)
 

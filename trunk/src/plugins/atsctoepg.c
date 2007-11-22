@@ -29,6 +29,7 @@ Plugin to collect EPG schedule information from ATSC/PSIP.
 
 #include "plugin.h"
 #include "epgdbase.h"
+#include "dvbpsi/atsc/ett.h"
 #include "dvbpsi/atsc/eit.h"
 
 
@@ -44,15 +45,15 @@ Plugin to collect EPG schedule information from ATSC/PSIP.
 * Defines                                                                      *
 *******************************************************************************/
 #define MAX_EITS 128 /* Maximum number of EIT tables (PIDs) */
-
+#define MAX_ETTS 128 /* Maximum number of ETT tables (PIDs) */
 /*******************************************************************************
 * Typedefs                                                                     *
 *******************************************************************************/
-typedef struct EITInfo_s
+typedef struct TableInfo_s
 {
     uint16_t pid;
-    dvbpsi_handle demux;
-}EITInfo_t;
+    dvbpsi_handle decoder;
+}TableInfo_t;
 
 /*******************************************************************************
 * Prototypes                                                                   *
@@ -67,11 +68,13 @@ static int ATSCtoEPGFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid
 static TSPacket_t * ATSCtoEPGProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
 static void ATSCtoEPGMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex);
 
-static void ClearEITInfo(void);
+static void ClearTableInfo(void);
 
 static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension);
+static void ProcessETT(void *arg, dvbpsi_atsc_ett_t *newETT);
 static void ProcessEIT(void *arg, dvbpsi_atsc_eit_t *newEIT);
 static void DeferredProcessEIT(void *arg);
+static void DeferredProcessETT(void *arg);
 
 static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_atsc_eit_event_t *event);
 static void DumpDescriptor(char *prefix, dvbpsi_descriptor_t *descriptor);
@@ -86,8 +89,10 @@ static const char ATSCTOEPG[] = "ATSCtoEPG";
 
 static uint8_t GPStoUTCSecondsOffset = 14; /* From the test streams 24th May 2007 */
 
-static int EITCount = 0;
-static EITInfo_t EITInfo[MAX_EITS];
+static int EventInfoTableCount = 0;
+static TableInfo_t EventInfoTableInfo[MAX_EITS];
+static int ExtendedTextTableCount = 0;
+static TableInfo_t ExtendedTextTableInfo[MAX_ETTS];
 static time_t UnixEpochOffset;
 
 /*******************************************************************************
@@ -135,33 +140,45 @@ static void DeinitEITFilter(PIDFilter_t *filter)
 {
     filter->enabled = FALSE;
 
-    ClearEITInfo();
+    ClearTableInfo();
 }
 
 
-static void ClearEITInfo(void)
+static void ClearTableInfo(void)
 {
     int i;
-    for (i = 0; i < EITCount; i ++)
+    for (i = 0; i < EventInfoTableCount; i ++)
     {
-        dvbpsi_DetachDemux(EITInfo[i].demux);
+        dvbpsi_DetachDemux(EventInfoTableInfo[i].decoder);
     }
-    EITCount = 0;
+    EventInfoTableCount = 0;
+    for (i = 0; i < ExtendedTextTableCount; i ++)
+    {
+        dvbpsi_atsc_DetachETT(ExtendedTextTableInfo[i].decoder);
+    }
+    ExtendedTextTableCount = 0;
 }
 
 static void NewMGT(dvbpsi_atsc_mgt_t *newMGT)
 {
     dvbpsi_atsc_mgt_table_t * table;
-    ClearEITInfo();
+    ClearTableInfo();
 
     for (table = newMGT->p_first_table; table; table = table->p_next)
     {
         if ((table->i_type >= 0x100) && (table->i_type <= 0x17f))
         {
-            EITInfo[EITCount].pid = table->i_pid;
-            EITInfo[EITCount].demux = dvbpsi_AttachDemux(SubTableHandler, NULL);
-            EITCount ++;
+            EventInfoTableInfo[EventInfoTableCount].pid = table->i_pid;
+            EventInfoTableInfo[EventInfoTableCount].decoder = dvbpsi_AttachDemux(SubTableHandler, NULL);
+            EventInfoTableCount ++;
         }
+        if ((table->i_type >= 0x200) && (table->i_type <= 0x27f))
+        {
+            ExtendedTextTableInfo[ExtendedTextTableCount].pid = table->i_pid;
+            ExtendedTextTableInfo[ExtendedTextTableCount].decoder = dvbpsi_atsc_AttachETT(ProcessETT, NULL);
+            ExtendedTextTableCount ++;
+        }
+        
     }
 }
 
@@ -173,30 +190,45 @@ static void NewSTT(dvbpsi_atsc_stt_t *newSTT)
 static int ATSCtoEPGFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet)
 {
     int i;
-    for (i = 0; i < EITCount; i ++)
+    for (i = 0; i < EventInfoTableCount; i ++)
     {
-        if (EITInfo[i].pid == pid)
+        if (EventInfoTableInfo[i].pid == pid)
         {
             return TRUE;
         }
     }
+    for (i = 0; i < ExtendedTextTableCount; i ++)
+    {
+        if (ExtendedTextTableInfo[i].pid == pid)
+        {
+            return TRUE;
+        }
+    }
+    
     return FALSE;
 }
 
 static void ATSCtoEPGMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex)
 {
-    ClearEITInfo();
+    ClearTableInfo();
 }
 
 static TSPacket_t * ATSCtoEPGProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet)
 {
     int i;
     uint16_t pid = TSPACKET_GETPID(*packet);
-    for (i = 0; i < EITCount; i ++)
+    for (i = 0; i < EventInfoTableCount; i ++)
     {
-        if (EITInfo[i].pid == pid)
+        if (EventInfoTableInfo[i].pid == pid)
         {
-            dvbpsi_PushPacket(EITInfo[i].demux, (uint8_t*)packet);
+            dvbpsi_PushPacket(EventInfoTableInfo[i].decoder, (uint8_t*)packet);
+        }
+    }
+    for (i = 0; i < ExtendedTextTableCount; i ++)
+    {
+        if (ExtendedTextTableInfo[i].pid == pid)
+        {
+            dvbpsi_PushPacket(ExtendedTextTableInfo[i].decoder, (uint8_t*)packet);            
         }
     }
     return NULL;
@@ -205,6 +237,12 @@ static TSPacket_t * ATSCtoEPGProcessPacket(PIDFilter_t *pidfilter, void *arg, TS
 static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension)
 {
     dvbpsi_atsc_AttachEIT(demuxHandle, tableId, extension, ProcessEIT, NULL);
+}
+
+static void ProcessETT(void *arg, dvbpsi_atsc_ett_t *newETT)
+{
+    DeferredProcessingAddJob(DeferredProcessETT, newETT);
+    ObjectRefDec(newETT);    
 }
 
 static void ProcessEIT(void *arg, dvbpsi_atsc_eit_t *newEIT)
@@ -237,6 +275,44 @@ static void DeferredProcessEIT(void *arg)
 
     MultiplexRefDec(multiplex);
 }
+
+static void DeferredProcessETT(void *arg)
+{
+    ATSCMultipleStrings_t *description;
+    dvbpsi_atsc_ett_t *ett = (dvbpsi_atsc_ett_t*) arg;
+    Multiplex_t *multiplex = TuningCurrentMultiplexGet();
+    EPGServiceRef_t serviceRef;
+    unsigned int eventId; 
+    char lang[4];
+    int i;
+    
+    serviceRef.netId = multiplex->networkId;
+    serviceRef.tsId = multiplex->tsId;
+    serviceRef.serviceId = (ett->i_etm_id >> 16) & 0xffff;
+    eventId = ett->i_etm_id & 0xffff;
+    lang[3] = 0;
+    EPGDBaseTransactionStart();    
+    description = ATSCMultipleStringsConvert(ett->p_etm, ett->i_etm_length);
+    LogModule(LOG_DEBUG, ATSCTOEPG,"Processing ETT for %04x.%04x.%04x.%04x: Number of strings %d\n",
+        serviceRef.netId, serviceRef.tsId, serviceRef.serviceId, eventId, description->number_of_strings);
+    for (i = 0; i < description->number_of_strings; i ++)
+    {
+        
+        LogModule(LOG_DEBUG, ATSCTOEPG, "%d : (%c%c%c) %s\n",
+            i + 1, description->strings[i].lang[0],description->strings[i].lang[1],description->strings[i].lang[2],
+            description->strings[i].text);
+        lang[0] = description->strings[i].lang[0];
+        lang[1] = description->strings[i].lang[1];
+        lang[2] = description->strings[i].lang[2];
+        EPGDBaseDetailAdd(&serviceRef,eventId, lang, EPG_EVENT_DETAIL_DESCRIPTION,description->strings[i].text);
+    }
+    EPGDBaseTransactionCommit();
+    ObjectRefDec(description);
+
+    MultiplexRefDec(multiplex);    
+    ObjectRefDec(ett);
+}
+
 /*******************************************************************************
 * Helper Functions                                                             *
 *******************************************************************************/
