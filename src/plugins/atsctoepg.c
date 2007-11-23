@@ -289,7 +289,7 @@ static void DeferredProcessETT(void *arg)
     serviceRef.netId = multiplex->networkId;
     serviceRef.tsId = multiplex->tsId;
     serviceRef.serviceId = (ett->i_etm_id >> 16) & 0xffff;
-    eventId = ett->i_etm_id & 0xffff;
+    eventId = (ett->i_etm_id >> 2) & 0xffff;
     lang[3] = 0;
     EPGDBaseTransactionStart();    
     description = ATSCMultipleStringsConvert(ett->p_etm, ett->i_etm_length);
