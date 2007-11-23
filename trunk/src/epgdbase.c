@@ -61,16 +61,16 @@ Plugin to collect EPG schedule information.
                         EPGEVENT_EVENTID "," EPGEVENT_STARTTIME "," EPGEVENT_ENDTIME  "," \
                         EPGEVENT_CA
 
-#define EPGRATING_FIELDS_NOID EPGRATING_EVENTUID "," EPGRATING_STANDARD "," \
+#define EPGRATING_FIELDS EPGRATING_EVENTUID "," EPGRATING_STANDARD "," \
                          EPGRATING_RATING
 
-#define EPGRATING_FIELDS_NOREF EPGRATING_ID "," EPGRATING_STANDARD "," \
+#define EPGRATING_FIELDS_NOREF EPGRATING_STANDARD "," \
                          EPGRATING_RATING
                          
-#define EPGDETAIL_FIELDS_NOID EPGDETAIL_EVENTUID "," EPGDETAIL_LANGUAGE "," \
+#define EPGDETAIL_FIELDS EPGDETAIL_EVENTUID "," EPGDETAIL_LANGUAGE "," \
                           EPGDETAIL_NAME "," EPGDETAIL_VALUE
 
-#define EPGDETAIL_FIELDS_NOREF EPGDETAIL_ID "," EPGDETAIL_LANGUAGE "," \
+#define EPGDETAIL_FIELDS_NOREF EPGDETAIL_LANGUAGE "," \
                           EPGDETAIL_NAME "," EPGDETAIL_VALUE                          
 
 /*******************************************************************************
@@ -120,10 +120,10 @@ int EPGDBaseInit(int adapter)
         }
 
         rc = sqlite3_exec(EPGDBaseConnection, "CREATE TABLE IF NOT EXISTS " EPGRATINGS_TABLE" ( "
-                         EPGRATING_ID        " INTEGER PRIMARY KEY AUTOINCREMENT," 
                          EPGRATING_EVENTUID   "," 
                          EPGRATING_STANDARD  ","
-                         EPGRATING_RATING
+                         EPGRATING_RATING   ","
+                         "PRIMARY KEY ( " EPGRATING_EVENTUID "," EPGRATING_STANDARD ")"
                          ");", NULL, NULL, NULL);
         if (rc)
         {
@@ -132,11 +132,11 @@ int EPGDBaseInit(int adapter)
         }
 
         rc = sqlite3_exec(EPGDBaseConnection, "CREATE TABLE IF NOT EXISTS " EPGDETAILS_TABLE" ( "
-                         EPGDETAIL_ID        " INTEGER PRIMARY KEY AUTOINCREMENT," 
                          EPGDETAIL_EVENTUID   "," 
                          EPGDETAIL_LANGUAGE  ","
                          EPGDETAIL_NAME  ","
-                         EPGDETAIL_VALUE
+                         EPGDETAIL_VALUE ","
+                         "PRIMARY KEY ( " EPGDETAIL_EVENTUID "," EPGDETAIL_LANGUAGE "," EPGDETAIL_NAME ")"
                          ");", NULL, NULL, NULL);
         if (rc)
         {
@@ -330,7 +330,7 @@ int EPGDBaseRatingAdd(EPGServiceRef_t *serviceRef, unsigned int eventId, char *s
     STATEMENT_INIT;
     eventUID  = CreateEventUID(serviceRef, eventId);
     
-    STATEMENT_PREPAREVA("INSERT OR REPLACE INTO " EPGRATINGS_TABLE "(" EPGRATING_FIELDS_NOID ") "
+    STATEMENT_PREPAREVA("INSERT OR REPLACE INTO " EPGRATINGS_TABLE "(" EPGRATING_FIELDS ") "
                         "VALUES (%lld,'%q','%q');",
                         eventUID, system, rating);
     RETURN_RC_ON_ERROR;
@@ -406,10 +406,9 @@ EPGEventRating_t *EPGDBaseRatingGetNext(EPGDBaseEnumerator_t enumerator)
         EPGEventRating_t *rating = NULL;
         char *temp;
         rating = ObjectCreateType(EPGEventRating_t);
-        rating->id = STATEMENT_COLUMN_INT( 0);
-        temp = STATEMENT_COLUMN_TEXT( 1);
+        temp = STATEMENT_COLUMN_TEXT( 0);
         rating->system= strdup(temp);
-        temp = STATEMENT_COLUMN_TEXT( 2);
+        temp = STATEMENT_COLUMN_TEXT( 1);
         rating->rating = strdup(temp);        
         return rating;
     }
@@ -427,7 +426,7 @@ int EPGDBaseDetailAdd(EPGServiceRef_t *serviceRef, unsigned int eventId, char *l
     STATEMENT_INIT;
     eventUID  = CreateEventUID(serviceRef, eventId);
     
-    STATEMENT_PREPAREVA("INSERT OR REPLACE INTO " EPGDETAILS_TABLE "(" EPGDETAIL_FIELDS_NOID ") "
+    STATEMENT_PREPAREVA("INSERT OR REPLACE INTO " EPGDETAILS_TABLE "(" EPGDETAIL_FIELDS ") "
                         "VALUES (%lld,'%q','%q','%q');",
                         eventUID, lang, name, value);
     RETURN_RC_ON_ERROR;
@@ -518,12 +517,11 @@ EPGEventDetail_t *EPGDBaseDetailGetNext(EPGDBaseEnumerator_t enumerator)
         EPGEventDetail_t *detail = NULL;
         char *temp;
         detail = ObjectCreateType(EPGEventDetail_t);
-        detail->id = STATEMENT_COLUMN_INT( 0);
-        temp = STATEMENT_COLUMN_TEXT( 1);
+        temp = STATEMENT_COLUMN_TEXT( 0);
         strcpy(detail->lang, temp);
-        temp = STATEMENT_COLUMN_TEXT( 2);
+        temp = STATEMENT_COLUMN_TEXT( 1);
         detail->name = strdup(temp);
-        temp = STATEMENT_COLUMN_TEXT( 3);
+        temp = STATEMENT_COLUMN_TEXT( 2);
         detail->value = strdup(temp);        
         return detail;
     }

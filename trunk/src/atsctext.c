@@ -457,15 +457,19 @@ static uint8_t *AppendSegment(uint8_t *segment, int *sbIndex, bool *supported)
         case 0x48:          /* Assigned to ATSC standard for South Korea */
         case 0x49 ... 0xdf: /* Reserved for future ATSC use. */
         case 0xe0 ... 0xfe: /* Used in other systems */
+            LogModule(LOG_DEBUG, ATSCTEXT, "Unsupported mode!(%d)\n", mode);
             *supported = FALSE;
             break;
         case 0xff:          /* Not applicable */
+            LogModule(LOG_DEBUG, ATSCTEXT, "ASCII to UTF8(%d)\n", mode);
             textStandard = AsciiToUtf8CD;
             break;
         case 0x3f:
+            LogModule(LOG_DEBUG, ATSCTEXT, "UTF16 to UTF8(%d)\n", mode);
             textStandard = Utf16ToUtf8CD;
             break;
         default:
+            LogModule(LOG_DEBUG, ATSCTEXT, "UCS2 to UTF8(%d)\n", mode);
             textStandard =  Ucs2ToUtf8CD;
             break;
     }
@@ -517,7 +521,7 @@ static uint8_t *AppendSegment(uint8_t *segment, int *sbIndex, bool *supported)
     if (ret != -1)
     {
         *outBytes = 0;
-        sbIndex += (long)outBytes - (long)(TextBuffer + *sbIndex);
+        *sbIndex += (long)outBytes - (long)(TextBuffer + *sbIndex);
     }
     
     return segment;
