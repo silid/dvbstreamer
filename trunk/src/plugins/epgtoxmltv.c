@@ -190,7 +190,7 @@ static void DumpProgramme(Multiplex_t *multiplex, Service_t *service, EPGEvent_t
     EPGServiceRef_t serviceRef;
     serviceRef.netId = multiplex->networkId;
     serviceRef.tsId = multiplex->tsId;
-    serviceRef.serviceId = service->id;
+    serviceRef.serviceId = service->source;
 
     CommandPrintf("<programme start=\"%04d%02d%02d%02d%02d%02d +0000\" stop=\"%04d%02d%02d%02d%02d%02d +0000\" channel=\"%s\">\n",
                     event->startTime.tm_year + 1900, event->startTime.tm_mon + 1, event->startTime.tm_mday,
