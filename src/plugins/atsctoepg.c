@@ -289,12 +289,12 @@ static void DeferredProcessETT(void *arg)
     serviceRef.netId = multiplex->networkId;
     serviceRef.tsId = multiplex->tsId;
     serviceRef.serviceId = (ett->i_etm_id >> 16) & 0xffff;
-    eventId = (ett->i_etm_id >> 2) & 0xffff;
+    eventId = (ett->i_etm_id & 0xffff) >> 2;
     lang[3] = 0;
     EPGDBaseTransactionStart();    
     description = ATSCMultipleStringsConvert(ett->p_etm, ett->i_etm_length);
-    LogModule(LOG_DEBUG, ATSCTOEPG,"Processing ETT for %04x.%04x.%04x.%04x: Number of strings %d\n",
-        serviceRef.netId, serviceRef.tsId, serviceRef.serviceId, eventId, description->number_of_strings);
+    LogModule(LOG_DEBUG, ATSCTOEPG,"Processing ETT for %04x.%04x.%04x.%04x (%08x): Number of strings %d\n",
+        serviceRef.netId, serviceRef.tsId, serviceRef.serviceId, eventId,ett->i_etm_id, description->number_of_strings);
     for (i = 0; i < description->number_of_strings; i ++)
     {
         
@@ -332,7 +332,7 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_atsc_eit_event_t *e
     epgevent.ca = FALSE;
     strftime(startTimeStr, sizeof(startTimeStr), "%Y-%m-%d %T", &epgevent.startTime);
     strftime(endTimeStr, sizeof(startTimeStr), "%Y-%m-%d %T", &epgevent.endTime);
-    LogModule(LOG_DEBUG, ATSCTOEPG, "(%x:%x:%x) Event %x Start Time %s (%d) End Time %s (duration %d) Title Length %d ETM location=%d\n",
+    LogModule(LOG_DEBUG, ATSCTOEPG, "Processing EIT for %04x.%04x.%04x.%04x Start Time %s (%d) End Time %s (duration %d) Title Length %d ETM location=%d\n",
         serviceRef->netId, serviceRef->tsId, serviceRef->serviceId, epgevent.eventId,
         startTimeStr,eitevent->i_start_time, endTimeStr,eitevent->i_length_seconds, eitevent->i_title_length, eitevent->i_etm_location);
     
@@ -356,12 +356,12 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_atsc_eit_event_t *e
     }
     ObjectRefDec(title);
     
-    LogModule(LOG_DEBUG, ATSCTOEPG, "Start of Descriptors\n");
+    LogModule(LOG_DEBUGV, ATSCTOEPG, "Start of Descriptors\n");
     for (descriptor = eitevent->p_first_descriptor; descriptor; descriptor = descriptor->p_next)
     {
         DumpDescriptor("\t", descriptor);
     }
-    LogModule(LOG_DEBUG, ATSCTOEPG, "End of Descriptors:\n");    
+    LogModule(LOG_DEBUGV, ATSCTOEPG, "End of Descriptors:\n");    
 }
 
 static void ConvertToTM(uint32_t startSeconds, uint32_t duration,
@@ -385,19 +385,19 @@ static void DumpDescriptor(char *prefix, dvbpsi_descriptor_t *descriptor)
     int i;
     char line[(16 * 3) + 1];
     line[0] = 0;
-    LogModule(LOG_DEBUG, ATSCTOEPG, "%sTag : 0x%02x (Length %d)\n", prefix, descriptor->i_tag, descriptor->i_length);
+    LogModule(LOG_DEBUGV, ATSCTOEPG, "%sTag : 0x%02x (Length %d)\n", prefix, descriptor->i_tag, descriptor->i_length);
     for (i = 0; i < descriptor->i_length; i ++)
     {
         if (i && ((i % 16) == 0))
         {
-            LogModule(LOG_DEBUG, ATSCTOEPG, "%s%s\n", prefix, line);
+            LogModule(LOG_DEBUGV, ATSCTOEPG, "%s%s\n", prefix, line);
             line[0] = 0;
         }
         sprintf(line + strlen(line), "%02x ", descriptor->p_data[i]);
     }
     if (line[0])
     {
-        LogModule(LOG_DEBUG, ATSCTOEPG, "%s%s\n", prefix, line);
+        LogModule(LOG_DEBUGV, ATSCTOEPG, "%s%s\n", prefix, line);
     }
 }
 

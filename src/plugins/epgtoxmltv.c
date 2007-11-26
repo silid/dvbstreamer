@@ -271,7 +271,7 @@ static void PrintXmlified(char *text)
                 temp[utf8CharLen] = 0;
                 break;
         } // switch
-        if (strlen(temp) + bufferIndex > sizeof(buffer))
+        if (strlen(temp) + bufferIndex >= sizeof(buffer) - 1)
         {
             CommandPrintf("%s", buffer);
             bufferIndex = 0;
