@@ -49,12 +49,12 @@ Plugin to collect EPG schedule information.
 
 /* Undef it and redefine it to use the correct database connection */
 #undef STATEMENT_PREPARE
-#define STATEMENT_PREPARE(_statement) rc = sqlite3_prepare( EPGDBaseConnection,  _statement, -1, &stmt, NULL)
+#define STATEMENT_PREPARE(_statement) rc = sqlite3_prepare( EPGDBaseConnectionGet(),  _statement, -1, &stmt, NULL)
 
 #undef PRINTLOG_SQLITE3ERROR
 #define PRINTLOG_SQLITE3ERROR() \
     do{\
-        LogModule(LOG_DEBUG, EPGDBASE, "%s(%d): Failed with error code 0x%x = %s\n",__FUNCTION__,__LINE__, rc, sqlite3_errmsg(EPGDBaseConnection));\
+        LogModule(LOG_DEBUG, EPGDBASE, "%s(%d): Failed with error code 0x%x = %s\n",__FUNCTION__,__LINE__, rc, sqlite3_errmsg(EPGDBaseConnectionGet()));\
     }while(0)
 
 #define EPGEVENT_FIELDS EPGEVENT_NETID "," EPGEVENT_TSID "," EPGEVENT_SERVICEID "," \
@@ -76,8 +76,10 @@ Plugin to collect EPG schedule information.
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
+static sqlite3 *EPGDBaseConnectionGet(void);
 static void EPGEventRatingDestructor(void *arg);
 static void EPGEventDetailDestructor(void *arg);
+
 static long long int CreateEventUID(EPGServiceRef_t *serviceRef, unsigned int eventId);
 static void *ReaperProcess(void *arg);
 static int PurgeOldEvents(void);
@@ -89,24 +91,26 @@ static pthread_mutex_t EPGMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  ReaperCondVar = PTHREAD_COND_INITIALIZER;
 static pthread_t       ReaperThread;
 static bool            ReaperExit = FALSE;
-static sqlite3 *EPGDBaseConnection;
 static const char TimeFormat[] = "%Y-%m-%d %T";
 static const char EPGDBASE[] = "EPGDBase";
+static char EPGDBaseFile[PATH_MAX];
+
+static pthread_key_t EPGDaseConnectionKey;
 
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
 int EPGDBaseInit(int adapter)
 {
-    char file[PATH_MAX];
     int rc;
-
+    sqlite3 *EPGDBaseConnection;
+    
     ObjectRegisterType(EPGEvent_t);
     ObjectRegisterTypeDestructor(EPGEventRating_t, EPGEventRatingDestructor);    
     ObjectRegisterTypeDestructor(EPGEventDetail_t, EPGEventDetailDestructor);
 
-    sprintf(file, "%s/epg%d.db", DataDirectory, adapter);
-    rc = sqlite3_open(file, &EPGDBaseConnection);
+    sprintf(EPGDBaseFile, "%s/epg%d.db", DataDirectory, adapter);
+    rc = sqlite3_open(EPGDBaseFile, &EPGDBaseConnection);
     if (rc == SQLITE_OK)
     {
         rc = sqlite3_exec(EPGDBaseConnection, "CREATE TABLE IF NOT EXISTS " EPGEVENTS_TABLE" ( "
@@ -152,8 +156,10 @@ int EPGDBaseInit(int adapter)
             LogModule(LOG_ERROR, EPGDBASE, "Failed to create EPG details index: %s\n", sqlite3_errmsg(EPGDBaseConnection));
             return rc;
         }
+        pthread_key_create(&EPGDaseConnectionKey, (void(*)(void *))sqlite3_close);
         pthread_create(&ReaperThread, NULL, ReaperProcess, NULL);
-        
+
+        sqlite3_close(EPGDBaseConnection);        
     }
     return rc;
 }
@@ -164,20 +170,18 @@ int EPGDBaseDeInit()
     ReaperExit = TRUE;
     pthread_cond_signal(&ReaperCondVar);
     pthread_join(ReaperThread, NULL);
-    
-    sqlite3_close(EPGDBaseConnection);
     return 0;
 }
 
 int EPGDBaseTransactionStart(void)
 {
     pthread_mutex_lock(&EPGMutex);
-    return  sqlite3_exec(EPGDBaseConnection, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+    return  sqlite3_exec(EPGDBaseConnectionGet(), "BEGIN TRANSACTION;", NULL, NULL, NULL);
 }
 
 int EPGDBaseTransactionCommit(void)
 {
-    int rc = sqlite3_exec(EPGDBaseConnection, "COMMIT TRANSACTION;", NULL, NULL, NULL);
+    int rc = sqlite3_exec(EPGDBaseConnectionGet(), "COMMIT TRANSACTION;", NULL, NULL, NULL);
     pthread_mutex_unlock(&EPGMutex);
     return rc;
 }
@@ -543,6 +547,20 @@ void EPGDBaseEnumeratorDestroy(EPGDBaseEnumerator_t enumerator)
 /*******************************************************************************
 * Local Functions                                                              *
 *******************************************************************************/
+static sqlite3 *EPGDBaseConnectionGet(void)
+{
+    sqlite3 *connection = pthread_getspecific(EPGDaseConnectionKey);
+    if (connection == NULL)
+    {
+        int rc = sqlite3_open(EPGDBaseFile, &connection);
+        if (rc == SQLITE_OK)
+        {
+            pthread_setspecific(EPGDaseConnectionKey, connection);
+        }
+    }
+    return connection;
+}
+
 static void EPGEventRatingDestructor(void *arg)
 {
     EPGEventRating_t *rating = arg;
@@ -592,10 +610,11 @@ static void *ReaperProcess(void *arg)
 
 static int PurgeOldEvents(void)
 {
+    sqlite3 *connection = EPGDBaseConnectionGet();
     STATEMENT_INIT;
     time_t past24 = time(NULL);
     past24 -= (24*60) * 60; /* Delete everything that finished 24 hours ago */
-    sqlite3_exec(EPGDBaseConnection, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+    sqlite3_exec(connection, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 
     LogModule(LOG_DEBUG, EPGDBASE, "Deleting from EPGEvents table.\n");
     /* Remove events that finished over 24 hours ago */
@@ -606,7 +625,7 @@ static int PurgeOldEvents(void)
     STATEMENT_STEP();
     LogModule(LOG_DEBUG, EPGDBASE, "Deleting from EPGDetails table.\n");
     /* Remove orphaned details and ratings */
-    sqlite3_exec(EPGDBaseConnection, "DELETE FROM " EPGDETAILS_TABLE " WHERE NOT EXISTS"
+    sqlite3_exec(connection, "DELETE FROM " EPGDETAILS_TABLE " WHERE NOT EXISTS"
                                         "(SELECT * FROM " EPGEVENTS_TABLE " WHERE "
                                         "netid=((EPGDetails.eventuid>>48) &65535) AND "
                                         "tsid=((EPGDetails.eventuid >>32) & 65535) AND "
@@ -614,7 +633,7 @@ static int PurgeOldEvents(void)
                                         "eventid=(EPGDetails.eventuid & 65535));", 
                                         NULL, NULL, NULL);
     LogModule(LOG_DEBUG, EPGDBASE, "Deleting from EPGRatings table.\n");
-    sqlite3_exec(EPGDBaseConnection, "DELETE FROM " EPGRATINGS_TABLE " WHERE NOT EXISTS"
+    sqlite3_exec(connection, "DELETE FROM " EPGRATINGS_TABLE " WHERE NOT EXISTS"
                                         "(SELECT * FROM " EPGEVENTS_TABLE " WHERE "
                                         "netid=((EPGDetails.eventuid>>48) &65535) AND "
                                         "tsid=((EPGDetails.eventuid >>32) & 65535) AND "
@@ -622,7 +641,7 @@ static int PurgeOldEvents(void)
                                         "eventid=(EPGDetails.eventuid & 65535));", 
                                         NULL, NULL, NULL);    
     LogModule(LOG_DEBUG, EPGDBASE, "Committing.\n");
-    sqlite3_exec(EPGDBaseConnection, "COMMIT TRANSACTION;", NULL, NULL, NULL);
+    sqlite3_exec(connection, "COMMIT TRANSACTION;", NULL, NULL, NULL);
     STATEMENT_FINALIZE();
     return 0;
 }

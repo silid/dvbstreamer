@@ -321,10 +321,9 @@ static bool SendCommand(FILE *socketfp, char *cmd, char **ver, int *errno, char 
     {
         if (fgets(line, MAX_LINE_LENGTH, socketfp))
         {
-            StripNewLineFromEnd(line);
-            LogModule(LOG_DEBUG, DVBCTRL, "Got line \"%s\"\n", line);
             if (strncmp(line, responselineStart, sizeof(responselineStart) - 1) == 0)
             {
+                StripNewLineFromEnd(line);
                 separator = strchr(line + sizeof(responselineStart), '/');
                 if (separator)
                 {
@@ -333,7 +332,7 @@ static bool SendCommand(FILE *socketfp, char *cmd, char **ver, int *errno, char 
                     break;
                 }
             }
-            puts(line);
+            printf("%s", line);
         }
         else
         {

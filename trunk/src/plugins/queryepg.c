@@ -237,7 +237,7 @@ static void CommandEventDetails(int argc, char **argv)
         CommandError(COMMAND_ERROR_GENERIC, "Failed to parse event id!");
         return;
     }
-
+    EPGDBaseTransactionStart();    
     if (displayDetails)
     {
         enumerator = EPGDBaseDetailEnumeratorGet(&serviceRef, eventId);
@@ -268,6 +268,7 @@ static void CommandEventDetails(int argc, char **argv)
     }while(detail && !ExitProgram);
     
     EPGDBaseEnumeratorDestroy(enumerator);
+    EPGDBaseTransactionCommit();
     
 }
 
