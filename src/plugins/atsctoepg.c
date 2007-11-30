@@ -93,7 +93,7 @@ static int EventInfoTableCount = 0;
 static TableInfo_t EventInfoTableInfo[MAX_EITS];
 static int ExtendedTextTableCount = 0;
 static TableInfo_t ExtendedTextTableInfo[MAX_ETTS];
-static time_t UnixEpochOffset;
+static time_t UnixEpochOffset = 315964800;
 
 /*******************************************************************************
 * Plugin Setup                                                                 *
@@ -119,21 +119,11 @@ PLUGIN_INTERFACE_F(
 *******************************************************************************/
 static void InitEITFilter(PIDFilter_t *filter)
 {
-    struct tm temp;
-
     filter->name = "ATSC to EPG";
     filter->enabled = TRUE;
     PIDFilterFilterPacketSet(filter, ATSCtoEPGFilterPacket, NULL);
     PIDFilterMultiplexChangeSet(filter, ATSCtoEPGMultiplexChanged, NULL);
-    PIDFilterProcessPacketSet(filter, ATSCtoEPGProcessPacket, NULL);
-
-    memset(&temp, 0, sizeof(temp));
-    temp.tm_year = 80;
-    temp.tm_mon = 0;
-    temp.tm_mday = 6;
-
-    UnixEpochOffset = mktime(&temp);
-    
+    PIDFilterProcessPacketSet(filter, ATSCtoEPGProcessPacket, NULL);   
 }
 
 static void DeinitEITFilter(PIDFilter_t *filter)
