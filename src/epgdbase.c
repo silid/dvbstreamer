@@ -192,14 +192,9 @@ int EPGDBaseEventAdd(EPGEvent_t *event)
     time_t startTime;
     time_t endTime;
 
-    /* mktime assume local time so correct to UTC as we recieve UTC in */
-#ifdef __CYGWIN__
-    startTime = mktime(&event->startTime) + _timezone;
-    endTime = mktime(&event->endTime) + _timezone;
-#else
-    startTime = mktime(&event->startTime) + timezone;
-    endTime = mktime(&event->endTime) + timezone;
-#endif
+    startTime = timegm(&event->startTime);
+    endTime = timegm(&event->endTime);
+
     STATEMENT_PREPAREVA("INSERT OR REPLACE INTO " EPGEVENTS_TABLE"("EPGEVENT_FIELDS") "
                         "VALUES (%d,%d,%d,%d,%d,%d,%d);",
                         event->serviceRef.netId,event->serviceRef.tsId,event->serviceRef.serviceId,
