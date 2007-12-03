@@ -166,7 +166,7 @@ Command_t CommandDetailsServiceFilter[] =
     },
     {
         "getsfmrl",
-        TRUE, 2, 2,
+        TRUE, 1, 1,
         "Get the service filter's MRL.",
         "getsfmrl <service filter name>\n"
         "Retrieve the current MRL for the specified service filter.",
