@@ -163,7 +163,7 @@ static void CommandNext(int argc, char **argv)
 static void PrintEvent(Event_t *event)
 {
     CommandPrintf("Name       : %s\n", event->name);
-    CommandPrintf("Start time : %4d/%2d/%2d %02d:%02d:%02d\n",
+    CommandPrintf("Start time : %04d/%02d/%02d %02d:%02d:%02d\n",
         event->startTime.i_year, event->startTime.i_month, event->startTime.i_day,
         event->startTime.i_hour, event->startTime.i_minute, event->startTime.i_second);
     CommandPrintf("Duration   : %02d:%02d:%02d\n", 
