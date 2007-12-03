@@ -69,6 +69,7 @@ static List_t *NewMGTCallbacksList = NULL;
 static List_t *NewSTTCallbacksList = NULL;
 static List_t *NewVCTCallbacksList = NULL;
 static iconv_t utf16ToUtf8CD;
+static time_t UnixEpochOffset = 315964800;
 
 /*******************************************************************************
 * Global functions                                                             *
@@ -243,21 +244,14 @@ static void ProcessMGT(void *arg, dvbpsi_atsc_mgt_t *newMGT)
 static void ProcessSTT(void *arg, dvbpsi_atsc_stt_t *newSTT)
 {
     ListIterator_t iterator;
-    struct tm gpsEpoch;
-    time_t gpsEpochSeconds;
     time_t utcSeconds;
-    LogModule(LOG_DEBUG, PSIPPROCESSOR,"New STT Received! Protocol %d GPS Time =%lu GPS->UTC Offset = %u \n",
+    LogModule(LOG_DEBUGV, PSIPPROCESSOR,"New STT Received! Protocol %d GPS Time =%lu GPS->UTC Offset = %u \n",
             newSTT->i_protocol, newSTT->i_system_time, newSTT->i_gps_utc_offset);
-    gpsEpoch.tm_hour = 0;
-    gpsEpoch.tm_min  = 0;
-    gpsEpoch.tm_sec  = 0;
-    gpsEpoch.tm_mday = 6;
-    gpsEpoch.tm_mon  = 0;
-    gpsEpoch.tm_year = 80;
-    gpsEpochSeconds = mktime(&gpsEpoch);
-    utcSeconds = gpsEpochSeconds + newSTT->i_system_time -  newSTT->i_gps_utc_offset;
 
-    LogModule(LOG_DEBUG, PSIPPROCESSOR, "STT UTC Time = %s\n", asctime(gmtime(&utcSeconds)));
+
+    utcSeconds = UnixEpochOffset + newSTT->i_system_time -  newSTT->i_gps_utc_offset;
+
+    LogModule(LOG_DIARRHEA, PSIPPROCESSOR, "STT UTC Time = %s\n", asctime(gmtime(&utcSeconds)));
 
     for (ListIterator_Init(iterator, NewSTTCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
