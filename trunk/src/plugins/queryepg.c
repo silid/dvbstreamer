@@ -361,7 +361,7 @@ static time_t ParseTime(char *timeStr)
 
     timeTm.tm_sec = 0;
     timeTm.tm_isdst = 0;
-    return mktime(&timeTm);
+    return timegm(&timeTm);
 }
 
 static bool FilterEvent(time_t startTime, time_t endTime, EPGEvent_t *event)
@@ -369,8 +369,8 @@ static bool FilterEvent(time_t startTime, time_t endTime, EPGEvent_t *event)
     time_t eventStartTime;
     time_t eventEndTime;
 
-    eventStartTime = mktime(&event->startTime);
-    eventEndTime = mktime(&event->endTime);
+    eventStartTime = timegm(&event->startTime);
+    eventEndTime = timegm(&event->endTime);
     /* Start during the period describe by startTime - endTime */
     if ((startTime <= eventStartTime) && (endTime > eventStartTime))
     {
