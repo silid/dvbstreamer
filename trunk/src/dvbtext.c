@@ -97,22 +97,27 @@ char *DVBTextToUTF8(char *toConvert, size_t toConvertLen)
         case 0x01: 
             cs_new = ISO8859_5;
             toConvert += 1;
+	        toConvertLen -=1;
             break;
         case 0x02:
             cs_new = ISO8859_6;
             toConvert += 1;
+	        toConvertLen -=1;
             break;
         case 0x03:
             cs_new = ISO8859_7;
             toConvert += 1;
+	        toConvertLen -=1;
             break;
         case 0x04:
             cs_new = ISO8859_8;
             toConvert += 1;
+	        toConvertLen -=1;
             break;
         case 0x05:
             cs_new = ISO8859_9;
             toConvert += 1;
+	        toConvertLen -=1;
             break;
 
         /* if the first byte of the text field has a value "0x10" then the 
@@ -126,6 +131,7 @@ char *DVBTextToUTF8(char *toConvert, size_t toConvertLen)
                 + ((unsigned char)toConvert[1] << 8)
                 +  (unsigned char)toConvert[2];
             toConvert += 3;
+	        toConvertLen -=3;
             break;
         /* if the first byte of the text field has a value "0x11" then the 
            ramaining bytes in the text item are coded in pairs in accordance with
@@ -134,6 +140,7 @@ char *DVBTextToUTF8(char *toConvert, size_t toConvertLen)
         case 0x11: 
             cs_new = ISO10646;
             toConvert += 1;
+	        toConvertLen -=1;
             break;
         /* Values for the first byte of "0x00", "0x06" to "0x0F", and "0x12" to 
            "0x1F" are reserved for future use.
