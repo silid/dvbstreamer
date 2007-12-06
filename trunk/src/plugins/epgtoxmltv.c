@@ -90,14 +90,15 @@ static void DumpChannels(void)
         service = ServiceGetNext(enumerator);
         if (service)
         {
-            CommandPrintf("<channel id=\"");
-            PrintXmlified(service->name);
-            CommandPrintf("\">\n");
+            Multiplex_t *multiplex = MultiplexFindUID(service->multiplexUID);
+            CommandPrintf("<channel id=\"%04x.%04x.%04x\">\n",
+                multiplex->networkId, multiplex->tsId, service->id);
             CommandPrintf("<display-name>");
             PrintXmlified(service->name);
-            CommandPrintf("</display-name>\n", service->name);
+            CommandPrintf("</display-name>\n");
             CommandPrintf("</channel>\n");
             ServiceRefDec(service);
+            MultiplexRefDec(multiplex);
         }
     }
     while(service);
@@ -192,12 +193,12 @@ static void DumpProgramme(Multiplex_t *multiplex, Service_t *service, EPGEvent_t
     serviceRef.tsId = multiplex->tsId;
     serviceRef.serviceId = service->source;
 
-    CommandPrintf("<programme start=\"%04d%02d%02d%02d%02d%02d +0000\" stop=\"%04d%02d%02d%02d%02d%02d +0000\" channel=\"%s\">\n",
+    CommandPrintf("<programme start=\"%04d%02d%02d%02d%02d%02d +0000\" stop=\"%04d%02d%02d%02d%02d%02d +0000\" channel=\"%04x.%04x.%04x\">\n",
                     event->startTime.tm_year + 1900, event->startTime.tm_mon + 1, event->startTime.tm_mday,
                     event->startTime.tm_hour, event->startTime.tm_min, event->startTime.tm_sec,
                     event->endTime.tm_year + 1900, event->endTime.tm_mon + 1, event->endTime.tm_mday,
                     event->endTime.tm_hour, event->endTime.tm_min, event->endTime.tm_sec,                    
-                    service->name);
+                    multiplex->networkId, multiplex->tsId, service->id);
 
     enumerator = EPGDBaseDetailGet(&serviceRef, event->eventId, EPG_EVENT_DETAIL_TITLE);
     do
