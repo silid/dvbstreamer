@@ -44,7 +44,7 @@ dvbstreamer_SOURCES = \
     epgdbase.c \
     utf8.c \
     threading/messageq.c \
-    threading/deferredproc.c \    
+    threading/deferredproc.c \
     $(atsc_src) \
     $(dvb_src) \
     $(plugin_src) \

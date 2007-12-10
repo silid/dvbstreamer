@@ -1,3 +1,30 @@
+0.9
+---
+* SAP support for multicast UDP and RTP streams.
+* ATSC EPG now fully working, includes event descriptions.
+* Multiple dumpxmltv bugs fixed.
+* 3 NEW plugins
+  - QueryEPG  - Allows querying of EPG database for more details and on a finer 
+                grain than dumpxmltv.
+  - SICapture - This plugin is intend to aid debugging of streams that I don't 
+                have access to by allowing a user to capture just the PSI and 
+                DVB SI or ATSCPSIP information for attaching to a bug report etc.
+  - ManualFilters - The 'manual output' feature has been removed from the core
+                    and renamed to avoid confusion and make DVBStreamer more modular.
+* Services can now be selected/queried by fully qualified id (network id.ts id.service id)
+* New commands to simplify setting and getting the primary mrl.
+* Command output has been cleaned up to make it more consistent.
+* setsfavsonly command now includes the CAT table if required for a service.
+* Internally
+  - There is a new Deferred Procedure module and a thread safe message queue.
+  - The included dvbpsi library has been updated to 0.16.
+* Bugs fixed:
+    1842675 'now' command, EPG info incorrectly displaying start time.
+    1823706	sdtprocessor.c segfault [patch supplied]
+    1819913	date command has no space/return before 'Last received'
+    1841275 Correct length in UTF8 encoding
+    1841279 Xmlify service name in xmltv epg
+
 0.8 
 ---
 * DVB-S fully supported, thanks to Alex Luccisano.
