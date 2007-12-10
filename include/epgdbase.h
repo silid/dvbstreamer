@@ -47,14 +47,12 @@ typedef struct EPGEvent_s
 
 typedef struct EPGEventRating_s
 {
-    int id;
     char *system;
     char *rating;
 }EPGEventRating_t;
 
 typedef struct EPGEventDetail_s
 {
-    int id;
     char lang[4]; /**< 3 character language code + \0 */
     char *name;   /**< Name of the information in question, ie title/description/director etc. */
     char *value;  /**< The actual information. */
