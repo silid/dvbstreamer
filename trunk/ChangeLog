@@ -20,10 +20,11 @@
   - The included dvbpsi library has been updated to 0.16.
 * Bugs fixed:
     1842675 'now' command, EPG info incorrectly displaying start time.
-    1823706	sdtprocessor.c segfault [patch supplied]
-    1819913	date command has no space/return before 'Last received'
+    1823706 sdtprocessor.c segfault [patch supplied]
+    1819913 date command has no space/return before 'Last received'
     1841275 Correct length in UTF8 encoding
     1841279 Xmlify service name in xmltv epg
+    1849291 Service filter doesn't work if created after a 'select'
 
 0.8 
 ---
