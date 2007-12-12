@@ -40,6 +40,7 @@ the output to only include this service.
 #include "cache.h"
 #include "logging.h"
 #include "deliverymethod.h"
+#include "tuning.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -130,6 +131,7 @@ PIDFilter_t *ServiceFilterCreate(TSFilter_t *tsfilter)
         }
         PIDFilterMultiplexChangeSet(result, ServiceFilterMultiplexChanged, state);
         result->type = ServicePIDFilterType;
+        state->currentMultiplex = TuningCurrentMultiplexGet();
         pthread_mutex_init(&state->serviceChangeMutex, NULL);
     }
     return result;
