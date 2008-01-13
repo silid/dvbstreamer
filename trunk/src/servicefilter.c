@@ -145,6 +145,11 @@ void ServiceFilterDestroy(PIDFilter_t *filter)
     {
         DVBDemuxReleaseAllFilters(filter->tsFilter->adapter, FALSE);    
     }
+    if (filter->opArg)
+    {
+        DeliveryMethodDestroy(filter->opArg);
+        filter->opArg = NULL;
+    }
     PIDFilterFree(filter);
     if (state->serviceChanged)
     {
@@ -204,6 +209,11 @@ void ServiceFilterDeliveryMethodSet(PIDFilter_t *filter, DeliveryMethodInstance_
     if (instance->ReserveHeaderSpace)
     {
         instance->ReserveHeaderSpace(instance, HEADER_PACKETS); 
+    }
+    if (filter->opArg)
+    {
+        DeliveryMethodDestroy(filter->opArg);
+        filter->opArg = NULL;
     }
     PIDFilterOutputPacketSet(filter, DeliveryMethodOutputPacket, instance);
 
