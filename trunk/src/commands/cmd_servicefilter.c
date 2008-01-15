@@ -289,7 +289,6 @@ static void CommandAddSF(int argc, char **argv)
 static void CommandRemoveSF(int argc, char **argv)
 {
     PIDFilter_t *filter;
-    Service_t *oldService;
     char *name;
 
     CommandCheckAuthenticated();
@@ -302,13 +301,8 @@ static void CommandRemoveSF(int argc, char **argv)
 
     FIND_SERVICE_FILTER(argv[0]);
     
-    oldService = ServiceFilterServiceGet(filter);
     name = filter->name;
     ServiceFilterDestroy(filter);
-    if (oldService)
-    {
-        ServiceRefDec(oldService);
-    }
     free(name);
 
 }
