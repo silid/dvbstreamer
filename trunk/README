@@ -103,8 +103,8 @@ dvbstreamer -o udp://localhost:1234 -f eitredirect
 And in eitredirect you would have
 
 # Redirect EIT tables to port 1235 on localhost
-addoutput eitoutput udp://localhost:1235
-addpid eitoutput 0x12
+addmf eitoutput udp://localhost:1235
+addmfpid eitoutput 0x12
 
 Its as simple as that, you can use all the commands that you can use on the dvbstreamer prompt.
 
@@ -290,9 +290,10 @@ Nicholas Humfrey - Power PC testing and patch.
 Alex Luccisano   - DVB-S testing.
 Jonathan Isom    - ATSC testing.
 Michael Treuer   - Patch to DVB text code.
+Steve VanDeBogart - Several patches and the traffic monitor plugin.
 Ramsey Ammar     - DVBStreamer first donor :-) many thanks.
 
-VideoLan libdvbpsi Team for the excelent libdvbpsi. (http://www.videolan.org/developers/libdvbpsi.html)
+VideoLan libdvbpsi Team for the excellent libdvbpsi. (http://www.videolan.org/developers/libdvbpsi.html)
 
 History
 -------

@@ -60,7 +60,8 @@ plugin_src = \
     plugins/sap.c \
     plugins/manualfilters.c \
     plugins/queryepg.c \
-    plugins/sicapture.c
+    plugins/sicapture.c \
+    plugins/traffic.c
     
 if ENABLE_ATSC
 atsc_plugin_src=plugins/atsctoepg.c

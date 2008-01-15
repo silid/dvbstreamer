@@ -20,6 +20,7 @@ plugins_LTLIBRARIES = \
 	manualfilters.la \
 	queryepg.la \
 	sicapture.la \
+	traffic.la \
 	$(atsc_plugins) \
 	$(dvb_plugins)
 endif
@@ -107,3 +108,8 @@ sicapture_la_SOURCES = \
     sicapture.c
 
 sicapture_la_LDFLAGS = -module -no-undefined -avoid-version
+
+traffic_la_SOURCES = \
+    traffic.c
+
+traffic_la_LDFLAGS = -module -no-undefined -avoid-version

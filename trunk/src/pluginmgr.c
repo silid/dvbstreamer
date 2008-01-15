@@ -132,6 +132,7 @@ extern Plugin_t EPGtoXMLTVPluginInterface;
 extern Plugin_t UDPOutputPluginInterface;
 extern Plugin_t QueryEPGPluginInterface;
 extern Plugin_t SICapturePluginInterface;
+extern Plugin_t TrafficPluginInterface;
 
 #if defined(ENABLE_ATSC)
 extern Plugin_t ATSCtoEPGPluginInterface;
@@ -155,41 +156,32 @@ int PluginManagerInit(void)
 #ifdef __CYGWIN__
     {
         struct PluginEntry_t *entry;
+        int i;
+        Plugin_t *listToAdd[] = {
 #if defined(ENABLE_DVB)
-        entry = calloc(1, sizeof(struct PluginEntry_t));
-        entry->pluginInterface = &LCNQueryPluginInterface;
-        ListAdd(PluginsList, entry);
-        entry = calloc(1, sizeof(struct PluginEntry_t));
-        entry->pluginInterface = &NowNextPluginInterface;
-        ListAdd(PluginsList, entry);
-        entry = calloc(1, sizeof(struct PluginEntry_t));
-        entry->pluginInterface = &DVBSchedulePluginInterface;
-        ListAdd(PluginsList, entry);        
-#endif
-        entry = calloc(1, sizeof(struct PluginEntry_t));
-        entry->pluginInterface = &ManualFilterPluginInterface;
-        ListAdd(PluginsList, entry);                
-        
-        entry = calloc(1, sizeof(struct PluginEntry_t));
-        entry->pluginInterface = &EPGtoXMLTVPluginInterface;
-        ListAdd(PluginsList, entry);                
-
-        entry = calloc(1, sizeof(struct PluginEntry_t));
-        entry->pluginInterface = &UDPOutputPluginInterface;
-        ListAdd(PluginsList, entry);                
-
-        entry = calloc(1, sizeof(struct PluginEntry_t));
-        entry->pluginInterface = &QueryEPGPluginInterface;
-        ListAdd(PluginsList, entry);                
-        
-        entry = calloc(1, sizeof(struct PluginEntry_t));
-        entry->pluginInterface = &SICapturePluginInterface;
-        ListAdd(PluginsList, entry);   
+            &LCNQueryPluginInterface,
+            &NowNextPluginInterface,
+            &DVBSchedulePluginInterface,
+#endif          
+            &ManualFilterPluginInterface,
+            &EPGtoXMLTVPluginInterface,
+            &UDPOutputPluginInterface,
+            &QueryEPGPluginInterface,
+            &SICapturePluginInterface,
+            &TrafficPluginInterface,
 #if defined(ENABLE_ATSC)
-        entry = calloc(1, sizeof(struct PluginEntry_t));
-        entry->pluginInterface = &ATSCtoEPGPluginInterface;
-        ListAdd(PluginsList, entry);                
-#endif        
+            &ATSCtoEPGPluginInterface,
+#endif            
+            NULL
+        };
+        
+        for (i = 0; listToAdd[i]; i ++)
+        {
+            entry = calloc(1, sizeof(struct PluginEntry_t));            
+            entry->pluginInterface = listToAdd[i];
+            ListAdd(PluginsList, entry);
+        }
+        
     }
 #endif
     isSuitableMask = MainIsDVB() ? PLUGIN_FOR_DVB:PLUGIN_FOR_ATSC;
