@@ -66,19 +66,29 @@ bool ListInsertAfterCurrent(ListIterator_t *iterator, void *data)
         return FALSE;
     }
     entry->data = data;
-    entry->prev = iterator->current;
-    if (iterator->current)
+    if (iterator->current == NULL) 
+    {
+        entry->next = NULL;
+        entry->prev = iterator->list->tail;
+        if (entry->prev) {
+                entry->prev->next = entry;
+        }
+    }
+    else 
     {
         entry->next = iterator->current->next;
+        entry->prev = iterator->current;
         iterator->current->next = entry;
+        if (entry->next) 
+        {
+            entry->next->prev = entry;
+        }
     }
-
     if (iterator->list->head == NULL)
     {
         iterator->list->head = entry;
     }
-
-    if (iterator->current == iterator->list->tail)
+    if (entry->next == NULL) 
     {
         iterator->list->tail = entry;
     }
@@ -96,20 +106,23 @@ bool ListInsertBeforeCurrent(ListIterator_t *iterator, void *data)
     }
     entry->data = data;
     entry->next = iterator->current;
-    if (iterator->current)
+    if (iterator->current == NULL) 
+    {
+        entry->prev = iterator->list->tail;
+        iterator->list->tail = entry;
+    }
+    else
     {
         entry->prev = iterator->current->prev;
-        iterator->current->prev = entry;
+        entry->next->prev = entry;
     }
-
     if (iterator->current == iterator->list->head)
     {
         iterator->list->head = entry;
     }
-
-    if (iterator->current == iterator->list->tail)
+    if (entry->prev) 
     {
-        iterator->list->tail = entry;
+        entry->prev->next = entry;
     }
     iterator->list->count ++;
     return TRUE;
