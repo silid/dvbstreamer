@@ -545,6 +545,7 @@ static void installsighandler(void)
     signal(SIGTERM, sighandler);
     signal(SIGINT, sighandler);
     signal(SIGQUIT, sighandler);
+    signal(SIGPIPE, SIG_IGN);
 }
 
 static void sighandler(int signum)
