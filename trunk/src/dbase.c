@@ -49,20 +49,20 @@ static int DBaseCheckVersion();
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
-sqlite3 *DBaseInstance;
+static sqlite3 *DBaseInstance;
 
 static char DBASE[] = "dbase";
-
+static char dbaseFile[PATH_MAX];
+static pthread_key_t dbaseKey;
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
 int DBaseInit(int adapter)
 {
-    char file[PATH_MAX];
     int rc;
-
-    sprintf(file, "%s/adapter%d.db", DataDirectory, adapter);
-    rc = sqlite3_open(file, &DBaseInstance);
+    
+    sprintf(dbaseFile, "%s/adapter%d.db", DataDirectory, adapter);
+    rc = sqlite3_open(dbaseFile, &DBaseInstance);
     if (rc)
     {
         LogModule(LOG_ERROR, DBASE, "Can't open database: %s\n", sqlite3_errmsg(DBaseInstance));
@@ -70,25 +70,54 @@ int DBaseInit(int adapter)
     }
     else
     {
+        sqlite3_busy_timeout(DBaseInstance, 500);
         rc = DBaseCheckVersion();
     }
+
+    pthread_key_create(&dbaseKey, (void(*)(void *))sqlite3_close);
+    pthread_setspecific(dbaseKey, (void*)DBaseInstance);
     return rc;
 }
 
 
 void DBaseDeInit()
 {
+    pthread_setspecific(dbaseKey, NULL);
     sqlite3_close(DBaseInstance);
+}
+
+sqlite3* DBaseConnectionGet(void)
+{
+    
+    sqlite3 *connection = pthread_getspecific(dbaseKey);
+    if (connection == NULL)
+    {
+        int rc = sqlite3_open(dbaseFile, &connection);
+        if (rc)
+        {
+            LogModule(LOG_ERROR, DBASE, "Can't open database: %s\n", sqlite3_errmsg(connection));
+            sqlite3_close(connection);
+            connection = NULL;
+        }
+        else
+        {
+            sqlite3_busy_timeout(connection, 500);            
+            pthread_setspecific(dbaseKey, (void*)connection);
+        }
+    }
+    return connection;
 }
 
 int DBaseTransactionBegin(void)
 {
-    return sqlite3_exec(DBaseInstance, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+    sqlite3 *connection = DBaseConnectionGet();
+    return sqlite3_exec(connection, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 }
 
 int DBaseTransactionCommit(void)
 {
-    return sqlite3_exec(DBaseInstance, "COMMIT TRANSACTION;", NULL, NULL, NULL);
+    sqlite3 *connection = DBaseConnectionGet();
+    return sqlite3_exec(connection, "COMMIT TRANSACTION;", NULL, NULL, NULL);
 }
 
 /*******************************************************************************
