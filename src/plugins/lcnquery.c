@@ -146,7 +146,7 @@ static void LCNQueryInstalled(bool installed)
             entries[i].visible = FALSE;
         }
         // Load from the database
-        sqlite3_exec(DBaseInstance, "CREATE TABLE " LCNENTRIES_TABLE "("
+        sqlite3_exec(DBaseConnectionGet(), "CREATE TABLE " LCNENTRIES_TABLE "("
                      LCNENTRY_NUMBER " PRIMARY KEY,"
                      LCNENTRY_ONETID ","
                      LCNENTRY_TSID   ","
@@ -188,9 +188,9 @@ static void LCNQueryInstalled(bool installed)
     {
         int i;
         // Store to the database
-        sqlite3_exec(DBaseInstance, "BEGIN TRANSACTION;", NULL, NULL, NULL);
+        sqlite3_exec(DBaseConnectionGet(), "BEGIN TRANSACTION;", NULL, NULL, NULL);
         
-        sqlite3_exec(DBaseInstance, "DELETE * FROM " LCNENTRIES_TABLE ";", NULL, NULL, NULL);
+        sqlite3_exec(DBaseConnectionGet(), "DELETE * FROM " LCNENTRIES_TABLE ";", NULL, NULL, NULL);
 
         for (i = 0; i < MAX_ENTRIES; i ++)
         {
@@ -203,7 +203,7 @@ static void LCNQueryInstalled(bool installed)
             }
         }
 
-        sqlite3_exec(DBaseInstance, "COMMIT TRANSACTION;", NULL, NULL, NULL);
+        sqlite3_exec(DBaseConnectionGet(), "COMMIT TRANSACTION;", NULL, NULL, NULL);
     }
     
 }

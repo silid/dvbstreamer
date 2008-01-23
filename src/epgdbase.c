@@ -34,6 +34,7 @@ Plugin to collect EPG schedule information.
 #include "main.h"
 #include "types.h"
 
+#define DBASE_CONNECTION_GET EPGDBaseConnectionGet
 #include "dbase.h"
 #include "epgdbase.h"
 
@@ -46,16 +47,6 @@ Plugin to collect EPG schedule information.
 *******************************************************************************/
 #define EPGDBASE_VERSION_NAME "EPGDBaseVersion"
 #define EPGDBASE_VERSION 0.1
-
-/* Undef it and redefine it to use the correct database connection */
-#undef STATEMENT_PREPARE
-#define STATEMENT_PREPARE(_statement) rc = sqlite3_prepare( EPGDBaseConnectionGet(),  _statement, -1, &stmt, NULL)
-
-#undef PRINTLOG_SQLITE3ERROR
-#define PRINTLOG_SQLITE3ERROR() \
-    do{\
-        LogModule(LOG_DEBUG, EPGDBASE, "%s(%d): Failed with error code 0x%x = %s\n",__FUNCTION__,__LINE__, rc, sqlite3_errmsg(EPGDBaseConnectionGet()));\
-    }while(0)
 
 #define EPGEVENT_FIELDS EPGEVENT_NETID "," EPGEVENT_TSID "," EPGEVENT_SERVICEID "," \
                         EPGEVENT_EVENTID "," EPGEVENT_STARTTIME "," EPGEVENT_ENDTIME  "," \

@@ -386,11 +386,15 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
  */
 #define STATEMENT_INIT int rc; sqlite3_stmt *stmt=NULL
 
+#ifndef DBASE_CONNECTION_GET
+#define DBASE_CONNECTION_GET DBaseConnectionGet
+#endif
+
 /**
  * Macro to prepare an sql statement.
  * @param _statement The sql statement to prepare.
  */
-#define STATEMENT_PREPARE(_statement) rc = sqlite3_prepare( DBaseInstance,  _statement, -1, &stmt, NULL)
+#define STATEMENT_PREPARE(_statement) rc = sqlite3_prepare( DBASE_CONNECTION_GET(),  _statement, -1, &stmt, NULL)
 
 /**
  * Macro to prepare an sql statement with arguments.
@@ -447,7 +451,8 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
  */
 #define PRINTLOG_SQLITE3ERROR() \
     do{\
-        LogModule(LOG_DEBUG, "dbase", "%s(%d): Failed with error code 0x%x = %s\n",__FUNCTION__,__LINE__, rc, sqlite3_errmsg(DBaseInstance));\
+        LogModule(LOG_DEBUG, "dbase", "%s(%d): Failed with error code 0x%x=%s\n",\
+            __FUNCTION__,__LINE__, rc, sqlite3_errmsg(DBASE_CONNECTION_GET()));\
     }while(0)
 
 /**
@@ -477,12 +482,6 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 
 /**
  * @internal
- * Global variable containing the handle to the sqlite database being used.
- */
-extern sqlite3 *DBaseInstance;
-
-/**
- * @internal
  * Initialise the database for the given adapter.
  * This function will create the database if one doesn't exist,
  * and upgrade the database if it is a different version to the one being used
@@ -498,6 +497,12 @@ int DBaseInit(int adapter);
  */
 void DBaseDeInit();
 
+/**
+ * Get the sqlite3 connection object for this thread.
+ * @return An sqlite3 connection object or NULL if the database could not be opened.
+ */
+sqlite3* DBaseConnectionGet(void);
+    
 /**
  * Start a transaction on the database.
  * Can be used to increase the speed when reading from multiple tables.
