@@ -60,7 +60,9 @@ static pthread_key_t dbaseKey;
 int DBaseInit(int adapter)
 {
     int rc;
-    
+
+    pthread_key_create(&dbaseKey, (void(*)(void *))sqlite3_close);
+
     sprintf(dbaseFile, "%s/adapter%d.db", DataDirectory, adapter);
     rc = sqlite3_open(dbaseFile, &DBaseInstance);
     if (rc)
@@ -70,12 +72,10 @@ int DBaseInit(int adapter)
     }
     else
     {
+        pthread_setspecific(dbaseKey, (void*)DBaseInstance);
         sqlite3_busy_timeout(DBaseInstance, 500);
         rc = DBaseCheckVersion();
     }
-
-    pthread_key_create(&dbaseKey, (void(*)(void *))sqlite3_close);
-    pthread_setspecific(dbaseKey, (void*)DBaseInstance);
     return rc;
 }
 
@@ -101,6 +101,7 @@ sqlite3* DBaseConnectionGet(void)
         }
         else
         {
+            LogModule(LOG_DEBUG, DBASE, "Database opened successfully. (%p)\n", connection);
             sqlite3_busy_timeout(connection, 500);            
             pthread_setspecific(dbaseKey, (void*)connection);
         }
@@ -167,7 +168,6 @@ static int DBaseCreateTables(double version)
             LogModule(LOG_ERROR, DBASE, "Failed to create Metadata table: %s\n", sqlite3_errmsg(DBaseInstance));
             return rc;
         }
-
         
         rc = sqlite3_exec(DBaseInstance, "CREATE TABLE " SERVICES_TABLE " ( "
                           SERVICE_MULTIPLEXUID ","
