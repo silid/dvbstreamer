@@ -83,6 +83,7 @@ int main(int argc, char *argv[])
     char *channelsFile = NULL;
     int adapterNumber = 0;
     LNBInfo_t lnbInfo = {NULL,NULL,0,0,0};
+    int rc;
     
     /* Create the data directory */
     sprintf(DataDirectory, "%s/.dvbstreamer", getenv("HOME"));
@@ -178,16 +179,20 @@ int main(int argc, char *argv[])
 #endif
 
     INIT(ObjectInit(), "objects");
+    INIT(DBaseInit(adapterNumber), "database");
     INIT(MultiplexInit(), "multiplex");
     INIT(ServiceInit(), "service");
-    INIT(DBaseInit(adapterNumber), "database");
 
     if (!channelsFile)
     {
         usage(argv[0]);
         exit(1);
     }
-    DBaseTransactionBegin();
+    rc = DBaseTransactionBegin();
+    if (rc != SQLITE_OK)
+    {
+        LogModule(LOG_ERROR, SETUP, "Begin Transaction failed (%d:%s)\n", rc, sqlite3_errmsg(DBaseConnectionGet()));
+    }
     
     LogModule(LOG_INFO, SETUP, "Importing services from %s\n", channelsFile);
     if (!parsezapfile(channelsFile, channelsFileType))
@@ -207,8 +212,11 @@ int main(int argc, char *argv[])
 
     DBaseMetadataSetInt(METADATA_NAME_SCAN_ALL, 1);
     
-    DBaseTransactionCommit();
-    
+    rc = DBaseTransactionCommit();
+    if (rc != SQLITE_OK)
+    {
+        LogModule(LOG_ERROR, SETUP, "Begin Transaction failed (%d:%s)\n", rc, sqlite3_errmsg(DBaseConnectionGet()));
+    }    
     printf("%d Services available on %d Multiplexes\n", ServiceCount(), MultiplexCount());
 
     DEINIT(ServiceDeinit(), "service");
