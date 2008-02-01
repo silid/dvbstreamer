@@ -292,6 +292,7 @@ Jonathan Isom    - ATSC testing.
 Michael Treuer   - Patch to DVB text code.
 Steve VanDeBogart - Several patches and the traffic monitor plugin.
 Ramsey Ammar     - DVBStreamer first donor :-) many thanks.
+Paul Kelly       - Patch to make festatus command work on DVB-S
 
 VideoLan libdvbpsi Team for the excellent libdvbpsi. (http://www.videolan.org/developers/libdvbpsi.html)
 

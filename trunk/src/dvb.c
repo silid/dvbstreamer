@@ -309,40 +309,50 @@ int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status,
     {
         if(ioctl(adapter->frontEndFd,FE_READ_BER, &tempU32) < 0)
         {
-            LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_BER: %s\n", strerror(errno));
-            return -1;
+            LogModule(LOG_INFO, DVBADAPTER,"FE_READ_BER: %s\n", strerror(errno));
+            *ber = 0xffffffff;
         }
-        *ber = tempU32;
+        else
+        {
+            *ber = tempU32;
+        }
     }
     if (strength)
     {
         if(ioctl(adapter->frontEndFd,FE_READ_SIGNAL_STRENGTH,&tempU16) < 0)
         {
-            LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_SIGNAL_STRENGTH: %s\n", strerror(errno));
-            return -1;
+            LogModule(LOG_INFO, DVBADAPTER,"FE_READ_SIGNAL_STRENGTH: %s\n", strerror(errno));
+            *strength = 0xffff;
         }
-        *strength = tempU16;
+        else
+        {
+            *strength = tempU16;
+        }
     }
 
     if (snr)
     {
         if(ioctl(adapter->frontEndFd,FE_READ_SNR,&tempU16) < 0)
         {
-            LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_SNR: %s\n", strerror(errno));
-            return -1;
+            LogModule(LOG_INFO, DVBADAPTER,"FE_READ_SNR: %s\n", strerror(errno));
+            *snr = 0xffff;
         }
-        
-        *snr = tempU16;
+        else
+        {
+            *snr = tempU16;
+        }
     }
     if (ucblock)
     {
         if(ioctl(adapter->frontEndFd,FE_READ_UNCORRECTED_BLOCKS,&tempU32) < 0)
         {
-            LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_SNR: %s\n", strerror(errno));
-            return -1;
+            LogModule(LOG_INFO, DVBADAPTER,"FE_READ_UNCORRECTED_BLOCKS: %s\n", strerror(errno));
+            *ucblock = 0xffffffff;
         }
-        
-        *ucblock = tempU32;
+        else        
+        {
+            *ucblock = tempU32;
+        }
     }
     #else
     if (status)
@@ -367,6 +377,10 @@ int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status,
     if (snr)
     {
         *snr = 0xffff;
+    }
+    if (ucblock)
+    {
+        *ucblock = 0xffffffff;
     }
     #endif
     return 0;
