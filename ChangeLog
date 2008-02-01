@@ -2,6 +2,7 @@
 ---
 * New Plugin - Traffic Monitor/Capture (thanks to Steve VanDeBogart)
 * Bug Fixed:
+    1884368 festatus command doesn't work on DVB-S (patch supplied)
  	1870354 The list add functions aren't completely implemented.
 	1870351 rmsf will leak file descriptors when using file://
 	1870353 rmsf seems to have a double free bug
