@@ -273,45 +273,57 @@ static void RotateData()
 static char * FindServiceNameFromPID(uint16_t pid)
 {
     Multiplex_t *multiplex;
-    Service_t **services;
+    ServiceEnumerator_t enumerator = NULL;
+    Service_t *service;
     PIDList_t *pids;
     int i;
-    int serviceIdx;
-    int serviceCount;
-    char *result = NULL;
+    char * result = NULL;
 
-    if (!(multiplex = TuningCurrentMultiplexGet()))
+    multiplex = TuningCurrentMultiplexGet();
+    if (multiplex == NULL)
     {
         return NULL;
     }
+    
+    enumerator = ServiceEnumeratorForMultiplex(multiplex);
     MultiplexRefDec(multiplex);
-    services = CacheServicesGet(&serviceCount);
-    for (serviceIdx = 0; (serviceIdx < serviceCount) && (result == NULL); serviceIdx ++)
+    if (enumerator == NULL)
     {
-        Service_t *service = services[serviceIdx];
-
-        if ((pid == service->pmtPid) || (pid == service->pcrPid))
+        return NULL;
+    }
+    
+    do
+    {
+        service = ServiceGetNext(enumerator);
+        if (service == NULL)
         {
-            result = service->name;
+            break;
+        }
+
+        if (pid == service->pmtPid || pid == service->pcrPid)
+        {
+            result = strdup(service->name);
         }
         else
         {
-            pids = CachePIDsGet(service);
+            pids = PIDListGet(service);
             if (pids)
             {
                 for (i = 0; i < pids->count; i++)
                 {
                     if (pid == pids->pids[i].pid)
                     {
-                        result = service->name;
+                        result = strdup(service->name);
                         break;
                     }
                 }
-                CachePIDsRelease();
+                PIDListFree(pids);
             }
         }
+        ServiceRefDec(service);
     }
-    CacheServicesRelease();
+    while(result == NULL && !ExitProgram);
+    ServiceEnumeratorDestroy(enumerator);
 
     return result;
 }
@@ -340,7 +352,9 @@ static void CommandTraffic(int argc, char **argv)
         }
         printServiceInfo = TRUE;
     }
-
+    /* Ensure the database is up-to-date */
+    UpdateDatabase();
+    
     /* Wait until there's data available */
     pthread_mutex_lock(&TrafficMutex);
     if (lastStart.tv_sec == currentStart.tv_sec 
