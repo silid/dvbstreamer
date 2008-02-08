@@ -37,7 +37,7 @@
 #elif defined(HAVE_STDINT_H)
 #include <stdint.h>
 #endif
-#define DEBUG
+
 #include "dvbpsi.h"
 #include "../dvbpsi_private.h"
 #include "psi.h"

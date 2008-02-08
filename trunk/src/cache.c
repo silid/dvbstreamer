@@ -46,16 +46,18 @@ Caches service and PID information from the database for the current multiplex.
 
 enum CacheFlags
 {
-    CacheFlag_Clean         = 0x0000,
-    CacheFlag_Dirty_PMTPID  = 0x0001,
-    CacheFlag_Dirty_PIDs    = 0x0002, /* Also means PMT Version and PCR PID needs to be updated */
-    CacheFlag_Dirty_Name    = 0x0004,
-    CacheFlag_Dirty_Source  = 0x0008,    
-    CacheFlag_Dirty_CA      = 0x0010,
-    CacheFlag_Dirty_Type    = 0x0020,
-    CacheFlag_Dirty_Provider= 0x0040,
-    CacheFlag_Dirty_DefAuth = 0x0060,
-    CacheFlag_Dirty_Added   = 0x8000,
+    CacheFlag_Clean           = 0x0000,
+    CacheFlag_Dirty_PMTPID    = 0x0001,
+    CacheFlag_Dirty_PIDs      = 0x0002, /* Also means PMT Version and PCR PID needs to be updated */
+    CacheFlag_Dirty_Name      = 0x0004,
+    CacheFlag_Dirty_Source    = 0x0008,    
+    CacheFlag_Dirty_CA        = 0x0010,
+    CacheFlag_Dirty_Type      = 0x0020,
+    CacheFlag_Dirty_Provider  = 0x0040,
+    CacheFlag_Dirty_DefAuth   = 0x0060,
+    CacheFlag_Not_Seen_In_SDT = 0x2000, 
+    CacheFlag_Not_Seen_In_PAT = 0x4000, 
+    CacheFlag_Dirty_Added     = 0x8000,
 };
 
 /*******************************************************************************
@@ -191,7 +193,7 @@ Service_t *CacheServiceFindName(char *name)
         if (strcmp(cachedServices[i]->name, name) == 0)
         {
             result = cachedServices[i];
-			ServiceRefInc(result);
+            ServiceRefInc(result);
             LogModule(LOG_DEBUGV, CACHE, "Found in cached services!\n");
             break;
         }
@@ -484,6 +486,45 @@ Service_t *CacheServiceAdd(int id)
     return result;
 }
 
+bool CacheServiceSeen(Service_t *service, bool seen, bool pat)
+{
+    bool exists = FALSE;
+    int seenIndex = -1;
+    int i;
+
+    for (i = 0; i < cachedServicesCount; i ++)
+    {
+        if ((cachedServices[i]) && ServiceAreEqual(service, cachedServices[i]))
+        {
+            seenIndex = i;
+            break;
+        }
+    }
+    if (seenIndex != -1)
+    {
+        int flag = pat ? CacheFlag_Not_Seen_In_PAT : CacheFlag_Not_Seen_In_SDT;
+        if (seen)
+        {
+            cacheFlags[seenIndex] &= ~flag;
+        }
+        else
+        {
+            cacheFlags[seenIndex] |= flag;            
+        }
+        
+        if ((cacheFlags[seenIndex] & CacheFlag_Not_Seen_In_PAT) && 
+            (cacheFlags[seenIndex] & CacheFlag_Not_Seen_In_SDT))
+        {
+            exists = FALSE;
+        }
+        else
+        {
+            exists = TRUE;
+        }
+    }
+    return exists;
+}
+
 void CacheServiceDelete(Service_t *service)
 {
     int deletedIndex = -1;
@@ -520,6 +561,10 @@ void CacheServiceDelete(Service_t *service)
          */
         cachedDeletedServices[cachedDeletedServicesCount] = service;
         cachedDeletedServicesCount ++;
+        if (cachedDeletedServicesCount >= SERVICES_MAX)
+        {
+            LogModule(LOG_ERROR, CACHE, "Reached maximum number of services to be deleted!!!!\n");
+        }
     }
 
     pthread_mutex_unlock(&cacheUpdateMutex);

@@ -197,6 +197,18 @@ void CacheUpdatePIDs(Service_t *service, int pcrpid, PIDList_t *pids, int pmtver
 Service_t *CacheServiceAdd(int id);
 
 /**
+ * Update the 'seen' state of the service. 
+ * If a service is seen in the PAT but not in the SDT/VCT or vice versa the service
+ * still exists, but if the service is no longer seen in the PAT and SDT/VCT, the
+ * service no longer exists and should be deleted.
+ * @param service The service to update the 'seen' status of.
+ * @param seen Whether the service has been seen or not.
+ * @param pat If the services was (not) seen in the PAT, but in the SDT/VCT.
+ * @return True if the service still exists, False otherwise.
+ */
+bool CacheServiceSeen(Service_t *service, bool seen, bool pat);
+
+/**
  * Delete a service from the cache.
  * @param service The service to be deleted when CacheWriteback() is called.
  */

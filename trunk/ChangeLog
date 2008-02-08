@@ -9,6 +9,7 @@
     1887166 Additional TSPacket_t header macros
     1880738 Allow comments in script files
     1885966 Foreground Daemon mode
+    1875269 Segmentation Fault during DVB-S streaming
     
 0.9
 ---

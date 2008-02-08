@@ -63,6 +63,7 @@ Process Service Description Tables and update the services information.
 
 typedef struct SDTProcessorState_s
 {
+    TSFilter_t *tsfilter;    
     Multiplex_t *multiplex;
 }SDTProcessorState_t;
 
@@ -97,31 +98,38 @@ void SDTProcessorDeInit(void)
 
 PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter)
 {
-    SDTProcessorState_t *state;
-    PIDFilter_t *result;
+    SDTProcessorState_t *state = NULL;
+    PIDFilter_t *result = NULL;
     ObjectRegisterType(SDTProcessorState_t);
     state = ObjectCreateType(SDTProcessorState_t);
-    result = SubTableProcessorCreate(tsfilter, SDT_PID, SubTableHandler, state, SDTMultiplexChanged, state);
-
-    if (result)
+    if (state)
     {
-        result->name = "SDT";
-        result->type = PSISIPIDFilterType;
-        /* If the PAT changes we want to pick up the SDT again as otherwise we 
-           may have services with no names.
-           Seen this with the UK multiplexes where there have been PAT changes 
-           in quick succesion but there has been no change to the SDT. This 
-           resulted in the services being available but losing there names
-           as the first changed to the PAT removed all services and then the 
-           next one added them all back (?!)
-        */
-        PIDFilterTSStructureChangeSet(result, SDTTSStructureChanged, state);
-        if (tsfilter->adapter->hardwareRestricted)
+        state->tsfilter = tsfilter;
+        result = SubTableProcessorCreate(tsfilter, SDT_PID, SubTableHandler, state, SDTMultiplexChanged, state);
+
+        if (result)
         {
-            DVBDemuxAllocateFilter(tsfilter->adapter, SDT_PID, TRUE);
+            result->name = "SDT";
+            result->type = PSISIPIDFilterType;
+            /* If the PAT changes we want to pick up the SDT again as otherwise we 
+               may have services with no names.
+               Seen this with the UK multiplexes where there have been PAT changes 
+               in quick succesion but there has been no change to the SDT. This 
+               resulted in the services being available but losing there names
+               as the first changed to the PAT removed all services and then the 
+               next one added them all back (?!)
+            */
+            PIDFilterTSStructureChangeSet(result, SDTTSStructureChanged, state);
+            if (tsfilter->adapter->hardwareRestricted)
+            {
+                DVBDemuxAllocateFilter(tsfilter->adapter, SDT_PID, TRUE);
+            }
+        }
+        else
+        {
+            ObjectRefDec(state);
         }
     }
-
     return result;
 }
 
@@ -170,6 +178,9 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
     SDTProcessorState_t *state = arg;
     ListIterator_t iterator;
     dvbpsi_sdt_service_t* sdtservice = newSDT->p_first_service;
+    int count,i;
+    Service_t **services;
+    
     LogModule(LOG_DEBUG, SDTPROCESSOR, "SDT recieved, version %d\n", newSDT->i_version);
     while(sdtservice)
     {
@@ -180,6 +191,10 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
         if (!service)
         {
             service = CacheServiceAdd(sdtservice->i_service_id);
+        }
+        else
+        {
+            CacheServiceSeen(service, TRUE, FALSE);
         }
         
         while(descriptor)
@@ -245,6 +260,37 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
 
         sdtservice =sdtservice->p_next;
     }
+
+    /* Delete any services that no longer exist */
+    services = CacheServicesGet(&count);
+    for (i = 0; i < count; i ++)
+    {
+        bool found = FALSE;
+        for (sdtservice = newSDT->p_first_service; sdtservice; sdtservice = sdtservice->p_next)
+        {
+            if (services[i]->id == sdtservice->i_service_id)
+            {
+                found = TRUE;
+                break;
+            }
+        }
+        if (!found)
+        {
+            LogModule(LOG_DEBUG, SDTPROCESSOR, "Service not found in SDT while checking cache, deleting 0x%04x (%s)\n",
+                services[i]->id, services[i]->name);
+            if (!CacheServiceSeen(services[i], FALSE, FALSE))
+            {
+                CacheServicesRelease();
+                CacheServiceDelete(services[i]);
+                services = CacheServicesGet(&count);
+                i --;
+                /* Cause a TS Structure change call back*/
+                state->tsfilter->tsStructureChanged = TRUE;
+            }
+        }
+    }
+    CacheServicesRelease();
+    
     /* Set the Original Network id, this is a hack should really get and decode the NIT */
     if (state->multiplex->networkId != newSDT->i_network_id)
     {
