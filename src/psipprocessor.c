@@ -101,7 +101,7 @@ void PSIPProcessorDeInit(void)
 
 PIDFilter_t *PSIPProcessorCreate(TSFilter_t *tsfilter)
 {
-    PIDFilter_t *result = SubTableProcessorCreate(tsfilter, 0x1ffb, SubTableHandler, NULL, NULL, NULL);
+    PIDFilter_t *result = SubTableProcessorCreate(tsfilter, 0x1ffb, SubTableHandler, tsfilter, NULL, NULL);
     if (result)
     {
         result->name = "PSIP";
@@ -267,6 +267,10 @@ static void ProcessVCT(void *arg, dvbpsi_atsc_vct_t *newVCT)
     ListIterator_t iterator;
     dvbpsi_descriptor_t *descriptor; 
     dvbpsi_atsc_vct_channel_t *channel;
+    int count,i;
+    Service_t **services;
+    TSFilter_t *tsfilter = (TSFilter_t*)arg;
+    
     LogModule(LOG_DEBUG, PSIPPROCESSOR, "New VCT Recieved! Version %d Protocol %d Cable VCT? %s TS Id = 0x%04x\n", 
         newVCT->i_version, newVCT->i_protocol, newVCT->b_cable_vct ? "Yes":"No", newVCT->i_ts_id);
     
@@ -301,6 +305,10 @@ static void ProcessVCT(void *arg, dvbpsi_atsc_vct_t *newVCT)
             if (!service)
             {
                service = CacheServiceAdd(channel->i_program_number);
+            }
+            else
+            {
+                CacheServiceSeen(service, TRUE, FALSE);
             }
 
             if (service->source != channel->i_source_id)
@@ -346,6 +354,36 @@ static void ProcessVCT(void *arg, dvbpsi_atsc_vct_t *newVCT)
         DumpDescriptor("\t\t",descriptor);
     }
     LogModule(LOG_DEBUG, PSIPPROCESSOR, "\tEnd of Descriptors\n");
+
+    /* Delete any services that no longer exist */
+    services = CacheServicesGet(&count);
+    for (i = 0; i < count; i ++)
+    {
+        bool found = FALSE;
+        for (channel = newVCT->p_first_channel; channel; channel = channel->p_next)
+        {
+            if (services[i]->id == channel->i_program_number)
+            {
+                found = TRUE;
+                break;
+            }
+        }
+        if (!found)
+        {
+            LogModule(LOG_DEBUG, PSIPPROCESSOR, "Channel not found in VCT while checking cache, deleting 0x%04x (%s)\n",
+                services[i]->id, services[i]->name);
+            if (!CacheServiceSeen(services[i], FALSE, FALSE))
+            {
+                CacheServicesRelease();
+                CacheServiceDelete(services[i]);
+                services = CacheServicesGet(&count);
+                i --;
+                /* Cause a TS Structure change call back*/
+                tsfilter->tsStructureChanged = TRUE;
+            }
+        }
+    }
+    CacheServicesRelease();
     
     for (ListIterator_Init(iterator, NewVCTCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {

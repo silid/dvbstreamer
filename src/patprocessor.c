@@ -84,7 +84,7 @@ PIDFilter_t *PATProcessorCreate(TSFilter_t *tsfilter)
                     NULL,NULL);
         if (result == NULL)
         {
-            free(state);
+            ObjectRefDec(state);
         }
         result->name = "PAT";
         result->type = PSISIPIDFilterType;
@@ -194,7 +194,8 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
     ListIterator_t iterator;
     int count,i;
     Service_t **services;
-
+    dvbpsi_pat_program_t *patentry;
+    
     LogModule(LOG_DEBUG, PATPROCESSOR, "PAT recieved, version %d (old version %d)\n", newpat->i_version, multiplex->patVersion);
     if (multiplex->patVersion == -1)
     {
@@ -202,9 +203,10 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
         state->tsfilter->tsStructureChanged = TRUE;
     }
     /* Version has changed update the services */
-    dvbpsi_pat_program_t *patentry = newpat->p_first_program;
-    while(patentry)
+
+    for (patentry = newpat->p_first_program; patentry; patentry = patentry->p_next)
     {
+        LogModule(LOG_DEBUG, PATPROCESSOR, "Service 0x%04x PMT PID 0x%04x\n", patentry->i_number, patentry->i_pid);
         if (patentry->i_number != 0x0000)
         {
             Service_t *service = CacheServiceFindId(patentry->i_number);
@@ -214,6 +216,10 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
                 service = CacheServiceAdd(patentry->i_number);
                 /* Cause a TS Structure change call back*/
                 state->tsfilter->tsStructureChanged = TRUE;
+            }
+            else
+            {
+                CacheServiceSeen(service, TRUE, TRUE);
             }
 
             if (service && (service->pmtPid != patentry->i_pid))
@@ -226,7 +232,6 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
                 ServiceRefDec(service);
             }
         }
-        patentry = patentry->p_next;
     }
 
     /* Delete any services that no longer exist */
@@ -246,12 +251,15 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
         {
             LogModule(LOG_DEBUG, PATPROCESSOR, "Service not found in PAT while checking cache, deleting 0x%04x (%s)\n",
                 services[i]->id, services[i]->name);
-            CacheServicesRelease();
-            CacheServiceDelete(services[i]);
-            services = CacheServicesGet(&count);
-            i --;
-            /* Cause a TS Structure change call back*/
-            state->tsfilter->tsStructureChanged = TRUE;
+            if (!CacheServiceSeen(services[i], FALSE, TRUE))
+            {
+                CacheServicesRelease();
+                CacheServiceDelete(services[i]);
+                services = CacheServicesGet(&count);
+                i --;
+                /* Cause a TS Structure change call back*/
+                state->tsfilter->tsStructureChanged = TRUE;
+            }
         }
     }
 
