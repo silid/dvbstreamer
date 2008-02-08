@@ -8,6 +8,7 @@
     1870353 rmsf seems to have a double free bug
     1887166 Additional TSPacket_t header macros
     1880738 Allow comments in script files
+    1885966 Foreground Daemon mode
     
 0.9
 ---
