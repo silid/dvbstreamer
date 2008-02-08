@@ -60,7 +60,7 @@ TSPacket_t;
  * @return The PID of the packet as a 16bit integer.
  */
 #define TSPACKET_GETPID(packet) \
-	(((((packet).header[1] & 0x1f) << 8) | ((packet).header[2] & 0xff)))
+    (((((packet).header[1] & 0x1f) << 8) | ((packet).header[2] & 0xff)))
 
 /**
  * Sets the PID of the packet in the packet header.
@@ -68,17 +68,17 @@ TSPacket_t;
  * @param pid    The new PID to set.
  */
 #define TSPACKET_SETPID(packet, pid) \
-	do{ \
-		(packet).header[1] = ((packet).header[1] & 0xe0) | ((pid >> 8) & 0x1f); \
-		(packet).header[2] = pid & 0xff; \
-	}while(0)
+    do{ \
+        (packet).header[1] = ((packet).header[1] & 0xe0) | ((pid >> 8) & 0x1f); \
+        (packet).header[2] = pid & 0xff; \
+    }while(0)
 /**
  * Retrieves the packet sequence count.
  * @param packet The packet to extract the count from.
  * @return The packet sequence count as a 4 bit integer.
  */
 #define TSPACKET_GETCOUNT(packet) \
-	((packet).header[3] & 0x0f)
+    ((packet).header[3] & 0x0f)
 
 /**
  * Sets the packet sequence count.
@@ -86,7 +86,7 @@ TSPacket_t;
  * @param count  The new sequence count to set.
  */
 #define TSPACKET_SETCOUNT(packet, count) \
-	((packet).header[3] = ((packet).header[3] & 0xf0) | ((count) & 0x0f))
+    ((packet).header[3] = ((packet).header[3] & 0xf0) | ((count) & 0x0f))
 
 /**
  * Boolean test to determine whether this packet is the start of a payload.
@@ -98,10 +98,52 @@ TSPacket_t;
  * Boolean test to determine whether this packet is valid, transport_error_indicator 
  * is not set.
  * @param packet The packet to check.
+ * @return True if the packet is valid, false otherwise.
  */
 #define TSPACKET_ISVALID(packet) \
     (((packet).header[1] & 0x80) == 0x00)
-    
+
+/**
+ * Retrieves the priority field of the packet.
+ * @param packet The packet to check.
+ * @return The packet priority.
+ */
+#define TSPACKET_GETPRIORITY(packet) \
+    (((packet).header[1] & 0x20) >> 4)
+
+/**
+ * Set the priority field of the packet.
+ * @param packet The packet to update.
+ * @param priority Either 1 or 0 to indicate that this is a priority packet.
+ */
+#define TSPACKET_SETPRIORITY(packet, priority) \
+    ((packet).header[1] = ((packet).header[1] & 0xdf) | (((priority) << 4) & 0x20))
+
+/**
+ * Retrieve whether the packet has an adaptation field.
+ * @param packet The packet to check.
+ * @return The adapatation field control flags.
+ */
+#define TSPACKET_GETADAPTATION(packet) \
+    (((packet).header[3] & 0x30) >> 4)
+
+/**
+ * Set whether the packet has an adaptation field.
+ * @param packet The packet to update.
+ * @param adaptation The new adaptation field flags.
+ */
+#define TSPACKET_SETADAPTATION(packet, adaptation) \
+    ((packet).header[3] = ((packet).header[3] & 0xcf) | (((adaptation) << 4) & 0x30))
+
+/**
+ * Retrieves the adaptation field length.
+ * @param packet The packet to check.
+ * @return The length of the adaptation field.
+ */
+#define TSPACKET_GETADAPTATION_LEN(packet) \
+    ((packet).payload[0])
+
+
 /**@}*/
 
 /**
