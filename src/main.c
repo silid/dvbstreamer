@@ -139,6 +139,7 @@ int main(int argc, char *argv[])
     char *bindAddress = NULL;
     char *primaryMRL = "null://";
     bool remoteInterface = FALSE;
+    bool disableConsoleInput = FALSE;
     bool hwRestricted = FALSE;
     PIDFilter_t *primaryServiceFilter = NULL;
     DeliveryMethodInstance_t *dmInstance;
@@ -153,7 +154,7 @@ int main(int argc, char *argv[])
     while (!ExitProgram)
     {
         int c;
-        c = getopt(argc, argv, "vVdro:a:f:u:p:n:F:i:R");
+        c = getopt(argc, argv, "vVdDro:a:f:u:p:n:F:i:R");
         if (c == -1)
         {
             break;
@@ -186,6 +187,9 @@ int main(int argc, char *argv[])
                 break;
                 /* Remote Interface Options */
                 case 'r': remoteInterface = TRUE;
+                break;
+                case 'D': disableConsoleInput = TRUE;
+                remoteInterface = TRUE;            
                 break;
                 case 'u': username = optarg;
                 break;
@@ -380,10 +384,20 @@ int main(int argc, char *argv[])
         {
             RemoteInterfaceAsyncAcceptConnections();
         }
+        if (disableConsoleInput)
+        {
+            while(!ExitProgram)
+            {
+                usleep(5000); /* Wake every half second */
+            }
+        }
+        else
+        {
+            CommandLoop();
+            LogModule(LOG_DEBUGV, MAIN, "Command loop finished, shutting down\n");
+            ExitProgram = TRUE;
+        }
 
-        CommandLoop();
-        LogModule(LOG_DEBUGV, MAIN, "Command loop finished, shutting down\n");
-        ExitProgram = TRUE;
         if (remoteInterface)
         {
             RemoteInterfaceDeInit();
@@ -514,6 +528,7 @@ static void usage(char *appname)
             "\n"
             "      Remote Interface Options\n"
             "      -r            : Start remote interface as well as console shell.\n"
+            "      -D            : Start remote interface but disable console shell.\n"
             "      -u <username> : Username used to login remotely to control this instance.\n"
             "      -p <password> : Password used to login remotely to control this instance.\n"
             "      -n <name>     : Informational name for this instance.\n"
