@@ -246,17 +246,26 @@ Service_t *ServiceFindFQID(uint16_t networkId, uint16_t tsId, uint16_t serviceId
 Service_t *ServiceFindFQIDStr(char *FQIdStr);
 
 /**
- * Rerieve an enumerator for the entire service table.
+ * Retrieve an enumerator for the entire service table.
  * @return A service enumerator or NULL if there is not enough memory.
  */
 ServiceEnumerator_t ServiceEnumeratorGet();
 
 /**
- * Rerieve an enumerator for the specified multiplex.
+ * Retrieve an enumerator for the specified multiplex.
  * @param multiplex The multiplex the service is broadcast on.
  * @return A service enumerator or NULL if there is not enough memory.
  */
 ServiceEnumerator_t ServiceEnumeratorForMultiplex(Multiplex_t *multiplex);
+
+/**
+ * Retrieve an enumerator for the services known to be assosciated with the
+ * given PID.  Optionally restrict the search to a given multiplex.
+ * @param pid The PID to search for.
+ * @param opt_multiplex Optional. The multiplex the service is broadcast on.
+ * @return A service enumerator or NULL if there is not enough memory.
+ */
+ServiceEnumerator_t ServiceFindByPID(int pid, Multiplex_t *opt_multiplex);
 
 /**
  * Free an enumerator.

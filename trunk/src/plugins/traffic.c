@@ -42,6 +42,8 @@ typedef struct TrafficPIDCount_s {
     uint16_t oldCount;
 } TrafficPIDCount_t;
 
+#define PID_EOL ((1 << 16) - 1)
+
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
@@ -52,8 +54,7 @@ static int FilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacke
 static TSPacket_t* ProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
 static void HandleMuxChange(struct PIDFilter_s *pidfilter, void *userarg, Multiplex_t *multiplex);
 static void RotateData(void);
-static void freeTrafficPIDCount(void * arg);
-static char * FindServiceNameFromPID(uint16_t pid);
+static TrafficPIDCount_t * CopyPIDCounts(void);
 
 static void CommandTraffic(int argc, char **argv);
 
@@ -65,6 +66,7 @@ static PluginFilter_t TrafficFilter = {NULL, InitFilter, DeinitFilter};
 static pthread_mutex_t TrafficMutex = PTHREAD_MUTEX_INITIALIZER;
 
 static List_t * PIDCounts = NULL;
+static int pidListLength = 0;
 static struct timeval currentStart;
 static struct timeval lastStart;
 static bool serviceLock;
@@ -83,11 +85,11 @@ PLUGIN_FEATURES(
 PLUGIN_COMMANDS(
     {
         "traffic",
-        TRUE, 0, 1,
+        TRUE, 0, 2,
         "Display the packet rate for each PID in the TS",
-        "traffic [-s]\n"
+        "traffic [-s] [-i]\n"
         "Display the packet rate for each PID in the TS.\n"
-        "Optionally, display known service information.",
+        "Optionally, display known service association (-s) or information (-i).",
         CommandTraffic
     }
     );
@@ -112,6 +114,7 @@ static void InitFilter(PIDFilter_t *filter)
     pthread_mutex_lock(&TrafficMutex);
 
     PIDCounts = ListCreate();
+    pidListLength = 0;
     serviceLock = FALSE;
     lastStart.tv_sec = currentStart.tv_sec = 0;
     lastStart.tv_usec = currentStart.tv_usec = 0;
@@ -127,7 +130,8 @@ static void DeinitFilter(PIDFilter_t *filter)
 
     pthread_mutex_lock(&TrafficMutex);
 
-    ListFree(PIDCounts, freeTrafficPIDCount);
+    ListFree(PIDCounts, free);
+    pidListLength = 0;
     PIDCounts = NULL;
 
     pthread_mutex_unlock(&TrafficMutex);
@@ -137,8 +141,9 @@ static void HandleMuxChange(struct PIDFilter_s *pidfilter, void *userarg, Multip
 {
     pthread_mutex_lock(&TrafficMutex);
 
-    ListFree(PIDCounts, freeTrafficPIDCount);
+    ListFree(PIDCounts, free);
     PIDCounts = ListCreate();
+    pidListLength = 0;
     serviceLock = FALSE;
     lastStart.tv_sec = currentStart.tv_sec = 0;
     lastStart.tv_usec = currentStart.tv_usec = 0;
@@ -205,6 +210,7 @@ static TSPacket_t * ProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t 
                 data->count = 1;
                 data->oldCount = 0;
                 ListInsertBeforeCurrent(&iterator, data);
+                pidListLength++;
             }
         }
         pthread_mutex_unlock(&TrafficMutex);
@@ -221,11 +227,6 @@ static void subtract_timeval(struct timeval a, struct timeval b,
         result->tv_sec--;
         result->tv_usec += 1000000;
     }
-}
-
-static void freeTrafficPIDCount(void * arg)
-{
-    free(arg);
 }
 
 static void RotateData()
@@ -259,6 +260,7 @@ static void RotateData()
             if (data->count == 0 && data->oldCount == 0)
             {
                 ListRemoveCurrent(&iterator);
+                pidListLength--;
             }
             else
             {
@@ -270,62 +272,26 @@ static void RotateData()
     }
 }
 
-static char * FindServiceNameFromPID(uint16_t pid)
+static TrafficPIDCount_t * CopyPIDCounts(void)
 {
-    Multiplex_t *multiplex;
-    ServiceEnumerator_t enumerator = NULL;
-    Service_t *service;
-    PIDList_t *pids;
+    ListIterator_t iterator;
+    TrafficPIDCount_t * data;
     int i;
-    char * result = NULL;
 
-    multiplex = TuningCurrentMultiplexGet();
-    if (multiplex == NULL)
+    data = calloc(pidListLength + 1, sizeof(TrafficPIDCount_t));
+    if (data == NULL)
     {
         return NULL;
     }
-    
-    enumerator = ServiceEnumeratorForMultiplex(multiplex);
-    MultiplexRefDec(multiplex);
-    if (enumerator == NULL)
+    for (i = 0, ListIterator_Init(iterator, PIDCounts);
+         i < pidListLength && ListIterator_MoreEntries(iterator); 
+         i++, ListIterator_Next(iterator))
     {
-        return NULL;
+        data[i] = *(TrafficPIDCount_t *)ListIterator_Current(iterator);
     }
-    
-    do
-    {
-        service = ServiceGetNext(enumerator);
-        if (service == NULL)
-        {
-            break;
-        }
+    data[i].PID = PID_EOL;
 
-        if (pid == service->pmtPid || pid == service->pcrPid)
-        {
-            result = strdup(service->name);
-        }
-        else
-        {
-            pids = PIDListGet(service);
-            if (pids)
-            {
-                for (i = 0; i < pids->count; i++)
-                {
-                    if (pid == pids->pids[i].pid)
-                    {
-                        result = strdup(service->name);
-                        break;
-                    }
-                }
-                PIDListFree(pids);
-            }
-        }
-        ServiceRefDec(service);
-    }
-    while(result == NULL && !ExitProgram);
-    ServiceEnumeratorDestroy(enumerator);
-
-    return result;
+    return data;
 }
 
 /*******************************************************************************
@@ -333,25 +299,38 @@ static char * FindServiceNameFromPID(uint16_t pid)
 *******************************************************************************/
 static void CommandTraffic(int argc, char **argv)
 {
-    char *serviceName = NULL;
+    bool printService = FALSE;
+    bool printServiceName = FALSE;
     bool printServiceInfo = FALSE;
-    ListIterator_t iterator;
     TrafficPIDCount_t * data;
-    struct timeval tmp;
-    uint64_t time;
+    Multiplex_t *multiplex = NULL;
+    int i;
     uint64_t freq = 0;
     uint64_t rate;
+
+    struct timeval tmp;
+    uint64_t time;
     int timeout = 30; // Wait up to 6s, (30 * 200000 usec)
 
-    if (argc > 0)
+    for (i = 0; i < argc; i++)
     {
-        if (strcmp(argv[0], "-s") != 0)
+        if (strcmp(argv[i], "-s") == 0)
+        {
+            printService = TRUE;
+            printServiceName = TRUE;
+        }
+        else if (strcmp(argv[i], "-i") == 0)
+        {
+            printService = TRUE;
+            printServiceInfo = TRUE;
+        }
+        else
         {
             CommandPrintf("Invalid argument\n");
             return;
         }
-        printServiceInfo = TRUE;
     }
+
     /* Ensure the database is up-to-date */
     UpdateDatabase();
     
@@ -375,40 +354,83 @@ static void CommandTraffic(int argc, char **argv)
             timeout--;
         }
     }
-
     if (serviceLock == FALSE)
     {
         pthread_mutex_unlock(&TrafficMutex);
         return;
     }
 
+    /* Copy the data so that we don't printf on the critical path */
+    data = CopyPIDCounts();
+    pthread_mutex_unlock(&TrafficMutex);
+
     CommandPrintf(" PID          Frequency Datarate%s\n", 
-            printServiceInfo ? "   Service" : "");
+            printService ? "   Service" : "");
     CommandPrintf("               (pkts/s) (kbit/s)\n");
 
     subtract_timeval(currentStart, lastStart, &tmp);
     time = tmp.tv_usec + tmp.tv_sec * 1000000;
 
-    for (ListIterator_Init(iterator, PIDCounts);
-                ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    if (data == NULL)
     {
-        data = (TrafficPIDCount_t *)ListIterator_Current(iterator);
+        printService = FALSE;
+    }
+    if (printService)
+    {
+        multiplex = TuningCurrentMultiplexGet();
+    }
+    if (!multiplex) {
+        printService = FALSE;
+    }
 
-        if (time != 0 && data->oldCount != 0)
+    for (i = 0; data[i].PID != PID_EOL; i++)
+    {
+        if (time != 0 && data[i].oldCount != 0)
         {
-            freq = ((uint64_t)data->oldCount * 1000000)/time;
+            freq = ((uint64_t)data[i].oldCount * 1000000)/time;
             rate = (freq * 188 * 8)/1024;
-            if (printServiceInfo)
+            if (printService)
             {
-                serviceName = FindServiceNameFromPID(data->PID);
+                char * name = "";
+                char * info = "";
+                Service_t *service;
+                ServiceEnumerator_t enumerator;
+
+                enumerator = ServiceFindByPID(data[i].PID, multiplex);
+                service = ServiceGetNext(enumerator);
+                if (service)
+                {
+                    if (printServiceName)
+                    {
+                        name = service->name;
+                    }
+                    if (printServiceInfo && data[i].PID == service->pmtPid)
+                    {
+                        info = " (PMT)";
+                    }
+                    if (printServiceInfo && data[i].PID == service->pcrPid)
+                    {
+                        info = " (PCR)";
+                    }
+                }
+                CommandPrintf("%4d (0x%04x)     %5lld    %5lld - %s%s\n", 
+                    data[i].PID, data[i].PID, freq, rate, name, info);
+                ServiceRefDec(service);
+                ServiceEnumeratorDestroy(enumerator);
             }
-                
-            CommandPrintf("%4d (0x%04x)     %5lld    %5lld%s%s\n", 
-                    data->PID, data->PID, freq, rate,
-                    (printServiceInfo && serviceName) ? " - " : "",
-                    (printServiceInfo && serviceName) ? serviceName : "");
+            else
+            {
+                CommandPrintf("%4d (0x%04x)     %5lld    %5lld\n", 
+                    data[i].PID, data[i].PID, freq, rate);
+            }
         }
     }
-    pthread_mutex_unlock(&TrafficMutex);
+
+    free(data);
+
+    if (printService)
+    {
+        MultiplexRefDec(multiplex);
+    }
 }
 
