@@ -33,17 +33,17 @@ Manage services and PIDs.
 * Defines                                                                      *
 *******************************************************************************/
 
-#define SERVICE_FIELDS SERVICE_MULTIPLEXUID "," \
-                       SERVICE_ID "," \
-                       SERVICE_SOURCE "," \
-                       SERVICE_CA "," \
-                       SERVICE_TYPE "," \
-                       SERVICE_NAME "," \
-                       SERVICE_PMTVERSION "," \
-                       SERVICE_PMTPID ","\
-                       SERVICE_PCRPID "," \
-                       SERVICE_PROVIDER "," \
-                       SERVICE_DEFAUTHORITY " "
+#define SERVICE_FIELDS SERVICES_TABLE "." SERVICE_MULTIPLEXUID "," \
+                       SERVICES_TABLE "." SERVICE_ID "," \
+                       SERVICES_TABLE "." SERVICE_SOURCE "," \
+                       SERVICES_TABLE "." SERVICE_CA "," \
+                       SERVICES_TABLE "." SERVICE_TYPE "," \
+                       SERVICES_TABLE "." SERVICE_NAME "," \
+                       SERVICES_TABLE "." SERVICE_PMTVERSION "," \
+                       SERVICES_TABLE "." SERVICE_PMTPID ","\
+                       SERVICES_TABLE "." SERVICE_PCRPID "," \
+                       SERVICES_TABLE "." SERVICE_PROVIDER "," \
+                       SERVICES_TABLE "." SERVICE_DEFAUTHORITY " "
 
 /*******************************************************************************
 * Prototypes                                                                   *
@@ -434,7 +434,7 @@ Service_t *ServiceFindFQIDStr(char *FQIdStr)
 ServiceEnumerator_t ServiceEnumeratorGet()
 {
     STATEMENT_INIT;
-    STATEMENT_PREPARE("SELECT "	SERVICE_FIELDS
+    STATEMENT_PREPARE("SELECT " SERVICE_FIELDS
                       "FROM " SERVICES_TABLE ";");
     RETURN_ON_ERROR(NULL);
     return stmt;
@@ -468,6 +468,47 @@ ServiceEnumerator_t ServiceEnumeratorForMultiplex(Multiplex_t *multiplex)
     STATEMENT_PREPAREVA("SELECT " SERVICE_FIELDS
                         "FROM " SERVICES_TABLE " WHERE " SERVICE_MULTIPLEXUID"=%d;",
                         multiplex->uid);
+    RETURN_ON_ERROR(NULL);
+
+    return stmt;
+}
+
+ServiceEnumerator_t ServiceFindByPID(int pid, Multiplex_t *multiplex)
+{
+    STATEMENT_INIT;
+    char * multiplexClause;
+
+    if (multiplex) 
+    {
+        multiplexClause = sqlite3_mprintf("AND " SERVICES_TABLE "." 
+                                       SERVICE_MULTIPLEXUID "=%d "
+                                       "AND " PIDS_TABLE "." 
+                                       PID_MULTIPLEXUID "=%d ",
+                                       multiplex->uid, multiplex->uid);
+    }
+    else
+    {
+        multiplexClause = sqlite3_mprintf("AND " SERVICES_TABLE "." 
+                                       SERVICE_MULTIPLEXUID "="
+                                       PIDS_TABLE "." PID_MULTIPLEXUID);
+    }
+    
+    if (!multiplexClause)
+    {
+        return NULL;
+    }
+
+    
+
+    STATEMENT_PREPAREVA("SELECT DISTINCT " SERVICE_FIELDS 
+                        "FROM " SERVICES_TABLE "," PIDS_TABLE " "
+                        "WHERE " SERVICE_ID "=" PID_SERVICEID " %s AND "
+                        "(" PIDS_TABLE "." PID_PID "=%d "
+                        "OR " SERVICES_TABLE "." SERVICE_PMTPID "=%d "
+                        "OR " SERVICES_TABLE "." SERVICE_PCRPID "=%d );", 
+                        multiplexClause, pid, pid, pid);
+    sqlite3_free(multiplexClause);
+
     RETURN_ON_ERROR(NULL);
 
     return stmt;

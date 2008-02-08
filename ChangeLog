@@ -10,6 +10,8 @@
     1880738 Allow comments in script files
     1885966 Foreground Daemon mode
     1875269 Segmentation Fault during DVB-S streaming
+    1856827 'dumpxmltv' from remote interface causes DVBStreamer to exit
+    1889789 Traffic plugin does work (printf) while blocking TS thread
     
 0.9
 ---
