@@ -256,9 +256,21 @@ int CommandProcessFile(char *file)
             *nl = 0;
         }
         lineno ++;
-        if (!CommandExecuteConsole(line))
+        if (strlen(line) > 0)
         {
-            fprintf(stderr, "%s(%d): Unknown command \"%s\"\n", file, lineno, line);
+            CommandExecute(&ConsoleCommandContext, printf, line);
+            
+            if (ConsoleCommandContext.errorNumber != COMMAND_OK)
+            {
+                if (ConsoleCommandContext.errorNumber == COMMAND_ERROR_UNKNOWN_COMMAND)
+                {
+                    fprintf(stderr, "%s(%d): Unknown command \"%s\"\n", file, lineno, line);
+                }
+                else
+                {
+                    fprintf(stderr, "%s(%d): %s\n", file, lineno, ConsoleCommandContext.errorMessage);
+                }
+            }
         }
     }
 
