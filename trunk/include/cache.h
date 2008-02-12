@@ -136,7 +136,7 @@ void CacheUpdateNetworkId(Multiplex_t *multiplex, int netid);
  * @param service The service to update.
  * @param pmtpid The new PMT PID.
  */
-void CacheUpdateService(Service_t *service, int pmtpid);
+void CacheUpdateServicePMTPID(Service_t *service, int pmtpid);
 
 /**
  * Update the cached service with a new name.
