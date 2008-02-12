@@ -70,6 +70,13 @@ PIDList_t *PIDListNew(int count);
 void PIDListFree(PIDList_t *pids);
 
 /**
+ * Create a deep copy of a pid list.
+ * @param pids The pids list to clone.
+ * @return A new PIDList_t object or NULL.
+ */
+PIDList_t *PIDListClone(PIDList_t *pids);
+
+/**
  * Set the list of PIDs for the specified service.
  *
  * @param service The service the pids belong to.

@@ -28,9 +28,18 @@ Manage PIDs.
 #include "pids.h"
 #include "logging.h"
 
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
+
 static void *RollUpDescriptors(dvbpsi_descriptor_t *descriptors, int *datasize);
 static dvbpsi_descriptor_t *UnRollDescriptors(char *descriptors, int size);
+static dvbpsi_descriptor_t *CloneDescriptors(dvbpsi_descriptor_t *descriptors);
 static int PIDAdd(Service_t *service, PID_t *pid);
+
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
 
 PIDList_t *PIDListNew(int count)
 {
@@ -56,6 +65,21 @@ void PIDListFree(PIDList_t *pids)
         }
         ObjectFree(pids);
     }
+}
+
+PIDList_t *PIDListClone(PIDList_t *pids)
+{
+    int i;
+    PIDList_t *result = PIDListNew(pids->count);
+    if (result)
+    {
+        for (i = 0; i < pids->count; i ++)
+        {
+            result->pids[i] = pids->pids[i];
+            result->pids[i].descriptors = CloneDescriptors(pids->pids[i].descriptors);
+        }
+    }
+    return result;
 }
 
 int PIDListSet(Service_t *service, PIDList_t *pids)
@@ -160,6 +184,9 @@ int PIDListRemove(Service_t *service)
     return 0;
 }
 
+/*******************************************************************************
+* Local Functions                                                              *
+*******************************************************************************/
 
 static int PIDAdd(Service_t *service, PID_t *pid)
 {
@@ -248,5 +275,30 @@ static dvbpsi_descriptor_t *UnRollDescriptors(char *descriptors, int size)
         current->i_length = descriptors[pos + 1];
     }
 
+    return result;
+}
+
+static dvbpsi_descriptor_t *CloneDescriptors(dvbpsi_descriptor_t *descriptors)
+{
+    dvbpsi_descriptor_t *result = NULL;
+
+    if (descriptors)
+    {
+        dvbpsi_descriptor_t *current = NULL;
+        dvbpsi_descriptor_t *prev_copy = NULL;
+        for (current = descriptors; current; current = current->p_next)
+        {
+            dvbpsi_descriptor_t *copy = dvbpsi_NewDescriptor(current->i_tag, current->i_length, current->p_data);
+            if (result == NULL)
+            {
+                result = copy;
+            }
+            else
+            {
+                prev_copy->p_next = copy;
+            }
+            prev_copy = copy;
+        }
+    }
     return result;
 }
