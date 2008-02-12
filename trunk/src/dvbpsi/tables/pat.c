@@ -322,8 +322,6 @@ void dvbpsi_GatherPATSections(dvbpsi_decoder_t* p_decoder,
     /* Initialize the structures if it's the first section received */
     if(!p_pat_decoder->p_building_pat)
     {
-      p_pat_decoder->p_building_pat =
-                                (dvbpsi_pat_t*)ObjectCreateType(dvbpsi_pat_t);
       dvbpsi_NewPAT(p_pat_decoder->p_building_pat,
                      p_section->i_extension,
                      p_section->i_version,
