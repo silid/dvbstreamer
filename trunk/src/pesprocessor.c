@@ -158,6 +158,7 @@ static PIDFilter_t *PESProcessorCreate(TSFilter_t *tsfilter, uint16_t pid)
         }
         asprintf(&result->name, "PES(PID 0x%04x)", pid);
         result->type = "PES";
+        result->enabled = TRUE;
         PIDFilterMultiplexChangeSet(result,PESProcessorMultiplexChanged, state);
 
         state->callbacksList = ListCreate();
