@@ -60,6 +60,9 @@ typedef struct Class_s {
 }Class_t;
 
 typedef struct Object_s {
+#ifdef OBJECT_CHECK
+    char    sig[8];
+#endif
     Class_t *clazz;
     int32_t refCount;
     uint32_t size;
@@ -221,7 +224,13 @@ bool ObjectRefDecImpl(void *ptr, char *file, int line)
     
     pthread_mutex_lock(&objectMutex);
     object = DataToObject(ptr);
-
+#ifdef OBJECT_CHECK
+    if (memcmp("ObjectP", object->sig, 8))
+    {
+        LogModule(LOG_ERROR, OBJECT, "Attempt to decrement the reference of a non-object (%p), offending code %s:%d\n", ptr, file, line);
+        exit(1);
+    }
+#endif
     if (object->clazz)
     {
         clazzName = object->clazz->name;
@@ -297,7 +306,9 @@ void *ObjectAllocImpl(int size, Class_t *clazz)
     }
 
     memset(ObjectToData(result), 0, size);
-
+#ifdef OBJECT_CHECK
+    memcpy(result->sig, "ObjectP", 8);
+#endif
     result->clazz = clazz;
     result->size = size;
     result->refCount = 1;
