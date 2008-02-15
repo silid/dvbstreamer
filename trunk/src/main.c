@@ -64,6 +64,7 @@ Entry point to the application.
 #include "tuning.h"
 #include "atsctext.h"
 #include "deferredproc.h"
+#include "events.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -210,8 +211,6 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    INIT(ObjectInit(), "objects");
-
     if (DaemonMode)
     {
         if (startupFile && (startupFile[0] != '/'))
@@ -229,7 +228,9 @@ int main(int argc, char *argv[])
         usage(argv[0]);
         exit(1);
     }
-
+    
+    INIT(ObjectInit(), "objects");    
+    INIT(EventsInit(),"events");
     INIT(DBaseInit(adapterNumber), "database");
     INIT(EPGDBaseInit(adapterNumber), "EPG database");
     INIT(MultiplexInit(), "multiplex");
@@ -461,7 +462,7 @@ int main(int argc, char *argv[])
     DEINIT(MultiplexDeinit(), "multiplex");
     DEINIT(EPGDBaseDeInit(), "EPG database");    
     DEINIT(DBaseDeInit(), "database");
-
+    DEINIT(EventsDeInit(), "events");
     DEINIT(ObjectDeinit(), "objects");
 
     if (DaemonMode)

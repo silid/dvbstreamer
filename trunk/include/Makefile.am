@@ -29,7 +29,8 @@ pkginclude_DATA = \
     atsctext.h \
     utf8.h \
     messageq.h \
-    deferredproc.h
+    deferredproc.h \
+    events.h
 
 
 EXTRA_DIST = $(pkginclude_DATA)
