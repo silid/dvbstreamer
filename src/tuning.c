@@ -20,6 +20,8 @@ tuning.c
 Control tuning of the dvb adapter.
 
 */
+#include "config.h"
+#include <stdio.h>
 #include "main.h"
 #include "tuning.h"
 #include "cache.h"
@@ -27,19 +29,25 @@ Control tuning of the dvb adapter.
 #include "dvb.h"
 #include "ts.h"
 #include "servicefilter.h"
+#include "events.h"
 
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
 static void ChannelChangedDoCallbacks(Multiplex_t *multiplex, Service_t *service);
 static void TuneMultiplex(Multiplex_t *multiplex);
-
+static char *MultiplexChangedEventToString(Event_t event,void * payload);
+static char *ServiceChangedEventToString(Event_t event,void * payload);
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
 static Multiplex_t *CurrentMultiplex = NULL;
 static Service_t *CurrentService = NULL;
 static List_t *ChannelChangedCallbacksList = NULL;
+
+static EventSource_t tuningSource;
+static Event_t serviceChangedEvent;
+static Event_t mulitplexChangedEvent;
 
 static const char TUNING[] = "tuning";
 
@@ -50,6 +58,9 @@ static const char TUNING[] = "tuning";
 int TuningInit(void)
 {
     ChannelChangedCallbacksList = ListCreate();
+    tuningSource = EventsRegisterSource("Tuning");
+    serviceChangedEvent = EventsRegisterEvent(tuningSource, "ServiceChanged", ServiceChangedEventToString);
+    mulitplexChangedEvent = EventsRegisterEvent(tuningSource, "MultiplexChanged", MultiplexChangedEventToString);
     return 0;
 }
 
@@ -58,6 +69,7 @@ int TuningDeInit(void)
     ListFree(ChannelChangedCallbacksList,NULL);
     MultiplexRefDec(CurrentMultiplex);
     ServiceRefDec(CurrentService);
+    EventsUnregisterSource(tuningSource);
     return 0;
 }
 
@@ -140,7 +152,7 @@ void TuningCurrentServiceSet(Service_t *service)
          * service.
          */
         ChannelChangedDoCallbacks((Multiplex_t *)CurrentMultiplex, (Service_t *)CurrentService);
-
+        EventsFireEventListeners(serviceChangedEvent, CurrentService);
         LogModule(LOG_DEBUGV, TUNING, "Enabling filters\n");
         TSFilterEnable(tsFilter, TRUE);
     }
@@ -177,7 +189,8 @@ void TuningCurrentMultiplexSet(Multiplex_t *multiplex)
      * service.
      */
     ChannelChangedDoCallbacks((Multiplex_t *)CurrentMultiplex, NULL);
-
+    EventsFireEventListeners(serviceChangedEvent, NULL);
+    
     LogModule(LOG_DEBUGV, TUNING, "Enabling filters\n");
     TSFilterEnable(tsFilter, TRUE);
 }
@@ -223,5 +236,22 @@ static void TuneMultiplex(Multiplex_t *multiplex)
 
     LogModule(LOG_DEBUGV,TUNING, "Informing TSFilter multiplex has changed!\n");
     TSFilterMultiplexChanged(tsFilter, CurrentMultiplex);
+
+    EventsFireEventListeners(mulitplexChangedEvent, multiplex);
 }
 
+static char *MultiplexChangedEventToString(Event_t event,void * payload)
+{
+    char *result=NULL;
+    Multiplex_t *mux = payload;
+    asprintf(&result, "%d", mux->uid);
+    return result;
+}
+
+static char *ServiceChangedEventToString(Event_t event,void * payload)
+{
+    char *result=NULL;
+    Service_t *service = payload;
+    asprintf(&result, "%d %04x %s",service->multiplexUID, service->id, service->name);
+    return result;
+}
