@@ -61,6 +61,9 @@ Command Processing and command functions.
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
+/* Context Prototypes. */
+static void CommandContextSet(CommandContext_t *context);
+
 /* External Command Prototypes. */
 void CommandInstallInfo(void);
 void CommandUnInstallInfo(void);
@@ -74,7 +77,7 @@ extern void CommandUnInstallScanning(void);
 /* File Prototypes */    
 static char **AttemptComplete (const char *text, int start, int end);
 static char *CompleteCommand(const char *text, int state);
-static bool ProcessCommand(char *command, char *argument);
+static bool ProcessCommand(CommandContext_t *context, char *command, char *argument);
 static Command_t *FindCommand(Command_t *commands, char *command);
 static char **Tokenise(char *arguments, int *argc);
 static void ParseLine(char *line, char **command, char **argument);
@@ -87,14 +90,25 @@ static void CommandGet(int argc, char **argv);
 static void CommandSet(int argc, char **argv);
 static void CommandVars(int argc, char **argv);
 
+static int CommandConsolePrintf(CommandContext_t *context,const char *fmt, va_list args);
+static char *CommandConsoleGets(CommandContext_t *context, char *buffer, int len);
 
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
 
-int (*CommandPrintf)(const char *fmt, ...);
-CommandContext_t *CurrentCommandContext;
-static CommandContext_t ConsoleCommandContext = {"console", FALSE, NULL, NULL, TRUE, 0, {0}};
+static CommandContext_t ConsoleCommandContext = 
+{
+    "console", 
+    FALSE, 
+    CommandConsolePrintf, 
+    CommandConsoleGets,
+    NULL, 
+    NULL, 
+    TRUE, 
+    0, 
+    {0}
+};
 
 static Command_t coreCommands[] = 
 {
@@ -140,11 +154,11 @@ static Command_t coreCommands[] =
     {NULL, FALSE, 0, 0, NULL,NULL}
 };
 
-static char *args[MAX_ARGS];
 static bool quit = FALSE;
 static List_t *CommandsList;
 static List_t *VariableHandlers;
 static pthread_mutex_t CommandMutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_key_t commandContextKey;
 
 static char COMMAND[] = "Command";
 
@@ -172,6 +186,8 @@ int CommandInit(void)
     
     ListAdd( CommandsList, coreCommands);
 
+    pthread_key_create(&commandContextKey, NULL);
+    
     CommandInstallServiceFilter();
     CommandInstallInfo();    
     CommandInstallScanning();
@@ -191,23 +207,60 @@ void CommandDeInit(void)
 
 void CommandRegisterCommands(Command_t *commands)
 {
+    pthread_mutex_lock(&CommandMutex);
     ListAdd( CommandsList, commands);
+    pthread_mutex_unlock(&CommandMutex);
 }
 
 void CommandUnRegisterCommands(Command_t *commands)
 {
+    pthread_mutex_lock(&CommandMutex);
     ListRemove( CommandsList, commands);
+    pthread_mutex_unlock(&CommandMutex);
 }
 
 void CommandRegisterVariable(CommandVariable_t *handler)
 {
+    pthread_mutex_lock(&CommandMutex);
     ListAdd(VariableHandlers, handler);
+    pthread_mutex_unlock(&CommandMutex);    
 }
 
 void CommandUnRegisterVariable(CommandVariable_t *handler)
 {
+    pthread_mutex_lock(&CommandMutex);
     ListRemove(VariableHandlers, handler);
+    pthread_mutex_unlock(&CommandMutex);
 }
+
+static void CommandContextSet(CommandContext_t *context)
+{
+    pthread_setspecific(commandContextKey, context);
+}
+
+CommandContext_t *CommandContextGet(void)
+{
+    return pthread_getspecific(commandContextKey);
+}
+
+int CommandPrintf(const char* fmt, ...)
+{
+    va_list args;
+    int result = 0;
+    
+    CommandContext_t *context = CommandContextGet();
+    va_start(args, fmt);
+    result = context->printf(context, fmt, args);
+    va_end(args);
+    return result;
+}
+
+char *CommandGets(char *buffer, int len)
+{
+    CommandContext_t *context = CommandContextGet();
+    return context->gets(context, buffer, len);
+}
+
 
 /*******************************************************************************
 * Command Loop/Startup file functions                                          *
@@ -258,7 +311,7 @@ int CommandProcessFile(char *file)
         lineno ++;
         if (strlen(line) > 0)
         {
-            CommandExecute(&ConsoleCommandContext, printf, line);
+            CommandExecute(&ConsoleCommandContext, line);
             
             if (ConsoleCommandContext.errorNumber != COMMAND_OK)
             {
@@ -281,7 +334,7 @@ int CommandProcessFile(char *file)
 bool CommandExecuteConsole(char *line)
 {
     bool found = FALSE;
-    if (CommandExecute(&ConsoleCommandContext, printf, line))
+    if (CommandExecute(&ConsoleCommandContext, line))
     {
         add_history(line);
         found = TRUE;
@@ -295,23 +348,20 @@ bool CommandExecuteConsole(char *line)
     return found;
 }
 
-bool CommandExecute(CommandContext_t *context, int (*cmdprintf)(const char *, ...), char *line)
+bool CommandExecute(CommandContext_t *context, char *line)
 {
     bool commandFound = FALSE;
     char *command = NULL;
     char *argument = NULL;
 
-    pthread_mutex_lock(&CommandMutex);
+    CommandContextSet(context);
     
-    CurrentCommandContext = context;
-    CommandPrintf = cmdprintf;
-
     CommandError(COMMAND_OK, "OK");
     ParseLine(line, &command, &argument);
     
     if (command && (strlen(command) > 0))
     {
-        commandFound = ProcessCommand(command, argument);
+        commandFound = ProcessCommand(context, command, argument);
         free(command);
         if (argument)
         {
@@ -322,9 +372,8 @@ bool CommandExecute(CommandContext_t *context, int (*cmdprintf)(const char *, ..
             CommandError(COMMAND_ERROR_UNKNOWN_COMMAND, "Unknown command");
         }
     }
-    
-    pthread_mutex_unlock(&CommandMutex);
-    
+
+    CommandContextSet(NULL);    
     return commandFound;
 }
 
@@ -378,7 +427,7 @@ static char *CompleteCommand(const char *text, int state)
 }
 
 
-static bool ProcessCommand(char *command, char *argument)
+static bool ProcessCommand(CommandContext_t *context, char *command, char *argument)
 {
     char **argv = NULL;
     int argc = 0;
@@ -386,20 +435,26 @@ static bool ProcessCommand(char *command, char *argument)
     ListIterator_t iterator;
     Command_t *commandInfo = NULL;
 
-    for ( ListIterator_Init(iterator, CommandsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    pthread_mutex_lock(&CommandMutex);
+    if (context->commands)
     {
-        Command_t *commands = ListIterator_Current(iterator);
-        commandInfo = FindCommand(commands, command);
-        if (commandInfo)
+        commandInfo = FindCommand(context->commands, command);
+    }
+
+    if (!commandInfo)
+    {
+        for ( ListIterator_Init(iterator, CommandsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
         {
-            break;
+            Command_t *commands = ListIterator_Current(iterator);
+            commandInfo = FindCommand(commands, command);
+            if (commandInfo)
+            {
+                break;
+            }
         }
     }
-    
-    if (!commandInfo && CurrentCommandContext->commands)
-    {
-        commandInfo = FindCommand(CurrentCommandContext->commands, command);
-    }
+    pthread_mutex_unlock(&CommandMutex);
+        
     
     if (commandInfo)
     {
@@ -412,15 +467,15 @@ static bool ProcessCommand(char *command, char *argument)
             else
             {
                 argc = 1;
-                argv = args;
-                args[0] = argument;
+                argv = calloc(sizeof(char*), 1);
+                argv[0] = argument;
             }
         }
         else
         {
             argc = 0;
-            argv = args;
-            args[0] = NULL;
+            argv = calloc(sizeof(char*), 1);
+            argv[0] = NULL;
         }
     
         if ((argc >= commandInfo->minArgs) && (argc <= commandInfo->maxArgs))
@@ -436,11 +491,11 @@ static bool ProcessCommand(char *command, char *argument)
         {
             int a;
     
-            /* Free the arguments but not the array as that is a static array */
             for (a = 0; a < argc; a ++)
             {
                 free(argv[a]);
             }
+            free(argv);
         }
     
         commandFound = TRUE;
@@ -530,7 +585,9 @@ static char **Tokenise(char *arguments, int *argc)
     char *start = arguments;
     char *end;
     char t;
-   
+    char **args;
+    
+    args = calloc(sizeof(char *), MAX_ARGS);
     
     while (*start)
     {
@@ -574,13 +631,7 @@ static char **Tokenise(char *arguments, int *argc)
 
         if (currentarg >= MAX_ARGS)
         {
-            int i;
-            for ( i = 0; i < MAX_ARGS; i ++)
-            {
-                free(args[i]);
-            }
-            *argc = 0;
-            return NULL;
+            break;
         }
     }
     *argc = currentarg;
@@ -593,7 +644,9 @@ static char **Tokenise(char *arguments, int *argc)
 *******************************************************************************/
 static void CommandQuit(int argc, char **argv)
 {
-    if (CurrentCommandContext->remote)
+    CommandContext_t *context = CommandContextGet();
+
+    if (context->remote)
     {
         CommandError(COMMAND_ERROR_GENERIC, "Only console sessions can do that!");
     }
@@ -608,25 +661,31 @@ static void CommandHelp(int argc, char **argv)
 {
     int i;
     ListIterator_t iterator;
-
+    CommandContext_t *context = CommandContextGet();
+    
     if (argc)
     {
         Command_t *requestedcmd = NULL;
-        for ( ListIterator_Init(iterator, CommandsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+
+        
+        if (context->commands)
         {
-            Command_t *commands = ListIterator_Current(iterator);
-            requestedcmd = FindCommand( commands, argv[0]);
-            if (requestedcmd)
+            requestedcmd = FindCommand( context->commands, argv[0]);
+        }
+        
+        if (!requestedcmd)
+        {
+            for ( ListIterator_Init(iterator, CommandsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
             {
-                break;
+                Command_t *commands = ListIterator_Current(iterator);
+                requestedcmd = FindCommand( commands, argv[0]);
+                if (requestedcmd)
+                {
+                    break;
+                }
             }
         }
-        
-        if (!requestedcmd && CurrentCommandContext->commands)
-        {
-            requestedcmd = FindCommand( CurrentCommandContext->commands, argv[0]);
-        }
-        
+
         if (requestedcmd)
         {
             CommandPrintf("%s\n\n", requestedcmd->longHelp);
@@ -647,16 +706,14 @@ static void CommandHelp(int argc, char **argv)
             }
         }
         
-        if (CurrentCommandContext->commands)
+        if (context->commands)
         {
-            for (i = 0; CurrentCommandContext->commands[i].command; i ++)
+            for (i = 0; context->commands[i].command; i ++)
             {
-                CommandPrintf("%12s - %s\n", CurrentCommandContext->commands[i].command,
-                              CurrentCommandContext->commands[i].shortHelp);
+                CommandPrintf("%12s - %s\n", context->commands[i].command,
+                              context->commands[i].shortHelp);
             }
         }
-        
-        
     }
 }
 
@@ -742,4 +799,14 @@ static void CommandVars(int argc, char **argv)
         }
         CommandPrintf("%-15s  (%s) : %s\n", handler->name, mode, handler->description);
      }
+}
+
+static int CommandConsolePrintf(CommandContext_t *context,const char *fmt, va_list args)
+{
+   return vprintf(fmt, args);
+}
+
+static char *CommandConsoleGets(CommandContext_t *context, char *buffer, int len)
+{
+    return fgets(buffer, len, stdin);
 }
