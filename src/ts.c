@@ -32,6 +32,7 @@ Transport stream processing and filter management.
 #include <dvbpsi/psi.h>
 #include "multiplexes.h"
 #include "services.h"
+#define __USE_UNIX98
 #include "ts.h"
 #include "logging.h"
 
@@ -59,9 +60,16 @@ TSFilter_t* TSFilterCreate(DVBAdapter_t *adapter)
     result = ObjectCreateType(TSFilter_t);
     if (result)
     {
+        pthread_mutexattr_t mutexAttr;
+
         result->adapter = adapter;
         result->pidFilters = ListCreate();
-        pthread_mutex_init(&result->mutex, NULL);
+
+        pthread_mutexattr_init(&mutexAttr);
+        pthread_mutexattr_settype(&mutexAttr, PTHREAD_MUTEX_RECURSIVE);
+        pthread_mutex_init(&result->mutex, &mutexAttr);
+        pthread_mutexattr_destroy(&mutexAttr);
+        
         pthread_create(&result->thread, NULL, FilterTS, result);
     }
     return result;
