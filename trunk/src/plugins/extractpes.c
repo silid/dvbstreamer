@@ -49,6 +49,10 @@ static bool started = FALSE;
 /*******************************************************************************
 * Plugin Setup                                                                 *
 *******************************************************************************/
+#ifdef __CYGWIN__
+#define PluginInterface ExtractPESPluginInterface
+#endif
+
 PLUGIN_COMMANDS(
     {
         "startxpes",

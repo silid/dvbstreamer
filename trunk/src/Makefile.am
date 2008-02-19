@@ -62,7 +62,9 @@ plugin_src = \
     plugins/manualfilters.c \
     plugins/queryepg.c \
     plugins/sicapture.c \
-    plugins/traffic.c
+    plugins/traffic.c \
+    plugins/extractpes.c \
+    plugins/eventsdispatcher.c
     
 if ENABLE_ATSC
 atsc_plugin_src=plugins/atsctoepg.c

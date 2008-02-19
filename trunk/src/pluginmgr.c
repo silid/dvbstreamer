@@ -132,7 +132,9 @@ extern Plugin_t EPGtoXMLTVPluginInterface;
 extern Plugin_t UDPOutputPluginInterface;
 extern Plugin_t QueryEPGPluginInterface;
 extern Plugin_t SICapturePluginInterface;
+extern Plugin_t ExtractPESPluginInterface;
 extern Plugin_t TrafficPluginInterface;
+extern Plugin_t EventsDispatcherPluginInterface;
 
 #if defined(ENABLE_ATSC)
 extern Plugin_t ATSCtoEPGPluginInterface;
@@ -169,6 +171,8 @@ int PluginManagerInit(void)
             &QueryEPGPluginInterface,
             &SICapturePluginInterface,
             &TrafficPluginInterface,
+            &ExtractPESPluginInterface,
+            &EventsDispatcherPluginInterface,
 #if defined(ENABLE_ATSC)
             &ATSCtoEPGPluginInterface,
 #endif            
