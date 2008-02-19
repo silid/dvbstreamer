@@ -410,11 +410,14 @@ int main(int argc, char *argv[])
     ServiceFilterDestroyAll(TSFilter);
     SectionProcessorDestroyAllProcessors();
     PESProcessorDestroyAllProcessors();
-    
-    /*
-     * Deinit Plugins after outputs so all delivery methods are properly torn
-     * down.
+
+    /* Destroy all delivery method instances before shutting down the plugins.
+     * We do this as although there may be instances being used by plugins,
+     * we do not know the order the plugins will be shutdown. This may mean the
+     * delivery method plugin is shutdown before the plugin using the instance!
      */
+    DeliveryMethodDestroyAll();
+
     DEINIT(PluginManagerDeInit(), "plugin manager");
 
     DEINIT(TuningDeInit(), "tuning");

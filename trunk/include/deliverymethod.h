@@ -173,6 +173,16 @@ DeliveryMethodInstance_t *DeliveryMethodCreate(char *mrl);
 void DeliveryMethodDestroy(DeliveryMethodInstance_t *instance);
 
 /**
+ * @internal
+ * Destroy all DeliveryMethodInstance_t instances.
+ * NOTE: This function will be called before plugin manager shutsdown all
+ * plugins. This is to ensure all delivery method instances are correctly closed
+ * down. Plugins should not attempt to destroy delivery method instances, as the
+ * plugin providing the method may have already been shutdown.
+ */
+void DeliveryMethodDestroyAll();
+
+/**
  * Function to use with a PIDFilter as the PacketOutput function. 
  * The oparg variable of the PIDFilter structure should be set to a valid 
  * DeliveryMethodInstance_t.
