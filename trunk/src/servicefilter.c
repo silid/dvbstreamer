@@ -161,6 +161,24 @@ void ServiceFilterDestroy(PIDFilter_t *filter)
     ObjectRefDec(state);
 }
 
+void ServiceFilterDestroyAll(TSFilter_t *tsFilter)
+{
+    ListIterator_t iterator;
+
+    TSFilterLock(tsFilter);
+    for ( ListIterator_Init(iterator, tsFilter->pidFilters); 
+          ListIterator_MoreEntries(iterator); )
+    {
+        PIDFilter_t *filter = (PIDFilter_t *)ListIterator_Current(iterator);
+        ListIterator_Next(iterator);
+        if (strcmp(filter->type, ServicePIDFilterType) == 0)
+        {
+            ServiceFilterDestroy(filter);
+        }
+    }    
+    TSFilterUnLock(tsFilter);
+}
+
 void ServiceFilterServiceSet(PIDFilter_t *filter, Service_t *service)
 {
     ServiceFilter_t *state = (ServiceFilter_t *)filter->fpArg;

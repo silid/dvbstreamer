@@ -404,8 +404,13 @@ int main(int argc, char *argv[])
             RemoteInterfaceDeInit();
         }
     }
-    ServiceFilterDestroy(primaryServiceFilter);
+
     TSFilterEnable(TSFilter, FALSE);
+    
+    ServiceFilterDestroyAll(TSFilter);
+    SectionProcessorDestroyAllProcessors();
+    PESProcessorDestroyAllProcessors();
+    
     /*
      * Deinit Plugins after outputs so all delivery methods are properly torn
      * down.
@@ -447,8 +452,7 @@ int main(int argc, char *argv[])
         DEINIT(ATSCMultipleStringsDeInit(), "ATSC Strings");        
 #endif        
     }
-    SectionProcessorDestroyAllProcessors();
-    PESProcessorDestroyAllProcessors();
+
     
     LogModule(LOG_DEBUGV, MAIN, "Processors destroyed\n");
     /* Close the adapter and shutdown the filter etc*/
