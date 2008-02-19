@@ -33,6 +33,7 @@ Delivery Method management functions.
 *******************************************************************************/
 static char DELIVERYMETHOD[] = "DeliveryMethod";
 static List_t *DeliveryMethodsList;
+static List_t *InstancesList;
 
 /*******************************************************************************
 * Global functions                                                             *
@@ -40,16 +41,27 @@ static List_t *DeliveryMethodsList;
 int DeliveryMethodManagerInit(void)
 {
     DeliveryMethodsList = ListCreate();
-    if (DeliveryMethodsList)
+    if (DeliveryMethodsList == NULL)
     {
-        return 0;
+        return -1;
     }
-    return -1;
+    InstancesList = ListCreate();
+    if (InstancesList == NULL)
+    {
+        ListFree(DeliveryMethodsList, NULL);
+        return -1;
+    }
+    return 0;
 }
 
 void DeliveryMethodManagerDeInit(void)
 {
     ListFree(DeliveryMethodsList, NULL);
+    if (ListCount(InstancesList) != 0)
+    {
+        LogModule(LOG_ERROR, DELIVERYMETHOD, "Instances still exist when shutting down Delivery Method Manager!\n");
+    }
+    ListFree(InstancesList, NULL);
 }
 
 void DeliveryMethodManagerRegister(DeliveryMethodHandler_t *handler)
@@ -115,6 +127,7 @@ DeliveryMethodInstance_t *DeliveryMethodCreate(char *mrl)
                 {
                     instance->mrl = strdup(mrl);
                 }
+                ListAdd(InstancesList, instance);
                 LogModule(LOG_DEBUG, DELIVERYMETHOD, "Created DeliveryMethodInstance(%p) for %s\n",instance, instance->mrl);
                 break;
             }
@@ -127,11 +140,22 @@ void DeliveryMethodDestroy(DeliveryMethodInstance_t *instance)
 {
     char *mrl = instance->mrl;
     instance->DestroyInstance(instance);
+    ListRemove(InstancesList, instance);
     LogModule(LOG_DEBUG, DELIVERYMETHOD, "Released DeliveryMethodInstance(%p) for %s\n" ,instance, mrl);
     free(mrl);
 }
 
-
+void DeliveryMethodDestroyAll()
+{
+    ListIterator_t iterator;
+    for (ListIterator_Init(iterator, InstancesList); 
+         ListIterator_MoreEntries(iterator);)
+     {
+        DeliveryMethodInstance_t *instance = ListIterator_Current(iterator);
+        ListIterator_Next(iterator);
+        DeliveryMethodDestroy(instance);
+     }
+}
 
 char* DeliveryMethodGetMRL(PIDFilter_t *filter)
 {
