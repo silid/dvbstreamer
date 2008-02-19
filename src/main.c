@@ -230,7 +230,7 @@ int main(int argc, char *argv[])
     }
     
     INIT(ObjectInit(), "objects");    
-    INIT(EventsInit(),"events");
+    INIT(EventsInit(), "events");
     INIT(DBaseInit(adapterNumber), "database");
     INIT(EPGDBaseInit(adapterNumber), "EPG database");
     INIT(MultiplexInit(), "multiplex");

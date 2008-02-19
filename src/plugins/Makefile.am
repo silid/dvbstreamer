@@ -21,6 +21,7 @@ plugins_LTLIBRARIES = \
 	queryepg.la \
 	sicapture.la \
 	traffic.la \
+	eventsdispatcher.la \
 	$(atsc_plugins) \
 	$(dvb_plugins)
 endif
@@ -113,3 +114,9 @@ traffic_la_SOURCES = \
     traffic.c
 
 traffic_la_LDFLAGS = -module -no-undefined -avoid-version
+
+eventsdispatcher_la_SOURCES = \
+    eventsdispatcher.c
+
+eventsdispatcher_la_LDFLAGS = -module -no-undefined -avoid-version
+
