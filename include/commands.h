@@ -23,6 +23,7 @@ Command Processing and command functions.
 #ifndef _COMMANDS_H
 #define _COMMANDS_H
 #include <stdint.h>
+#include <stdarg.h>
 #include "types.h"
 /**
  * @defgroup Commands Command Processing
@@ -84,6 +85,11 @@ typedef struct CommandContext_t
     char *interface;     /**< Human readable string containing the interface name,
                               ie Console for console or an IP address if a remote connection.*/
     bool remote;         /**< Whether this is a remote connection, ie not via the console. */
+                         
+    int (*printf)(struct CommandContext_t *context, const char *fmt, va_list arg_ptr); 
+                         /**< Printf style function used by commands for output. */
+    char *(*gets)(struct CommandContext_t *context,char *buffer, int len);
+                         /**< fgets style function used to retrieve data from the control connection. */
     void *privateArg;    /**< Private pointer for use by the owner of the context. */
     Command_t *commands; /**< Commands specific to this context */
     bool authenticated;  /**< Whether this context has been authenticated against the admin username/password.*/
@@ -96,8 +102,9 @@ typedef struct CommandContext_t
  */
 #define CommandError(_errcode, _msgformat...) \
     do{\
-        CurrentCommandContext->errorNumber = _errcode;\
-        snprintf(CurrentCommandContext->errorMessage, MAX_ERR_MSG,_msgformat);\
+        CommandContext_t *context = CommandContextGet();\
+        context->errorNumber = _errcode;\
+        snprintf(context->errorMessage, MAX_ERR_MSG,_msgformat);\
     }while(0)
 
 /**
@@ -106,7 +113,8 @@ typedef struct CommandContext_t
  */
 #define CommandCheckAuthenticated() \
     do{\
-        if (!CurrentCommandContext->authenticated)\
+        CommandContext_t *context = CommandContextGet();\
+        if (!context->authenticated)\
         {\
             CommandError(COMMAND_ERROR_AUTHENTICATION, "Not authenticated!");\
             return;\
@@ -160,11 +168,10 @@ bool CommandExecuteConsole(char *line);
 /**
  * Execute the command line supplied.
  * @param context The context the command is being executed.
- * @param cmdprintf Function pointer to set CommandPrintf to.
  * @param command The command line to execute.
  * @return true if the command was found, false otherwise.
  */
-bool CommandExecute(CommandContext_t *context, int (*cmdprintf)(const char *, ...), char *command);
+bool CommandExecute(CommandContext_t *context, char *command);
 
 /**
  * Printf style output function that should be in command functions to send
@@ -172,12 +179,21 @@ bool CommandExecute(CommandContext_t *context, int (*cmdprintf)(const char *, ..
  * @param fmt Printf format.
  * @return Number of bytes printed.
  */
-int (*CommandPrintf)(const char *fmt, ...);
+int CommandPrintf(const char *fmt, ...);
 
 /**
- * Context the currently running command is executing in.
+ * fgets style function to retrieve data from the control connection.
+ * @param buffer The buffer to store the data in.
+ * @param len Length of the buffer.
+ * @return On success returns buffer, otherwise returns NULL.
  */
-extern CommandContext_t *CurrentCommandContext;
+char *CommandGets(char *buffer, int len);
+
+/**
+ * Retrieve the command context specific to the current thread.
+ * @return A CommandContext_t instance or NULL if a command is not executing.
+ */
+CommandContext_t *CommandContextGet(void);
 
 /**
  * Register an info handler that will be invoked by the get/set command.
