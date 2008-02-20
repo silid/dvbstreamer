@@ -70,6 +70,7 @@ static void EventListenerDetailsFree(EventListenerDetails_t *details);
 static void RegisterEventListener(List_t *listenerList, EventListener_t callback, void *arg);
 static void UnRegisterEventListener(List_t *listenerList, EventListener_t callback, void *arg);
 static void FireEventListeners(List_t *listenerList, Event_t event, void *payload);
+static char* EventUnregisteredToString(Event_t event, void *payload);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -78,6 +79,9 @@ static List_t *sourcesList;
 static List_t *globalListenersList;
 static pthread_mutex_t eventsMutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 static char EVENTS[]="Events";
+
+static EventSource_t eventsSource;
+static Event_t       eventUnregistered;
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
@@ -91,6 +95,9 @@ int EventsInit(void)
     /* Create the sources and global event listeners list */
     sourcesList = ListCreate();
     globalListenersList = ListCreate();
+
+    eventsSource = EventsRegisterSource(EVENTS);
+    eventUnregistered = EventsRegisterEvent(eventsSource, "Unregistered", EventUnregisteredToString);
     return 0;
 }
 
@@ -297,6 +304,10 @@ static void EventSourceFree(EventSource_t source)
 
 static void EventFree(Event_t event)
 {
+    if (event != eventUnregistered)
+    {
+        EventsFireEventListeners(eventUnregistered, event);
+    }
     free(event->name);
     ListFree(event->listeners,(void (*)(void*))EventListenerDetailsFree);
     ObjectRefDec(event);
@@ -343,4 +354,9 @@ static void FireEventListeners(List_t *listenerList, Event_t event, void *payloa
         LogModule(LOG_DEBUG, EVENTS, "Sending event to %p\n", details);
         details->callback(details->arg, event, payload);
     }
+}
+
+static char* EventUnregisteredToString(Event_t event, void *payload)
+{
+    return EventsEventToString((Event_t)payload, NULL);
 }
