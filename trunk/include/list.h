@@ -27,27 +27,37 @@ Generic list management functions.
 #include "types.h"
 
 /**
- * @defgroup List Generic Linked List functions
+ * @defgroup List Generic Linked List
  *@{
  */
 
-typedef struct ListEntry_t
+/**
+ * Structure used to hold an entry in a double linked list.
+ */
+typedef struct ListEntry_s
 {
-    void *data;
-    struct ListEntry_t *next, *prev;
+    void *data;               /**< Pointer to the user data. */
+    struct ListEntry_s *next; /**< Pointer to the next list entry. */
+    struct ListEntry_s *prev; /**< Pointer to the previous list entry. */
 }ListEntry_t;
 
-typedef struct List_t
+/**
+ * Structure describing a double linked list.
+ */
+typedef struct List_s
 {
-    int count;
-    ListEntry_t *head;
-    ListEntry_t *tail;
+    int count;        /**< Number of entries in the list. */
+    ListEntry_t *head;/**< First entry in the list. */
+    ListEntry_t *tail;/**< Last entry in the list. */
 }List_t;
 
-typedef struct sListIterator_t
+/**
+ * Structure to hold the state of a list iterator. 
+ */
+typedef struct ListIterator_s
 {
-    List_t *list;
-    ListEntry_t *current;
+    List_t *list;         /**< The list being iterated over. */
+    ListEntry_t *current; /**< The current entry of the list */
 }ListIterator_t;
 
 /**
@@ -85,7 +95,7 @@ typedef void (*ListDataDestructor_t)(void *);
 
 /**
  * Determine whether there are any more entries in the list.
- * @param iterator The iterator to test.
+ * @param _iterator The iterator to test.
  * @return True if there are more entries, false otherwise.
  */
 #define ListIterator_MoreEntries(_iterator) ((_iterator).current)
@@ -99,6 +109,7 @@ List_t *ListCreate();
 /**
  * Free a list and all the entries calling the destructor function for each entry.
  * @param list The list to free.
+ * @param destructor Function to call on each item in the list.
  */
 void ListFree(List_t *list, void (*destructor)(void *data));
 

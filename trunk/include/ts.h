@@ -34,7 +34,7 @@ Transport stream processing and filter management.
 
 /*------ Transport Stream Packet Structures and macros ----*/
 /**
- * @defgroup TSPacket Transport Stream Packet structure and macros
+ * @defgroup TSPacket Transport Stream Packet Access
  * @{
  */
 
@@ -147,7 +147,7 @@ TSPacket_t;
 /**@}*/
 
 /**
- * @defgroup PIDFilter PID Filter functions and datatypes
+ * @defgroup TSPIDFilter PID Filtering
  * @{
  */
 
@@ -243,7 +243,7 @@ extern char PSISIPIDFilterType[];
 /**@}*/
 
 /**
- * @defgroup SimplePIDFilter Simple PID Filter packet filter structure and functions
+ * @defgroup SimplePIDFilter Simple PID Filter
  * @{
  */
 
@@ -268,7 +268,7 @@ PIDFilterSimpleFilter_t;
 
 /*---- Transport Stream Filter structure ----*/
 /**
- * @defgroup TSFilter Transport Stream filter structure and functions
+ * @defgroup TSFilter Transport Stream Filter
  * @{
  */
 /**
@@ -299,7 +299,7 @@ typedef struct TSFilter_t
     volatile unsigned long long totalPackets; /**< Total number of packets processed by this instance. */
     volatile unsigned long bitrate;     /**< Approximate bit rate of the transport stream being processed. */
 
-    List_t *pidFilters;
+    List_t *pidFilters;                 /**< List of PIDFilter_t objects associated with this TS Filter. */
 }
 TSFilter_t;
 
@@ -362,7 +362,7 @@ PIDFilter_t* TSFilterFindPIDFilter(TSFilter_t *tsfilter, const char *name, const
 /**@}*/
 
 /**
- * @addtogroup PIDFilter
+ * @addtogroup TSPIDFilter
  * @{
  */
 /**

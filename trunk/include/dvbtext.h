@@ -25,7 +25,7 @@ DVB Text Conversion functions.
 #include <sys/types.h>
 
 /**
- * @defgroup DVBText Functions to convert DVB encoded strings to UTF-8.
+ * @addtogroup TextConversion Text Conversion
  * @{
  */
 
@@ -41,7 +41,7 @@ DVB Text Conversion functions.
  * @return A pointer to a buffer containing the input string in UTF-8 format, or 
  *         NULL if the conversion failed.
  */
-char *DVBTextToUTF8(char *toConvert, size_t toCovertLen);
+char *DVBTextToUTF8(char *toConvert, size_t toConvertLen);
 /** @} */
 #endif
 

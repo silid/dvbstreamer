@@ -376,7 +376,7 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 /** @} */
 
 /**
- * @defgroup Database Database Macros and Functions
+ * @defgroup Database Database Management
  * @{
  */
 
@@ -387,6 +387,9 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 #define STATEMENT_INIT int rc; sqlite3_stmt *stmt=NULL
 
 #ifndef DBASE_CONNECTION_GET
+/**
+ * Macro for the function to call to get a database connection.
+ */
 #define DBASE_CONNECTION_GET DBaseConnectionGet
 #endif
 

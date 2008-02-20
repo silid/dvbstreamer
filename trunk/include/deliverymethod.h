@@ -24,7 +24,7 @@ Delivery Method management functions.
 #define _DELIVERYMETHOD_H
 #include "ts.h"
 /**
- * @defgroup DeliveryMethod Delivery Method Management.
+ * @defgroup DeliveryMethod Delivery Method Management
  * @{
  */
 
@@ -102,7 +102,7 @@ DeliveryMethodInstance_t;
  * The handler should implement the CanHandle() function to test if it can handle
  * a Media Resource Locator passed to it. If it can it should then expect the
  * CreateInstance method to be called for the same mrl.
- * MRLs will be in the form <delivery method>://<url>[,<options>]
+ * MRLs will be in the form \<delivery method\>://\<url\>[,\<options\>]
  * For example udp could be (ppd == Packets Per Datagram)
  * udp://localhost:1234,tos=25,ppd=7
  */
@@ -186,7 +186,7 @@ void DeliveryMethodDestroyAll();
  * Function to use with a PIDFilter as the PacketOutput function. 
  * The oparg variable of the PIDFilter structure should be set to a valid 
  * DeliveryMethodInstance_t.
- * @param filter The pid filter that is output a packet.
+ * @param pidfilter The pid filter that is output a packet.
  * @param userarg Must be a valid DeliveryMethodInstance_t.
  * @param packet The packet to output.
  */

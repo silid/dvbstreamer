@@ -115,6 +115,7 @@ void DVBDispose(DVBAdapter_t *adapter);
  * Tune the frontend to the specified parameters.
  * @param adapter The adapter to tune.
  * @param frontend The parameters to use to tune.
+ * @param diseqc DiSEqC settings, may be NULL if not a satellite frontend.
  * @return 0 on success, non-zero otherwise.
  */
 int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *frontend, DVBDiSEqCSettings_t *diseqc);

@@ -26,7 +26,7 @@ the output to only include this service.
 #include "ts.h"
 #include "deliverymethod.h"
 /**
- * @defgroup ServiceFilter Service Filter management functions and constants.
+ * @defgroup ServiceFilter Service Filter management
  * @{
  */
  
@@ -39,7 +39,7 @@ extern char ServicePIDFilterType[];
 /**
  * Creates a new Service Filter linked to the supplied TS Filter and return the
  * PIDFilter_t instance used to filter the TS.
- * @param tsFilter The TS Filter to link the ServiceFilter to.
+ * @param tsfilter The TS Filter to link the ServiceFilter to.
  * @return The PIDFilter_t instance that will be used to filter PIDs.
  */
 PIDFilter_t *ServiceFilterCreate(TSFilter_t *tsfilter);

@@ -32,10 +32,22 @@ Events management functions
  * interest and allow other modules to listen for those events, all events from
  * a source or any event.
  * Events are located based on the following naming convention:
- * <EventSource>.<EventName>
+ * \<EventSource\>.\<EventName\>
  * The '.' is used as the delimiter and should not appear in event source names.
  * The source and event names should follow the Pascal or UpperCamelCase naming
  * convention.
+ *
+ * The Events module itself exports the single event "Events.Unregistered", with
+ * the event being destroyed as the payload, to inform interested parties when an 
+ * event is destroyed. 
+ *
+ * \section events Events Exported
+ *
+ * \li \ref unregistered Sent when an event is being unregistered.
+ *
+ * \subsection unregistered Events.Unregistered
+ * This event is fired just before the event is removed from the source. \n
+ * \c payload = The event being unregistered.
  *@{
  */
 
@@ -107,31 +119,92 @@ EventSource_t EventsRegisterSource(char *name);
  */
 void EventsUnregisterSource(EventSource_t source);
 
+/**
+ * Find an event source with the given name.
+ * @param name The name of the event source to find.
+ * @return An EventSource_t or NULL if no source matched the supplied name.
+ */
 EventSource_t EventsFindSource(char *name);
 
+/**
+ * Register a listener for a specific source.
+ * @param source The source to register with.
+ * @param listener The callback function to register.
+ * @param arg The user defined argument to pass to the callback when an event is fired.
+ */
 void EventsRegisterSourceListener(EventSource_t source, EventListener_t listener, void *arg);
-
+/**
+ * Unregister a listener from receiving events from a source.
+ * @param source The source to unregister with.
+ * @param listener The callback function to unregister.
+ * @param arg The user defined argument to pass to the callback when an event is fired.
+ */
 void EventsUnregisterSourceListener(EventSource_t source, EventListener_t listener, void *arg);
 
+/**
+ * Register a new event with an event source.
+ * The toString function is used for debugging purposes and to allow the event
+ * to be translated into useful information for external applications that may
+ * receive event information over TCP for example.
+ *
+ * @param source The source the event is linked to.
+ * @param name The name of the event.
+ * @param toString A function to return a textual representation of the event.
+ */
 Event_t EventsRegisterEvent(EventSource_t source, char *name, EventToString_t toString);
 
+/**
+ * Unregisters an event.
+ * @param event The event to unregister from its assocated source.
+ */
 void EventsUnregisterEvent(Event_t event);
 
+/**
+ * Given a name in the form \<Source\>.\<Event\> find the Event_t object and return it.
+ * @param name The fully qualified name of the event to find.
+ * @return An Event_t object or NULL if the event could not be found.
+ */
 Event_t EventsFindEvent(char *name);
 
+/**
+ * Calls all listeners that have register to receive events in the following order
+ * - Global listeners
+ * - Source listeners
+ * - Event Listeners
+ *
+ * @note All callbacks are called on the calling thread!
+ *
+ * @param event The event to fire.
+ * @param payload The private information associated with the event.
+ */
 void EventsFireEventListeners(Event_t event, void *payload);
 
+/**
+ * Register a listener for a specific event.
+ * @param event The event to register with.
+ * @param listener The callback function to register.
+ * @param arg The user defined argument to pass to the callback when an event is fired.
+ */
 void EventsRegisterEventListener(Event_t event, EventListener_t listener, void *arg);
 
+/**
+ * Unregister a listener from receiving an event.
+ * @param event The event to unregister with.
+ * @param listener The callback function to unregister.
+ * @param arg The user defined argument to pass to the callback when an event is fired.
+ */
 void EventsUnregisterEventListener(Event_t event, EventListener_t listener, void *arg);
 
 /**
- * Default implementation of an EventToString_t functions.
- * This simply returns the name of the event as a combination of the source name
- * and the event name.
+ * This function converts the event into a human readable form by combining the 
+ * name of the event, with the output of the event specifc toString function 
+ * (if supplied when the event was created).
  * @param event The event to convert.
  * @param payload The payload of the event.
- * @return A string containing <SourceName>.<EventName>
+ * @return A string containing "\<SourceName\>.\<EventName\>" if no toString 
+ * function was supplied when the event was created, or 
+ * "\<SourceName\>.\<EventName\> \<toString output\>" if a toString function was
+ * supplied.
  */
 char *EventsEventToString(Event_t event, void *payload);
 

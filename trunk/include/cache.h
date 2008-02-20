@@ -29,7 +29,15 @@ Caches service and PID information from the database for the current multiplex.
 #include "services.h"
 #include "pids.h"
 
-/** @defgroup Cache Service Cache Management
+/** 
+ * @defgroup DatabaseCache Database Cache Management
+ * This module is used to allow changes to be recorded by the PID filters running
+ * in the TS Filter thread without having the thread halted while the database 
+ * file is accessed.
+ *
+ * @note Functions in this module should only be used from within the TS Filter 
+ * thread, all other threads should access the database through Services and 
+ * Multiplexes modules
  * @{
  */
 
@@ -65,7 +73,7 @@ Multiplex_t *CacheMultiplexGet(void);
 
 /**
  * Find a service in the cache by either name or fully qualified id (i.e. 
- * <network id>.<ts id>.<service id> where ids are in hex).
+ * \<network id\>.\<ts id\>.\<service id\> where ids are in hex).
  *
  * @param name Name of the service or fully qualified id 
  * @return A Service_t instance or NULL if not found.
@@ -88,7 +96,7 @@ Service_t *CacheServiceFindName(char *name);
 
 /**
  * Retrieve all the services currently in the cache and locks the cache to
- * prevent updates to the list.CacheServicesRelease() should be called when the
+ * prevent updates to the list. CacheServicesRelease() should be called when the
  * list is no longer needed.
  *
  * @param count Used to store the number of services in the cache.
@@ -185,7 +193,6 @@ void CacheUpdateServiceType(Service_t *service, ServiceType type);
  * @param service The service to update.
  * @param pcrpid The PID the PCR is being sent on.
  * @param pids A PIDList_t structure of new PIDs.
- * @param count The number of PIDs.
  * @param pmtversion The new PMT version.
  */
 void CacheUpdatePIDs(Service_t *service, int pcrpid, PIDList_t *pids, int pmtversion);
