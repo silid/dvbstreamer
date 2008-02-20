@@ -26,6 +26,7 @@ Plugin to allow manual filtering of PIDs.
 #include <string.h>
 #include <stdint.h>
 #include <ctype.h>
+#include <pthread.h>
 
 #include "plugin.h"
 #include "main.h"
@@ -72,6 +73,7 @@ static int ParsePID(char *argument);
 static char MANUALFILTER[]="ManualFilter";
 */
 static char ManualPIDFilterType[] = "Manual";
+static pthread_mutex_t manualFiltersMutex = PTHREAD_MUTEX_INITIALIZER;
 
 /*******************************************************************************
 * Plugin Setup                                                                 *
@@ -208,6 +210,7 @@ static void CommandRemoveMF(int argc, char **argv)
 {
     PIDFilter_t *filter;
     PIDFilterSimpleFilter_t *simplePIDFilter;
+    DeliveryMethodInstance_t *deliveryMethod;
     char *name;
     
     CommandCheckAuthenticated();
@@ -216,16 +219,19 @@ static void CommandRemoveMF(int argc, char **argv)
 
     name = filter->name;
     simplePIDFilter = filter->fpArg;
+    deliveryMethod = filter->opArg;
     PIDFilterFree(filter);
     ObjectRefDec(simplePIDFilter);
     free(name);
+    DeliveryMethodDestroy(deliveryMethod);
 }
 
 static void CommandListMF(int argc, char **argv)
 {
     TSFilter_t *tsFilter = MainTSFilterGet();    
     ListIterator_t iterator;
-    
+
+    TSFilterLock(tsFilter);
     for ( ListIterator_Init(iterator, tsFilter->pidFilters); 
           ListIterator_MoreEntries(iterator); 
           ListIterator_Next(iterator))
@@ -236,6 +242,7 @@ static void CommandListMF(int argc, char **argv)
             CommandPrintf("%10s : %s\n", filter->name,  DeliveryMethodGetMRL(filter));
         }
     }    
+    TSFilterUnLock(tsFilter);
 }
 
 static void CommandSetOutputMRL(int argc, char **argv)
@@ -246,10 +253,12 @@ static void CommandSetOutputMRL(int argc, char **argv)
     CommandCheckAuthenticated();
 
     FIND_MANUAL_FILTER(argv[0]);
-    
+
+    pthread_mutex_lock(&manualFiltersMutex);
     instance = DeliveryMethodCreate(argv[1]);
     if (instance)
     {
+        DeliveryMethodDestroy(filter->opArg);
         filter->opArg = instance;
         CommandPrintf("MRL set to \"%s\" for %s\n", DeliveryMethodGetMRL(filter), argv[0]);
     }
@@ -257,6 +266,7 @@ static void CommandSetOutputMRL(int argc, char **argv)
     {
         CommandError(COMMAND_ERROR_GENERIC,"Failed to set MRL");
     }
+    pthread_mutex_unlock(&manualFiltersMutex);
 }
 static void CommandAddMFPID(int argc, char **argv)
 {
@@ -265,27 +275,29 @@ static void CommandAddMFPID(int argc, char **argv)
     CommandCheckAuthenticated();
 
     FIND_MANUAL_FILTER(argv[0]);
-    
+
     if (filter)
     {
         int pid;
-        PIDFilterSimpleFilter_t *simplePIDFilter = filter->fpArg;
-        
+        PIDFilterSimpleFilter_t *simplePIDFilter;
         pid = ParsePID(argv[1]);
         if ((pid < 0) || (pid > 0x2000))
         {
             CommandError(COMMAND_ERROR_GENERIC, "Invalid PID!");
             return;
         }
-        
+        pthread_mutex_lock(&manualFiltersMutex);
+        simplePIDFilter = filter->fpArg;
         if (simplePIDFilter->pidcount == MAX_PIDS)
         {
             CommandError(COMMAND_ERROR_GENERIC,"No more available PID entries!");
-            return ;
         }
-        
-        simplePIDFilter->pids[simplePIDFilter->pidcount] = pid;
-        simplePIDFilter->pidcount ++;        
+        else
+        {
+            simplePIDFilter->pids[simplePIDFilter->pidcount] = pid;
+            simplePIDFilter->pidcount ++;        
+        }
+        pthread_mutex_unlock(&manualFiltersMutex);
     }
 }
 
@@ -300,13 +312,17 @@ static void CommandRemoveMFPID(int argc, char **argv)
     if (filter)
     {
         int pid, i;
-        PIDFilterSimpleFilter_t *simplePIDFilter = filter->fpArg;
+        PIDFilterSimpleFilter_t *simplePIDFilter;
+
         pid = ParsePID(argv[1]);
         if ((pid < 0) || (pid > 0x2000))
         {
             CommandError(COMMAND_ERROR_GENERIC, "Invalid PID!");
             return;
         }
+
+        pthread_mutex_lock(&manualFiltersMutex);
+        simplePIDFilter = filter->fpArg;
         for ( i = 0; i < simplePIDFilter->pidcount; i ++)
         {
             if (simplePIDFilter->pids[i] == pid)
@@ -317,6 +333,7 @@ static void CommandRemoveMFPID(int argc, char **argv)
                 break;
             }
         }
+        pthread_mutex_unlock(&manualFiltersMutex);
         
     }
 }
@@ -328,7 +345,7 @@ static void CommandListMFPIDs(int argc, char **argv)
     PIDFilterSimpleFilter_t *simplePIDFilter;
 
     FIND_MANUAL_FILTER(argv[0]);
-
+    pthread_mutex_lock(&manualFiltersMutex);
     simplePIDFilter = filter->fpArg;
 
     CommandPrintf("%d PIDs for \'%s\'\n", simplePIDFilter->pidcount, argv[0]);
@@ -337,6 +354,7 @@ static void CommandListMFPIDs(int argc, char **argv)
     {
         CommandPrintf("0x%x\n", simplePIDFilter->pids[i]);
     }
+    pthread_mutex_unlock(&manualFiltersMutex);
 
 }
 
