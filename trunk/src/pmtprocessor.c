@@ -302,7 +302,10 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
                     if (desc->i_tag == 10) /* ISO 639 Language Descriptor */
                     {
                         dvbpsi_iso639_dr_t *iso639 = dvbpsi_DecodeISO639Dr(desc);
-                        pids->pids[i].subType = iso639->code[0].i_audio_type;
+                        if (iso639)
+                        {
+                            pids->pids[i].subType = iso639->code[0].i_audio_type;
+                        }
                     }
                     desc = desc->p_next;
                 }
