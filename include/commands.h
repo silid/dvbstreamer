@@ -30,14 +30,18 @@ Command Processing and command functions.
  *@{
  */
 
-#define COMMAND_OK                    0x0000
-#define COMMAND_ERROR_TOO_MANY_CONNS  0x0001
-#define COMMAND_ERROR_UNKNOWN_COMMAND 0x0002
-#define COMMAND_ERROR_WRONG_ARGS      0x0003
-#define COMMAND_ERROR_AUTHENTICATION  0x0004
-#define COMMAND_ERROR_GENERIC         0xffff
+#define COMMAND_OK                    0x0000 /**< Command completed OK. */
+#define COMMAND_ERROR_TOO_MANY_CONNS  0x0001 /**< Too many connections, connection refused. */
+#define COMMAND_ERROR_UNKNOWN_COMMAND 0x0002 /**< Command is not known. */
+#define COMMAND_ERROR_WRONG_ARGS      0x0003 /**< Wrong number of arguments supplied for command. */
+#define COMMAND_ERROR_AUTHENTICATION  0x0004 /**< Connection has not authenticated successfully. */
+#define COMMAND_ERROR_GENERIC         0xffff /**< Unknown error code, the error message string should explain the problem. */
 
+/**
+ * Maximum length of the error message string.
+ */
 #define MAX_ERR_MSG 256
+
 /**
  * Structure used to define a command.
  */
@@ -48,7 +52,7 @@ typedef struct Command_t
     int   minArgs;  /**< Minimum number of args this command accepts. */
     int   maxArgs;  /**< Maximum number of args this command accepts. */
     char *shortHelp;/**< Short description of the command, displayed by help */
-    char *longHelp; /**< Long description of the command, displayed by help <command> */
+    char *longHelp; /**< Long description of the command, displayed by help \<command\> */
     void (*commandfunc)(int argc, char **argv); /**< Function to call to execute command */
 }Command_t;
 

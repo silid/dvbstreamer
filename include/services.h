@@ -49,7 +49,7 @@ typedef enum {
 }ServiceType;
 
 /**
- * Structure desribing a digital TV service.
+ * Structure describing a digital TV service.
  */
 typedef struct Service_t
 {
@@ -65,11 +65,14 @@ typedef struct Service_t
     int pmtPid;             /**< PID the PMT for this service is sent on. */
     int pcrPid;             /**< PID the PCR for this service is sent on. */
 
-    char *provider;
-    char *defaultAuthority;
+    char *provider;         /**< Provider of the service */
+    char *defaultAuthority; /**< TVAnytime default authority for this service. */
 }
 Service_t;
 
+/**
+ * Handle for enumerating services.
+ */
 typedef void *ServiceEnumerator_t;
 
 /**
@@ -100,7 +103,7 @@ int ServiceCount();
 
 /**
  * Retrieve the number of services on the specified multplex.
- * @param uid The multiplex to retrieve the service count for.
+ * @param multiplexuid The multiplex to retrieve the service count for.
  * @return The number of services on the specified multiplex.
  */
 int ServiceForMultiplexCount(int multiplexuid);
@@ -147,7 +150,7 @@ int ServicePMTPIDSet(Service_t  *service, int pmtpid);
 /**
  * Set the PCR PID for the given service.
  * @param service The service to update.
- * @param pmtpid The new PID of the PCR.
+ * @param pcrpid The new PID of the PCR.
  * @return 0 on success, otherwise an SQLite error code.
  */
 int ServicePCRPIDSet(Service_t  *service, int pcrpid);
@@ -230,7 +233,7 @@ Service_t *ServiceFindId(Multiplex_t *multiplex, int id);
  * The returned service should be released with ServiceRefDec.
  * @param networkId Network ID of the multiplex this service is on.
  * @param tsId TS ID of the multiplex this service is on.
- * @param serviecID ID of the service to find.
+ * @param serviceId ID of the service to find.
  * @return A service structure or NULL if the service was not found.
  */
 Service_t *ServiceFindFQID(uint16_t networkId, uint16_t tsId, uint16_t serviceId);
@@ -288,7 +291,7 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator);
 
 /**
  * Increment the references to the specified service object.
- * @param service The service instance to increment the reference count of.
+ * @param __service The service instance to increment the reference count of.
  */
 #define ServiceRefInc(__service) \
         do{ \
@@ -301,7 +304,7 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator);
 /**
  * Decrement the references of the specified service object. If the reference 
  * count reaches 0 the instance is free'd.
- * @param service The service instance to decrement the reference count of.
+ * @param __service The service instance to decrement the reference count of.
  */
 #define ServiceRefDec(__service) \
         do{ \

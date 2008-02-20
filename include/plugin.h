@@ -256,7 +256,7 @@ typedef struct Plugin_t
 
 /**
  * Simple macro to define a Channel Changed feature.
- * @param _cchanaged Function to call when the Primary service filter is updated.
+ * @param _cchanged Function to call when the Primary service filter is updated.
  */
 #define PLUGIN_FEATURE_CHANNELCHANGED(_cchanged) {PLUGIN_FEATURE_TYPE_CHANNELCHANGED, (void*)_cchanged}
 

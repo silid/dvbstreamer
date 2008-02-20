@@ -26,7 +26,7 @@ Object memory management.
 #include "types.h"
 
 /**
- * @defgroup Object Object Memory Managment functions.
+ * @defgroup Object Object Memory Managment
  *@{
  */
  
@@ -77,13 +77,25 @@ int ObjectRegisterClass(char *classname, unsigned int size, ObjectDestructor_t d
 #define ObjectRegisterTypeDestructor(_type, _destructor) ObjectRegisterClass(TOSTRING(_type), sizeof(_type), _destructor)
 
 /**
- * Create a new object of class <classname>. The initial reference count for the
+ * Create a new object of class \<classname\>. The initial reference count for the
  * returned object will be 1.
+ * @param _classname Class of object to create.
+ * @return A pointer to the new object or NULL.
+ */
+#define ObjectCreate(_classname) ObjectCreateImpl(_classname, __FILE__, __LINE__)
+
+/**
+ * Create a new object of class \<classname\>. The initial reference count for the
+ * returned object will be 1.
+ *
+ * @note This is the function should not be used instead the macro ObjectCreate should be used.
+ *
  * @param classname Class of object to create.
+ * @param file The file this function is being called from.
+ * @param line The line this function is being called from.
  * @return A pointer to the new object or NULL.
  */
 void *ObjectCreateImpl(char *classname, char *file, int line);
- #define ObjectCreate(_classname) ObjectCreateImpl(_classname, __FILE__, __LINE__)
  
 /**
  * Helper macro to create a new object of the specfied type.
@@ -93,19 +105,35 @@ void *ObjectCreateImpl(char *classname, char *file, int line);
 
 /**
  * Increment the reference count for the specified object.
+ * @param _ptr Pointer to the object to increment the ref. count of.
+ */
+#define ObjectRefInc(_ptr) ObjectRefIncImpl(_ptr, __FILE__, __LINE__)
+
+/**
+ * Increment the reference count for the specified object.
+ * @note This is the function should not be used instead the macro ObjectRefInc should be used. 
  * @param ptr Pointer to the object to increment the ref. count of.
+ * @param file The file this function is being called from.
+ * @param line The line this function is being called from. 
  */
 void ObjectRefIncImpl(void *ptr, char *file, int line);
-#define ObjectRefInc(_ptr) ObjectRefIncImpl(_ptr, __FILE__, __LINE__)
 
 /**
  * Decrement the reference count for the specified object. If the reference count
  * reaches zero the object's class's destructor will be called and the memory freed.
- * @param ptr Pointer to the object to decrement the ref. count of.
+ * @param _ptr Pointer to the object to decrement the ref. count of.
  * @return True if there are more references to the object, false if not.
  */
-bool ObjectRefDecImpl(void *ptr, char *file, int line);
 #define ObjectRefDec(_ptr) ObjectRefDecImpl(_ptr, __FILE__, __LINE__)
+
+/**
+ * Decrement the reference count for the specified object. If the reference count
+ * @note This is the function should not be used instead the macro ObjectRefDec should be used. 
+ * @param ptr Pointer to the object to decrement the ref. count of.
+ * @param file The file this function is being called from.
+ * @param line The line this function is being called from. 
+ */
+bool ObjectRefDecImpl(void *ptr, char *file, int line);
 
 /**
  * Replacement for malloc, with the addition that it also clears the memory to zero.

@@ -24,11 +24,20 @@ Generic type definitions.
 #ifndef _DVBSTREAMER_TYPES_H
 #define _DVBSTREAMER_TYPES_H
 /**
- * @defgroup Types Global types
+ * @defgroup GlobalTypes Global types
  *@{
  */
 
+/**
+ * 2nd part of the 2 stage macro (TOSTRING) to turn an unquoted identifier into a string.
+ * @param x identifer to turn into a string.
+ */
 #define STRINGIFY(x) #x
+
+/**
+ * Macro to turn an unquoted identifier into a string.
+ * @param x identifer to turn into a string.
+ */
 #define TOSTRING(x) STRINGIFY(x)
 
 /**

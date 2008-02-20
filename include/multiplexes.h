@@ -29,6 +29,8 @@ Manage multiplexes and tuning parameters.
 #include "dvb.h"
 /**
  * @defgroup Multiplex Multiplex information
+ * This module is used to store and retrieve the multiplex information in the 
+ * adapters database.
  * @{
  */
 
@@ -46,6 +48,9 @@ typedef struct Multiplex_t
 }
 Multiplex_t;
 
+/**
+ * Handle for enumerating multiplexes.
+ */
 typedef void * MultiplexEnumerator_t;
 
 /**
@@ -82,7 +87,7 @@ Multiplex_t *MultiplexFind(char *mux);
 /**
  * Retrieve the Multiplex_t structure for the UID.
  * The returned structured should be released using MultiplexRefDec.
- * @param UID Unique ID of the multiplex to retrieve.
+ * @param uid Unique ID of the multiplex to retrieve.
  * @return A Mulitplex_t or NULL if the frequency could not be found.
  */
 Multiplex_t *MultiplexFindUID(int uid);
@@ -128,6 +133,7 @@ Multiplex_t *MultiplexGetNext(MultiplexEnumerator_t enumerator);
  * Retrieve the frontend parameters for the given multiplex.
  * @param multiplex The multiplex to retrieve the frontend parameters for.
  * @param feparams Used to store the frontend parameters.
+ * @param diseqc DiSEqC parameters, may be NULL for non-satellite frontends.
  * @return 0 on success, otherwise an SQLite error code.
  */
 int MultiplexFrontendParametersGet(Multiplex_t *multiplex, struct dvb_frontend_parameters *feparams, DVBDiSEqCSettings_t *diseqc);
@@ -174,7 +180,7 @@ int MultiplexNetworkIdSet(Multiplex_t *multiplex, int netid);
 
 /**
  * Increment the references to the specified multiplex object.
- * @param multiplex The multiplex instance to increment the reference count of. (Multiplex can be NULL.)
+ * @param __multiplex The multiplex instance to increment the reference count of. (Multiplex can be NULL.)
  */
 #define MultiplexRefInc(__multiplex) \
         do{ \
@@ -187,7 +193,7 @@ int MultiplexNetworkIdSet(Multiplex_t *multiplex, int netid);
 /**
  * Decrement the references of the specified multiplex object. If the reference 
  * count reaches 0 the instance is free'd.
- * @param multiplex The multiplex instance to decrement the reference count of. (Multiplex can be NULL.)
+ * @param __multiplex The multiplex instance to decrement the reference count of. (Multiplex can be NULL.)
  */
 #define MultiplexRefDec(__multiplex) \
         do{ \

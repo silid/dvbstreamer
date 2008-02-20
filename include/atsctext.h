@@ -26,7 +26,7 @@ ATSC Text Conversion functions.
 
 
 /**
- * @defgroup ATSCText Functions to convert ATSC multiple encoded strings to UTF-8.
+ * @addtogroup TextConversion Text Conversion
  * @{
  */
 
@@ -57,7 +57,17 @@ typedef struct ATSCMultipleStrings_s
  */
 ATSCMultipleStrings_t *ATSCMultipleStringsConvert(uint8_t *data, uint8_t len);
 
+/**
+ * @internal
+ * Initialise the ATSC multiple strings module.
+ * @returns 0 on success.
+ */
 int ATSCMultipleStringsInit(void);
+
+/** 
+ * @internal
+ * Deinitiaise the  ATSC multiple strings module.
+ */
 void ATSCMultipleStringsDeInit(void);
 /** @} */
 #endif

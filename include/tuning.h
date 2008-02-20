@@ -31,7 +31,26 @@ Frontend Tuner control.
 #include "services.h"
 #include "plugin.h"
 
-/** @defgroup Tuning Frontend Control Functions
+/** @defgroup Tuning High level Frontend Control
+ * This module controls tuning of the frontend and attempts to keep retunes to a minimum.
+ *
+ * When an new service is selected with TuningCurrentServiceSet the new service 
+ * checked to see if it is encapsulated in the currently tuned multiplex. If it 
+ * is the frontend is not retuned, if the new service is not in the current 
+ * multiplex then the frontend is tuned to the multiplex the service is a member of.
+ *
+ * \section events Events Exported
+ * 
+ * \li \ref servicechanged Fired when the primary service is changed.
+ * \li \ref multiplexchanged Fired when the current multiplex changes.
+ *
+ * \subsection servicechanged Tuning.ServiceChanged
+ *  Fired when the primary service filter service is changed. \n
+ *  \c payload = The new Service_t. \n
+ *
+ * \subsection multiplexchanged Tuning.MultiplexChanged
+ * Fired when the tuned multiplex changes. \n
+ * \c payload = The new Multiplex_t.
  * @{
  */
  
