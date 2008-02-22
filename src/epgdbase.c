@@ -546,6 +546,7 @@ static sqlite3 *EPGDBaseConnectionGet(void)
         int rc = sqlite3_open(EPGDBaseFile, &connection);
         if (rc == SQLITE_OK)
         {
+            sqlite3_busy_timeout(connection, 1000);
             pthread_setspecific(EPGDaseConnectionKey, connection);
         }
     }
