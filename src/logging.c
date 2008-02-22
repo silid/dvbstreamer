@@ -147,9 +147,9 @@ static void LogImpl(int level, const char *module, const char * format, va_list 
     /* Print it out in a nice format. */
     strftime (timeBuffer, sizeof(timeBuffer), "%F %T : ", loctime);
 
-    fprintf(stderr, "%s %-15s : %2d : ", timeBuffer, module ? module:"<Unknown>", level);
+    fprintf(logFP, "%s %-15s : %2d : ", timeBuffer, module ? module:"<Unknown>", level);
 
-    vfprintf(stderr, format, valist);
+    vfprintf(logFP, format, valist);
 
     pthread_mutex_unlock(&mutex);
 }
