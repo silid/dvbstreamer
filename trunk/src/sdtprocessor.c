@@ -20,7 +20,6 @@ sdtprocessor.c
 Process Service Description Tables and update the services information.
 
 */
-#define _GNU_SOURCE
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

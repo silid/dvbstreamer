@@ -20,6 +20,7 @@ ts.c
 Transport stream processing and filter management.
 
 */
+#include "config.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -32,7 +33,6 @@ Transport stream processing and filter management.
 #include <dvbpsi/psi.h>
 #include "multiplexes.h"
 #include "services.h"
-#define __USE_UNIX98
 #include "ts.h"
 #include "logging.h"
 

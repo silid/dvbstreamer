@@ -2,7 +2,7 @@
 # Plugins
 #
 AM_CFLAGS =\
-     -I$(top_srcdir)/include  -Wall -Werror 
+     -I$(top_srcdir)/include  -Wall -Werror -D_GNU_SOURCE
 
 pluginsdir = @DVBSTREAMER_PLUGINDIR@
 

@@ -20,7 +20,6 @@ info.c
 Command functions to supply the user with information about the system.
 
 */
-#define _GNU_SOURCE
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>

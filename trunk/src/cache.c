@@ -21,7 +21,6 @@ Caches service and PID information from the database for the current multiplex.
 
 */
     
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

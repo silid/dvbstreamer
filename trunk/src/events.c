@@ -22,7 +22,6 @@ Event Management functions, for creating and firing events to listeners.
 */
 
 #include "config.h"
-#define _GNU_SOURCE
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

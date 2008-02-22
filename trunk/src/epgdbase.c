@@ -20,8 +20,6 @@ schedule.c
 Plugin to collect EPG schedule information.
 
 */
-#define _XOPEN_SOURCE
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
