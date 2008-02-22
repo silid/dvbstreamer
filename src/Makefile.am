@@ -1,13 +1,9 @@
 ## Process this file with automake to produce Makefile.in
 
-## Created by Anjuta - will be overwritten
-## If you don't want it to overwrite it,
-## 	Please disable it in the Anjuta project configuration
-
 INCLUDES = @INCLTDL@
 
 AM_CFLAGS =\
-     -I$(top_srcdir)/include -Wall -Werror
+     -I$(top_srcdir)/include -Wall -Werror -D_GNU_SOURCE 
 
 
 bin_PROGRAMS = dvbstreamer dvbctrl setupdvbstreamer
@@ -104,8 +100,6 @@ dvb_src =\
 else
 dvb_src =
 endif
-    
-dvbstreamer_CFLAGS = -I$(top_srcdir)/include -DLOGGING_CHECK_DAEMON -D_GNU_SOURCE -Wall -Werror
 
 dvbstreamer_LDFLAGS = -rdynamic -Wl,-whole-archive -Wl,dvbpsi/libdvbpsi.a -Wl,-no-whole-archive 
 

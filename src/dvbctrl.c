@@ -27,11 +27,13 @@ Application to control dvbstreamer in daemon mode.
 #include <ctype.h>
 #include <getopt.h>
 #include <unistd.h>
+#include <limits.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <linux/dvb/frontend.h>
 
 #include "types.h"
@@ -68,6 +70,7 @@ static char *username = NULL;
 static char *password = NULL;
 static char line[MAX_LINE_LENGTH];
 
+char DataDirectory[PATH_MAX];
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
@@ -90,7 +93,12 @@ int main(int argc, char *argv[])
     char *ver;
     int errno;
     char *errmsg;
+    int logLevel = 0;
 
+    /* Create the data directory */
+    sprintf(DataDirectory, "%s/.dvbstreamer", getenv("HOME"));
+    mkdir(DataDirectory, S_IRWXU);
+    
     while (TRUE)
     {
         int c;
@@ -102,7 +110,7 @@ int main(int argc, char *argv[])
         switch (c)
         {
             case 'v':
-                LogLevelInc();
+                logLevel++;
                 break;
             case 'V':
                 version();
@@ -110,11 +118,9 @@ int main(int argc, char *argv[])
                 break;
             case 'h':
                 host = optarg;
-                LogModule(LOG_INFOV, DVBCTRL, "Will connect to host %s\n", host);
                 break;
             case 'a':
                 adapterNumber = atoi(optarg);
-                LogModule(LOG_INFOV, DVBCTRL, "Using adapter %d\n", adapterNumber);
                 break;
             case 'u':
                 username = optarg;
@@ -130,6 +136,14 @@ int main(int argc, char *argv[])
                 exit(1);
         }
     }
+    
+    if (LoggingInit("dvbctrl", adapterNumber, logLevel))
+    {
+        perror("Couldn't initialising logging module:");
+        exit(1);
+    }
+
+    LogModule(LOG_INFOV, DVBCTRL, "Will connect to host %s adapter %d\n", host, adapterNumber);
     /* Commands follow options */
     if (optind >= argc)
     {
