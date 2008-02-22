@@ -108,7 +108,7 @@ static void version(void);
 static void sighandler(int signum);
 static void installsighandler(void);
 static void InitDaemon(int adapter);
-static void DeinitDaemon(void);
+static void DeInitDaemon(void);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -133,6 +133,7 @@ int main(int argc, char *argv[])
     int i;
     int adapterNumber = 0;
     int scanAll = 0;
+    int logLevel = 0;
     char *username = "dvbstreamer";
     char *password = "control";
     char *serverName = NULL;
@@ -148,7 +149,7 @@ int main(int argc, char *argv[])
     /* Create the data directory */
     sprintf(DataDirectory, "%s/.dvbstreamer", getenv("HOME"));
     mkdir(DataDirectory, S_IRWXU);
-
+    
     installsighandler();
 
     while (!ExitProgram)
@@ -161,7 +162,7 @@ int main(int argc, char *argv[])
         }
         switch (c)
         {
-                case 'v': LogLevelInc();
+                case 'v': logLevel ++;
                 break;
                 case 'V':
                 version();
@@ -170,17 +171,16 @@ int main(int argc, char *argv[])
                 case 'o': primaryMRL = optarg;
                 break;
                 case 'a': adapterNumber = atoi(optarg);
-                LogModule(LOG_INFOV, MAIN, "Using adapter %d\n", adapterNumber);
+
                 break;
                 case 'R': 
 #if defined(ENABLE_DVB)   
                 hwRestricted = TRUE;
 #else
-                LogModule(LOG_ERROR, MAIN, "Hardware restricted mode only supported for DVB!\n");
+                fprintf(stderr, "Hardware restricted mode only supported for DVB!\n");
 #endif
                 break;
                 case 'f': startupFile = optarg;
-                LogModule(LOG_INFOV, MAIN, "Using startup script %s\n", startupFile);
                 break;
                 /* Daemon options */
                 case 'd': DaemonMode = TRUE;
@@ -209,6 +209,15 @@ int main(int argc, char *argv[])
     {
         exit(1);
     }
+
+    if (LoggingInit("dvbstreamer", adapterNumber, logLevel))
+    {
+        perror("Couldn't initialising logging module:");
+        exit(1);
+    }
+    
+    LogModule(LOG_INFOV, MAIN, "Using adapter %d\n", adapterNumber);
+    LogModule(LOG_INFOV, MAIN, "Using startup script %s\n", startupFile);
 
     if (DaemonMode)
     {
@@ -473,9 +482,10 @@ int main(int argc, char *argv[])
 
     if (DaemonMode)
     {
-        DeinitDaemon();
+        DeInitDaemon();
     }
-
+    
+    LoggingDeInit();
     return 0;
 }
 
@@ -594,8 +604,6 @@ static void sighandler(int signum)
 *******************************************************************************/
 static void InitDaemon(int adapter)
 {
-    char *logdir = "/var/log";
-    char logfile[PATH_MAX];
     /* Our process ID and Session ID */
     pid_t pid, sid;
 
@@ -648,20 +656,10 @@ static void InitDaemon(int adapter)
     fclose(stdin);
     fclose(stdout);
     fclose(stderr);
-
-    sprintf(logfile, "%s/dvbstreamer-%d.err.log", logdir, adapter);
-    if (!freopen(logfile, "at", stderr))
-    {
-        logdir = DataDirectory;
-        sprintf(logfile, "%s/dvbstreamer-%d.err.log", DataDirectory, adapter);
-        freopen(logfile, "at", stderr);
-    }
-    sprintf(logfile, "%s/dvbstreamer-%d.out.log",logdir, adapter);
-    freopen(logfile, "at", stdout);
     DaemonMode = TRUE;
 }
 
-static void DeinitDaemon(void)
+static void DeInitDaemon(void)
 {
     /* Remove pid file */
     unlink(PidFile);

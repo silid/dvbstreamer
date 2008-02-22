@@ -23,6 +23,7 @@ Logging functions.
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <limits.h>
 #include <time.h>
 
 #include "main.h"
@@ -45,10 +46,49 @@ static void LogImpl(int level, const char *module, const char * format, va_list 
  */
 static int verbosity = 0;
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+static FILE *logFP = NULL;
 
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
+int LoggingInit(char *app, int adapter, int logLevel)
+{
+    char logFile[PATH_MAX];
+    char filename[NAME_MAX];
+
+    if (adapter >= 0)
+    {
+        sprintf(filename, "%s-%d.log", app, adapter);
+    }
+    else
+    {
+        sprintf(filename, "%s.log", app);
+    }
+    
+    /* Try /var/log first then users home directory */
+    sprintf(logFile, "/var/log/%s", filename);
+    logFP = fopen(logFile, "a");
+    if (logFP == NULL)
+    {
+        sprintf(logFile, "%s/%s", DataDirectory, filename);
+        logFP = fopen(logFile, "a");
+    }
+    if (logFP == NULL)
+    {
+        return -1;
+    }
+    /* Turn off buffering */
+    setbuf(logFP, NULL);
+
+    verbosity = logLevel;
+    return 0;
+}
+
+void LoggingDeInit(void)
+{
+    fclose(logFP);
+}
+
 void LogLevelSet(int level)
 {
     verbosity = level;
@@ -76,13 +116,17 @@ bool LogLevelIsEnabled(int level)
 
 void LogModule(int level, const char *module, char *format, ...)
 {
+    va_list valist;
+    va_start(valist, format);
+    if (level == 0)
+    {
+        vfprintf(stderr, format, valist);
+    }
     if (level <= verbosity)
     {
-        va_list valist;
-        va_start(valist, format);
         LogImpl(level, module, format, valist);
-        va_end(valist);
     }
+    va_end(valist);
 }
 /*******************************************************************************
 * Local Functions                                                              *
@@ -90,32 +134,22 @@ void LogModule(int level, const char *module, char *format, ...)
 
 static void LogImpl(int level, const char *module, const char * format, va_list valist)
 {
-    pthread_mutex_lock(&mutex);
-#ifdef LOGGING_CHECK_DAEMON
-    if (DaemonMode)
-    {
-        char buffer[24]; /* "YYYY-MM-DD HH:MM:SS" */
-        time_t curtime;
-        struct tm *loctime;
-        /* Get the current time. */
-        curtime = time (NULL);
-        /* Convert it to local time representation. */
-        loctime = localtime (&curtime);
-        /* Print it out in a nice format. */
-        strftime (buffer, sizeof(buffer), "%F %T : ", loctime);
-        fputs(buffer, stderr);
-    }
-#endif
+    char timeBuffer[24]; /* "YYYY-MM-DD HH:MM:SS" */
+    time_t curtime;
+    struct tm *loctime;
 
-    fprintf(stderr, "%-15s : %2d : ", module ? module:"<Unknown>", level);
+    pthread_mutex_lock(&mutex);
+
+    /* Get the current time. */
+    curtime = time (NULL);
+    /* Convert it to local time representation. */
+    loctime = localtime (&curtime);
+    /* Print it out in a nice format. */
+    strftime (timeBuffer, sizeof(timeBuffer), "%F %T : ", loctime);
+
+    fprintf(stderr, "%s %-15s : %2d : ", timeBuffer, module ? module:"<Unknown>", level);
 
     vfprintf(stderr, format, valist);
 
-#ifdef LOGGING_CHECK_DAEMON        
-    if (DaemonMode)
-    {
-        fflush(stderr);
-    }
-#endif        
     pthread_mutex_unlock(&mutex);
 }

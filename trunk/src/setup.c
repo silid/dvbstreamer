@@ -84,6 +84,7 @@ int main(int argc, char *argv[])
     int adapterNumber = 0;
     LNBInfo_t lnbInfo = {NULL,NULL,0,0,0};
     int rc;
+    int logLevel = 0;
     
     /* Create the data directory */
     sprintf(DataDirectory, "%s/.dvbstreamer", getenv("HOME"));
@@ -100,7 +101,7 @@ int main(int argc, char *argv[])
         switch (c)
         {
             case 'v':
-                LogLevelInc();
+                logLevel++;
                 break;
             case 'V':
                 version();
@@ -108,24 +109,20 @@ int main(int argc, char *argv[])
                 break;
             case 'a':
                 adapterNumber = atoi(optarg);
-                LogModule(LOG_INFOV, SETUP, "Using adapter %d\n", adapterNumber);
                 break;
                 /* Database initialisation options*/
 #if defined(ENABLE_DVB)
             case 't':
                 channelsFile = optarg;
                 channelsFileType = FE_OFDM;
-                LogModule(LOG_INFOV, SETUP, "Using DVB-T channels file %s\n", channelsFile);
                 break;
             case 's':
                 channelsFile = optarg;
                 channelsFileType = FE_QPSK;
-                LogModule(LOG_INFOV, SETUP, "Using DVB-S channels file %s\n", channelsFile);
                 break;
             case 'c':
                 channelsFile = optarg;
                 channelsFileType = FE_QAM;
-                LogModule(LOG_INFOV, SETUP, "Using DVB-C channels file %s\n", channelsFile);
                 break;
 #endif
 
@@ -133,7 +130,6 @@ int main(int argc, char *argv[])
             case 'A':
                 channelsFile = optarg;
                 channelsFileType = FE_ATSC;
-                LogModule(LOG_INFOV, SETUP, "Using ATSC channels file %s\n", channelsFile);
                 break;
 #endif
 
@@ -170,6 +166,12 @@ int main(int argc, char *argv[])
         }
     }
 
+    if (LoggingInit("setupdvbstreamer", LOGGING_NO_ADAPTER, logLevel))
+    {
+        perror("Couldn't initialising logging module:");
+        exit(1);
+    }
+    
 #if defined(ENABLE_DVB)
     if ((channelsFileType == FE_QPSK) && (lnbInfo.lowFrequency == 0))
     {
@@ -223,7 +225,7 @@ int main(int argc, char *argv[])
     DEINIT(MultiplexDeinit(), "multiplex");
     DEINIT(DBaseDeInit(), "database");
     DEINIT(ObjectDeinit(), "objects");
-
+    LoggingDeInit();
     return 0;
 }
 

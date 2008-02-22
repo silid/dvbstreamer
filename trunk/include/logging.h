@@ -57,6 +57,28 @@ Logging levels and functions.
 #define LOG_DIARRHEA 10
 
 /**
+ * @internal
+ * Constant for use when initialising the module to indicate no adapter specific log file.
+ */
+#define LOGGING_NO_ADAPTER -1
+
+/**
+ * @internal 
+ * Initialises logging.
+ * @param app Application name.
+ * @param adapter The DVB adapter number or LOGGING_NO_ADAPTER for no per adapter log.
+ * @param logLevel The initial logging/verbosity level.
+ * @return 0 on success.
+ */
+int LoggingInit(char *app, int adapter, int logLevel);
+
+/**
+ * @internal
+ * Deinitialise logging.
+ */
+void LoggingDeInit(void);
+
+/**
  * Set the current logging level.
  * @param level The new level to set.
  */
