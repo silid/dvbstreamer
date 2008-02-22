@@ -20,7 +20,6 @@ logging.h
 Logging functions.
 
 */
-#define _GNU_SOURCE
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -50,7 +49,6 @@ static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
-
 void LogLevelSet(int level)
 {
     verbosity = level;

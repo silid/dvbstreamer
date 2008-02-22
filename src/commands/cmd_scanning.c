@@ -20,7 +20,6 @@ scanning.c
 Command functions related to scanning multiplex and frequency bands.
 
 */
-#define _GNU_SOURCE
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>

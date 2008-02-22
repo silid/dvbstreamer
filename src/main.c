@@ -20,7 +20,6 @@ main.c
 Entry point to the application.
 
 */
-#define _GNU_SOURCE
 #include "config.h"
 
 #include <limits.h>

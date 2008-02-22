@@ -20,7 +20,6 @@ commands.c
 Command Processing and command functions.
 
 */
-#define _GNU_SOURCE
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>

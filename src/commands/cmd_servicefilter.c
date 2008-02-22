@@ -20,7 +20,6 @@ servicefilter.c
 Command functions for service filter related tasks
 
 */
-#define _GNU_SOURCE
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>

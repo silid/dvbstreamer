@@ -21,7 +21,6 @@ Control tuning of the dvb adapter.
 
 */
 #include "config.h"
-#define _GNU_SOURCE
 #include <stdio.h>
 #include "main.h"
 #include "tuning.h"
