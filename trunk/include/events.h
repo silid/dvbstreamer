@@ -47,6 +47,7 @@ Events management functions
  *
  * \subsection unregistered Events.Unregistered
  * This event is fired just before the event is removed from the source. \n
+ * \par
  * \c payload = The event being unregistered.
  *@{
  */

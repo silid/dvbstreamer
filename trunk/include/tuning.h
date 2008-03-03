@@ -45,11 +45,13 @@ Frontend Tuner control.
  * \li \ref multiplexchanged Fired when the current multiplex changes.
  *
  * \subsection servicechanged Tuning.ServiceChanged
- *  Fired when the primary service filter service is changed. \n
- *  \c payload = The new Service_t. \n
+ * Fired when the primary service filter service is changed. \n
+ * \par 
+ * \c payload = The new Service_t. \n
  *
  * \subsection multiplexchanged Tuning.MultiplexChanged
  * Fired when the tuned multiplex changes. \n
+ * \par 
  * \c payload = The new Multiplex_t.
  * @{
  */
