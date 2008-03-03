@@ -162,6 +162,8 @@ void DVBDispose(DVBAdapter_t *adapter)
     {
         LogModule(LOG_DEBUGV, DVBADAPTER, "Closing Frontend file descriptor\n");
         close(adapter->frontEndFd);
+        LogModule(LOG_DEBUGV, DVBADAPTER, "Closed Frontend file descriptor\n");
+        adapter->frontEndFd = -1;
     }
 #ifdef __CYGWIN__         
     pthread_mutex_destroy(&tuningMutex);
@@ -578,7 +580,7 @@ static void *DVBFrontEndMonitor(void *arg)
     bool locked;
     struct pollfd pfd[1];
 
-    pfd[0].fd = adapter->monitorFrontEndFd;
+    pfd[0].fd = adapter->frontEndFd;
     pfd[0].events = POLLIN;
 
     /* Read initial status */

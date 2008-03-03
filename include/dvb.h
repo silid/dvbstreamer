@@ -107,8 +107,6 @@ typedef struct DVBAdapter_t
                                            portion of the transport stream */
     pthread_t monitorThread;          /**< Thread monitoring the lock state of the frontend. */
     bool monitorExit;                 /**< Boolean to exit monitor thread. */
-    int monitorFrontEndFd;            /**< File descriptor used to monitor status */
-                                          
 }
 DVBAdapter_t;
 
