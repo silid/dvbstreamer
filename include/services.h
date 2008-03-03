@@ -35,6 +35,22 @@ Manage services and PIDs.
 
 /**
  * @defgroup Service Service information
+ * Provides access to the underlying database to add/remove and modify services.
+ *
+ * \section events Events Exported
+ *
+ * \li \ref added Sent when a new service is added to the database.
+ * \li \ref deleted Sent when a service is removed from the database.
+ *
+ * \subsection added Services.Added
+ * This event is fired after a service has been added to the database. \n
+ * \par
+ * \c payload = A Service_t representing the service that has been added.
+ *
+ * \subsection deleted Services.Deleted
+ * This event is fired before a service is removed from the database. \n
+ * \par
+ * \c payload = A Service_t representing the service that is to be removed.
  * @{
  */
 

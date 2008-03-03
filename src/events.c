@@ -102,6 +102,8 @@ int EventsInit(void)
 
 int EventsDeInit(void)
 {
+    eventsSource = NULL;
+    eventUnregistered = NULL;
     ListFree(sourcesList, (void(*)(void*)) EventSourceFree);
     ListFree(globalListenersList, (void(*)(void*)) EventListenerDetailsFree);
     return 0;
@@ -303,7 +305,7 @@ static void EventSourceFree(EventSource_t source)
 
 static void EventFree(Event_t event)
 {
-    if (event != eventUnregistered)
+    if ((eventUnregistered) && (event != eventUnregistered))
     {
         EventsFireEventListeners(eventUnregistered, event);
     }

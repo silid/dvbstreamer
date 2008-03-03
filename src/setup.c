@@ -37,6 +37,7 @@ Setups the database for the main application.
 #include "services.h"
 #include "main.h"
 #include "logging.h"
+#include "events.h"
 #include "lnb.h"
 
 /*******************************************************************************
@@ -181,6 +182,7 @@ int main(int argc, char *argv[])
 #endif
 
     INIT(ObjectInit(), "objects");
+    INIT(EventsInit(), "events");
     INIT(DBaseInit(adapterNumber), "database");
     INIT(MultiplexInit(), "multiplex");
     INIT(ServiceInit(), "service");
@@ -224,6 +226,7 @@ int main(int argc, char *argv[])
     DEINIT(ServiceDeinit(), "service");
     DEINIT(MultiplexDeinit(), "multiplex");
     DEINIT(DBaseDeInit(), "database");
+    DEINIT(EventsDeInit(), "events");
     DEINIT(ObjectDeinit(), "objects");
     LoggingDeInit();
     return 0;

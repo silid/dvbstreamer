@@ -129,6 +129,8 @@ setupdvbstreamer_SOURCES = \
     services.c\
     dbase.c \
     objects.c \
+    events.c \
+    list.c \
     lnb.c
 
 setupdvbstreamer_LDFLAGS =
