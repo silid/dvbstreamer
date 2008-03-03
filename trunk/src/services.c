@@ -28,6 +28,7 @@ Manage services and PIDs.
 #include "multiplexes.h"
 #include "services.h"
 #include "logging.h"
+#include "events.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -50,6 +51,15 @@ Manage services and PIDs.
 *******************************************************************************/
 
 static void ServiceDestructor(void * arg);
+static char *ServiceEventToString(Event_t event,void * payload);
+
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
+
+static EventSource_t servicesSource;
+static Event_t serviceAddedEvent;
+static Event_t serviceDeletedEvent;
 
 /*******************************************************************************
 * Global functions                                                             *
@@ -57,11 +67,20 @@ static void ServiceDestructor(void * arg);
 
 int ServiceInit(void)
 {
-    return  ObjectRegisterTypeDestructor(Service_t, ServiceDestructor);
+    int result = 0;   
+    result = ObjectRegisterTypeDestructor(Service_t, ServiceDestructor);
+    if (!result)
+    {
+        servicesSource = EventsRegisterSource("Services");
+        serviceAddedEvent = EventsRegisterEvent(servicesSource, "Added", ServiceEventToString);
+        serviceDeletedEvent = EventsRegisterEvent(servicesSource, "Deleted", ServiceEventToString);
+    }
+    return  result;
 }
 
 int ServiceDeinit(void)
 {
+    EventsUnregisterSource(servicesSource);
     return 0;
 }
 
@@ -87,6 +106,8 @@ int ServiceDelete(Service_t  *service)
 {
     STATEMENT_INIT;
 
+    EventsFireEventListeners(serviceDeletedEvent, service);
+    
     STATEMENT_PREPAREVA("DELETE FROM " SERVICES_TABLE " "
                         "WHERE " SERVICE_MULTIPLEXUID "=%d AND " SERVICE_ID "=%d;",
                         service->multiplexUID, service->id);
@@ -101,6 +122,8 @@ int ServiceDelete(Service_t  *service)
 int ServiceAdd(int uid, char *name, int id, int source, bool ca, ServiceType type, 
                     int pmtversion, int pmtpid, int pcrpid)
 {
+    Service_t *service = NULL;
+
     STATEMENT_INIT;
 
     STATEMENT_PREPAREVA("INSERT INTO "SERVICES_TABLE "("
@@ -121,6 +144,21 @@ int ServiceAdd(int uid, char *name, int id, int source, bool ca, ServiceType typ
     RETURN_RC_ON_ERROR;
 
     STATEMENT_FINALIZE();
+
+    /* Create a service object to send in the event. */
+    service = ServiceNew();
+    service->multiplexUID = uid;
+    service->id = id;
+    service->name = strdup(name);
+    service->source = source;
+    service->conditionalAccess = ca;
+    service->type = type;
+    service->pmtVersion = pmtversion;
+    service->pmtPid = pmtpid;
+    service->pcrPid = pcrpid;
+    EventsFireEventListeners(serviceAddedEvent, service);
+    ServiceRefDec(service);
+    
     return 0;
 }
 
@@ -586,4 +624,11 @@ static void ServiceDestructor(void * arg)
     }
 }
 
+static char *ServiceEventToString(Event_t event,void * payload)
+{
+    char *result=NULL;
+    Service_t *service = payload;
+    asprintf(&result, "%d %04x %s",service->multiplexUID, service->id, service->name);
+    return result;
+}
 

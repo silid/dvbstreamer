@@ -23,12 +23,46 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 #ifndef _DVB_H
 #define _DVB_H
 #include <stdint.h>
+#include <pthread.h>
 #include <linux/dvb/dmx.h>
 #include <linux/dvb/frontend.h>
+
 #include "types.h"
 
 /**
  * @defgroup DVBAdapter DVB Adapter access
+ * The dvb module provides access to the linuxdvb API via a simple adapter model
+ * that encompasses the frontend/demux/dvr device into one object.
+ * By default the entire transport stream is routed to the DVR device, although
+ * for hardware restricted devices it is possible to allocate PID filters that 
+ * are routed to the DVR device.
+ * These PID filters are grouped into system and application filters, making it 
+ * easier to release a specific set of PID filters that are being used to filter
+ * a service say.
+ *
+ * \section events Events Exported
+ *
+ * \li \ref locked Sent when the frontend acquires a signal lock.
+ * \li \ref unlocked Sent when the frontend loses signal lock.
+ * \li \ref tuneFailed Sent when the frontend fails to tune.
+ *
+ * \subsection locked DVBAdapter.Locked
+ * This event is fired from the DVBAdapter monitor thread when it detects that 
+ * the frontend has acquired a signal lock. \n
+ * \par 
+ * \c payload = The adapter that has locked.
+ *
+ * \subsection unlocked DVBAdapter.Unlocked
+ * This event is fired from the DVBAdapter monitor thread when it detects that 
+ * the frontend has lost signal lock. \n
+ * \par 
+ * \c payload = The adapter that has lost locked.
+ *
+ * \subsection tuneFailed DVBAdapter.TuneFailed
+ * This event is fired when the frontend fails to tune, for example parameters 
+ * out of range etc. \n
+ * \par
+ * \c payload = The adapter that failed to tune.
  * @{
  */
 /**
@@ -71,6 +105,10 @@ typedef struct DVBAdapter_t
 
     bool hardwareRestricted;          /**< Whether the adapter can only stream a
                                            portion of the transport stream */
+    pthread_t monitorThread;          /**< Thread monitoring the lock state of the frontend. */
+    bool monitorExit;                 /**< Boolean to exit monitor thread. */
+    int monitorFrontEndFd;            /**< File descriptor used to monitor status */
+                                          
 }
 DVBAdapter_t;
 
