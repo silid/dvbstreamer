@@ -111,7 +111,7 @@ void *ObjectCreateImpl(char *classname, char *file, int line);
 
 /**
  * Increment the reference count for the specified object.
- * @note This is the function should not be used instead the macro ObjectRefInc should be used. 
+ * @note This function should not be used instead the macro ObjectRefInc should be used. 
  * @param ptr Pointer to the object to increment the ref. count of.
  * @param file The file this function is being called from.
  * @param line The line this function is being called from. 
@@ -128,7 +128,7 @@ void ObjectRefIncImpl(void *ptr, char *file, int line);
 
 /**
  * Decrement the reference count for the specified object. If the reference count
- * @note This is the function should not be used instead the macro ObjectRefDec should be used. 
+ * @note This function should not be used instead the macro ObjectRefDec should be used. 
  * @param ptr Pointer to the object to decrement the ref. count of.
  * @param file The file this function is being called from.
  * @param line The line this function is being called from. 
@@ -136,17 +136,57 @@ void ObjectRefIncImpl(void *ptr, char *file, int line);
 bool ObjectRefDecImpl(void *ptr, char *file, int line);
 
 /**
+ * Retrieve the current reference count of the specific object.
+ * @param ptr Pointer to the object to get the reference count of.
+ * @return The reference count of the object.
+ */
+int ObjectRefCount(void *ptr);
+
+/**
+ * Queries the supplied pointer to determine if it is an object instance.
+ * @param ptr Pointer to check to see if it is an object pointer.
+ * @return True if the pointer is an object pointer, false otherwise.
+ */
+bool ObjectIsObject(void *ptr);
+
+/**
+ * Queries the supplied object pointer to determine the class of the object.
+ * @param ptr Pointer to check.
+ * @return The name of the class of the object or NULL if a alloc'ed block.
+ */
+char *ObjectGetObjectClass(void * ptr);
+
+/**
  * Replacement for malloc, with the addition that it also clears the memory to zero.
- * @param size Size of the block to allocated.
+ * @param _size Size of the block to allocated.
  * @return Pointer to the new memory block or NULL.
  */
-void *ObjectAlloc(int size);
+#define ObjectAlloc(_size) ObjectAllocImpl(_size, __FILE__, __LINE__)
+
+/**
+ * Replacement for malloc  with the addition that it also clears the memory to zero.
+ * @note This function should not be used instead the macro ObjectAlloc should be used. 
+ * @param size Size of the block to allocated.
+ * @param file The file this function is being called from.
+ * @param line The line this function is being called from.  
+ * @return Pointer to the new memory block or NULL.
+ */
+void *ObjectAllocImpl(int size, char * file, int line);
 
 /**
  * Replacement for free. Releases memory previously allocated by ObjectAlloc.
- * @param ptr The memory block to free.
+ * @param _ptr The memory block to free.
  */
-void ObjectFree(void *ptr);
+#define ObjectFree(_ptr) ObjectFreeImpl(_ptr, __FILE__, __LINE__)
+
+/**
+ * Replacement for free. Releases memory previously allocated by ObjectAlloc.
+ * @note This function should not be used instead the macro ObjectFree should be used.  
+ * @param _ptr The memory block to free.
+ * @param file The file this function is being called from.
+ * @param line The line this function is being called from.   
+ */
+void ObjectFreeImpl(void * ptr, char * file, int line);
 
 /**
  * Print out debugging information about the object.
