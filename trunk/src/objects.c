@@ -74,7 +74,7 @@ typedef struct Object_s {
 * Prototypes                                                                   *
 *******************************************************************************/
 static Class_t *FindClass(char *classname);
-void *ObjectAllocImpl(int size, Class_t *clazz);
+static void *ObjectAllocInstance(int size, Class_t *clazz);
 static void RemoveReferencedObject(Object_t *toRemove);
 
 
@@ -181,7 +181,7 @@ void *ObjectCreateImpl(char *classname, char *file, int line)
         return NULL;
     }
 
-    result = ObjectAllocImpl(clazz->size, clazz);
+    result = ObjectAllocInstance(clazz->size, clazz);
     if (result != NULL)
     {
         LogModule(LOG_DEBUGV, OBJECT, "(%p) Created object of class \"%s\" app ptr %p (%s:%d)\n", DataToObject(result), classname, result, file, line);
@@ -273,7 +273,7 @@ bool ObjectRefDecImpl(void *ptr, char *file, int line)
     return result;
 }
 
-void *ObjectAlloc(int size)
+void *ObjectAllocImpl(int size, char *file, int line)
 {
     void *result;
 #ifdef USE_MALLOC_FOR_ALLOC
@@ -285,17 +285,17 @@ void *ObjectAlloc(int size)
 #else
     pthread_mutex_lock(&objectMutex);
 
-    result = ObjectAllocImpl(size, NULL);
+    result = ObjectAllocInstance(size, NULL);
     if (result != NULL)
     {
-        LogModule(LOG_DEBUGV, OBJECT,"(%p) Malloc'ed memory size %d app ptr %p\n", DataToObject(result), size, result);
+        LogModule(LOG_DEBUGV, OBJECT,"(%p) Malloc'ed memory size %d app ptr %p (%s:%d)\n", DataToObject(result), size, result, file, line);
     }
     pthread_mutex_unlock(&objectMutex);
 #endif
     return result;
 }
 
-void *ObjectAllocImpl(int size, Class_t *clazz)
+static void *ObjectAllocInstance(int size, Class_t *clazz)
 {
     Object_t *result = NULL;
 
@@ -318,7 +318,7 @@ void *ObjectAllocImpl(int size, Class_t *clazz)
     return ObjectToData(result);
 }
 
-void ObjectFree(void *ptr)
+void ObjectFreeImpl(void *ptr, char *file, int line)
 {
 #ifdef USE_MALLOC_FOR_ALLOC
     free(ptr);
@@ -328,8 +328,7 @@ void ObjectFree(void *ptr)
     OBJECTS_ASSERT(object->clazz == NULL, "Attempt to free a class based object! (%p class %s)\n", ptr, object->clazz->name);
 
     OBJECTS_ASSERT(object->refCount == 1, "Attempt to free a memory area with a reference count > 1 (%d)\n", object->refCount);
-    
-    ObjectRefDec(ptr);
+    ObjectRefDecImpl(ptr, file, line);
 #endif    
 }
 
@@ -345,6 +344,41 @@ void ObjectDump(void *ptr)
         LogModule(LOG_DEBUG, OBJECT, "Malloc'ed(%p) size %u app ptr %p ref count %u\n",object, object->size, ptr, object->refCount);
     }
 }
+
+bool ObjectIsObject(void *ptr)
+{
+    Object_t *object;
+    Object_t *possibleObject = DataToObject(ptr);
+
+    for (object = referencedObjects; object; object = object->next)
+    {
+        if (object == possibleObject)
+        {
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+char * ObjectGetObjectClass(void *ptr)
+{
+    char *classname = NULL;
+     Object_t *object = DataToObject(ptr);   
+     if (object->clazz)
+     {
+        classname = object->clazz->name;
+     }
+
+    return classname;
+}
+
+int ObjectRefCount(void *ptr)
+{
+    Object_t *object = DataToObject(ptr);
+    return object->refCount;
+}
+
 /*******************************************************************************
 * Local Functions                                                              *
 *******************************************************************************/
