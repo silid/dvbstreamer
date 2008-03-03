@@ -217,8 +217,10 @@ int main(int argc, char *argv[])
     }
     
     LogModule(LOG_INFOV, MAIN, "Using adapter %d\n", adapterNumber);
-    LogModule(LOG_INFOV, MAIN, "Using startup script %s\n", startupFile);
-
+    if (startupFile)
+    {
+        LogModule(LOG_INFOV, MAIN, "Using startup script %s\n", startupFile);
+    }
     if (DaemonMode)
     {
         if (startupFile && (startupFile[0] != '/'))
@@ -419,6 +421,11 @@ int main(int argc, char *argv[])
     SectionProcessorDestroyAllProcessors();
     PESProcessorDestroyAllProcessors();
 
+    /* Stop the deferred processing as when we unload the plugins we may be 
+     * unloading code that is required by any jobs left on the queue 
+     */
+    DEINIT(DeferredProcessingDeinit(), "deferred processing");
+
     /* Destroy all delivery method instances before shutting down the plugins.
      * We do this as although there may be instances being used by plugins,
      * we do not know the order the plugins will be shutdown. This may mean the
@@ -427,6 +434,8 @@ int main(int argc, char *argv[])
     DeliveryMethodDestroyAll();
 
     DEINIT(PluginManagerDeInit(), "plugin manager");
+
+    DEINIT(DeliveryMethodManagerDeInit(), "delivery method manager");
 
     DEINIT(TuningDeInit(), "tuning");
 
@@ -469,8 +478,7 @@ int main(int argc, char *argv[])
     /* Close the adapter and shutdown the filter etc*/
     DEINIT(TSFilterDestroy(TSFilter), "TS filter");
     DEINIT(DVBDispose(DVBAdapter), "DVB adapter");
-    DEINIT(DeferredProcessingDeinit(), "deferred processing");
-    DEINIT(DeliveryMethodManagerDeInit(), "delivery method manager");
+    
     DEINIT(CacheDeInit(), "cache");    
 
     DEINIT(ServiceDeinit(), "service");
