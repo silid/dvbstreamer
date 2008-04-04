@@ -143,9 +143,9 @@ EventSource_t EventsRegisterSource(char *name)
 void EventsUnregisterSource(EventSource_t source)
 {
     pthread_mutex_lock(&eventsMutex);
+    LogModule(LOG_DEBUG, EVENTS, "Event source unregistered (%s)\n", source->name);
     ListRemove(sourcesList, source);
     EventSourceFree(source);
-    LogModule(LOG_DEBUG, EVENTS, "Event source unregistered (%s)\n", source->name);
     pthread_mutex_unlock(&eventsMutex);
 }
 
@@ -203,9 +203,9 @@ Event_t EventsRegisterEvent(EventSource_t source, char *name, EventToString_t to
 void EventsUnregisterEvent(Event_t event)
 {
    pthread_mutex_lock(&eventsMutex);
+   LogModule(LOG_DEBUG, EVENTS, "Event unregistered (%s.%s)\n", event->source->name, event->name);   
    ListRemove(event->source->events, event);
    EventFree(event);
-   LogModule(LOG_DEBUG, EVENTS, "Event unregistered (%s.%s)\n", event->source->name, event->name);   
    pthread_mutex_unlock(&eventsMutex);
 }
 
