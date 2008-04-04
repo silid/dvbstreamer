@@ -26,31 +26,58 @@ EPG Database Functions and structures.
 #include <time.h>
 #include "types.h"
 
+/**
+ * @defgroup EPGDB EPG Database
+ * This module is used to hold all EPG information for an adapter.\n
+ * Event information older than 24 hours is removed by a thread that runs every 
+ * hour.
+ * @{
+ */
+
+/**
+ * Constant for an events title.
+ */
 #define EPG_EVENT_DETAIL_TITLE       "title"
+
+/**
+ * Constant for an events descripton.
+ */
 #define EPG_EVENT_DETAIL_DESCRIPTION "description"
 
+/**
+ * Structure used to identify a service in the EPG database.
+ */
 typedef struct EPGServiceRef_s
 {
-    unsigned int netId;
-    unsigned int tsId;
-    unsigned int serviceId;
+    unsigned int netId;     /**< Original network id. */
+    unsigned int tsId;      /**< Transport stream id. */
+    unsigned int serviceId; /**< Service id. */
 }EPGServiceRef_t;
 
+/** 
+ * Structure used to describe an EPG event.
+ */
 typedef struct EPGEvent_s
 {
-    EPGServiceRef_t serviceRef;
-    unsigned int eventId;
-    struct tm    startTime;
-    struct tm    endTime;
-    bool         ca;
+    EPGServiceRef_t serviceRef; /**< Service the event is happening on. */
+    unsigned int eventId;       /**< Event id. */
+    struct tm    startTime;     /**< Start time of the event.*/
+    struct tm    endTime;       /**< Finish time of the event. */
+    bool         ca;            /**< Whether the event is encrypted. */
 }EPGEvent_t;
 
+/**
+ * Structure describing a rating for an event.
+ */
 typedef struct EPGEventRating_s
 {
-    char *system;
-    char *rating;
+    char *system; /**< System the rating pertains to. */
+    char *rating; /**< Rating of the event. */
 }EPGEventRating_t;
 
+/**
+ * Structure describing a detail of an event.
+ */
 typedef struct EPGEventDetail_s
 {
     char lang[4]; /**< 3 character language code + \0 */
@@ -58,9 +85,22 @@ typedef struct EPGEventDetail_s
     char *value;  /**< The actual information. */
 }EPGEventDetail_t;
 
+/**
+ * Handle to enumerate events.
+ */
 typedef void *EPGDBaseEnumerator_t;
 
+/**
+ * @internal
+ * Initialises the EPG database for a specific adapter.
+ * @param adapter The adapter number to initialise the database for.
+ * @returns 0 on success.
+ */
 int EPGDBaseInit(int adapter);
+/**
+ * @internal
+ * Deinitialises the EPG database.
+ */
 int EPGDBaseDeInit(void);
 
 int EPGDBaseTransactionStart(void);
@@ -88,4 +128,6 @@ EPGDBaseEnumerator_t EPGDBaseDetailGet(EPGServiceRef_t *serviceRef, unsigned int
 EPGDBaseEnumerator_t EPGDBaseDetailEnumeratorGet(EPGServiceRef_t *serviceRef, unsigned int eventId);
 EPGEventDetail_t *EPGDBaseDetailGetNext(EPGDBaseEnumerator_t enumerator);
 void EPGDBaseEnumeratorDestroy(EPGDBaseEnumerator_t enumerator);
+
+/**@}*/
 #endif
