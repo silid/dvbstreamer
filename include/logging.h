@@ -57,21 +57,25 @@ Logging levels and functions.
 #define LOG_DIARRHEA 10
 
 /**
- * @internal
- * Constant for use when initialising the module to indicate no adapter specific log file.
- */
-#define LOGGING_NO_ADAPTER -1
-
-/**
  * @internal 
- * Initialises logging.
- * @param app Application name.
- * @param adapter The DVB adapter number or LOGGING_NO_ADAPTER for no per adapter log.
+ * Initialises logging, by first attempting to create the log file in /var/log, 
+ * then if unsuccessful in ~/.dvbstreamer
+ 
+ * @param filename Name of the log file to create.
  * @param logLevel The initial logging/verbosity level.
  * @return 0 on success.
  */
-int LoggingInit(char *app, int adapter, int logLevel);
+int LoggingInit(char *filename, int logLevel);
 
+/**
+ * @internal
+ * Initialises logging by using the file path specified as the log file.
+ * @param filepath File path of the file to use for logging.
+ * @param logLevel The initial logging/verbosity level.
+ * @return 0 on success.
+ */
+int LoggingInitFile(char *filename, int logLevel); 
+ 
 /**
  * @internal
  * Deinitialise logging.

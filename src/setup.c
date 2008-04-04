@@ -86,6 +86,7 @@ int main(int argc, char *argv[])
     LNBInfo_t lnbInfo = {NULL,NULL,0,0,0};
     int rc;
     int logLevel = 0;
+    char logFilename[PATH_MAX] = {0};
     
     /* Create the data directory */
     sprintf(DataDirectory, "%s/.dvbstreamer", getenv("HOME"));
@@ -94,7 +95,7 @@ int main(int argc, char *argv[])
     while (TRUE)
     {
         int c;
-        c = getopt(argc, argv, "vVdro:a:t:s:c:A:l:h");
+        c = getopt(argc, argv, "vVdro:a:t:s:c:A:l:hL:");
         if (c == -1)
         {
             break;
@@ -103,6 +104,8 @@ int main(int argc, char *argv[])
         {
             case 'v':
                 logLevel++;
+                break;
+            case 'L': strcpy(logFilename, optarg);
                 break;
             case 'V':
                 version();
@@ -167,11 +170,24 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (LoggingInit("setupdvbstreamer", LOGGING_NO_ADAPTER, logLevel))
+    if (logFilename[0])
     {
-        perror("Couldn't initialising logging module:");
-        exit(1);
+        if (LoggingInitFile(logFilename, logLevel))
+        {
+            perror("Could not open user specified log file:");
+            exit(1);
+        }
     }
+    else
+    {
+        sprintf(logFilename, "setupdvbstreamer-%d.log", adapterNumber);
+        if (LoggingInit(logFilename, logLevel))
+        {
+            perror("Couldn't initialising logging module:");
+            exit(1);
+        }
+    }
+
     
 #if defined(ENABLE_DVB)
     if ((channelsFileType == FE_QPSK) && (lnbInfo.lowFrequency == 0))
@@ -241,6 +257,7 @@ static void usage(char *appname)
             "      Options:\n"
             "      -v            : Increase the amount of debug output, can be used multiple\n"
             "                      times for more output\n"
+            "      -L <file>     : Set the location of the log file.\n"            
             "      -V            : Print version information then exit\n"
             "\n"
             "      -a <adapter>  : Use adapter number (ie /dev/dvb/adapter<adapter>/...)\n"
