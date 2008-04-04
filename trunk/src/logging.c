@@ -23,6 +23,7 @@ Logging functions.
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
 #include <limits.h>
 #include <time.h>
 
@@ -51,27 +52,38 @@ static FILE *logFP = NULL;
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
-int LoggingInit(char *app, int adapter, int logLevel)
+int LoggingInitFile(char *filepath, int logLevel)
 {
-    char logFile[PATH_MAX];
-    char filename[NAME_MAX];
-
-    if (adapter >= 0)
+    if (strcmp(filepath, "-") == 0)
     {
-        sprintf(filename, "%s-%d.log", app, adapter);
+        logFP = stderr;
     }
     else
     {
-        sprintf(filename, "%s.log", app);
+        logFP = freopen(filepath, "a", stderr);
+        if (logFP == NULL)
+        {
+            return -1;
+        }
+        
+        /* Turn off buffering */
+        setbuf(logFP, NULL);
     }
+    verbosity = logLevel;
+    return 0;
+}
+
+int LoggingInit(char *filename, int logLevel)
+{
+    char logFile[PATH_MAX];
     
     /* Try /var/log first then users home directory */
     sprintf(logFile, "/var/log/%s", filename);
-    logFP = fopen(logFile, "a");
+    logFP = freopen(logFile, "a", stderr);
     if (logFP == NULL)
     {
         sprintf(logFile, "%s/%s", DataDirectory, filename);
-        logFP = fopen(logFile, "a");
+        logFP = freopen(logFile, "a", stderr);
     }
     if (logFP == NULL)
     {
@@ -83,7 +95,7 @@ int LoggingInit(char *app, int adapter, int logLevel)
     verbosity = logLevel;
     return 0;
 }
-
+    
 void LoggingDeInit(void)
 {
     fclose(logFP);

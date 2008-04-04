@@ -145,6 +145,7 @@ int main(int argc, char *argv[])
     PIDFilter_t *primaryServiceFilter = NULL;
     DeliveryMethodInstance_t *dmInstance;
     PIDFilter_t *PIDFilters[MAX_PIDFILTERS];
+    char logFilename[PATH_MAX] = {0};
     
     /* Create the data directory */
     sprintf(DataDirectory, "%s/.dvbstreamer", getenv("HOME"));
@@ -155,7 +156,7 @@ int main(int argc, char *argv[])
     while (!ExitProgram)
     {
         int c;
-        c = getopt(argc, argv, "vVdDro:a:f:u:p:n:F:i:R");
+        c = getopt(argc, argv, "vVdDro:a:f:u:p:n:F:i:RL:");
         if (c == -1)
         {
             break;
@@ -163,6 +164,8 @@ int main(int argc, char *argv[])
         switch (c)
         {
                 case 'v': logLevel ++;
+                break;
+                case 'L': strcpy(logFilename, optarg);
                 break;
                 case 'V':
                 version();
@@ -210,17 +213,6 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    if (LoggingInit("dvbstreamer", adapterNumber, logLevel))
-    {
-        perror("Couldn't initialising logging module:");
-        exit(1);
-    }
-    
-    LogModule(LOG_INFOV, MAIN, "Using adapter %d\n", adapterNumber);
-    if (startupFile)
-    {
-        LogModule(LOG_INFOV, MAIN, "Using startup script %s\n", startupFile);
-    }
     if (DaemonMode)
     {
         if (startupFile && (startupFile[0] != '/'))
@@ -231,6 +223,31 @@ int main(int argc, char *argv[])
         }
         InitDaemon( adapterNumber);
     }
+
+    if (logFilename[0])
+    {
+        if (LoggingInitFile(logFilename, logLevel))
+        {
+            perror("Could not open user specified log file:");
+            exit(1);
+        }
+    }
+    else
+    {
+        sprintf(logFilename, "dvbstreamer-%d.log", adapterNumber);
+        if (LoggingInit(logFilename, logLevel))
+        {
+            perror("Couldn't initialising logging module:");
+            exit(1);
+        }
+    }
+    
+    LogModule(LOG_INFOV, MAIN, "Using adapter %d\n", adapterNumber);
+    if (startupFile)
+    {
+        LogModule(LOG_INFOV, MAIN, "Using startup script %s\n", startupFile);
+    }
+    
 
     if (primaryMRL == NULL)
     {
@@ -544,6 +561,7 @@ static void usage(char *appname)
             "      Options:\n"
             "      -v            : Increase the amount of debug output, can be used multiple\n"
             "                      times for more output\n"
+            "      -L <file>     : Set the location of the log file.\n"
             "      -V            : Print version information then exit\n"
             "      -o <mrl>      : Output primary service to the specified mrl.\n"
             "      -a <adapter>  : Use adapter number (ie /dev/dvb/adapter<adapter>/...)\n"
@@ -647,7 +665,7 @@ static void InitDaemon(int adapter)
     sid = setsid();
     if (sid < 0)
     {
-        LogModule(LOG_ERROR, MAIN, "setsid failed\n");
+        perror("setsid failed while going into daemon mode");
         /* Log the failure */
         exit(1);
     }
@@ -655,7 +673,7 @@ static void InitDaemon(int adapter)
     /* Change the current working directory */
     if ((chdir("/")) < 0)
     {
-        LogModule(LOG_ERROR, MAIN, "chdir failed\n");
+        perror("chdir failed while going into daemon mode");
         /* Log the failure */
         exit(1);
     }

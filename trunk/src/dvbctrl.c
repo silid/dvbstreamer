@@ -94,6 +94,7 @@ int main(int argc, char *argv[])
     int errno;
     char *errmsg;
     int logLevel = 0;
+    char logFilename[PATH_MAX] = {0};
 
     /* Create the data directory */
     sprintf(DataDirectory, "%s/.dvbstreamer", getenv("HOME"));
@@ -102,7 +103,7 @@ int main(int argc, char *argv[])
     while (TRUE)
     {
         int c;
-        c = getopt(argc, argv, "vVh:a:u:p:f:");
+        c = getopt(argc, argv, "vVh:a:u:p:f:L:");
         if (c == -1)
         {
             break;
@@ -112,6 +113,8 @@ int main(int argc, char *argv[])
             case 'v':
                 logLevel++;
                 break;
+            case 'L': strcpy(logFilename, optarg);
+                break;                
             case 'V':
                 version();
                 exit(0);
@@ -136,11 +139,29 @@ int main(int argc, char *argv[])
                 exit(1);
         }
     }
-    
-    if (LoggingInit("dvbctrl", adapterNumber, logLevel))
+    if (logFilename[0])
     {
-        perror("Couldn't initialising logging module:");
-        exit(1);
+        if (LoggingInitFile(logFilename, logLevel))
+        {
+            perror("Could not open user specified log file:");
+            exit(1);
+        }
+    }
+    else
+    {
+        if (strcmp(host, "localhost") == 0)
+        {
+            sprintf(logFilename, "dvbctrl-%d.log", adapterNumber);
+        }
+        else
+        {
+            sprintf(logFilename, "dvbctrl-%s-%d.log", host, adapterNumber);
+        }
+        if (LoggingInit(logFilename, logLevel))
+        {
+            perror("Couldn't initialising logging module:");
+            exit(1);
+        }
     }
 
     LogModule(LOG_INFOV, DVBCTRL, "Will connect to host %s adapter %d\n", host, adapterNumber);
