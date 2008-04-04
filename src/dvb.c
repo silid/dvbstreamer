@@ -577,22 +577,24 @@ static void *DVBFrontEndMonitor(void *arg)
 #ifndef __CYGWIN__
     struct dvb_frontend_event event;
     fe_status_t status;
-    bool locked;
     struct pollfd pfd[1];
+    bool feLocked = FALSE; 
 
     pfd[0].fd = adapter->frontEndFd;
     pfd[0].events = POLLIN;
 
     /* Read initial status */
-    ioctl(adapter->frontEndFd, FE_READ_STATUS, &status);
-    if (status & FE_HAS_LOCK)
+    if (ioctl(adapter->frontEndFd, FE_READ_STATUS, &status) == 0)
     {
-        locked = TRUE;
+        if (status & FE_HAS_LOCK)
+        {
+            feLocked = TRUE;
+        }
     }
 #else 
     bool previousLockState = locked;
 #endif
-    LogModule(LOG_DEBUG, DVBADAPTER, "Monitoring thread started.\n");
+    
     while (!adapter->monitorExit)
     {
 #ifndef __CYGWIN__
@@ -602,15 +604,15 @@ static void *DVBFrontEndMonitor(void *arg)
             {
                 if (ioctl(adapter->frontEndFd, FE_GET_EVENT, &event) == 0)
                 {
-                    bool newLockState = FALSE;
-                    LogModule(LOG_DEBUG, DVBADAPTER, "FE Event: status %x\n", event.status);
-                    if (event.status & FE_HAS_LOCK)                 
+                    bool newFELocked = FALSE;
+                    if (event.status & FE_HAS_LOCK)
                     {
-                        newLockState = TRUE;
+                        newFELocked = TRUE;
                     }
-                    if (locked != newLockState)
+                    
+                    if (feLocked != newFELocked)
                     {
-                        if (newLockState)
+                        if (newFELocked)
                         {
                             EventsFireEventListeners(lockedEvent, adapter);
                         }
@@ -618,8 +620,9 @@ static void *DVBFrontEndMonitor(void *arg)
                         {
                             EventsFireEventListeners(unlockedEvent, adapter);                            
                         }
-                       locked = newLockState;
+                        feLocked = newFELocked;
                     }
+
                     if (event.parameters.frequency <= 0)
                     {
                         EventsFireEventListeners(tuningFailedEvent, adapter);
