@@ -153,7 +153,6 @@ char *DVBTextToUTF8(char *toConvert, size_t toConvertLen)
             return NULL;
     }
     pthread_mutex_lock(&ResultBufferMutex);    
-    LogModule(LOG_DEBUG, DVBTEXT, "Selected %d to convert to utf-8\n", cs_new);
     if ((cs_old != cs_new) || (cs_old == CS_UNKNOWN))
     {
         if (cd) 
@@ -220,7 +219,7 @@ char *DVBTextToUTF8(char *toConvert, size_t toConvertLen)
     }
     if ((long)cd == -1)
     {
-        LogModule(LOG_INFO, DVBTEXT, "Failed to open conversion descriptor!\n");
+        LogModule(LOG_ERROR, DVBTEXT, "Failed to open conversion descriptor!\n");
         return NULL;
     }
     inBytes = toConvert;
@@ -228,19 +227,16 @@ char *DVBTextToUTF8(char *toConvert, size_t toConvertLen)
     outBytesLeft = sizeof(ResultBuffer);
     outBytes = ResultBuffer;
 
-    LogModule(LOG_DEBUG,DVBTEXT,  "Starting conversion. (%d, %d, %d)\n", cd , inBytesLeft, outBytesLeft);
     ret = iconv(cd, (ICONV_INPUT_CAST)&inBytes, &inBytesLeft, &outBytes, &outBytesLeft);
 
     if (ret == -1)
     {
-        LogModule(LOG_DEBUG, DVBTEXT, "Conversion failed.\n");
         pthread_mutex_unlock(&ResultBufferMutex);    
         return NULL;
     }
     *outBytes = 0;
     result = strdup(ResultBuffer);
     pthread_mutex_unlock(&ResultBufferMutex);
-    LogModule(LOG_DEBUG, DVBTEXT, "Conversion successful.\n");
     return result;
 }
 
