@@ -443,16 +443,22 @@ Service_t *ServiceFindId(Multiplex_t *multiplex, int id)
 
 Service_t *ServiceFindFQID(uint16_t networkId, uint16_t tsId, uint16_t serviceId)
 {
-    Service_t *service = NULL;
-    Multiplex_t *multiplex;
+    STATEMENT_INIT;
+    Service_t *result;
 
-    multiplex = MultiplexFindId(networkId, tsId);
-    if (multiplex)
-    {
-        service = ServiceFindId(multiplex, serviceId);
-        MultiplexRefDec(multiplex);
-    }
-    return service;
+    STATEMENT_PREPAREVA("SELECT " SERVICE_FIELDS
+                        "FROM " SERVICES_TABLE "," MULTIPLEXES_TABLE " WHERE "
+                        MULTIPLEXES_TABLE "." MULTIPLEX_NETID "=%d AND "
+                        MULTIPLEXES_TABLE "." MULTIPLEX_TSID "=%d AND "
+                        SERVICES_TABLE "." SERVICE_MULTIPLEXUID "=" MULTIPLEXES_TABLE "." MULTIPLEX_UID " AND "
+                        SERVICE_ID "=%d;",
+                        networkId, tsId, serviceId);
+    RETURN_ON_ERROR(NULL);
+
+    result = ServiceGetNext((ServiceEnumerator_t) stmt);
+    
+    STATEMENT_FINALIZE();
+    return result;
 }
 
 Service_t *ServiceFindFQIDStr(char *FQIdStr)
