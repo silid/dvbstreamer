@@ -269,7 +269,12 @@ int main(int argc, char *argv[])
     LogModule(LOG_INFO, MAIN, "%d Services available on %d Multiplexes\n", ServiceCount(), MultiplexCount());
 
     /* Initialise the DVB adapter */
-    INIT(!(DVBAdapter = DVBInit(adapterNumber, hwRestricted)), "DVB adapter");
+    DVBAdapter = DVBInit(adapterNumber, hwRestricted);
+    if (!DVBAdapter)
+    {
+        printf("Could not open dvb adapter %d!\n", adapterNumber);
+        exit(1);
+    }
 
 #if defined(ENABLE_DVB)
     if (DVBAdapter->info.type == FE_QPSK)

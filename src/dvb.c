@@ -168,7 +168,10 @@ void DVBDispose(DVBAdapter_t *adapter)
 #ifdef __CYGWIN__         
     pthread_mutex_destroy(&tuningMutex);
 #endif
+    if (adapter->monitorThread)
+    {
     pthread_join(adapter->monitorThread, NULL);
+    }
 
     ObjectFree(adapter);
 }
