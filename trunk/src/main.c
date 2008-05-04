@@ -622,7 +622,10 @@ static void sighandler(int signum)
                 rl_free_line_state ();
             case SIGTERM:
                 rl_cleanup_after_signal();
-                fclose(rl_instream);
+                if (rl_instream)
+                {
+                    fclose(rl_instream);
+                }
                 break;
         }
     }
