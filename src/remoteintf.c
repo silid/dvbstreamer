@@ -47,6 +47,8 @@ Remote Interface functions.
 #define MAX_CONNECTIONS   2 /* 1 for monitoring by web and another for control */
 #define MAX_LINE_LENGTH 256
 
+/* Max connection string = [xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx]:xxxxx */
+#define MAX_CONNECTION_STR_LENGTH 48 
 
 /*******************************************************************************
 * Typedefs                                                                     *
@@ -57,9 +59,7 @@ typedef struct Connection_t
     FILE *readfp;
     FILE *writefp;
 
-    struct sockaddr_in clientAddress;
-    bool authenticated;
-    bool active;
+    struct sockaddr_storage clientAddress;
     bool connected;
     pthread_t thread;
 }
@@ -69,7 +69,11 @@ Connection_t;
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
+static void AddConnection(int socketfd, struct sockaddr_storage *clientAddress);
+static void RemoveConnection(Connection_t *connection);
 static void HandleConnection(Connection_t *connection);
+static void GetConnectionString(struct sockaddr_storage *connAddr, char *output);
+
 static void RemoteInterfaceAuthenticate(int argc, char **argv);
 static void RemoteInterfaceWho(int argc, char **argv);
 static void RemoteInterfaceLogout(int argc, char **argv);
@@ -126,7 +130,8 @@ static pthread_mutex_t connectionsMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t connectionCondVar = PTHREAD_COND_INITIALIZER;
 
 static int serverSocket;
-static Connection_t connections[MAX_CONNECTIONS];
+
+static List_t *connectionsList;
 
 static char *infoStreamerName;
 static char *authUsername;
@@ -138,12 +143,12 @@ static char responselineStart[] = "DVBStreamer/" VERSION "/";
 
 static char REMOTEINTERFACE[] = "RemoteInterface";
 
+
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
 int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char *username, char *password)
 {
-     int i;
 #ifndef __CYGWIN__
     socklen_t address_len;
     struct sockaddr_storage address;
@@ -177,6 +182,7 @@ int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char
         LogModule(LOG_ERROR, REMOTEINTERFACE, "Failed to create server socket!\n");
         return 1;
     }
+
     if (bind(serverSocket, (struct sockaddr *) &address, address_len) < 0)
     {
         LogModule(LOG_ERROR, REMOTEINTERFACE, "Failed to bind server to port %d\n", REMOTEINTERFACE_PORT + adapter);
@@ -185,7 +191,6 @@ int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char
     }
 #else
     struct sockaddr_in serverAddress;
-
     serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (serverSocket < 0)
     {
@@ -206,6 +211,9 @@ int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char
     }
 #endif
 
+    ObjectRegisterType(Connection_t);
+    connectionsList = ListCreate();
+
     listen(serverSocket, 1);
 
     infoStreamerName = strdup(streamerName);
@@ -218,12 +226,6 @@ int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char
     LogModule(LOG_DEBUG, REMOTEINTERFACE, "Password    : %s\n", authPassword);
     LogModule(LOG_DEBUG, REMOTEINTERFACE, "Server Name : %s\n", infoStreamerName);
 
-    for (i = 0; i < MAX_CONNECTIONS; i ++)
-    {
-        connections[i].active = FALSE;
-        pthread_create(&connections[i].thread, NULL, (void*)HandleConnection, (void*)&connections[i]);
-    }
-    
     CommandRegisterCommands(RemoteInterfaceCommands);
     CommandRegisterVariable(&CommandVariableServerName);
     return 0;
@@ -231,26 +233,33 @@ int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char
 
 void RemoteInterfaceDeInit(void)
 {
-    int i;
+    ListIterator_t iterator;
+    
     CommandUnRegisterCommands(RemoteInterfaceCommands);
     CommandUnRegisterVariable(&CommandVariableServerName);
 
     remoteIntfExit = TRUE;
-    pthread_cond_broadcast(&connectionCondVar);
     close(serverSocket);
-    for ( i = 0; i < MAX_CONNECTIONS; i ++)
+
+    pthread_mutex_lock(&connectionsMutex);
+    if (ListCount(connectionsList) > 0)
     {
-        if (connections[i].connected)
+        for (ListIterator_Init(iterator, connectionsList);
+             ListIterator_MoreEntries(iterator);
+             ListIterator_Next(iterator))
         {
-            /* Force closure of the sockets should cause the thread to terminate. */
-            close(connections[i].socketfd);
-            connections[i].connected = FALSE;
+            Connection_t *connection = (Connection_t*)ListIterator_Current(iterator);
+            close(connection->socketfd);
         }
-        pthread_join(connections[i].thread, NULL);
+        
+        pthread_cond_wait(&connectionCondVar, &connectionsMutex);
     }
+    pthread_mutex_unlock(&connectionsMutex);
+
     free(infoStreamerName);
     free(authUsername);
     free(authPassword);
+    ListFree(connectionsList, NULL);
 }
 
 void RemoteInterfaceAsyncAcceptConnections(void)
@@ -260,8 +269,6 @@ void RemoteInterfaceAsyncAcceptConnections(void)
 
 void RemoteInterfaceAcceptConnections(void)
 {
-    int i;
-    int found;
     struct pollfd pfd[1];
 
     pfd[0].fd = serverSocket;
@@ -273,92 +280,89 @@ void RemoteInterfaceAcceptConnections(void)
         {
             if (pfd[0].revents & POLLIN)
             {
-                FILE *readfp;
-                FILE *writefp;
                 int clientfd;
-                struct sockaddr_in clientAddress;
+                struct sockaddr_storage clientAddress;
                 socklen_t clientAddressSize;
 
                 clientAddressSize = sizeof(clientAddress);
-                clientfd = accept(serverSocket, (struct sockaddr *) & clientAddress, &clientAddressSize);
+                clientfd = accept(serverSocket, (struct sockaddr *) &clientAddress, &clientAddressSize);
                 if (clientfd < 0)
                 {
                     continue;
                 }
-                readfp = fdopen(clientfd, "r");
-                writefp =fdopen(clientfd, "w"); 
-                pthread_mutex_lock(&connectionsMutex);
-                found = -1;
-
-                for (i = 0; i < MAX_CONNECTIONS; i ++)
-                {
-                    if (!connections[i].active)
-                    {
-                        found = i;
-                        break;
+                AddConnection(clientfd, &clientAddress);
+            }
                     }
                 }
+    LogModule(LOG_DEBUG,REMOTEINTERFACE,"Accept thread exiting.\n");
+}
                 
-                if (found >= 0)
+static void AddConnection(int socketfd, struct sockaddr_storage *clientAddress)
+{
+    char connectionStr[MAX_CONNECTION_STR_LENGTH];
+    FILE *readfp;
+    FILE *writefp;
+    Connection_t *connection = ObjectCreateType(Connection_t);
+
+    GetConnectionString(clientAddress, connectionStr);
+    
+    readfp = fdopen(socketfd, "r");
+    writefp =fdopen(socketfd, "w"); 
+
+    if (connection)
                 {
-                    connections[i].active = TRUE;
-                    connections[i].connected = TRUE;
-                    connections[i].socketfd = clientfd;
-                    connections[i].readfp = readfp;
-                    connections[i].writefp = writefp;
-                    connections[i].clientAddress = clientAddress;
-                    LogModule(LOG_INFO, REMOTEINTERFACE, "Connection attempt from %s:%d accepted!\n",
-                             inet_ntoa(clientAddress.sin_addr), clientAddress.sin_port);
-                    /* Wake up the connection threads */
-                    pthread_cond_broadcast(&connectionCondVar);
+        connection->connected = TRUE;
+        connection->socketfd = socketfd;
+        connection->readfp = readfp;
+        connection->writefp = writefp;
+        connection->clientAddress = *clientAddress;
+        LogModule(LOG_INFO, REMOTEINTERFACE, "Connection attempt from %s accepted!\n",
+                 connectionStr);
+        
+        pthread_mutex_lock(&connectionsMutex);
+        ListAdd(connectionsList, connection);
+        pthread_mutex_unlock(&connectionsMutex);
+        
+        pthread_create(&connection->thread, NULL, (void*)HandleConnection, (void*)connection);        
                 }
                 else
                 {
-                    LogModule(LOG_INFO, REMOTEINTERFACE, "Connection attempt from %s:%d rejected as no connections structures left!\n",
-                             inet_ntoa(clientAddress.sin_addr), clientAddress.sin_port);
-                    PrintResponse(writefp,COMMAND_ERROR_TOO_MANY_CONNS, "Too many connect clients!");
+        LogModule(LOG_INFO, REMOTEINTERFACE, "Connection attempt from %s rejected as no connections structures left!\n",
+                 connectionStr);
+
+        PrintResponse(writefp, COMMAND_ERROR_TOO_MANY_CONNS, "Too many connect clients!");
                     fclose(readfp);
                     fclose(writefp);
                 }
-
-                pthread_mutex_unlock(&connectionsMutex);
-            }
-        }
-    }
-    LogModule(LOG_DEBUG,REMOTEINTERFACE,"Accept thread exiting.\n");
 }
 
+static void RemoveConnection(Connection_t *connection)
+{
+    pthread_mutex_lock(&connectionsMutex);
+    ListRemove(connectionsList, connection);
+    ObjectRefDec(connection);
+    if ((ListCount(connectionsList) == 0) && remoteIntfExit)
+    {
+        pthread_cond_broadcast(&connectionCondVar);
+    }
+    pthread_mutex_unlock(&connectionsMutex);
+}
 /******************************************************************************
 * Connection functions                                                        *
 ******************************************************************************/
 static void HandleConnection(Connection_t *connection)
 {
     struct pollfd pfd[1];
+    char connectionStr[MAX_CONNECTION_STR_LENGTH];
     char line[MAX_LINE_LENGTH];
     int socketfd;
     FILE *readfp;
     FILE *writefp;
     CommandContext_t context;
 
-
-    while(!remoteIntfExit)
-    {
-        LogModule(LOG_DEBUG, REMOTEINTERFACE, "Waiting for connection (%p)\n", connection);
-
-        pthread_mutex_lock(&connectionsMutex);
-        connection->active = FALSE;
-        pthread_cond_wait(&connectionCondVar, &connectionsMutex);
-        pthread_mutex_unlock(&connectionsMutex);
-        
-        if (!connection->active)
-        {
-            continue;
-        }
-
-        LogModule(LOG_DEBUG, REMOTEINTERFACE, "Connection accepted (%p)\n", connection);
         /* Setup context */
-        asprintf(&context.interface, "%s:%d",
-            inet_ntoa(connection->clientAddress.sin_addr), connection->clientAddress.sin_port);
+    GetConnectionString(&connection->clientAddress, connectionStr);
+    context.interface = connectionStr;
         context.authenticated = FALSE;
         context.remote = TRUE;
         context.printf = RemoteInterfacePrintfImpl;
@@ -414,9 +418,10 @@ static void HandleConnection(Connection_t *connection)
         fclose(readfp);
         fclose(writefp);        
         connection->connected = FALSE;
-        free(context.interface);
-    }
+
     LogModule(LOG_DEBUG,REMOTEINTERFACE,"Connection thread exiting.\n");
+    pthread_detach(connection->thread);
+    RemoveConnection(connection);
 }
 
 static void PrintResponse(FILE *fp, uint16_t errno, char * msg)
@@ -458,13 +463,18 @@ static void RemoteInterfaceAuthenticate(int argc, char **argv)
 
 static void RemoteInterfaceWho(int argc, char **argv)
 {
-    int i;
-    for (i = 0; i < MAX_CONNECTIONS; i ++)
+    char connectionStr[MAX_CONNECTION_STR_LENGTH];
+    ListIterator_t iterator;
+    
+    for (ListIterator_Init(iterator, connectionsList);
+         ListIterator_MoreEntries(iterator);
+         ListIterator_Next(iterator))
     {
-        if (connections[i].connected)
+        Connection_t *connection = (Connection_t*)ListIterator_Current(iterator);
+        if (connection->connected)
         {
-            CommandPrintf("%s:%d %s\n", inet_ntoa(connections[i].clientAddress.sin_addr), connections[i].clientAddress.sin_port,
-            connections[i].authenticated ? "(Authentitcated)":"");
+            GetConnectionString(&connection->clientAddress, connectionStr);
+            CommandPrintf("%s\n", connectionStr);
         }
     }
 }
@@ -495,3 +505,26 @@ static void RemoteInterfaceServerNameSet(char *name, int argc, char **argv)
     CommandPrintf("%s\n", infoStreamerName);
 }
 
+static void GetConnectionString(struct sockaddr_storage *connAddr, char *output)
+{
+    if (connAddr->ss_family == AF_INET)
+    {
+        inet_ntop(connAddr->ss_family, &((struct sockaddr_in*)connAddr)->sin_addr, output, INET_ADDRSTRLEN);
+        
+        sprintf(output + strlen(output), ":%d", ((struct sockaddr_in*)connAddr)->sin_port);
+    }
+#ifndef __CYGWIN__    
+    else if (connAddr->ss_family == AF_INET6)
+    {
+        *output = '[';
+        inet_ntop(connAddr->ss_family, &((struct sockaddr_in*)connAddr)->sin_addr, output + 1, INET6_ADDRSTRLEN);
+
+        sprintf(output + strlen(output), "]:%d", ((struct sockaddr_in*)connAddr)->sin_port);
+    }
+#endif
+    else
+    {
+        strcpy(output, "<unknown>");
+        LogModule(LOG_ERROR, REMOTEINTERFACE, "Unknown family %d\n", connAddr->ss_family);
+    }
+}
