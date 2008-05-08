@@ -24,6 +24,7 @@ Logging functions.
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <errno.h>
 #include <limits.h>
 #include <time.h>
 
@@ -162,6 +163,12 @@ static void LogImpl(int level, const char *module, const char * format, va_list 
     fprintf(logFP, "%s %-15s : %2d : ", timeBuffer, module ? module:"<Unknown>", level);
 
     vfprintf(logFP, format, valist);
+
+    if ((level == LOG_ERROR) && (errno != 0))
+    {
+        fprintf(logFP, "%s %-15s : %2d : errno = %d (%s)\n", timeBuffer, 
+            module ? module:"<Unknown>", level, errno, strerror(errno));
+    }
 
     pthread_mutex_unlock(&mutex);
 }
