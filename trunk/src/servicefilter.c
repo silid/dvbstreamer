@@ -224,21 +224,25 @@ bool ServiceFilterAVSOnlyGet(PIDFilter_t *filter)
 void ServiceFilterDeliveryMethodSet(PIDFilter_t *filter, DeliveryMethodInstance_t *instance)
 {
     ServiceFilter_t *state = (ServiceFilter_t *)filter->fpArg;
+    DeliveryMethodInstance_t *prevInstance = filter->opArg;
+    
     if (instance->ReserveHeaderSpace)
     {
         instance->ReserveHeaderSpace(instance, HEADER_PACKETS); 
     }
-    if (filter->opArg)
-    {
-        DeliveryMethodDestroy(filter->opArg);
-        filter->opArg = NULL;
-    }
+
     PIDFilterOutputPacketSet(filter, DeliveryMethodOutputPacket, instance);
 
     if (instance->ReserveHeaderSpace)
     {
         state->setHeader = TRUE;
     }
+
+    if (prevInstance)
+    {
+        DeliveryMethodDestroy(prevInstance);
+    }
+
 }
 
 DeliveryMethodInstance_t * ServiceFilterDeliveryMethodGet(PIDFilter_t *filter)
