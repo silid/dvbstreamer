@@ -1,6 +1,8 @@
 1.0
 ---
 * New Plugin - Traffic Monitor/Capture (thanks to Steve VanDeBogart)
+* New Event framework to allow monitoring of events like signal lock, service 
+   addition/removal by an external client.
 * Bug Fixed:
     1884368 festatus command doesn't work on DVB-S (patch supplied)
     1870354 The list add functions aren't completely implemented.
@@ -12,6 +14,9 @@
     1875269 Segmentation Fault during DVB-S streaming
     1856827 'dumpxmltv' from remote interface causes DVBStreamer to exit
     1889789 Traffic plugin does work (printf) while blocking TS thread
+    1948144 Segfault on exit when in foreground daemon mode
+    1952127 Segfault on invalid adapter number
+    1961030 SAP session id not unique
     
 0.9
 ---

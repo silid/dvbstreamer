@@ -415,6 +415,9 @@ static void CreateSAPSession(struct UDPOutputState_t *state, bool rtp, unsigned 
     char ipaddr[256];
     char typevalue[256];
     in_port_t port = 0;
+    struct timeval tv;
+
+    gettimeofday(&tv,(struct timezone*) NULL);
     
     gethostname(hostname, sizeof(hostname) - 1);
     
@@ -484,7 +487,7 @@ static void CreateSAPSession(struct UDPOutputState_t *state, bool rtp, unsigned 
     }while(0)
 
     SDPAdd('v',"0");
-    SDPAddf('o',"- %ld 0 IN %s %s", time(NULL), addrtype, ipaddr);
+    SDPAddf('o',"- %ld%ld 0 IN %s %s", tv.tv_sec, tv.tv_usec, addrtype,  ipaddr);
     SDPAddf('s',"%s", sessionName);
     
     if (state->address.ss_family == AF_INET)
