@@ -56,8 +56,7 @@ Remote Interface functions.
 typedef struct Connection_t
 {
     int socketfd;
-    FILE *readfp;
-    FILE *writefp;
+    FILE *fp;
 
     struct sockaddr_storage clientAddress;
     bool connected;
@@ -300,21 +299,18 @@ void RemoteInterfaceAcceptConnections(void)
 static void AddConnection(int socketfd, struct sockaddr_storage *clientAddress)
 {
     char connectionStr[MAX_CONNECTION_STR_LENGTH];
-    FILE *readfp;
-    FILE *writefp;
+    FILE *fp;
     Connection_t *connection = ObjectCreateType(Connection_t);
 
     GetConnectionString(clientAddress, connectionStr);
     
-    readfp = fdopen(socketfd, "r");
-    writefp =fdopen(socketfd, "w"); 
+    fp = fdopen(socketfd, "r+");
 
     if (connection)
                 {
         connection->connected = TRUE;
         connection->socketfd = socketfd;
-        connection->readfp = readfp;
-        connection->writefp = writefp;
+        connection->fp = fp;
         connection->clientAddress = *clientAddress;
         LogModule(LOG_INFO, REMOTEINTERFACE, "Connection attempt from %s accepted!\n",
                  connectionStr);
@@ -330,9 +326,8 @@ static void AddConnection(int socketfd, struct sockaddr_storage *clientAddress)
         LogModule(LOG_INFO, REMOTEINTERFACE, "Connection attempt from %s rejected as no connections structures left!\n",
                  connectionStr);
 
-        PrintResponse(writefp, COMMAND_ERROR_TOO_MANY_CONNS, "Too many connect clients!");
-                    fclose(readfp);
-                    fclose(writefp);
+        PrintResponse(fp, COMMAND_ERROR_TOO_MANY_CONNS, "Too many connect clients!");
+        fclose(fp);
                 }
 }
 
@@ -356,8 +351,7 @@ static void HandleConnection(Connection_t *connection)
     char connectionStr[MAX_CONNECTION_STR_LENGTH];
     char line[MAX_LINE_LENGTH];
     int socketfd;
-    FILE *readfp;
-    FILE *writefp;
+    FILE *fp;
     CommandContext_t context;
 
         /* Setup context */
@@ -371,12 +365,12 @@ static void HandleConnection(Connection_t *connection)
         context.commands = ConnectionCommands;
 
         socketfd = connection->socketfd;
-        readfp = connection->readfp;
-        writefp = connection->writefp;
+    fp = connection->fp;
+
         pfd[0].fd = socketfd;
         pfd[0].events = POLLIN;
     
-        PrintResponse(writefp,COMMAND_OK, "Ready");
+    PrintResponse(fp,COMMAND_OK, "Ready");
 
         while (!remoteIntfExit && connection->connected)
         {
@@ -387,7 +381,7 @@ static void HandleConnection(Connection_t *connection)
             {
                 char *nl;
                 // Read in the command
-                if (fgets(line, MAX_LINE_LENGTH, readfp))
+            if (fgets(line, MAX_LINE_LENGTH, fp))
                 {
                     nl = strchr(line, '\n');
                     if (nl)
@@ -401,7 +395,7 @@ static void HandleConnection(Connection_t *connection)
                     }
                     LogModule(LOG_DEBUG, REMOTEINTERFACE, "%s: Received Line: \"%s\"\n", context.interface, line);
                     CommandExecute(&context, line);
-                    PrintResponse(writefp,context.errorNumber, context.errorMessage);
+                PrintResponse(fp,context.errorNumber, context.errorMessage);
                 }
                 else
                 {
@@ -415,8 +409,7 @@ static void HandleConnection(Connection_t *connection)
         }
         LogModule(LOG_INFO, REMOTEINTERFACE, "%s: Connection closed!\n", context.interface);
         /* Close the socket and free our resources */
-        fclose(readfp);
-        fclose(writefp);        
+    fclose(fp);
         connection->connected = FALSE;
 
     LogModule(LOG_DEBUG,REMOTEINTERFACE,"Connection thread exiting.\n");
@@ -433,13 +426,13 @@ static void PrintResponse(FILE *fp, uint16_t errno, char * msg)
 static int RemoteInterfacePrintfImpl(CommandContext_t *context, const char *format, va_list args)
 {
     Connection_t *connection = (Connection_t*)context->privateArg;
-    return vfprintf(connection->writefp, format, args);
+    return vfprintf(connection->fp, format, args);
 }
 
 static char *RemoteInterfaceGetsImpl(CommandContext_t *context, char *buffer, int len)
 {
     Connection_t *connection = (Connection_t*)context->privateArg;
-    return fgets(buffer, len, connection->readfp);
+    return fgets(buffer, len, connection->fp);
 }
 
 /******************************************************************************
