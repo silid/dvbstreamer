@@ -375,8 +375,7 @@ static void CommandGetSFService(int argc, char **argv)
     PIDFilter_t *filter;
     Service_t *service;
     Multiplex_t *multiplex;
-    CommandCheckAuthenticated();
-
+ 
     FIND_SERVICE_FILTER(argv[0]);
     service = ServiceFilterServiceGet(filter);
     multiplex = MultiplexFindUID(service->multiplexUID);
