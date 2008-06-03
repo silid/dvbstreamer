@@ -133,10 +133,11 @@ void TuningCurrentServiceSet(Service_t *service)
                 multiplex->networkId & 0xffff, multiplex->tsId & 0xffff);
 
             TuneMultiplex(multiplex);
-            MultiplexRefDec(multiplex);            
             /* Reset all stats as this is a new TS */
             TSFilterZeroStats(tsFilter);            
         }
+        
+        MultiplexRefDec(multiplex);
 
         if (CurrentService)
         {
