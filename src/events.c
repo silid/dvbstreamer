@@ -340,6 +340,7 @@ static void UnRegisterEventListener(List_t *listenerList, EventListener_t callba
         if ((details->callback == callback) && (details->arg == arg))
         {
             ListRemoveCurrent(&iterator);
+            ObjectRefDec(details);
             break;
         }
     }
