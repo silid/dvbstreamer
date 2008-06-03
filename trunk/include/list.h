@@ -102,9 +102,16 @@ typedef void (*ListDataDestructor_t)(void *);
 
 /**
  * Creates a new double linked list.
- *@return A new List_t instance or NULL if there is not enough memory.
+ * @return A new List_t instance or NULL if there is not enough memory.
  */
 List_t *ListCreate();
+
+/**
+ * Alias for ListCreate().
+ * Creates a list that will only be used to hold objects.
+ * @return A new List_t instance or NULL if there is not enough memory.
+ */ 
+#define ObjectListCreate() ListCreate()
 
 /**
  * Free a list and all the entries calling the destructor function for each entry.
@@ -112,6 +119,19 @@ List_t *ListCreate();
  * @param destructor Function to call on each item in the list.
  */
 void ListFree(List_t *list, void (*destructor)(void *data));
+
+/**
+ * Free a list that only contains objects.
+ * Any objects still in the list will have their reference counts decremented.
+ * @param list The list to free.
+ */
+#define ObjectListFree(list) ListFree(list, ListFreeObject);
+
+/**
+ * @internal
+ * Function used by the ObjectListFree() macro to decrement object ref counts.
+ */
+void ListFreeObject(void *ptr);
 
 /**
  * Add an entry to the end of the list.
