@@ -25,6 +25,15 @@ Generic list management functions.
 #include "list.h"
 #include "objects.h"
 
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
+static const char LIST[] = "list";
+
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
+
 List_t *ListCreate()
 {
     ObjectRegisterType(List_t);
@@ -48,6 +57,11 @@ void ListFree(List_t *list, void (*destructor)(void *data))
     list->head = NULL;
     list->tail = NULL;
     ObjectRefDec(list);
+}
+
+void ListFreeObject(void *ptr)
+{
+    ObjectRefDec(ptr);
 }
 
 bool ListAdd(List_t *list, void *data)
@@ -170,7 +184,7 @@ void ListRemoveCurrent(ListIterator_t *iterator)
 void ListDump(List_t *list)
 {
     ListIterator_t iterator;
-    char LIST[] = "list";
+
     LogModule(LOG_DEBUG, LIST, "Dumping list %p (%d entries)\n", list, list->count);
     for ( ListIterator_Init(iterator, list); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
