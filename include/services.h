@@ -287,6 +287,14 @@ ServiceEnumerator_t ServiceEnumeratorForMultiplex(Multiplex_t *multiplex);
 ServiceEnumerator_t ServiceFindByPID(int pid, Multiplex_t *opt_multiplex);
 
 /**
+ * Retrieve an enumerator for the names that match the query string.
+ * This function uses the SQL LIKE syntax for the query string.
+ * @param query An SQL LIKE formated string of the name to search for.
+ *@return A service enumerator or NULL if there is not enough memory.
+ */
+ServiceEnumerator_t ServiceQueryNameLike(char *query);
+
+/**
  * Free an enumerator.
  */
 void ServiceEnumeratorDestroy(ServiceEnumerator_t enumerator);

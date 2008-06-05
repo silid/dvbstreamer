@@ -3,6 +3,8 @@
 * New Plugin - Traffic Monitor/Capture (thanks to Steve VanDeBogart)
 * New Event framework to allow monitoring of events like signal lock, service 
    addition/removal by an external client.
+* Wildcard query added for lsservices, use ls -q <query> to list all services that match <query>
+   For example ls -q BBC% would list all BBC channels under freeview.
 * Bug Fixed:
     1884368 festatus command doesn't work on DVB-S (patch supplied)
     1870354 The list add functions aren't completely implemented.

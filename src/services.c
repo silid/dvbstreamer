@@ -558,6 +558,18 @@ ServiceEnumerator_t ServiceFindByPID(int pid, Multiplex_t *multiplex)
     return stmt;
 }
 
+ServiceEnumerator_t ServiceQueryNameLike(char *query)
+{
+    STATEMENT_INIT;
+
+    STATEMENT_PREPAREVA("SELECT " SERVICE_FIELDS
+                        "FROM " SERVICES_TABLE " WHERE " SERVICE_NAME " LIKE %Q;",
+                        query);
+    RETURN_ON_ERROR(NULL);
+
+    return stmt;
+}
+
 void ServiceEnumeratorDestroy(ServiceEnumerator_t enumerator)
 {
     int rc;
