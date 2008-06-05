@@ -86,7 +86,7 @@ Command_t CommandDetailsInfo[] =
         "lsservices",
         TRUE, 0, 6,
         "List all services or for a specific multiplex.",
-        "lsservices [-id] [filters] [multiplex]\n"
+        "lsservices [-id] [filters] [-q query|[multiplex]]\n"
         "Lists selected services, by default all services on all multiplex are displayed.\n"
         "\n"
         "-id\n"
@@ -95,6 +95,9 @@ Command_t CommandDetailsInfo[] =
         "filters (tv, radio, data, unknown)\n"
         "Multiple filters can be specified or if no filters are specified all selected"
         " services will be displayed\n"
+        "\n"
+        "-q query\n"
+        "List names that match the specified query, %% can be used as a wild card character\n"
         "\n"
         "multiplex (\'mux\'| uid | netid.tsid | frequency)\n"
         "Select only services on the specified multiplex, where \'mux\' indiciated the current multiplex.",
@@ -241,6 +244,7 @@ static void CommandListServices(int argc, char **argv)
     Multiplex_t *multiplex = NULL;
     int i;
     bool dvbIds = FALSE;
+    char *query = NULL;
     uint32_t filterByType = FILTER_TYPE_NOT_USED;
     uint32_t filterByAccess = FILTER_ACCESS_NOT_USED;
     char *provider = NULL;
@@ -255,8 +259,28 @@ static void CommandListServices(int argc, char **argv)
         {
             dvbIds = TRUE;
         }
+        else if (strcmp(argv[i], "-q") == 0)
+        {
+            if (multiplex)
+            {
+                CommandError(COMMAND_ERROR_GENERIC, "Cannot specify a multiplex and a query string!");
+                return;
+            }
+            if (argc <= i +1)
+            {
+                CommandError(COMMAND_ERROR_GENERIC, "Missing query string");
+                return;
+            }
+            i ++;
+            query = argv[i];
+        }
         else if (strcmp(argv[i], "mux") == 0)
         {
+            if (query)
+            {
+                CommandError(COMMAND_ERROR_GENERIC, "Cannot specify a multiplex and a query string!");
+                return;
+            }
             if (multiplex)
             {
                 MultiplexRefDec(multiplex);
@@ -264,7 +288,7 @@ static void CommandListServices(int argc, char **argv)
             multiplex = TuningCurrentMultiplexGet();
             if (!multiplex)
             {
-                CommandPrintf("No multiplex currently selected!\n");
+                CommandError(COMMAND_ERROR_GENERIC, "No multiplex currently selected!");
                 return;
             }
         }
@@ -312,8 +336,11 @@ static void CommandListServices(int argc, char **argv)
         }
     }
 
-
-    if (multiplex)
+    if (query)
+    {
+        enumerator = ServiceQueryNameLike(query);
+    }
+    else if (multiplex)
     {
         enumerator = ServiceEnumeratorForMultiplex(multiplex);
         MultiplexRefDec(multiplex);
