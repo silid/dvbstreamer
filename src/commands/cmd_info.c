@@ -118,7 +118,7 @@ Command_t CommandDetailsInfo[] =
         "lspids",
         TRUE, 1, 2,
         "List the PIDs for a specified service.",
-        "lspids <service name>\n"
+        "lspids <service name or service id>\n"
         "List all the PIDs specified in <service name> PMT.",
         CommandListPids
     },    
@@ -133,7 +133,7 @@ Command_t CommandDetailsInfo[] =
         "serviceinfo",
         FALSE, 1, 1,
         "Display information about a service.",
-        "serviceinfo <service name>\n"
+        "serviceinfo <service name or service id>\n"
         "Displays information about the specified service.",
         CommandServiceInfo
     },
@@ -491,7 +491,7 @@ static void CommandServiceInfo(int argc, char **argv)
 
     UpdateDatabase();
     
-    service = ServiceFindName(argv[0]);
+    service = ServiceFind(argv[0]);
 
     if (service)
     {
@@ -632,7 +632,7 @@ static void CommandListPids(int argc, char **argv)
 {
     Service_t *service;
 
-    service = ServiceFindName(argv[0]);
+    service = ServiceFind(argv[0]);
     if (service)
     {
         bool cached = TRUE;
