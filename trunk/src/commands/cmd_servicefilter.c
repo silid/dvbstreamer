@@ -272,9 +272,7 @@ static void CommandAddSF(int argc, char **argv)
     else
     {
         DeliveryMethodInstance_t *instance;
-        filter = ServiceFilterCreate(tsFilter);
-        filter->name = strdup(argv[0]);
-
+        filter = ServiceFilterCreate(tsFilter, strdup(argv[0]));
         instance = DeliveryMethodCreate(argv[1]);
         if (!instance)
         {

@@ -40,9 +40,10 @@ extern char ServicePIDFilterType[];
  * Creates a new Service Filter linked to the supplied TS Filter and return the
  * PIDFilter_t instance used to filter the TS.
  * @param tsfilter The TS Filter to link the ServiceFilter to.
+ * @param name The name of this filter.
  * @return The PIDFilter_t instance that will be used to filter PIDs.
  */
-PIDFilter_t *ServiceFilterCreate(TSFilter_t *tsfilter);
+PIDFilter_t *ServiceFilterCreate(TSFilter_t *tsfilter, char *name);
 
 /**
  * Destroy a service filter created by ServiceFilterCreate().
