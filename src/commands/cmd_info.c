@@ -45,6 +45,7 @@ Command functions to supply the user with information about the system.
 #include "plugin.h"
 #include "servicefilter.h"
 #include "tuning.h"
+#include "properties.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -72,6 +73,11 @@ static void CommandServiceInfo(int argc, char **argv);
 static void CommandMuxInfo(int argc, char **argv);
 static void CommandStats(int argc, char **argv);
 static void CommandFEStatus(int argc, char **argv);
+static void CommandListProperties(int argc, char **argv);
+static void CommandGetProperty(int argc, char **argv);
+static void CommandSetProperty(int argc, char **argv);
+static void CommandPropertyInfo(int argc, char **argv);
+static char* GetPropertyTypeString(PropertyType_e type);
 
 static void CommandVariableUptimeGet(char *name);
 static void CommandVariableFETypeGet(char *name);
@@ -162,6 +168,38 @@ Command_t CommandDetailsInfo[] =
         "Displays whether the front end is locked, the bit error rate and signal to noise"
         "ratio and the signal strength",
         CommandFEStatus
+    },
+    {
+        "lsprops",
+        TRUE, 0, 1,
+        "List available properties.",
+        "lsprops [<property path>]\n"
+        "List all available properties at the specified path or the root if not supplied.\n",
+        CommandListProperties
+    },
+    {
+        "getprop",
+        TRUE, 1, 1,
+        "Get the value of a property.",
+        "getprop <property path>\n"
+        "Get the value of the specified property.\n",
+        CommandGetProperty
+    },
+    {
+        "setprop",
+         TRUE, 2, 2,
+        "Set the value of a property.",
+        "setprop <property path> <new value>\n"
+        "Set the value of the specified property to that of <new value>.\n",
+        CommandSetProperty   
+    },
+    {
+        "propinfo",
+        TRUE, 1, 1,
+        "Display information about a property.",
+        "propinfo <property path>\n"
+        "Display information about the specified property.\n",
+        CommandPropertyInfo
     },
     {NULL, FALSE, 0, 0, NULL,NULL}
 };
@@ -722,6 +760,153 @@ static char *GetStreamTypeString(int type)
     }
     return result;
 }
+
+static void CommandListProperties(int argc, char **argv)
+{
+    PropertiesEnumerator_t pos;
+    char *path = "";
+    char *name;
+    char *desc;
+    char *typeStr;
+    PropertyType_e type;
+    bool read, write, dir;
+    
+    if (argc == 1)
+    {
+        path = argv[0];
+    }
+    if (PropertiesEnumerate(path, &pos) == 0)
+    {
+        if (PropertiesEnumMoreEntries(pos))
+        {
+            for (; PropertiesEnumMoreEntries(pos); pos = PropertiesEnumNext(pos))
+            {
+                PropertiesEnumGetInfo(pos, &name, &desc, &type, &read, &write, &dir);
+                typeStr = GetPropertyTypeString(type);
+                CommandPrintf("%c%c%c %-10s %s\n", dir == TRUE   ? 'D':'-', 
+                                                   read == TRUE  ? 'R':'-', 
+                                                   write == TRUE ? 'W':'-', 
+                                                   typeStr, name);
+            }
+        }
+        else
+        {
+            CommandError(COMMAND_ERROR_GENERIC, "Property %s does not have any children!", path);
+        }
+    }
+    else
+    {
+        CommandError(COMMAND_ERROR_GENERIC, "Couldn\'t find property \"%s\"", path);
+    }
+    
+}
+
+static  void CommandGetProperty(int argc, char **argv)
+{
+    PropertyValue_t value;
+    
+    if (PropertiesGet(argv[0], &value) == 0)
+    {
+        switch(value.type)
+        {
+            case PropertyType_Int:
+                CommandPrintf("%d\n", value.u.integer);
+                break;                    
+            case PropertyType_Float:
+                CommandPrintf("%lf\n", value.u.fp);
+                break;           
+            case PropertyType_Boolean:
+                CommandPrintf("%s\n", value.u.boolean ? "True":"False");
+                break;
+            case PropertyType_String:
+                CommandPrintf("%s\n", value.u.string);
+                free(value.u.string);
+                break;
+            case PropertyType_Char:
+                CommandPrintf("%c\n", value.u.ch);
+                break;
+            case PropertyType_PID:
+                CommandPrintf("%u\n", value.u.pid);
+                break;
+            case PropertyType_IPAddress:
+                CommandPrintf("%s\n", value.u.string);
+                break;
+            default:
+                break;
+        }
+    }
+}
+
+static void CommandSetProperty(int argc, char **argv)
+{
+    CommandCheckAuthenticated();
+    if (PropertiesSetStr(argv[0], argv[1]) != 0)
+    {
+        CommandError(COMMAND_ERROR_GENERIC, "Failed to set property \"%s\"", argv[0]);
+    }
+}
+
+static void CommandPropertyInfo(int argc, char **argv)
+{
+    char *desc;
+    PropertyType_e type;
+    bool read, write, dir;
+    
+    if (PropertiesGetInfo(argv[0], &desc, &type, &read, &write, &dir) == 0)
+    {
+        CommandPrintf("Type        : %s\n", GetPropertyTypeString(type));
+        CommandPrintf("Readable    : %s\n", read  == TRUE ? "Yes":"No");
+        CommandPrintf("Writeable   : %s\n", write == TRUE ? "Yes":"No");
+        CommandPrintf("Has Children: %s\n", dir   == TRUE ? "Yes":"No");
+        CommandPrintf("Description:\n%s\n", desc == NULL ? "":desc);
+    }
+    else
+    {
+        CommandError(COMMAND_ERROR_GENERIC, "Couldn\'t find property \"%s\"", argv[0]);
+    }
+}
+
+
+static char* GetPropertyTypeString(PropertyType_e type)
+{
+    char *typeStr = NULL;
+    switch(type)
+    {
+        case PropertyType_None:
+            typeStr = "None";
+            break;
+        case PropertyType_Int:
+            typeStr = "Integer";
+            break;                    
+        case PropertyType_Float:
+            typeStr = "Float";
+            break;           
+        case PropertyType_Boolean:
+            typeStr = "Boolean";
+            break;
+        case PropertyType_String:
+            typeStr = "String";
+            break;
+        case PropertyType_Char:
+            typeStr = "Character";
+            break;
+        case PropertyType_PID:
+            typeStr = "PID";
+            break;
+        case PropertyType_IPAddress:
+            typeStr = "IP Address";
+            break;
+        case PropertyType_Table:
+            typeStr = "Table";
+            break;
+        default:
+            typeStr = "Unknown";
+            break;
+    }
+    return typeStr;
+}
+
+
 /*******************************************************************************
 * Variable Functions                                                           *
 *******************************************************************************/
