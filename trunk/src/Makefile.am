@@ -40,6 +40,7 @@ dvbstreamer_SOURCES = \
     epgdbase.c \
     utf8.c \
     events.c \
+    properties.c \
     threading/messageq.c \
     threading/deferredproc.c \
     $(atsc_src) \
