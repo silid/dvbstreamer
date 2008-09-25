@@ -41,6 +41,7 @@ the output to only include this service.
 #include "logging.h"
 #include "deliverymethod.h"
 #include "tuning.h"
+#include "properties.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -103,6 +104,9 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t *state);
 static void ServiceFilterInitPacket(TSPacket_t *packet, dvbpsi_psi_section_t* section, char *sectionname);
 static void ServiceFilterAllocateFilters(ServiceFilter_t *state, DVBAdapter_t *adapter);
 
+static int ServiceFilterPropertyServiceGet(void *userArg, PropertyValue_t *value);
+static int ServiceFilterPropertyAVSOnlyGet(void *userArg, PropertyValue_t *value);
+static int ServiceFilterPropertyAVSOnlySet(void *userArg, PropertyValue_t *value);
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
@@ -113,8 +117,9 @@ static char SERVICEFILTER[] = "ServiceFilter";
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
-PIDFilter_t *ServiceFilterCreate(TSFilter_t *tsfilter)
+PIDFilter_t *ServiceFilterCreate(TSFilter_t *tsfilter, char* name)
 {
+    char propertyPath[PROPERTIES_PATH_MAX];
     PIDFilter_t *result = NULL;
     ServiceFilter_t *state;
     ObjectRegisterType(ServiceFilter_t);
@@ -131,6 +136,15 @@ PIDFilter_t *ServiceFilterCreate(TSFilter_t *tsfilter)
         }
         PIDFilterMultiplexChangeSet(result, ServiceFilterMultiplexChanged, state);
         result->type = ServicePIDFilterType;
+        result->name = name;
+
+        sprintf(propertyPath, "filters.service.%s", name);
+        PropertiesAddProperty(propertyPath, "service", "The service that is currently being filtered", 
+            PropertyType_String, state, ServiceFilterPropertyServiceGet, NULL);
+
+        PropertiesAddProperty(propertyPath, "avsonly", "Whether only the first Audio/Video/Subtitle streams should be filtered.", 
+            PropertyType_Boolean, state, ServiceFilterPropertyAVSOnlyGet, ServiceFilterPropertyAVSOnlySet);        
+        
         state->currentMultiplex = TuningCurrentMultiplexGet();
         pthread_mutex_init(&state->serviceChangeMutex, NULL);
     }
@@ -139,8 +153,13 @@ PIDFilter_t *ServiceFilterCreate(TSFilter_t *tsfilter)
 
 void ServiceFilterDestroy(PIDFilter_t *filter)
 {
+    char propertyPath[PROPERTIES_PATH_MAX];
     ServiceFilter_t *state = (ServiceFilter_t *)filter->ppArg;
     assert(filter->filterPacket == ServiceFilterFilterPacket);
+
+    sprintf(propertyPath, "filters.service.%s", filter->name);
+    PropertiesRemoveAllProperties(propertyPath);
+    
     if (filter->tsFilter->adapter->hardwareRestricted)
     {
         DVBDemuxReleaseAllFilters(filter->tsFilter->adapter, FALSE);    
@@ -602,4 +621,33 @@ static void ServiceFilterAllocateFilters(ServiceFilter_t *state, DVBAdapter_t *a
     }
 }
 
+static int ServiceFilterPropertyServiceGet(void *userArg, PropertyValue_t *value)
+{
+    ServiceFilter_t *state = userArg;
+    value->type = PropertyType_String;
+    if (state->service)
+    {
+        value->u.string = state->service->name;
+    }
+    else
+    {
+        value->u.string = "";
+    }
+    return 0;
+}
+
+static int ServiceFilterPropertyAVSOnlyGet(void *userArg, PropertyValue_t *value)
+{
+    ServiceFilter_t *state = userArg;
+    value->type = PropertyType_Boolean;
+    value->u.boolean = state->avsOnly;
+    return 0;
+}
+
+static int ServiceFilterPropertyAVSOnlySet(void *userArg, PropertyValue_t *value)
+{
+    ServiceFilter_t *state = userArg;
+    state->avsOnly = value->u.boolean;
+    return 0;
+}
 
