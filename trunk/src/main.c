@@ -64,6 +64,7 @@ Entry point to the application.
 #include "atsctext.h"
 #include "deferredproc.h"
 #include "events.h"
+#include "properties.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -110,6 +111,10 @@ static void installsighandler(void);
 static void InitDaemon(int adapter);
 static void DeInitDaemon(void);
 
+static void InstallSysProperties(void);
+static int SysPropertyGetUptime(void *userArg, PropertyValue_t *value);
+static int SysPropertyGetUptimeSecs(void *userArg, PropertyValue_t *value);
+
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
@@ -123,6 +128,7 @@ static char PidFile[PATH_MAX];
 static TSFilter_t *TSFilter;
 static DVBAdapter_t *DVBAdapter;
 static const char MAIN[] = "Main";
+static time_t StartTime;
 
 /*******************************************************************************
 * Global functions                                                             *
@@ -224,6 +230,8 @@ int main(int argc, char *argv[])
         InitDaemon( adapterNumber);
     }
 
+    StartTime = time(NULL);
+    
     if (logFilename[0])
     {
         if (LoggingInitFile(logFilename, logLevel))
@@ -258,6 +266,7 @@ int main(int argc, char *argv[])
     
     INIT(ObjectInit(), "objects");    
     INIT(EventsInit(), "events");
+    INIT(PropertiesInit(), "properties");
     INIT(DBaseInit(adapterNumber), "database");
     INIT(EPGDBaseInit(adapterNumber), "EPG database");
     INIT(MultiplexInit(), "multiplex");
@@ -336,6 +345,8 @@ int main(int argc, char *argv[])
 
     INIT(TuningInit(), "tuning");
 
+    InstallSysProperties();
+    
     /*
      * Start plugins after outputs but before creating the primary output to
      * allow pugins to create outputs and allow new delivery methods to be
@@ -344,13 +355,12 @@ int main(int argc, char *argv[])
     INIT(PluginManagerInit(), "plugin manager");
 
     /* Create Service filter */
-    primaryServiceFilter = ServiceFilterCreate(TSFilter);
+    primaryServiceFilter = ServiceFilterCreate(TSFilter, (char *)PrimaryService);
     if (!primaryServiceFilter)
     {
         LogModule(LOG_ERROR, MAIN, "Failed to create primary service filter\n");
         exit(1);
     }
-    primaryServiceFilter->name = (char *)PrimaryService;
     dmInstance = DeliveryMethodCreate(primaryMRL);
     if (dmInstance == NULL)
     {
@@ -507,6 +517,7 @@ int main(int argc, char *argv[])
     DEINIT(MultiplexDeinit(), "multiplex");
     DEINIT(EPGDBaseDeInit(), "EPG database");    
     DEINIT(DBaseDeInit(), "database");
+    DEINIT(PropertiesDeInit(), "properties");
     DEINIT(EventsDeInit(), "events");
     DEINIT(ObjectDeinit(), "objects");
 
@@ -525,6 +536,41 @@ void UpdateDatabase()
     CacheWriteback();
     TSFilterUnLock(TSFilter);
 }
+
+static void InstallSysProperties(void)
+{
+    PropertiesAddProperty("sys", "uptime", "The time that this instance has been running in days/hours/minutes/seconds.",
+                      PropertyType_String, NULL, SysPropertyGetUptime, NULL);
+    PropertiesAddProperty("sys.uptime", "seconds", "The time that this instance has been running in seconds.",
+                          PropertyType_Int, NULL, SysPropertyGetUptimeSecs, NULL);  
+}
+
+static int SysPropertyGetUptime(void *userArg, PropertyValue_t *value)
+{
+    char *uptimeStr = NULL;
+    time_t now;
+    int seconds;
+    int d, h, m, s;
+    time(&now);
+    seconds = (int)difftime(now, StartTime);
+    d = seconds / (24 * 60 * 60);
+    h = (seconds - (d * 24 * 60 * 60)) / (60 * 60);
+    m = (seconds - ((d * 24 * 60 * 60) + (h * 60 * 60))) / 60;
+    s = (seconds - ((d * 24 * 60 * 60) + (h * 60 * 60) + (m * 60)));
+
+    asprintf(&uptimeStr, "%d Days %d Hours %d Minutes %d seconds", d, h, m, s);
+    value->u.string = uptimeStr; 
+    return 0;
+}
+
+static int SysPropertyGetUptimeSecs(void *userArg, PropertyValue_t *value)
+{
+    time_t now;
+    time(&now);
+    value->u.integer = (int)difftime(now, StartTime);
+    return 0;
+}
+
 
 TSFilter_t *MainTSFilterGet(void)
 {
