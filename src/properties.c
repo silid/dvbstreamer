@@ -26,7 +26,6 @@ Expose internal properties to the user.
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-#include <stdint.h>
 #include <string.h>
 #include <pthread.h>
 #include <getopt.h>
@@ -57,6 +56,7 @@ typedef struct PropertyNode_s {
             PropertySimpleAccessor_t get;
         }simple;
         struct {
+            PropertyTableDescription_t *tableDesc;
             PropertyTableAccessor_t set;
             PropertyTableAccessor_t get;
             PropertyTableCounter_t  count;
@@ -122,7 +122,7 @@ int PropertiesAddProperty(char *path, char *name, char *desc, PropertyType_e typ
     return 0;
 }
 
-int PropertyAddTableProperty(char *path, char *name, char *desc, 
+int PropertyAddTableProperty(char *path, char *name, char *desc, PropertyTableDescription_t *tableDesc,
                               void *userArg, PropertyTableAccessor_t get, PropertyTableAccessor_t set, 
                               PropertyTableCounter_t count)
 {
@@ -132,7 +132,7 @@ int PropertyAddTableProperty(char *path, char *name, char *desc,
     propertyNode->desc = desc;
     propertyNode->type = PropertyType_Table;
     propertyNode->userArg = userArg;
-
+    propertyNode->accessors.table.tableDesc = tableDesc;
     propertyNode->accessors.table.get = get;
     propertyNode->accessors.table.set = set;
     propertyNode->accessors.table.count = count;
@@ -240,36 +240,38 @@ int PropertiesRemoveAllProperties(char *path)
 
 int PropertiesSet(char *path, PropertyValue_t *value)
 {
-    int result = 0;
+    int result = -1;
     char *leftOver;
     PropertyNode_t *node = PropertiesFindNode(path, &leftOver);
-    if ((node == NULL) || ((leftOver != NULL) && (node->type != PropertyType_Table)))
-    {
-        result = -1;
-    }
-    else
+
+    if ((node != NULL) && ((leftOver == NULL) || (node->type == PropertyType_Table)))
     {
         if (node->type == PropertyType_Table)
         {
+            int row, column;
             /* Check that all dimensions are specified */
+            if (sscanf(leftOver, ".%d.%d", &row, &column) == 2)
+            {
+                PropertyTableDescription_t *tableDesc = node->accessors.table.tableDesc;
+                if (column < tableDesc->nrofColumns)
+                {
+                    if ((tableDesc->columns[column].type == value->type) &&
+                        (node->accessors.table.set != NULL))
+                    {
+                        result = node->accessors.table.set(node->userArg, row, column, value);
+                    }
+                }
+            }
         }
         else
         {
-            if (node->type == value->type)
+            if ((node->type == value->type) && (node->accessors.simple.set != NULL))
             {
-                if (node->accessors.simple.set != NULL)
-                {
-                    result = node->accessors.simple.set(node->userArg, value);
-                }
-                else
-                {
-                    result = -1;
-                }
+                result = node->accessors.simple.set(node->userArg, value);
             }
             else
             {
                 LogModule(LOG_ERROR, PROPERTIES, "Wrong type supplied as value while trying to set property %s!", path);
-                result = -1;
             }
         }
     }
@@ -635,13 +637,45 @@ static PropertyNode_t *PropertiesCreateNode(PropertyNode_t *parentNode, char *ne
     childNode->type = PropertyType_None;
     childNode->desc = NULL;
     childNode->parent = parentNode;
-    childNode->prev = NULL;
-    childNode->next = parentNode->childNodes;
+
     if (parentNode->childNodes)
     {
-        parentNode->childNodes->prev = childNode;
+        PropertyNode_t *node, *prevNode = NULL;
+        for (node = parentNode->childNodes; node; node = node->next)
+        {
+            if (strcmp(node->name, newProp) > 0)
+            {
+                break;
+            }
+            prevNode = node;
+        }
+        if (node == NULL)
+        {
+            prevNode->next = childNode;
+            childNode->next = NULL;
+            childNode->prev = prevNode;            
+        }
+        else
+        {
+            childNode->next = node;
+            node->prev = childNode;
+            childNode->prev = prevNode;
+            if (prevNode)
+            {
+                prevNode->next = childNode;
+            }
+            else
+            {
+                parentNode->childNodes = childNode;
+            }
+        }
     }
-    parentNode->childNodes = childNode;
+    else
+    {
+        parentNode->childNodes = childNode;
+        childNode->prev = NULL;
+        childNode->next = NULL;
+    }
     return childNode;
 }
 

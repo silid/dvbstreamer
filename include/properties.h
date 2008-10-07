@@ -24,10 +24,11 @@ Expose internal properties to the user.
 #define _PROPERTIES_H
 
 #include "types.h"
+#include "stdint.h"
 
 #define PROPERTIES_PATH_MAX 255
 
-#define PROPERTIES_TABLE_DIMS_MAX 4
+#define PROPERTIES_TABLE_COLUMNS_MAX 10
 
 typedef enum PropertyType_e {
     PropertyType_None,      /**< Special internal type, do not use. */
@@ -58,41 +59,20 @@ typedef struct PropertyValue_s{
     }u;
 }PropertyValue_t;
     
-typedef struct PropertyTableDimension_s{
-    char *description;
-}PropertyTableDimension_t;
-
-typedef struct PropertyTable_s{
-    int nrofDimensions; /**< Number of dimensions in this table */
-    PropertyTableDimension_t *dimensions; /**< Description of the table dimensions */
-}PropertyTable_t;
-
-typedef struct PropertyTableLocation_s{
-    int nrofDimensions;
-    char *indices[PROPERTIES_TABLE_DIMS_MAX];
-}PropertyTableLocation_t;
-
-typedef int (*PropertySimpleAccessor_t)(void *userArg, PropertyValue_t *value);
-typedef int (*PropertyTableAccessor_t)(void *userArg, PropertyTableLocation_t *location, PropertyValue_t *value);
-typedef int (*PropertyTableCounter_t)(void *userArg, PropertyTableLocation_t *location);
-
-typedef struct PropertyDef_s{
+typedef struct PropertyTableColumn_s{
     char *name;
     char *description;
     PropertyType_e type;
-    void *userArg;
-    union {
-        struct {
-            PropertySimpleAccessor_t set;
-            PropertySimpleAccessor_t get;
-        }simple;
-        struct {
-            PropertyTableAccessor_t set;
-            PropertyTableAccessor_t get;
-            PropertyTableCounter_t  count;
-        }table;
-    }accessors;
-}PropertyDef_t;
+}PropertyTableColumn_t;
+
+typedef struct PropertyTableDescription_s{
+    int nrofColumns;
+    PropertyTableColumn_t columns[PROPERTIES_TABLE_COLUMNS_MAX];
+}PropertyTableDescription_t;
+
+typedef int (*PropertySimpleAccessor_t)(void *userArg, PropertyValue_t *value);
+typedef int (*PropertyTableAccessor_t)(void *userArg, int row, int column, PropertyValue_t *value);
+typedef int (*PropertyTableCounter_t)(void *userArg);
 
 /**
  * Initialise properties module.
@@ -110,7 +90,7 @@ int PropertiesDeInit(void);
 int PropertiesAddProperty(char *path, char *name, char *desc, PropertyType_e type, 
                               void *userArg, PropertySimpleAccessor_t get, PropertySimpleAccessor_t set);
 
-int PropertyAddTableProperty(char *path, char *name, char *desc, 
+int PropertyAddTableProperty(char *path, char *name, char *desc, PropertyTableDescription_t *tableDesc,
                               void *userArg, PropertyTableAccessor_t get, PropertyTableAccessor_t set, 
                               PropertyTableCounter_t count);
 
