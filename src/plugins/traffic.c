@@ -156,8 +156,8 @@ static int FilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacke
     // We're only interested in collecting data when there's a lock on a mux
     if (serviceLock == FALSE)
     {
+        DVBAdapter_t *adapter;
         Service_t * service;
-        fe_status_t status = 0;
 
         service = TuningCurrentServiceGet();
         if (!service)
@@ -165,9 +165,8 @@ static int FilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacke
             return 0;
         }
         ServiceRefDec(service);
-
-        DVBFrontEndStatus(MainDVBAdapterGet(), &status, NULL, NULL, NULL, NULL);
-        if (!(status & FE_HAS_LOCK))
+        adapter = MainDVBAdapterGet();
+        if (adapter->frontEndLocked)
         {
             return 0;
         }

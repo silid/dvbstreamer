@@ -92,6 +92,7 @@ typedef struct DVBAdapter_t
 
     char frontEndPath[30];            /**< Path to the frontend device */
     int frontEndFd;                   /**< File descriptor for the frontend device */
+    bool frontEndLocked;              /**< Whether the frontend is currently locked onto a signal. */
 
     char demuxPath[30];               /**< Path to the demux device */
     DVBAdapterPIDFilter_t filters[DVB_MAX_PID_FILTERS];/**< File descriptor for the demux device.*/
@@ -107,6 +108,8 @@ typedef struct DVBAdapter_t
                                            portion of the transport stream */
     pthread_t monitorThread;          /**< Thread monitoring the lock state of the frontend. */
     bool monitorExit;                 /**< Boolean to exit monitor thread. */
+    int monitorRecvFd;                /**< File descriptor for monitor task to recieve commands */
+    int monitorSendFd;                /**< File descriptor to send commands to monitor task. */
 }
 DVBAdapter_t;
 

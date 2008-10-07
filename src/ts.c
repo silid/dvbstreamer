@@ -207,7 +207,6 @@ static void *FilterTS(void *arg)
     struct timeval now, last;
     int diff;
     unsigned long long prevpackets = 0;
-    bool locked = FALSE;
 
     TSFilter_t *state = (TSFilter_t*)arg;
     DVBAdapter_t *adapter = state->adapter;
@@ -221,7 +220,7 @@ static void *FilterTS(void *arg)
     {
         int p;
         /* Read in packet */
-        count = DVBDVRRead(adapter, (char*)state->readBuffer, sizeof(state->readBuffer), 100);
+        count = DVBDVRRead(adapter, (char*)state->readBuffer, sizeof(state->readBuffer), 1000);
         if (state->quit)
         {
             break;
@@ -231,20 +230,12 @@ static void *FilterTS(void *arg)
         {
             InformMultiplexChanged(state);
             state->multiplexChanged = FALSE;
-            locked = FALSE;
             /* Thow away these packets as they could be a mix of packets from the old TS and the new TS */
             continue;
         }
 
-        if (!locked)
+        if (!adapter->frontEndLocked)
         {
-            fe_status_t status = 0;
-            DVBFrontEndStatus(adapter, &status, NULL, NULL, NULL, NULL);
-
-            if (status & FE_HAS_LOCK)
-            {
-                locked = TRUE;
-            }
             continue;
         }
 
