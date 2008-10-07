@@ -228,7 +228,8 @@ Event_t EventsFindEvent(char *name)
     if (sourceName)
     {
         memcpy(sourceName, name, sourceNameLen);
-        ObjectFree(sourceName);
+        sourceName[sourceNameLen] = 0;
+
         source = EventsFindSource(sourceName);
         if (source)
         {
@@ -245,7 +246,7 @@ Event_t EventsFindEvent(char *name)
                 }
             }
         }
-            
+        ObjectFree(sourceName);    
     }
     pthread_mutex_unlock(&eventsMutex);
     return result;
