@@ -110,6 +110,26 @@ Multiplex_t *MultiplexFindId(int netid, int tsid);
 Multiplex_t *MultiplexFindFrequency(int freq);
 
 /**
+ * Retrieve the first Multiplex_t structure for the given frequency range, ie
+ * freq - plusminus >= mux <= freq + plusminus.
+ * The returned structured should be released using MultiplexRefDec.
+ * @param freq Frequency of the multiplex to retrieve.
+ * @param plusminus The range above and below the frequency to match.
+ * @return A Mulitplex_t or NULL if the frequency could not be found.
+ */
+Multiplex_t *MultiplexFindFrequencyRange(int freq, int plusminus);
+
+/**
+ * Retrieve the first Multiplex_t structure for the given frequency which also 
+ * matches the supplied DiSEqC settings.
+ * The returned structured should be released using MultiplexRefDec.
+ * @param freq Frequency of the multiplex to retrieve.
+ * @param diseqc The DiSEqC settings to match.
+ * @return A Mulitplex_t or NULL if the frequency could not be found.
+ */
+Multiplex_t *MultiplexFindDVBSMultiplex(int freq, DVBDiSEqCSettings_t *diseqc);
+
+/**
  * Retrieve an enumerator for all the multiplexes in the database.
  * @return An enumerator instance or NULL if there was not enough memory.
  */
@@ -147,6 +167,13 @@ int MultiplexFrontendParametersGet(Multiplex_t *multiplex, struct dvb_frontend_p
  * @return 0 on success, otherwise an SQLite error code.
  */
 int MultiplexAdd(fe_type_t type, struct dvb_frontend_parameters *feparams, DVBDiSEqCSettings_t *diseqc, int *uid);
+
+/**
+ * Remove a multiplex and all its services from the database.
+ * @param multiplex The multiplex to delete.
+ * @return 0 on success, otherwise an SQLite error code.
+ */
+int MultiplexDelete(Multiplex_t *multiplex);
 
 /**
  * Set the PAT version of a multiplex.
