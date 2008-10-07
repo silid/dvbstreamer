@@ -132,6 +132,13 @@ int ServiceForMultiplexCount(int multiplexuid);
 int ServiceDelete(Service_t  *service);
 
 /**
+ * Remove all service for a specific multiplex from the database.
+ * @param mux The multiplex to remove all services for.
+ * @return 0 on success, otherwise an SQLite error code.
+ */
+int ServiceDeleteAll(Multiplex_t *mux);
+
+/**
  * Add a service to the database.
  * @param multiplexuid The multiplex the service is broadcast on.
  * @param name Name of the service.

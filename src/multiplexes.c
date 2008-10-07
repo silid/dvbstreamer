@@ -26,13 +26,18 @@ Manage multiplexes and tuning parameters.
 
 #include "dbase.h"
 #include "multiplexes.h"
+#include "services.h"
 #include "logging.h"
 
 /*******************************************************************************
 * Defines                                                                      *
 *******************************************************************************/
-#define MULTIPLEX_FIELDS MULTIPLEX_UID "," MULTIPLEX_FREQ "," MULTIPLEX_TSID "," \
-                        MULTIPLEX_NETID "," MULTIPLEX_TYPE "," MULTIPLEX_PATVERSION
+#define MULTIPLEX_FIELDS MULTIPLEXES_TABLE "." MULTIPLEX_UID "," \
+                         MULTIPLEXES_TABLE "." MULTIPLEX_FREQ "," \
+                         MULTIPLEXES_TABLE "." MULTIPLEX_TSID "," \
+                         MULTIPLEXES_TABLE "." MULTIPLEX_NETID "," \
+                         MULTIPLEXES_TABLE "." MULTIPLEX_TYPE "," \
+                         MULTIPLEXES_TABLE "." MULTIPLEX_PATVERSION
                         
 /*******************************************************************************
 * Prototypes                                                                   *
@@ -40,13 +45,16 @@ Manage multiplexes and tuning parameters.
 
 static int OFDMParametersGet(int uid, struct dvb_frontend_parameters *feparams);
 static int OFDMParametersAdd(int uid,struct dvb_frontend_parameters *feparams);
+static int OFDMParametersDelete(int uid);
 static int QPSKParametersGet(int uid, struct dvb_frontend_parameters *feparams, DVBDiSEqCSettings_t *diseqc);
 static int QPSKParametersAdd(int uid,struct dvb_frontend_parameters *feparams, DVBDiSEqCSettings_t *diseqc);
+static int QPSKParametersDelete(int uid);
 static int QAMParametersGet(int uid, struct dvb_frontend_parameters *feparams);
 static int QAMParametersAdd(int uid,struct dvb_frontend_parameters *feparams);
+static int QAMParametersDelete(int uid);
 static int VSBParametersGet(int uid, struct dvb_frontend_parameters *feparams);
 static int VSBParametersAdd(int uid,struct dvb_frontend_parameters *feparams);
-
+static int VSBParametersDelete(int uid);
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
@@ -157,6 +165,43 @@ Multiplex_t *MultiplexFindFrequency(int freq)
     return result;
 }
 
+Multiplex_t *MultiplexFindFrequencyRange(int freq, int plusminus)
+{
+    Multiplex_t *result = NULL;
+    STATEMENT_INIT;
+
+    STATEMENT_PREPAREVA("SELECT " MULTIPLEX_FIELDS " "
+                        "FROM " MULTIPLEXES_TABLE " WHERE " MULTIPLEX_FREQ">=%d AND "
+                        MULTIPLEX_FREQ"<=%d;", freq - plusminus, freq + plusminus);
+    RETURN_ON_ERROR(NULL);
+
+    result = MultiplexGetNext((MultiplexEnumerator_t)stmt);
+
+    STATEMENT_FINALIZE();
+    return result;
+}
+
+Multiplex_t *MultiplexFindDVBSMultiplex(int freq, DVBDiSEqCSettings_t *diseqc)
+{
+    Multiplex_t *result = NULL;
+    STATEMENT_INIT;
+
+    STATEMENT_PREPAREVA("SELECT " MULTIPLEX_FIELDS " "
+                        "FROM " MULTIPLEXES_TABLE"," QPSKPARAMS_TABLE" WHERE " 
+                        QPSKPARAMS_TABLE "." QPSKPARAM_FREQ"=%d AND " 
+                        QPSKPARAMS_TABLE "." QPSKPARAM_POLARISATION "=%d AND " 
+                        QPSKPARAMS_TABLE "." QPSKPARAM_SATNUMBER "=%u AND " 
+                        QPSKPARAMS_TABLE "." QPSKPARAM_MULTIPLEXUID "=" MULTIPLEXES_TABLE"."MULTIPLEX_UID";", 
+                        freq, diseqc->polarisation, diseqc->satellite_number);
+    RETURN_ON_ERROR(NULL);
+
+    result = MultiplexGetNext((MultiplexEnumerator_t)stmt);
+
+    STATEMENT_FINALIZE();
+    return result;
+}
+
+
 MultiplexEnumerator_t MultiplexEnumeratorGet()
 {
     STATEMENT_INIT;
@@ -257,6 +302,41 @@ int MultiplexAdd(fe_type_t type, struct dvb_frontend_parameters *feparams, DVBDi
 
     STATEMENT_FINALIZE();
     return rc;
+}
+
+int MultiplexDelete(Multiplex_t *multiplex)
+{
+    STATEMENT_INIT;
+    STATEMENT_PREPAREVA("DELETE FROM " MULTIPLEXES_TABLE
+                        " WHERE " MULTIPLEX_UID "=%d;", multiplex->uid);
+
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+
+    STATEMENT_FINALIZE();
+
+    ServiceDeleteAll(multiplex);
+        
+    switch (multiplex->type)
+    {
+        case FE_QPSK:
+            QPSKParametersDelete(multiplex->uid);
+            break;
+        case FE_QAM:
+            QAMParametersDelete(multiplex->uid);
+            break;
+        case FE_OFDM:
+            OFDMParametersDelete(multiplex->uid);
+            break;
+        case FE_ATSC:
+            VSBParametersDelete(multiplex->uid);
+            break;
+        default:
+            break;
+    }
+    
+    return 0;
 }
 
 int MultiplexPATVersionSet(Multiplex_t *multiplex, int patversion)
@@ -376,6 +456,20 @@ static int OFDMParametersAdd(int uid, struct dvb_frontend_parameters *feparams)
     return rc;
 }
 
+static int OFDMParametersDelete(int uid)
+{
+    STATEMENT_INIT;
+    STATEMENT_PREPAREVA("DELETE FROM " OFDMPARAMS_TABLE
+                        " WHERE " OFDMPARAM_MULTIPLEXUID "=%d;", uid);
+
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+
+    STATEMENT_FINALIZE();
+    return 0;
+}
+
 static int QPSKParametersGet(int uid, struct dvb_frontend_parameters *feparams, DVBDiSEqCSettings_t *diseqc)
 {
     STATEMENT_INIT;
@@ -434,6 +528,19 @@ static int QPSKParametersAdd(int uid,struct dvb_frontend_parameters *feparams, D
     return rc;
 }
 
+static int QPSKParametersDelete(int uid)
+{
+    STATEMENT_INIT;
+    STATEMENT_PREPAREVA("DELETE FROM " QPSKPARAMS_TABLE
+                        " WHERE " QPSKPARAM_MULTIPLEXUID "=%d;", uid);
+
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+
+    STATEMENT_FINALIZE();
+    return 0;
+}
 static int QAMParametersGet(int uid, struct dvb_frontend_parameters *feparams)
 {
     STATEMENT_INIT;
@@ -487,6 +594,20 @@ static int QAMParametersAdd(int uid,struct dvb_frontend_parameters *feparams)
     return rc;
 }
 
+static int QAMParametersDelete(int uid)
+{
+    STATEMENT_INIT;
+    STATEMENT_PREPAREVA("DELETE FROM " QAMPARAMS_TABLE
+                        " WHERE " QAMPARAM_MULTIPLEXUID "=%d;", uid);
+
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+
+    STATEMENT_FINALIZE();
+    return 0;
+}
+
 static int VSBParametersGet(int uid, struct dvb_frontend_parameters *feparams)
 {
     STATEMENT_INIT;
@@ -527,5 +648,19 @@ static int VSBParametersAdd(int uid, struct dvb_frontend_parameters *feparams)
 
     STATEMENT_FINALIZE();
     return rc;
+}
+
+static int VSBParametersDelete(int uid)
+{
+    STATEMENT_INIT;
+    STATEMENT_PREPAREVA("DELETE FROM " VSBPARAMS_TABLE
+                        " WHERE " VSBPARAM_MULTIPLEXUID "=%d;", uid);
+
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+
+    STATEMENT_FINALIZE();
+    return 0;
 }
 

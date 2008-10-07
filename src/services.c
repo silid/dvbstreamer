@@ -52,6 +52,7 @@ Manage services and PIDs.
 
 static void ServiceDestructor(void * arg);
 static char *ServiceEventToString(Event_t event,void * payload);
+static char *ServiceEventAllDeletedToString(Event_t event,void * payload);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -60,6 +61,7 @@ static char *ServiceEventToString(Event_t event,void * payload);
 static EventSource_t servicesSource;
 static Event_t serviceAddedEvent;
 static Event_t serviceDeletedEvent;
+static Event_t serviceAllDeletedEvent;
 
 /*******************************************************************************
 * Global functions                                                             *
@@ -74,6 +76,7 @@ int ServiceInit(void)
         servicesSource = EventsRegisterSource("Services");
         serviceAddedEvent = EventsRegisterEvent(servicesSource, "Added", ServiceEventToString);
         serviceDeletedEvent = EventsRegisterEvent(servicesSource, "Deleted", ServiceEventToString);
+        serviceAllDeletedEvent = EventsRegisterEvent(servicesSource, "AllDeleted", ServiceEventAllDeletedToString);        
     }
     return  result;
 }
@@ -106,8 +109,6 @@ int ServiceDelete(Service_t  *service)
 {
     STATEMENT_INIT;
 
-    EventsFireEventListeners(serviceDeletedEvent, service);
-    
     STATEMENT_PREPAREVA("DELETE FROM " SERVICES_TABLE " "
                         "WHERE " SERVICE_MULTIPLEXUID "=%d AND " SERVICE_ID "=%d;",
                         service->multiplexUID, service->id);
@@ -116,7 +117,26 @@ int ServiceDelete(Service_t  *service)
     STATEMENT_STEP();
 
     STATEMENT_FINALIZE();
+    EventsFireEventListeners(serviceDeletedEvent, service);
+    
     return 0;
+}
+
+int ServiceDeleteAll(Multiplex_t *mux)
+{
+    STATEMENT_INIT;
+    
+    STATEMENT_PREPAREVA("DELETE FROM " SERVICES_TABLE " "
+                        "WHERE " SERVICE_MULTIPLEXUID "=%d;",
+                        mux->uid);
+    RETURN_RC_ON_ERROR;
+
+    STATEMENT_STEP();
+
+    STATEMENT_FINALIZE();
+
+    EventsFireEventListeners(serviceAllDeletedEvent, mux);
+    return 0;    
 }
 
 int ServiceAdd(int uid, char *name, int id, int source, bool ca, ServiceType type, 
@@ -647,6 +667,15 @@ static char *ServiceEventToString(Event_t event,void * payload)
     char *result=NULL;
     Service_t *service = payload;
     asprintf(&result, "%d %04x %s",service->multiplexUID, service->id, service->name);
+    return result;
+}
+
+
+static char *ServiceEventAllDeletedToString(Event_t event,void * payload)
+{
+    char *result=NULL;
+    Multiplex_t *mux = payload;
+    asprintf(&result, "%d", mux->uid);
     return result;
 }
 
