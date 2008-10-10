@@ -68,7 +68,7 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 /**
  * Maximum number of PID filters when running in hardware restricted mode.
  */
-#define DVB_MAX_PID_FILTERS 15
+#define DVB_MAX_PID_FILTERS 64
 
 /**
  * Structure used to keep track of hardware pid filters.
@@ -79,39 +79,6 @@ typedef struct DVBAdapterPIDFilter_s
     uint16_t pid; /**< PID that is being filtered. */
     bool system;  /**< Whether this filter is for a 'system' PID */
 }DVBAdapterPIDFilter_t;
-
-/**
- * Structure representing a DVB Adapter, that is a frontend, a demux and a dvr
- * device.
- * Currently only supports the first frontend/demux/dvr per adapter.
- */
-typedef struct DVBAdapter_t
-{
-    int adapter;                      /**< The adapter number ie /dev/dvb/adapter<#adapter> */
-    struct dvb_frontend_info info;    /**< Information about the front end */
-
-    char frontEndPath[30];            /**< Path to the frontend device */
-    int frontEndFd;                   /**< File descriptor for the frontend device */
-    bool frontEndLocked;              /**< Whether the frontend is currently locked onto a signal. */
-
-    char demuxPath[30];               /**< Path to the demux device */
-    DVBAdapterPIDFilter_t filters[DVB_MAX_PID_FILTERS];/**< File descriptor for the demux device.*/
-
-    char dvrPath[30];                 /**< Path to the dvr device */
-    int dvrFd;                        /**< File descriptor for the dvr device */
-
-    int lnbLowFreq;                   /**< LNB LO frequency information */
-    int lnbHighFreq;                  /**< LNB LO frequency information */
-    int lnbSwitchFreq;                /**< LNB LO frequency information */
-
-    bool hardwareRestricted;          /**< Whether the adapter can only stream a
-                                           portion of the transport stream */
-    pthread_t monitorThread;          /**< Thread monitoring the lock state of the frontend. */
-    bool monitorExit;                 /**< Boolean to exit monitor thread. */
-    int monitorRecvFd;                /**< File descriptor for monitor task to recieve commands */
-    int monitorSendFd;                /**< File descriptor to send commands to monitor task. */
-}
-DVBAdapter_t;
 
 /**
  * Enum to represent the different polarisation available for satellite
@@ -132,6 +99,43 @@ typedef struct DVBDiSEqCSettings_s
     enum Polarisation_e polarisation;/**< Polarisation of the signal */
     unsigned long satellite_number;  /**< Satellite number for the switch */
 }DVBDiSEqCSettings_t;
+
+/**
+ * Structure representing a DVB Adapter, that is a frontend, a demux and a dvr
+ * device.
+ * Currently only supports the first frontend/demux/dvr per adapter.
+ */
+typedef struct DVBAdapter_t
+{
+    int adapter;                      /**< The adapter number ie /dev/dvb/adapter<#adapter> */
+    struct dvb_frontend_info info;    /**< Information about the front end */
+
+    char frontEndPath[30];            /**< Path to the frontend device */
+    int frontEndFd;                   /**< File descriptor for the frontend device */
+    bool frontEndLocked;              /**< Whether the frontend is currently locked onto a signal. */
+    __u32 frontEndRequestedFreq;      /**< The frequency that the application requested, may be different from one used (ie DVB-S intermediate frequency) */
+    struct dvb_frontend_parameters frontEndParams; /**< The current frontend configuration parameters. These may be updated when the frontend locks. */
+    DVBDiSEqCSettings_t diseqcSettings; /**< Current DiSEqC settings for DVB-S */
+
+    char demuxPath[30];               /**< Path to the demux device */
+    DVBAdapterPIDFilter_t filters[DVB_MAX_PID_FILTERS];/**< File descriptor for the demux device.*/
+
+    char dvrPath[30];                 /**< Path to the dvr device */
+    int dvrFd;                        /**< File descriptor for the dvr device */
+
+    int lnbLowFreq;                   /**< LNB LO frequency information */
+    int lnbHighFreq;                  /**< LNB LO frequency information */
+    int lnbSwitchFreq;                /**< LNB LO frequency information */
+
+    bool hardwareRestricted;          /**< Whether the adapter can only stream a
+                                           portion of the transport stream */
+    pthread_t monitorThread;          /**< Thread monitoring the lock state of the frontend. */
+    bool monitorExit;                 /**< Boolean to exit monitor thread. */
+    int monitorRecvFd;                /**< File descriptor for monitor task to recieve commands */
+    int monitorSendFd;                /**< File descriptor to send commands to monitor task. */
+}
+DVBAdapter_t;
+
     
 /**
  * Open a DVB Adapter.

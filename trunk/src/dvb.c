@@ -47,7 +47,7 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 * Defines                                                                      *
 *******************************************************************************/
 #define MONITOR_CMD_EXIT              0
-#define MONITOR_CMD_RETUNING           1
+#define MONITOR_CMD_RETUNING          1
 #define MONITOR_CMD_FE_ACTIVE_CHANGED 2
 /*******************************************************************************
 * Prototypes                                                                   *
@@ -58,9 +58,17 @@ static int DVBFrontEndDiSEqCSet(DVBAdapter_t *adapter, DVBDiSEqCSettings_t *dise
 #endif
 static int DVBDemuxStartFilter(DVBAdapter_t *adapter, DVBAdapterPIDFilter_t *filter);
 static int DVBDemuxStopFilter(DVBAdapter_t *adapter, DVBAdapterPIDFilter_t *filter);
+static void DVBDemuxStartAllFilters(DVBAdapter_t *adapter);
+static void DVBDemuxStopAllFilters(DVBAdapter_t *adapter);
+
 static void DVBFrontEndMonitorSend(DVBAdapter_t *adapter, char cmd);
 static void *DVBFrontEndMonitor(void *arg);
+
 static char *DVBEventToString(Event_t event, void *payload);
+
+static int DVBPropertyNameGet(void *userArg, PropertyValue_t *value);
+static int DVBPropertyActiveGet(void *userArg, PropertyValue_t *value);
+static int DVBPropertyActiveSet(void *userArg, PropertyValue_t *value);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -76,6 +84,8 @@ static EventSource_t dvbSource = NULL;
 static Event_t lockedEvent;
 static Event_t unlockedEvent;
 static Event_t tuningFailedEvent;
+static Event_t feActiveEvent;
+static Event_t feIdleEvent;
 
 static char *FETypesStr[] = {
     "QPSK",
@@ -106,6 +116,8 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
         lockedEvent = EventsRegisterEvent(dvbSource, "Locked", DVBEventToString);
         unlockedEvent = EventsRegisterEvent(dvbSource, "Unlocked", DVBEventToString);
         tuningFailedEvent = EventsRegisterEvent(dvbSource, "TuneFailed", DVBEventToString);
+        feActiveEvent  = EventsRegisterEvent(dvbSource, "FrontEndActive", DVBEventToString);
+        feIdleEvent  = EventsRegisterEvent(dvbSource, "FrontEndIdle", DVBEventToString);
     }
     
     result = (DVBAdapter_t*)ObjectAlloc(sizeof(DVBAdapter_t));
@@ -216,16 +228,19 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
         PropertiesAddProperty("adapter", "number", "The number of the adapter being used",
             PropertyType_Int, &result->adapter, PropertiesSimplePropertyGet, NULL);
         PropertiesAddProperty(adapterName, "name", "Hardware driver name", 
-            PropertyType_String, &result->info.name, PropertiesSimplePropertyGet, NULL);
+            PropertyType_String, result, DVBPropertyNameGet, NULL);
         PropertiesAddProperty(adapterName, "hwrestricted", "Whether the hardware is not capable of supplying the entire TS.", 
             PropertyType_Boolean, &result->hardwareRestricted, PropertiesSimplePropertyGet, NULL);
         PropertiesAddProperty(adapterName, "type", "The type of broadcast the frontend is capable of receiving", 
             PropertyType_String, &FETypesStr[result->info.type], PropertiesSimplePropertyGet, NULL);
         PropertiesAddProperty(adapterName, "system", "The broadcast system the frontend is capable of receiving", 
             PropertyType_String, &BroadcastSysemStr[result->info.type], PropertiesSimplePropertyGet, NULL);
+        PropertiesAddProperty(adapterName, "active","Whether the frontend is currently in use.", 
+            PropertyType_Boolean, result,DVBPropertyActiveGet,DVBPropertyActiveSet);
     }
     return result;
 }
+
 void DVBDispose(DVBAdapter_t *adapter)
 {
     char adapterName[PROPERTIES_PATH_MAX];
@@ -266,17 +281,19 @@ void DVBDispose(DVBAdapter_t *adapter)
 int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *frontend, DVBDiSEqCSettings_t *diseqc)
 {
 #ifndef __CYGWIN__
-    struct dvb_frontend_parameters localFEParams = *frontend;
-
+    adapter->frontEndParams = *frontend;
+    adapter->frontEndRequestedFreq = frontend->frequency;
+    
     if (adapter->info.type == FE_QPSK)
     {
-        if (DVBFrontEndSatelliteSetup(adapter, &localFEParams, diseqc))
+        adapter->diseqcSettings = *diseqc;
+        if (DVBFrontEndSatelliteSetup(adapter, &adapter->frontEndParams, diseqc))
         {
             return -1;
         }
     }
     DVBFrontEndMonitorSend(adapter, MONITOR_CMD_RETUNING);
-    if (ioctl(adapter->frontEndFd, FE_SET_FRONTEND, &localFEParams) < 0)
+    if (ioctl(adapter->frontEndFd, FE_SET_FRONTEND, &adapter->frontEndParams) < 0)
     {
         LogModule(LOG_ERROR, DVBADAPTER, "setfront front: %s\n", strerror(errno));
         return -1;
@@ -476,6 +493,48 @@ int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status,
     return 0;
 }
 
+int DVBFrontEndSetActive(DVBAdapter_t *adapter, bool active)
+{
+    if (active && (adapter->frontEndFd == -1))
+    {
+        struct dvb_frontend_parameters feparams;
+        DVBDiSEqCSettings_t diseqc;
+        /* Open frontend */
+        adapter->frontEndFd = open(adapter->frontEndPath, O_RDWR);
+        if (adapter->frontEndFd == -1)
+        {
+            LogModule(LOG_ERROR, DVBADAPTER, "Failed to open %s : %s\n",adapter->frontEndPath, strerror(errno));
+            return -1;
+        }
+        /* Signal monitor thread */
+        DVBFrontEndMonitorSend(adapter, MONITOR_CMD_FE_ACTIVE_CHANGED);
+        /* Fire frontend active event */
+        EventsFireEventListeners(feActiveEvent, adapter);        
+        /* Retune */
+        feparams = adapter->frontEndParams;
+        if (adapter->info.type == FE_QPSK)
+        {
+            feparams.frequency = adapter->frontEndRequestedFreq;
+            diseqc = adapter->diseqcSettings;
+        }
+        return DVBFrontEndTune(adapter, &feparams, &diseqc);
+    }
+    
+    if (!active && (adapter->frontEndFd != -1))
+    {
+        /* Stop all filters */
+        DVBDemuxStopAllFilters(adapter);
+        /* Close frontend */
+        close(adapter->frontEndFd);
+        adapter->frontEndFd = -1;
+        /* Signal monitor thread */
+        DVBFrontEndMonitorSend(adapter, MONITOR_CMD_FE_ACTIVE_CHANGED);
+        /* Fire frontend idle event */
+        EventsFireEventListeners(feIdleEvent, adapter);
+    }
+    return 0;
+}
+
 int DVBDemuxSetBufferSize(DVBAdapter_t *adapter, unsigned long size)
 {
     #ifndef __CYGWIN__
@@ -555,6 +614,7 @@ int DVBDemuxAllocateFilter(DVBAdapter_t *adapter, uint16_t pid, bool system)
                 pesFilterParam.pes_type = DMX_PES_OTHER;
                 if (adapter->frontEndLocked)
                 {
+                    LogModule(LOG_DEBUG, DVBADAPTER, "Starting pid filter immediately!\n");
                     pesFilterParam.flags = DMX_IMMEDIATE_START;
                 }
                 else
@@ -650,6 +710,30 @@ static int DVBDemuxStopFilter(DVBAdapter_t *adapter, DVBAdapterPIDFilter_t *filt
     return result;
 }
 
+static void DVBDemuxStartAllFilters(DVBAdapter_t *adapter)
+{
+    int i = 0;
+    for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
+    {
+        if (adapter->filters[i].demuxFd != -1)
+        {
+            DVBDemuxStartFilter(adapter, &adapter->filters[i]);
+        }
+    }        
+}
+
+static void DVBDemuxStopAllFilters(DVBAdapter_t *adapter)
+{
+    int i = 0;
+    for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
+    {
+        if (adapter->filters[i].demuxFd != -1)
+        {
+            DVBDemuxStopFilter(adapter, &adapter->filters[i]);
+        }
+    }        
+}
+
 int DVBDVRRead(DVBAdapter_t *adapter, char *data, int max, int timeout)
 {
 #ifndef __CYGWIN__    
@@ -710,9 +794,11 @@ static void *DVBFrontEndMonitor(void *arg)
 {
     DVBAdapter_t *adapter = arg;
 #ifndef __CYGWIN__
-    #define NROF_FDS 2
+    #define MAX_FDS 2
     fe_status_t status;
-    struct pollfd pfd[NROF_FDS];
+    struct pollfd pfd[MAX_FDS];
+    int nrofPfds = 2;
+    int i;
     bool feLocked = FALSE; 
 
     pfd[0].fd = adapter->frontEndFd;
@@ -738,82 +824,76 @@ static void *DVBFrontEndMonitor(void *arg)
     {
 #ifndef __CYGWIN__
 
-        int n = poll(pfd, NROF_FDS, -1);
+        int n = poll(pfd, nrofPfds, -1);
         if (n > 0)
         {
-            if (pfd[0].revents & POLLIN)
+            for (i = 0; i < nrofPfds; i ++)
             {
-
-                struct dvb_frontend_event event;
-                if (ioctl(adapter->frontEndFd, FE_GET_EVENT, &event) == 0)
+                
+                if ((pfd[i].revents & POLLIN) == 0)
                 {
-                    if (event.status & FE_HAS_LOCK)
-                    {
-                        adapter->frontEndLocked = TRUE;
-                    }
-                    else
-                    {
-                        adapter->frontEndLocked = FALSE;
-                    }
+                    continue;
+                }
+                if (pfd[i].fd == adapter->frontEndFd)
+                {
 
-                    
-                    if (feLocked != adapter->frontEndLocked)
+                    struct dvb_frontend_event event;
+                    if (ioctl(adapter->frontEndFd, FE_GET_EVENT, &event) == 0)
                     {
-                        if (adapter->frontEndLocked)
+                        if (event.status & FE_HAS_LOCK)
                         {
-                            int i = 0;
-                            for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
-                            {
-                                if (adapter->filters[i].demuxFd != -1)
-                                {
-                                    DVBDemuxStartFilter(adapter, &adapter->filters[i]);
-                                }
-                            }
-                            EventsFireEventListeners(lockedEvent, adapter);
-                            
+                            adapter->frontEndLocked = TRUE;
                         }
                         else
                         {
-                            int i = 0;
-                            for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
-                            {
-                                if (adapter->filters[i].demuxFd != -1)
-                                {
-                                    DVBDemuxStopFilter(adapter, &adapter->filters[i]);
-                                }
-                            }                            
-                            EventsFireEventListeners(unlockedEvent, adapter);                            
+                            adapter->frontEndLocked = FALSE;
                         }
-                        feLocked = adapter->frontEndLocked;
-                    }
 
-                    if (event.parameters.frequency <= 0)
-                    {
-                        EventsFireEventListeners(tuningFailedEvent, adapter);
+                        
+                        if (feLocked != adapter->frontEndLocked)
+                        {
+                            if (adapter->frontEndLocked)
+                            {
+                                DVBDemuxStartAllFilters(adapter);
+                                adapter->frontEndParams = event.parameters;
+                                EventsFireEventListeners(lockedEvent, adapter);
+                                
+                            }
+                            else
+                            {
+                                DVBDemuxStopAllFilters(adapter);                                                
+                                EventsFireEventListeners(unlockedEvent, adapter);                            
+                            }
+                            feLocked = adapter->frontEndLocked;
+                        }
+
+                        if (event.parameters.frequency <= 0)
+                        {
+                            EventsFireEventListeners(tuningFailedEvent, adapter);
+                        }
                     }
                 }
-                
 
-            }
-            if ((pfd[0].revents & POLLERR) || (pfd[0].revents & POLLHUP))
-            {
-                break;
+                if (pfd[i].fd == adapter->monitorRecvFd)
+                {
+                    char cmd;
+                    read(adapter->monitorRecvFd, &cmd, 1);
+                    switch (cmd)
+                    {
+                        case MONITOR_CMD_EXIT: /* Exit */
+                            break;
+                        case MONITOR_CMD_RETUNING:
+                            break;
+                        case MONITOR_CMD_FE_ACTIVE_CHANGED:
+                            if (adapter->frontEndFd == -1)
+                            {
+                                DVBDemuxStopAllFilters(adapter);
+                            }
+                            break;
+                    }
+                }
             }
             
-            if (pfd[1].revents & POLLIN)
-            {
-                char cmd;
-                read(adapter->monitorRecvFd, &cmd, 1);
-                switch (cmd)
-                {
-                    case MONITOR_CMD_EXIT: /* Exit */
-                        break;
-                    case MONITOR_CMD_RETUNING:
-                        
-                        break;
-                        
-                }
-            }
         }
         else if (n == -1)
         {
@@ -845,5 +925,25 @@ static char *DVBEventToString(Event_t event, void *payload)
     DVBAdapter_t *adapter = payload;
     asprintf(&result, "%d", adapter->adapter);
     return result;
+}
+
+static int DVBPropertyNameGet(void *userArg, PropertyValue_t *value)
+{
+    DVBAdapter_t *adapter = userArg;
+    value->u.string = strdup(adapter->info.name);
+    return 0;
+}
+
+static int DVBPropertyActiveGet(void *userArg, PropertyValue_t *value)
+{
+    DVBAdapter_t *adapter = userArg;
+    value->u.boolean = adapter->frontEndFd != -1;
+    return 0;
+}
+
+static int DVBPropertyActiveSet(void *userArg, PropertyValue_t *value)
+{
+    DVBAdapter_t *adapter = userArg;
+    return DVBFrontEndSetActive(adapter,value->u.boolean);
 }
 
