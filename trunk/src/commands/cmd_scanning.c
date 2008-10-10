@@ -127,6 +127,7 @@ static bool NITneeded = FALSE;
 static bool waitingForFELocked= FALSE;
 static bool FELocked = FALSE;
 static int PMTCount = 0;
+static int PMTNextIndex = 0;
 static struct PMTReceived_t *PMTsReceived = NULL;
 static pthread_mutex_t scanningmutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t scanningcond = PTHREAD_COND_INITIALIZER;
@@ -638,6 +639,13 @@ static void ScanMultiplex(Multiplex_t *multiplex, bool needNIT)
 
     if (PMTsReceived)
     {
+        int i;
+        DVBAdapter_t *adapter = MainDVBAdapterGet();
+        /* Make sure we remove all the PMT filters */
+        for (i = 0; i < PMTCount; i ++)
+        {
+            DVBDemuxReleaseFilter(adapter,PMTsReceived[i].pid);
+        }
         ObjectFree(PMTsReceived);
     }
 
@@ -676,7 +684,7 @@ static void PATCallback(dvbpsi_pat_t* newpat)
         tsFilter->tsStructureChanged = TRUE; /* Force all PMTs to be received again incase we are scanning a mux we have pids for */
         if (tsFilter->adapter->hardwareRestricted)
         {
-            DVBDemuxAllocateFilter(tsFilter->adapter, PMTsReceived[0].pid,FALSE);
+            for (PMTNextIndex = 0;DVBDemuxAllocateFilter(tsFilter->adapter, PMTsReceived[PMTNextIndex].pid,FALSE) == 0; PMTNextIndex ++);
         }
         pthread_mutex_lock(&scanningmutex);
         pthread_cond_signal(&scanningcond);
@@ -699,9 +707,11 @@ static void PMTCallback(dvbpsi_pmt_t* newpmt)
                 if (adapter->hardwareRestricted)
                 {
                     DVBDemuxReleaseFilter(adapter,PMTsReceived[i].pid);
-                    if (i + 1 < PMTCount)
+                    
+                    if (PMTNextIndex < PMTCount)
                     {
-                        DVBDemuxAllocateFilter(adapter, PMTsReceived[i + 1].pid,FALSE);
+                        DVBDemuxAllocateFilter(adapter, PMTsReceived[PMTNextIndex].pid, FALSE);
+                        PMTNextIndex ++;
                     }
                 }
             }
