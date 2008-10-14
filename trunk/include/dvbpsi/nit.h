@@ -22,6 +22,9 @@ Decode Network Information Tables.
 */
 #ifndef _NIT_H
 #define _NIT_H
+#define PID_NIT 0x0010
+#define TABLE_ID_NIT_ACTUAL 0x40
+#define TABLE_ID_NIT_OTHER  0x41
 
 /*****************************************************************************
  * dvbpsi_nit_service_t
@@ -66,6 +69,7 @@ typedef struct dvbpsi_nit_transport_s
  */
 typedef struct dvbpsi_nit_s
 {
+  int                       b_actual;           /*!< TRUE if NIT(Actual) or FALSE if NIT(Other)*/
   uint16_t                  i_network_id;       /*!< network_id */
   uint8_t                   i_version;          /*!< version_number */
   int                       b_current_next;     /*!< current_next_indicator */
@@ -131,13 +135,14 @@ void dvbpsi_DetachNIT(dvbpsi_demux_t * p_demux, uint8_t i_table_id,
           uint8_t i_version, int b_current_next)
  * \brief Initialize a user-allocated dvbpsi_nit_t structure.
  * \param p_nit pointer to the NIT structure
+ * \param b_actual True if this is the NIT(actual), false if NIT(other)
  * \param i_network_id network id
  * \param i_version NIT version
  * \param b_current_next current next indicator
  * \return nothing.
  */
-void dvbpsi_InitNIT(dvbpsi_nit_t *p_nit, uint16_t i_network_id, uint8_t i_version,
-                    int b_current_next);
+void dvbpsi_InitNIT(dvbpsi_nit_t *p_nit, int b_actual, uint16_t i_network_id, 
+                    uint8_t i_version, int b_current_next);
 
 /*!
  * \def dvbpsi_NewNIT(p_nit, i_network_id, i_version, b_current_next)
@@ -148,12 +153,12 @@ void dvbpsi_InitNIT(dvbpsi_nit_t *p_nit, uint16_t i_network_id, uint8_t i_versio
  * \param b_current_next current next indicator
  * \return nothing.
  */
-#define dvbpsi_NewNIT(p_nit, i_network_id, i_version, b_current_next) \
+#define dvbpsi_NewNIT(p_nit, b_actual, i_network_id, i_version, b_current_next) \
 do {                                                                    \
   ObjectRegisterTypeDestructor(dvbpsi_nit_t, (ObjectDestructor_t)dvbpsi_EmptyNIT);          \
   p_nit = (dvbpsi_nit_t*)ObjectCreateType(dvbpsi_nit_t);                \
   if(p_nit != NULL)                                                     \
-    dvbpsi_InitNIT(p_nit, i_network_id, i_version, b_current_next); \
+    dvbpsi_InitNIT(p_nit, b_actual, i_network_id, i_version, b_current_next); \
 } while(0);
 
 

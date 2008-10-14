@@ -21,6 +21,7 @@ dvbpsi_DATA = \
 	dr_0e.h \
 	dr_0f.h \
 	dr_42.h \
+	dr_43.h \
 	dr_47.h \
 	dr_48.h \
 	dr_4d.h \
@@ -29,6 +30,7 @@ dvbpsi_DATA = \
 	dr_55.h \
 	dr_56.h \
 	dr_59.h \
+	dr_5a.h \
 	dr_62.h \
 	dr_69.h \
 	dr_73.h \

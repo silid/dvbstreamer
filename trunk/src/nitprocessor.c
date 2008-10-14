@@ -47,9 +47,7 @@ Process Network Information Tables.
 /*******************************************************************************
 * Defines                                                                      *
 *******************************************************************************/
-#define NIT_PID 0x10
-#define TABLE_ID_NIT_ACTUAL 0x40
-#define TABLE_ID_NIT_OTHER  0x41
+
 
 /*******************************************************************************
 * Prototypes                                                                   *
@@ -80,14 +78,14 @@ void NITProcessorDeInit(void)
 
 PIDFilter_t *NITProcessorCreate(TSFilter_t *tsfilter)
 {
-    PIDFilter_t *result = SubTableProcessorCreate(tsfilter, NIT_PID, SubTableHandler, NULL, NULL, NULL);
+    PIDFilter_t *result = SubTableProcessorCreate(tsfilter, PID_NIT, SubTableHandler, NULL, NULL, NULL);
     if (result)
     {
         result->name = "NIT";
         result->type = PSISIPIDFilterType;
         if (tsfilter->adapter->hardwareRestricted)
         {
-            DVBDemuxAllocateFilter(tsfilter->adapter, NIT_PID, TRUE);
+            DVBDemuxAllocateFilter(tsfilter->adapter, PID_NIT, TRUE);
         }        
     }
 
@@ -98,7 +96,7 @@ void NITProcessorDestroy(PIDFilter_t *filter)
 {
     if (filter->tsFilter->adapter->hardwareRestricted)
     {
-        DVBDemuxReleaseFilter(filter->tsFilter->adapter, NIT_PID);
+        DVBDemuxReleaseFilter(filter->tsFilter->adapter, PID_NIT);
     }    
     SubTableProcessorDestroy(filter);
 }
@@ -125,7 +123,7 @@ void NITProcessorUnRegisterNITCallback(PluginNITProcessor_t callback)
 
 static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension)
 {
-    if(tableId == TABLE_ID_NIT_ACTUAL)
+    if((tableId == TABLE_ID_NIT_ACTUAL) || (tableId == TABLE_ID_NIT_OTHER))
     {
         dvbpsi_AttachNIT(demuxHandle, tableId, extension, NITHandler, arg);
     }

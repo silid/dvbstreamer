@@ -200,9 +200,10 @@ void dvbpsi_DetachNIT(dvbpsi_demux_t * p_demux, uint8_t i_table_id,
  *****************************************************************************
  * Initialize a pre-allocated dvbpsi_nit_t structure.
  *****************************************************************************/
-void dvbpsi_InitNIT(dvbpsi_nit_t* p_nit, uint16_t i_network_id, uint8_t i_version,
+void dvbpsi_InitNIT(dvbpsi_nit_t* p_nit, int b_actual, uint16_t i_network_id, uint8_t i_version,
                     int b_current_next)
 {
+  p_nit->b_actual = b_actual;
   p_nit->i_network_id = i_network_id;
   p_nit->i_version = i_version;
   p_nit->b_current_next = b_current_next;
@@ -358,6 +359,7 @@ void dvbpsi_GatherNITSections(dvbpsi_decoder_t * p_psi_decoder,
     if(!p_nit_decoder->p_building_nit)
     {
       dvbpsi_NewNIT(p_nit_decoder->p_building_nit,
+                     p_section->i_table_id == TABLE_ID_NIT_ACTUAL,
                      p_section->i_extension,
                      p_section->i_version,
                      p_section->b_current_next);

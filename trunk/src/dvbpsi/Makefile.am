@@ -51,6 +51,7 @@ mpeg2_descriptors_src = \
 
 dvb_descriptors_src = \
 	descriptors/dr_42.c \
+	descriptors/dr_43.c \
 	descriptors/dr_47.c \
 	descriptors/dr_48.c \
 	descriptors/dr_4d.c \
@@ -59,6 +60,7 @@ dvb_descriptors_src = \
 	descriptors/dr_55.c \
 	descriptors/dr_56.c \
 	descriptors/dr_59.c \
+	descriptors/dr_5a.c \
 	descriptors/dr_62.c \
 	descriptors/dr_69.c \
 	descriptors/dr_73.c \
