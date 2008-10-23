@@ -345,6 +345,9 @@ static void ScanFullDVBT(void)
     int channelCount = 0;
     int totalChannels = 0;
     Multiplex_t *mux;
+    int offsetIndex = 0;
+    unsigned int frequency;
+    unsigned int offsets[] = {-166670, 0, 166670};
 
     if (adapter->info.caps & FE_CAN_INVERSION_AUTO)
     {
@@ -429,11 +432,18 @@ static void ScanFullDVBT(void)
             feparams.u.ofdm.transmission_mode = transmit_mode;
             feparams.u.ofdm.guard_interval = guard_interval;
             feparams.u.ofdm.hierarchy_information = hierarchy;
-            feparams.frequency = 142500000 + (channel * 7000000);
-            CommandPrintf("%d %u\n", channelCount + 1, feparams.frequency);
+            frequency = 142500000 + (channel * 7000000);
+            CommandPrintf("%d %u\n", channelCount + 1, frequency);
             channelCount ++;
             mux = MultiplexFindFrequencyRange(feparams.frequency, 166670);
-            TuneFrequency(FE_OFDM, &feparams, NULL, mux, FALSE);
+            for (offsetIndex = 0; offsetIndex < 3; offsetIndex ++)
+            {
+                feparams.frequency = frequency + offsets[offsetIndex];
+                if (TuneFrequency(FE_OFDM, &feparams, NULL, mux, FALSE))
+                {
+                    break;
+                }
+            }
 
         }
     }
@@ -450,11 +460,18 @@ static void ScanFullDVBT(void)
             feparams.u.ofdm.transmission_mode = transmit_mode;
             feparams.u.ofdm.guard_interval = guard_interval;
             feparams.u.ofdm.hierarchy_information = hierarchy;
-            feparams.frequency = 306000000 + (channel * 8000000);
-            CommandPrintf("%d %u\n", channelCount + 1, feparams.frequency);
+            frequency = 306000000 + (channel * 8000000);
+            CommandPrintf("%d %u\n", channelCount + 1, frequency);
             channelCount ++;
             mux = MultiplexFindFrequencyRange(feparams.frequency, 166670);
-            TuneFrequency(FE_OFDM, &feparams, NULL, mux, FALSE);
+            for (offsetIndex = 0; offsetIndex < 3; offsetIndex ++)
+            {
+                feparams.frequency = frequency + offsets[offsetIndex];
+                if (TuneFrequency(FE_OFDM, &feparams, NULL, mux, FALSE))
+                {
+                    break;
+                }
+            }
         }
     }
 
@@ -909,6 +926,8 @@ static void ScanNetwork(char *initialdata)
                     {
                         TransponderEntry_t *entry = (TransponderEntry_t*)ListIterator_Current(iterator);
                         mux = MultiplexFindId(entry->netId, entry->tsId);
+                        feparams = entry->feparams;
+                        CommandPrintf("%d %u\n", channelCount + 1, feparams.frequency);
                         if (mux)
                         {
                             CommandPrintf(" Skipped - already found %04x:%04x\n", entry->netId, entry->tsId);
@@ -916,7 +935,6 @@ static void ScanNetwork(char *initialdata)
                         }
                         else
                         {
-                            feparams = entry->feparams;
                             if (feType == QPSK)
                             {
                                 mux = MultiplexFindDVBSMultiplex(feparams.frequency, &entry->diseqc);
@@ -925,11 +943,9 @@ static void ScanNetwork(char *initialdata)
                             {
                                 mux = MultiplexFindFrequencyRange(feparams.frequency, muxFindRange);
                             }
-                            CommandPrintf("%d %u\n", channelCount + 1, feparams.frequency);
                             TuneFrequency(feType, &feparams, &diseqcSettings, mux, TRUE);
-                            channelCount ++;
                         }
-
+                        channelCount ++;
                     }
                 }
             }
