@@ -129,6 +129,8 @@ static TSFilter_t *TSFilter;
 static DVBAdapter_t *DVBAdapter;
 static const char MAIN[] = "Main";
 static time_t StartTime;
+static char *versionStr = VERSION;
+static char *hexVersionStr;
 
 /*******************************************************************************
 * Global functions                                                             *
@@ -539,6 +541,11 @@ void UpdateDatabase()
 
 static void InstallSysProperties(void)
 {
+    asprintf(&hexVersionStr, "%02x%02x", DVBSTREAMER_MAJOR, DVBSTREAMER_MINOR);
+    PropertiesAddProperty("sys", "version", "Version of this instance of DVBStreamer", PropertyType_String,
+                        &versionStr, PropertiesSimplePropertyGet, NULL);
+    PropertiesAddProperty("sys", "hexversion", "Version of this instance of DVBStreamer as a 16 bit hex number", PropertyType_String,
+                        &hexVersionStr, PropertiesSimplePropertyGet, NULL);
     PropertiesAddProperty("sys", "uptime", "The time that this instance has been running in days/hours/minutes/seconds.",
                       PropertyType_String, NULL, SysPropertyGetUptime, NULL);
     PropertiesAddProperty("sys.uptime", "seconds", "The time that this instance has been running in seconds.",
