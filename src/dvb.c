@@ -73,7 +73,8 @@ static int DVBPropertyActiveSet(void *userArg, PropertyValue_t *value);
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
-static char DVBADAPTER[] = "DVBAdapter";
+static const char DVBADAPTER[] = "DVBAdapter";
+static const char propertyParent[] = "adapter";
 
 #ifdef __CYGWIN__
 static volatile bool locked = FALSE;
@@ -107,7 +108,6 @@ static char *BroadcastSysemStr[] = {
 DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
 {
     DVBAdapter_t *result = NULL;
-    char adapterName[PROPERTIES_PATH_MAX];
     int monitorFds[2];
     
     if (dvbSource == NULL)
@@ -224,18 +224,17 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
         pthread_create(&result->monitorThread, NULL, DVBFrontEndMonitor, result);
 
         /* Add properties */
-        sprintf(adapterName, "adapter.%d", adapter);
-        PropertiesAddProperty("adapter", "number", "The number of the adapter being used",
+        PropertiesAddProperty(propertyParent, "number", "The number of the adapter being used",
             PropertyType_Int, &result->adapter, PropertiesSimplePropertyGet, NULL);
-        PropertiesAddProperty(adapterName, "name", "Hardware driver name", 
+        PropertiesAddProperty(propertyParent, "name", "Hardware driver name", 
             PropertyType_String, result, DVBPropertyNameGet, NULL);
-        PropertiesAddProperty(adapterName, "hwrestricted", "Whether the hardware is not capable of supplying the entire TS.", 
+        PropertiesAddProperty(propertyParent, "hwrestricted", "Whether the hardware is not capable of supplying the entire TS.", 
             PropertyType_Boolean, &result->hardwareRestricted, PropertiesSimplePropertyGet, NULL);
-        PropertiesAddProperty(adapterName, "type", "The type of broadcast the frontend is capable of receiving", 
+        PropertiesAddProperty(propertyParent, "type", "The type of broadcast the frontend is capable of receiving", 
             PropertyType_String, &FETypesStr[result->info.type], PropertiesSimplePropertyGet, NULL);
-        PropertiesAddProperty(adapterName, "system", "The broadcast system the frontend is capable of receiving", 
+        PropertiesAddProperty(propertyParent, "system", "The broadcast system the frontend is capable of receiving", 
             PropertyType_String, &BroadcastSysemStr[result->info.type], PropertiesSimplePropertyGet, NULL);
-        PropertiesAddProperty(adapterName, "active","Whether the frontend is currently in use.", 
+        PropertiesAddProperty(propertyParent, "active","Whether the frontend is currently in use.", 
             PropertyType_Boolean, result,DVBPropertyActiveGet,DVBPropertyActiveSet);
     }
     return result;
@@ -243,7 +242,6 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
 
 void DVBDispose(DVBAdapter_t *adapter)
 {
-    char adapterName[PROPERTIES_PATH_MAX];
     if (adapter->dvrFd > -1)
     {
         LogModule(LOG_DEBUGV, DVBADAPTER, "Closing DVR file descriptor\n");
@@ -272,8 +270,7 @@ void DVBDispose(DVBAdapter_t *adapter)
         close(adapter->monitorRecvFd);
         close(adapter->monitorSendFd);
     }
-    sprintf(adapterName, "adapter.%d", adapter->adapter);
-    PropertiesRemoveAllProperties(adapterName);
+    PropertiesRemoveAllProperties(propertyParent);
     
     ObjectFree(adapter);
 }
@@ -883,6 +880,7 @@ static void *DVBFrontEndMonitor(void *arg)
                         case MONITOR_CMD_EXIT: /* Exit */
                             break;
                         case MONITOR_CMD_RETUNING:
+                            DVBDemuxStopAllFilters(adapter);
                             break;
                         case MONITOR_CMD_FE_ACTIVE_CHANGED:
                             if (adapter->frontEndFd == -1)
