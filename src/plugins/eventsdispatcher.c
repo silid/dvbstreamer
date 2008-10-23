@@ -38,6 +38,7 @@ Plugin to allow access to internal event information.
 #include "deferredproc.h"
 #include "list.h"
 #include "deliverymethod.h"
+#include "properties.h"
 
 /*******************************************************************************
 * Typedefs                                                                     *
@@ -90,6 +91,8 @@ static void RemoveListener(EventDispatcherListener_t *listener);
 static EventDispatcherListener_t *FindListener(char *name);
 static void AddListenerEvent(EventDispatcherListener_t *listener, char *filter);
 static bool RemoveListenerEvent(EventDispatcherListener_t *listener, char *filter);
+static int ListenerPropertyTableGet(void *userArg, int row, int column, PropertyValue_t *value);
+static int ListenerPropertyTableCount(void *userArg);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -101,6 +104,12 @@ static List_t *listenersList;
 static pthread_mutex_t listenersMutex = PTHREAD_MUTEX_INITIALIZER;
 static const char console[] = "<Console>";
 static const char EVENTDISPATCH[] = "EventDispatch";
+static const char propertiesParentPath[] = "commands.eventlisteners";
+static PropertyTableDescription_t tableDescription = {
+    .nrofColumns = 1,
+    .columns[0] = {"Event", "Events the listener is registered to received", PropertyType_String}
+};
+
 /*******************************************************************************
 * Plugin Setup                                                                 *
 *******************************************************************************/
@@ -191,20 +200,19 @@ static void EventDispatcherInstalled(bool installed)
         ObjectRegisterTypeDestructor(EventDescription_t, EventDescriptionDestructor);
         ObjectRegisterTypeDestructor(EventDispatcherListener_t, EventDispatcherListenerDestructor);
         listenersList = ListCreate();
+        PropertiesAddProperty("commands", "eventlisteners", "", PropertyType_None, NULL, NULL, NULL);
     }
     else
     {
-        while(ListCount(listenersList) > 0)
+        ListIterator_t iterator;        
+        PropertiesRemoveAllProperties(propertiesParentPath);
+        EventsUnregisterListener(EventCallback, NULL);
+        for (ListIterator_Init(iterator, listenersList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
         {
-            ListIterator_t iterator;
-            EventDispatcherListener_t *listener;
-            ListIterator_Init(iterator, listenersList);
-            listener = ListIterator_Current(iterator);
-            RemoveListener(listener);
+            EventDispatcherListener_t *listener = ListIterator_Current(iterator);
             listener->arg.dmInstance = NULL; /* Delivery Method Manager will already have destroyed this by the time we get here! */
-            ObjectRefDec(listener);
         }
-        ListFree(listenersList, NULL);
+        ObjectListFree(listenersList);
     }
 }
 
@@ -318,6 +326,7 @@ static void CommandAddListener(int argc, char **argv)
 {
     EventDispatcherListener_t *listener;
     DeliveryMethodInstance_t *mrlInstance;
+    
     listener = FindListener(argv[0]);
     if (listener)
     {
@@ -339,6 +348,8 @@ static void CommandAddListener(int argc, char **argv)
     listener->arg.dmInstance = mrlInstance;
 
     AddListener(listener);
+    PropertiesAddTableProperty(propertiesParentPath, argv[0], "Event Listener", &tableDescription, listener,
+        ListenerPropertyTableGet, NULL, ListenerPropertyTableCount);
     
 }
 
@@ -354,6 +365,7 @@ static void CommandRemoveListener(int argc, char **argv)
     
     RemoveListener(listener);
     ObjectRefDec(listener);
+    PropertiesRemoveProperty(propertiesParentPath, argv[1]);
 }
 
 static void CommandListListeners(int argc, char **argv)
@@ -439,6 +451,8 @@ static void DeferredInformListeners(void * arg)
     ListIterator_t iterator;
     char *outputLine = NULL;
     size_t outputLineLen = 0;
+    DVBAdapter_t *adapter = MainDVBAdapterGet();
+    
     LogModule(LOG_DEBUG, EVENTDISPATCH, "Processing event (%ld.%ld) %s\n", 
         eventDesc->at.tv_sec, eventDesc->at.tv_usec, eventDesc->description);
     pthread_mutex_lock(&listenersMutex);
@@ -483,8 +497,8 @@ static void DeferredInformListeners(void * arg)
                     struct tm *localtm = localtime(&eventDesc->at.tv_sec);
                     char timeStr[21]; /* xxxx-xx-xx xx:xx:xx */
                     strftime(timeStr, sizeof(timeStr)-1, "%F %T", localtm);
-                    outputLineLen = asprintf(&outputLine, "%s.%ld %s\n", 
-                        timeStr, eventDesc->at.tv_usec, 
+                    outputLineLen = asprintf(&outputLine, "%s.%ld %d %s\n", 
+                        timeStr, eventDesc->at.tv_usec, adapter->adapter,
                         eventDesc->description);
                 }
                 if (outputLine)
@@ -534,7 +548,7 @@ static void AddListener(EventDispatcherListener_t *listener)
 {
     pthread_mutex_lock(&listenersMutex);
     ListAdd(listenersList, listener);
-    if (ListCount(listenersList) > 0)
+    if (ListCount(listenersList) == 1)
     {
         LogModule(LOG_DEBUG, EVENTDISPATCH, "Adding Event callback\n");
         EventsRegisterListener(EventCallback, NULL);
@@ -550,6 +564,7 @@ static void RemoveListener(EventDispatcherListener_t *listener)
     {
         LogModule(LOG_DEBUG, EVENTDISPATCH, "Removing Event callback\n");
         EventsUnregisterListener(EventCallback, NULL);
+        LogModule(LOG_DEBUG, EVENTDISPATCH, "Removed Event callback\n");
     }
     pthread_mutex_unlock(&listenersMutex);
 }
@@ -617,4 +632,57 @@ static bool RemoveListenerEvent(EventDispatcherListener_t *listener, char *filte
     }
     pthread_mutex_unlock(&listenersMutex);    
     return found;
+}
+
+static int ListenerPropertyTableGet(void *userArg, int row, int column, PropertyValue_t *value)
+{
+    EventDispatcherListener_t *listener = userArg;
+    int count = ListenerPropertyTableCount(userArg);
+    int i = 0;
+    ListIterator_t iterator;
+    if (row > count)
+    {
+        return -1;
+    }
+    value->u.string = NULL;
+    if (listener->allEvents)
+    {
+        if (row == 0)
+        {
+            value->u.string = strdup("*");
+        }
+        else
+        {
+            i = 1;
+        }
+    }
+    if (value->u.string == NULL)
+    {
+        
+        for (ListIterator_Init(iterator, listener->events); 
+             ListIterator_MoreEntries(iterator);
+             ListIterator_Next(iterator))
+        {
+            if (i == row)
+            {
+                char *eventStr = ListIterator_Current(iterator);
+                value->u.string = strdup(eventStr);
+                break;
+            }
+            i ++;
+        }
+    }
+    return 0;
+}
+
+static int ListenerPropertyTableCount(void *userArg)
+{
+    EventDispatcherListener_t *listener = userArg;
+    int count = 0;
+    if (listener->allEvents)
+    {
+        count ++;
+    }
+    count = ListCount(listener->events);
+    return count;
 }
