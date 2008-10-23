@@ -72,7 +72,6 @@ typedef struct TransponderEntry_s
     int tsId;
     struct dvb_frontend_parameters feparams;
     DVBDiSEqCSettings_t diseqc;
-    bool tried;
 }TransponderEntry_t;
 
 /*******************************************************************************
@@ -885,41 +884,61 @@ static void ScanNetwork(char *initialdata)
 
     if (parsed)
     {
-        if (adapter->info.caps & FE_CAN_INVERSION_AUTO)
+        if (adapter->info.type == feType)
         {
-            feparams.inversion = INVERSION_AUTO;
-        }
-        else
-        {
-            LogModule(LOG_INFO, SCANNING, "INVERSION_AUTO not supported, trying INVERSION_OFF.\n");
-            feparams.inversion = INVERSION_OFF;
-        }
-        
-        transponderList = ListCreate();
-        mux = MultiplexFindFrequencyRange(feparams.frequency, muxFindRange);
-        CommandPrintf("Scanning 1 frequencies\n");
-        CommandPrintf("%d %u\n", channelCount + 1, feparams.frequency);
-        if (TuneFrequency(feType, &feparams, &diseqcSettings, mux, TRUE) == 0)
-        {
-             if (ListCount(transponderList) > 0)
+            if (adapter->info.caps & FE_CAN_INVERSION_AUTO)
             {
-                CommandPrintf("Scanning %d frequencies\n", ListCount(transponderList));            
-                for (ListIterator_Init(iterator, transponderList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+                feparams.inversion = INVERSION_AUTO;
+            }
+            else
+            {
+                LogModule(LOG_INFO, SCANNING, "INVERSION_AUTO not supported, trying INVERSION_OFF.\n");
+                feparams.inversion = INVERSION_OFF;
+            }
+            
+            transponderList = ListCreate();
+            mux = MultiplexFindFrequencyRange(feparams.frequency, muxFindRange);
+            CommandPrintf("Scanning 1 frequencies\n");
+            CommandPrintf("%d %u\n", channelCount + 1, feparams.frequency);
+            if (TuneFrequency(feType, &feparams, &diseqcSettings, mux, TRUE) == 0)
+            {
+                 if (ListCount(transponderList) > 0)
                 {
-                    TransponderEntry_t *entry = (TransponderEntry_t*)ListIterator_Current(iterator);
-                    if (entry->tried == FALSE)
+                    CommandPrintf("Scanning %d frequencies\n", ListCount(transponderList));            
+                    for (ListIterator_Init(iterator, transponderList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
                     {
-                        entry->tried = TRUE;
-                        feparams = entry->feparams;
-                        mux = MultiplexFindFrequencyRange(feparams.frequency, muxFindRange);
-                        CommandPrintf("%d %u\n", channelCount + 1, feparams.frequency);
-                        TuneFrequency(feType, &feparams, &diseqcSettings, mux, TRUE);
-                        channelCount ++;
+                        TransponderEntry_t *entry = (TransponderEntry_t*)ListIterator_Current(iterator);
+                        mux = MultiplexFindId(entry->netId, entry->tsId);
+                        if (mux)
+                        {
+                            CommandPrintf(" Skipped - already found %04x:%04x\n", entry->netId, entry->tsId);
+                            MultiplexRefDec(mux);
+                        }
+                        else
+                        {
+                            feparams = entry->feparams;
+                            if (feType == QPSK)
+                            {
+                                mux = MultiplexFindDVBSMultiplex(feparams.frequency, &entry->diseqc);
+                            }
+                            else
+                            {
+                                mux = MultiplexFindFrequencyRange(feparams.frequency, muxFindRange);
+                            }
+                            CommandPrintf("%d %u\n", channelCount + 1, feparams.frequency);
+                            TuneFrequency(feType, &feparams, &diseqcSettings, mux, TRUE);
+                            channelCount ++;
+                        }
+
                     }
                 }
             }
+            ListFree(transponderList, free);
         }
-        ListFree(transponderList, free);
+        else
+        {
+            CommandError(COMMAND_ERROR_GENERIC, "Type of initial tuning data supplied does not match frontend type!");
+        }
     }
     else
     {
@@ -1202,6 +1221,13 @@ static fe_guard_interval_t ofdmGuardIntTable[] = {GUARD_INTERVAL_1_32, GUARD_INT
                                                   GUARD_INTERVAL_1_8, GUARD_INTERVAL_1_4};
 static fe_transmit_mode_t  ofdmTransmitModeTable[] = { TRANSMISSION_MODE_2K, TRANSMISSION_MODE_8K,
                                                        TRANSMISSION_MODE_AUTO,TRANSMISSION_MODE_AUTO};
+
+static fe_code_rate_t fecInnerTable[] = {FEC_NONE, FEC_1_2, FEC_2_3, FEC_3_4, 
+                                         FEC_5_6, FEC_7_8, FEC_8_9, FEC_AUTO,
+                                         FEC_4_5, FEC_AUTO,FEC_NONE, FEC_NONE,
+                                         FEC_NONE, FEC_NONE,FEC_NONE, FEC_NONE};
+
+static enum Polarisation_e polarisationTable[] = {POL_HORIZONTAL, POL_VERTICAL, POL_HORIZONTAL, POL_VERTICAL};
 static void NITCallback(dvbpsi_nit_t* newnit)
 {
     DVBAdapter_t *adapter = MainDVBAdapterGet();
@@ -1210,6 +1236,7 @@ static void NITCallback(dvbpsi_nit_t* newnit)
     int i;
     dvbpsi_nit_transport_t *transport = NULL;
     struct dvb_frontend_parameters feparams;
+    DVBDiSEqCSettings_t diseqc = {POL_HORIZONTAL, 0};
     bool moreFreqs = FALSE;
 
 #define ADD_TRANSPONDER() \
@@ -1220,7 +1247,7 @@ static void NITCallback(dvbpsi_nit_t* newnit)
             if (tpEntry != NULL)\
             {\
                 tpEntry->feparams = feparams;\
-                tpEntry->tried = FALSE;\
+                tpEntry->diseqc = diseqc; \
                 tpEntry->netId = transport->i_original_network_id;\
                 tpEntry->tsId = transport->i_ts_id;\
                 ListAdd(transponderList, tpEntry);\
@@ -1277,7 +1304,29 @@ static void NITCallback(dvbpsi_nit_t* newnit)
                         if (descriptor->i_tag == 0x43)
                         {
                             dvbpsi_sat_deliv_sys_dr_t *satDelSysDr = dvbpsi_DecodeSatDelivSysDr(descriptor);
-                            BCDFixedPoint3_7ToDouble(satDelSysDr->i_frequency);
+                            double freq = BCDFixedPoint3_7ToDouble(satDelSysDr->i_frequency);
+                            double symbolRate =BCDFixedPoint3_7ToDouble(satDelSysDr->i_symbol_rate << 4);
+                            
+                            feparams.frequency = (__u32)(freq * 1000000.0);
+                            feparams.u.qpsk.fec_inner = fecInnerTable[satDelSysDr->i_fec_inner];
+                            feparams.u.qpsk.symbol_rate = (__u32)(symbolRate * 1000000.0);
+                            diseqc.polarisation = polarisationTable[satDelSysDr->i_polarization];
+                            diseqc.satellite_number = DVBSSatNumber;
+                            ADD_TRANSPONDER();
+                            moreFreqs = TRUE;
+                        }
+                        else if ((descriptor->i_tag == 0x62) && moreFreqs)
+                        {
+                            dvbpsi_frequency_list_dr_t *freqListDr = dvbpsi_DecodeFrequencyListDr(descriptor);
+                            if (freqListDr->i_coding_type == 1)
+                            {
+                                for (i = 0; i < freqListDr->i_number_of_frequencies; i ++)
+                                {
+                                    double freq = BCDFixedPoint3_7ToDouble(freqListDr->p_center_frequencies[i]);
+                                    feparams.frequency =  (__u32)(freq * 1000000.0);
+                                    ADD_TRANSPONDER();
+                                }
+                            }
                         }
                         break;
                         
