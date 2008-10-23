@@ -171,10 +171,11 @@ Command_t CommandDetailsInfo[] =
     },
     {
         "lsprops",
-        TRUE, 0, 1,
+        TRUE, 0, 2,
         "List available properties.",
-        "lsprops [<property path>]\n"
-        "List all available properties at the specified path or the root if not supplied.\n",
+        "lsprops [-l] [<property path>]\n"
+        "List all available properties at the specified path or the root if not supplied."
+        "Use -l to show type and whether the property is readable/writable and has any children.",
         CommandListProperties
     },
     {
@@ -182,7 +183,7 @@ Command_t CommandDetailsInfo[] =
         TRUE, 1, 1,
         "Get the value of a property.",
         "getprop <property path>\n"
-        "Get the value of the specified property.\n",
+        "Get the value of the specified property.",
         CommandGetProperty
     },
     {
@@ -190,7 +191,7 @@ Command_t CommandDetailsInfo[] =
          TRUE, 2, 2,
         "Set the value of a property.",
         "setprop <property path> <new value>\n"
-        "Set the value of the specified property to that of <new value>.\n",
+        "Set the value of the specified property to that of <new value>.",
         CommandSetProperty   
     },
     {
@@ -198,7 +199,7 @@ Command_t CommandDetailsInfo[] =
         TRUE, 1, 1,
         "Display information about a property.",
         "propinfo <property path>\n"
-        "Display information about the specified property.\n",
+        "Display information about the specified property.",
         CommandPropertyInfo
     },
     {NULL, FALSE, 0, 0, NULL,NULL}
@@ -764,16 +765,21 @@ static char *GetStreamTypeString(int type)
 static void CommandListProperties(int argc, char **argv)
 {
     PropertiesEnumerator_t pos;
-    char *path = "";
-    char *name;
-    char *desc;
+    PropertyInfo_t propInfo;
+    char *path = NULL;
     char *typeStr;
-    PropertyType_e type;
-    bool read, write, dir;
-    
-    if (argc == 1)
+    int i;
+    bool list = FALSE;
+    for (i = 0; i < argc; i++)
     {
-        path = argv[0];
+        if (strcmp("-l", argv[i]) == 0)
+        {
+            list = TRUE;
+        }
+        else if (path == NULL)
+        {
+            path = argv[i];
+        }
     }
     if (PropertiesEnumerate(path, &pos) == 0)
     {
@@ -781,12 +787,19 @@ static void CommandListProperties(int argc, char **argv)
         {
             for (; PropertiesEnumMoreEntries(pos); pos = PropertiesEnumNext(pos))
             {
-                PropertiesEnumGetInfo(pos, &name, &desc, &type, &read, &write, &dir);
-                typeStr = GetPropertyTypeString(type);
-                CommandPrintf("%c%c%c %-10s %s\n", dir == TRUE   ? 'D':'-', 
-                                                   read == TRUE  ? 'R':'-', 
-                                                   write == TRUE ? 'W':'-', 
-                                                   typeStr, name);
+                PropertiesEnumGetInfo(pos, &propInfo);
+                if (list)
+                {
+                    typeStr = GetPropertyTypeString(propInfo.type);
+                    CommandPrintf("%c%c%c %-10s %s\n", propInfo.hasChildren == TRUE ? 'D':'-', 
+                                                       propInfo.readable    == TRUE ? 'R':'-', 
+                                                       propInfo.writeable   == TRUE ? 'W':'-', 
+                                                       typeStr, propInfo.name);
+                }
+                else
+                {
+                    CommandPrintf("%s\n", propInfo.name);
+                }
             }
         }
         else
@@ -848,17 +861,26 @@ static void CommandSetProperty(int argc, char **argv)
 
 static void CommandPropertyInfo(int argc, char **argv)
 {
-    char *desc;
-    PropertyType_e type;
-    bool read, write, dir;
+    PropertyInfo_t propInfo;
     
-    if (PropertiesGetInfo(argv[0], &desc, &type, &read, &write, &dir) == 0)
+    if (PropertiesGetInfo(argv[0], &propInfo) == 0)
     {
-        CommandPrintf("Type        : %s\n", GetPropertyTypeString(type));
-        CommandPrintf("Readable    : %s\n", read  == TRUE ? "Yes":"No");
-        CommandPrintf("Writeable   : %s\n", write == TRUE ? "Yes":"No");
-        CommandPrintf("Has Children: %s\n", dir   == TRUE ? "Yes":"No");
-        CommandPrintf("Description:\n%s\n", desc == NULL ? "":desc);
+        CommandPrintf("Type        : %s\n", GetPropertyTypeString(propInfo.type));
+        CommandPrintf("Readable    : %s\n", propInfo.readable    == TRUE ? "Yes":"No");
+        CommandPrintf("Writeable   : %s\n", propInfo.writeable   == TRUE ? "Yes":"No");
+        CommandPrintf("Has Children: %s\n", propInfo.hasChildren == TRUE ? "Yes":"No");
+        CommandPrintf("Description :\n%s\n", propInfo.desc == NULL ? "":propInfo.desc);
+        if (propInfo.type == PropertyType_Table)
+        {
+            int i;
+            CommandPrintf("\nColumns     : %d\n", propInfo.tableDesc->nrofColumns);
+            for (i = 0; i < propInfo.tableDesc->nrofColumns; i ++)
+            {
+                CommandPrintf("(%d) Name: %s\n", i, propInfo.tableDesc->columns[i].name);
+                CommandPrintf("(%d) Type: %s\n", i, GetPropertyTypeString(propInfo.tableDesc->columns[i].type));
+                CommandPrintf("(%d) Description: %s\n\n", i, propInfo.tableDesc->columns[i].description);
+            }
+        }
     }
     else
     {

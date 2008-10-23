@@ -41,7 +41,7 @@ typedef enum PropertyType_e {
     /* Special types */    
     PropertyType_PID,       /**< 12Bit unsigned integer, special value of 8192 allowed for all PIDs*/
     PropertyType_IPAddress, /**< IPv4 or IPv6 IP address/hostname */
-    PropertyType_Table,     /**< Multi-dimensional tables, need to use VarTableDescription_t to describe the table */    
+    PropertyType_Table,     /**< 2-dimensional table, need to use PropertyTableDescription_t to describe the table */    
 }PropertyType_e;
 
 typedef void *PropertiesEnumerator_t;
@@ -70,6 +70,17 @@ typedef struct PropertyTableDescription_s{
     PropertyTableColumn_t columns[PROPERTIES_TABLE_COLUMNS_MAX];
 }PropertyTableDescription_t;
 
+typedef struct PropertyInfo_s
+{
+    char *name;
+    char *desc;
+    PropertyType_e type;
+    bool readable;
+    bool writeable;
+    bool hasChildren;
+    PropertyTableDescription_t *tableDesc;
+}PropertyInfo_t;
+
 typedef int (*PropertySimpleAccessor_t)(void *userArg, PropertyValue_t *value);
 typedef int (*PropertyTableAccessor_t)(void *userArg, int row, int column, PropertyValue_t *value);
 typedef int (*PropertyTableCounter_t)(void *userArg);
@@ -87,16 +98,16 @@ int PropertiesInit(void);
 int PropertiesDeInit(void);
 
 
-int PropertiesAddProperty(char *path, char *name, char *desc, PropertyType_e type, 
+int PropertiesAddProperty(const char *path, const char *name, const char *desc, PropertyType_e type, 
                               void *userArg, PropertySimpleAccessor_t get, PropertySimpleAccessor_t set);
 
-int PropertyAddTableProperty(char *path, char *name, char *desc, PropertyTableDescription_t *tableDesc,
+int PropertiesAddTableProperty(const char *path, const char *name, const char *desc, PropertyTableDescription_t *tableDesc,
                               void *userArg, PropertyTableAccessor_t get, PropertyTableAccessor_t set, 
                               PropertyTableCounter_t count);
 
-int PropertiesRemoveProperty(char *path, char *name);
+int PropertiesRemoveProperty(const char *path, const char *name);
 
-int PropertiesRemoveAllProperties(char *path);
+int PropertiesRemoveAllProperties(const char *path);
 
 int PropertiesSet(char *path, PropertyValue_t *value);
 
@@ -106,9 +117,9 @@ int PropertiesSetStr(char *path, char *value);
 
 int PropertiesEnumerate(char *path, PropertiesEnumerator_t *pos);
 PropertiesEnumerator_t PropertiesEnumNext(PropertiesEnumerator_t pos);
-void PropertiesEnumGetInfo(PropertiesEnumerator_t pos, char **name, char **desc, PropertyType_e *type, bool *get, bool *set, bool *branch);
+void PropertiesEnumGetInfo(PropertiesEnumerator_t pos, PropertyInfo_t *propInfo);
 
-int PropertiesGetInfo(char *path, char **desc, PropertyType_e *type, bool *get, bool *set, bool *branch);
+int PropertiesGetInfo(char *path, PropertyInfo_t *propInfo);
 
 /**
  * Simple properties getter that returns the value stored at userArg.

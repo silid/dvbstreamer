@@ -46,8 +46,8 @@ typedef struct PropertyNode_s {
     struct PropertyNode_s *next;
     struct PropertyNode_s *prev;
     
-    char *name;
-    char *desc;
+    const char *name;
+    const char *desc;
     PropertyType_e type;
     void *userArg;
     union {
@@ -69,9 +69,9 @@ typedef struct PropertyNode_s {
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
-static PropertyNode_t *PropertiesCreateNodes(char *path);
-static PropertyNode_t *PropertiesCreateNode(PropertyNode_t *parentNode, char *newProp);
-static PropertyNode_t *PropertiesFindNode(char *path, char **leftOver);
+static PropertyNode_t *PropertiesCreateNodes(const char *path);
+static PropertyNode_t *PropertiesCreateNode(PropertyNode_t *parentNode, const char *newProp);
+static PropertyNode_t *PropertiesFindNode(const char *path, char **leftOver);
 static int PropertiesStrToValue(char *input, PropertyType_e toType, PropertyValue_t *output);
 static void PropertryDestructor(void *ptr);
 /*******************************************************************************
@@ -107,13 +107,13 @@ int PropertiesDeInit(void)
     return 0;
 }
 
-int PropertiesAddProperty(char *path, char *name, char *desc, PropertyType_e type, 
+int PropertiesAddProperty(const char *path, const char *name, const char *desc, PropertyType_e type, 
                               void *userArg, PropertySimpleAccessor_t get, PropertySimpleAccessor_t set)
 {
     PropertyNode_t *parentNode = PropertiesCreateNodes(path);
     PropertyNode_t *propertyNode = PropertiesCreateNode(parentNode, name);
     
-    propertyNode->desc = desc;
+    propertyNode->desc =desc;
     propertyNode->type = type;
     propertyNode->userArg = userArg;
 
@@ -122,7 +122,7 @@ int PropertiesAddProperty(char *path, char *name, char *desc, PropertyType_e typ
     return 0;
 }
 
-int PropertyAddTableProperty(char *path, char *name, char *desc, PropertyTableDescription_t *tableDesc,
+int PropertiesAddTableProperty(const char *path, const char *name, const char *desc, PropertyTableDescription_t *tableDesc,
                               void *userArg, PropertyTableAccessor_t get, PropertyTableAccessor_t set, 
                               PropertyTableCounter_t count)
 {
@@ -140,7 +140,7 @@ int PropertyAddTableProperty(char *path, char *name, char *desc, PropertyTableDe
 
 }
 
-int PropertiesRemoveProperty(char *path, char *name)
+int PropertiesRemoveProperty(const char *path, const char *name)
 {
     int result = 0;
     char *leftOver;
@@ -186,7 +186,7 @@ int PropertiesRemoveProperty(char *path, char *name)
     return result;
 }
 
-int PropertiesRemoveAllProperties(char *path)
+int PropertiesRemoveAllProperties(const char *path)
 {
     int result = 0;
     char *leftOver;
@@ -280,19 +280,35 @@ int PropertiesSet(char *path, PropertyValue_t *value)
 
 int PropertiesGet(char *path, PropertyValue_t *value)
 {
-    int result = 0;
+    int result = -1;
     char *leftOver;
     PropertyNode_t *node = PropertiesFindNode(path, &leftOver);
-    if ((node == NULL) || ((leftOver != NULL) && (node->type != PropertyType_Table)))
-    {
-        result = -1;
-    }
-    else
+    if ((node != NULL) && ((leftOver == NULL) || (node->type == PropertyType_Table)))
     {
         if (node->type == PropertyType_Table)
         {
             /* Check that all dimensions are specified and call get */
             /* Otherwise call count */
+            if (leftOver == NULL)
+            {
+                value->type = PropertyType_Int;
+                value->u.integer = node->accessors.table.count(node->userArg);
+                result = 0;
+            }
+            else
+            {
+                int row, column;
+                /* Check that all dimensions are specified */
+                if (sscanf(leftOver, "%d.%d", &row, &column) == 2)
+                {
+                    printf("row = %d column = %d nrofColumns = %d\n", row, column, node->accessors.table.tableDesc->nrofColumns);
+                    if (column < node->accessors.table.tableDesc->nrofColumns)
+                    {
+                        value->type = node->accessors.table.tableDesc->columns[column].type;
+                        result = node->accessors.table.get(node->userArg, row, column, value);
+                    }
+                }
+            }
         }
         else
         {
@@ -300,10 +316,6 @@ int PropertiesGet(char *path, PropertyValue_t *value)
             {
                 value->type = node->type;
                 result = node->accessors.simple.get(node->userArg, value);
-            }
-            else
-            {
-                result = -1;
             }
         }
     }
@@ -381,37 +393,34 @@ PropertiesEnumerator_t PropertiesEnumNext(PropertiesEnumerator_t pos)
     return NULL;
 }
 
-void PropertiesEnumGetInfo(PropertiesEnumerator_t pos, char **name, char **desc, PropertyType_e *type, bool *get, bool *set, bool *branch)
+void PropertiesEnumGetInfo(PropertiesEnumerator_t pos, PropertyInfo_t *propInfo)
 {
     PropertyNode_t *node = pos;
     
     if (node)
     {
-        *name = node->name;
-        *desc = node->desc;
-        *type = node->type;
+        propInfo->name = (char *)node->name;
+        propInfo->desc = (char *)node->desc;
+        propInfo->type = node->type;
         if (node->type == PropertyType_Table)
         {
-            *get = (node->accessors.table.get != NULL);
+            propInfo->readable = (node->accessors.table.get != NULL);
+            propInfo->writeable = (node->accessors.table.set != NULL);
+            propInfo->tableDesc = node->accessors.table.tableDesc;
         }
         else
         {
-            *get = (node->accessors.simple.get != NULL);
-        }
-        if (node->type == PropertyType_Table)
-        {
-            *set = (node->accessors.table.set != NULL);
-        }
-        else
-        {
-            *set = (node->accessors.simple.set != NULL);
+            propInfo->readable = (node->accessors.simple.get != NULL);
+            propInfo->writeable = (node->accessors.simple.set != NULL);
+            propInfo->tableDesc = NULL;
         }
         
-        *branch = (node->childNodes != NULL);
+        propInfo->hasChildren = (node->childNodes != NULL);
+        
     }
 }
 
-int PropertiesGetInfo(char *path, char **desc, PropertyType_e *type, bool *get, bool *set, bool *branch)
+int PropertiesGetInfo(char *path, PropertyInfo_t *propInfo)
 {
     int result = 0;
     char *leftOver;
@@ -422,26 +431,23 @@ int PropertiesGetInfo(char *path, char **desc, PropertyType_e *type, bool *get, 
     }
     else
     {
-        *desc = node->desc;
-        *type = node->type;
+        propInfo->name = (char *)node->name;
+        propInfo->desc = (char *)node->desc;
+        propInfo->type = node->type;
         if (node->type == PropertyType_Table)
         {
-            *get = (node->accessors.table.get != NULL);
+            propInfo->readable = (node->accessors.table.get != NULL);
+            propInfo->writeable = (node->accessors.table.set != NULL);
+            propInfo->tableDesc = node->accessors.table.tableDesc;
         }
         else
         {
-            *get = (node->accessors.simple.get != NULL);
-        }
-        if (node->type == PropertyType_Table)
-        {
-            *set = (node->accessors.table.set != NULL);
-        }
-        else
-        {
-            *set = (node->accessors.simple.set != NULL);
+            propInfo->readable = (node->accessors.simple.get != NULL);
+            propInfo->writeable = (node->accessors.simple.set != NULL);
+            propInfo->tableDesc = NULL;
         }
         
-        *branch = (node->childNodes != NULL);
+        propInfo->hasChildren = (node->childNodes != NULL);
     }
     return result;
 }
@@ -592,7 +598,7 @@ int PropertiesSimplePropertySet(void *userArg, PropertyValue_t *value)
     return  result;
 }
 
-static PropertyNode_t *PropertiesCreateNodes(char *path)
+static PropertyNode_t *PropertiesCreateNodes(const char *path)
 {
     char *toCreate = NULL;
     PropertyNode_t *currentNode;
@@ -629,7 +635,7 @@ static PropertyNode_t *PropertiesCreateNodes(char *path)
     return currentNode;
 }
 
-static PropertyNode_t *PropertiesCreateNode(PropertyNode_t *parentNode, char *newProp)
+static PropertyNode_t *PropertiesCreateNode(PropertyNode_t *parentNode, const char *newProp)
 {
     PropertyNode_t *childNode = NULL;
     childNode = ObjectCreateType(PropertyNode_t);
@@ -679,17 +685,17 @@ static PropertyNode_t *PropertiesCreateNode(PropertyNode_t *parentNode, char *ne
     return childNode;
 }
 
-static PropertyNode_t *PropertiesFindNode(char *path, char **leftOver)
+static PropertyNode_t *PropertiesFindNode(const char *path, char **leftOver)
 {
     PropertyNode_t *result = NULL;
     PropertyNode_t *currentNode = &rootProperty;
     PropertyNode_t *childNode;
-    char *elementStart = path;
+    char *elementStart = (char *)path;
     char *elementEnd = NULL;
     char nodeName[PROPERTIES_PATH_MAX];
 
     bool nodeFound = FALSE;
-    *leftOver = path;
+    *leftOver = (char *)path;
     do
     {
         elementEnd = strchr(elementStart, '.');
@@ -730,5 +736,5 @@ static PropertyNode_t *PropertiesFindNode(char *path, char **leftOver)
 static void PropertryDestructor(void *ptr)
 {
     PropertyNode_t *node = (PropertyNode_t*)ptr;
-    free(node->name);
+    free((char *)node->name);
 }
