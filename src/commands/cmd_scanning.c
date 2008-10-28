@@ -80,22 +80,30 @@ typedef struct TransponderEntry_s
 static void CommandScan(int argc, char **argv);
 static void CommandScanCancel(int argc, char **argv);
 static void ScanCurrentMultiplexes(void);
+
+#if defined(ENABLE_DVB)
 static void ScanFullDVBT(void);
 static void ScanFullDVBC(void);
 static void TryTuneDVBC(int channelCount, struct dvb_frontend_parameters *feparams,
    __u32 *symbolRates, int nrofSymbolRates, fe_modulation_t *modulations, int nrofModulations);
+static void SDTCallback(dvbpsi_sdt_t* newsdt);
+static void NITCallback(dvbpsi_nit_t* newnit);
+static bool FindTransponder(int freq);
+static double BCDFixedPoint3_7ToDouble(uint32_t bcd);
+#endif
+
+#if defined(ENABLE_ATSC)
 static void ScanFullATSC(void);
+static void VCTCallback(dvbpsi_atsc_vct_t* newvct);
+#endif
+
 static void ScanNetwork(char *initialdata);
 static void ScanMultiplex(Multiplex_t *multiplex, bool needNIT);
 static int TuneFrequency(fe_type_t type, struct dvb_frontend_parameters *feparams, DVBDiSEqCSettings_t * diseqc, Multiplex_t *mux, bool needNIT);
 static void PATCallback(dvbpsi_pat_t* newpat);
 static void PMTCallback(dvbpsi_pmt_t* newpmt);
-static void SDTCallback(dvbpsi_sdt_t* newsdt);
-static void NITCallback(dvbpsi_nit_t* newnit);
-static void VCTCallback(dvbpsi_atsc_vct_t* newvct);
+
 static void FELockedEventListener(void *arg, Event_t event, void *payload);
-static bool FindTransponder(int freq);
-static double BCDFixedPoint3_7ToDouble(uint32_t bcd);
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
@@ -131,14 +139,17 @@ Command_t CommandDetailsScanning[] =
 
 
 static char SCANNING[]="Scanning";
+static char propertyParent[] = "commands.scan";
 static bool scanning = FALSE;
 static bool cancelScan = FALSE;
 static bool PATReceived = FALSE;
 static bool AllPMTReceived = FALSE;
 static bool SDTReceived = FALSE;
 
-static bool NITReceived = FALSE;
+#if defined(ENABLE_DVB)
 static bool NITneeded = FALSE;
+#endif
+
 static List_t *transponderList = NULL;
 static bool waitingForFELocked= FALSE;
 static bool FELocked = FALSE;
@@ -149,16 +160,21 @@ static pthread_mutex_t scanningmutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t scanningcond = PTHREAD_COND_INITIALIZER;
 
 static bool removeFailedFreqs = TRUE;
+
+#if defined(ENABLE_DVB)
 /* DVB-T Related variables */
 static bool DVBTScanVHF = TRUE;
 static bool DVBTScanUHF = TRUE;
 
 /* DVB-S Related variables */
 static int DVBSSatNumber = 0;
+#endif
 
+#if defined(ENABLE_ATSC)
 /* ATSC Related variables */
 static bool ATSCScanOTA = TRUE;
 static bool ATSCScanCable = TRUE;
+#endif
 
 /*******************************************************************************
 * Global functions                                                             *
@@ -166,15 +182,20 @@ static bool ATSCScanCable = TRUE;
 void CommandInstallScanning(void)
 {
     Event_t feLockedEvent;
+    char propertyName[PROPERTIES_PATH_MAX];
     LogModule(LOG_DEBUG,SCANNING,"Starting to install scanning.\n");
     if (MainIsDVB())
     {
+#if defined(ENABLE_DVB)
         SDTProcessorRegisterSDTCallback(SDTCallback);
         NITProcessorRegisterNITCallback(NITCallback);
+#endif
     }
     else
     {
+#if defined(ENABLE_ATSC)
         PSIPProcessorRegisterVCTCallback(VCTCallback);
+#endif
     }
     PATProcessorRegisterPATCallback(PATCallback);
     PMTProcessorRegisterPMTCallback(PMTCallback);
@@ -182,41 +203,52 @@ void CommandInstallScanning(void)
     feLockedEvent = EventsFindEvent("DVBAdapter.Locked");
     EventsRegisterEventListener(feLockedEvent, FELockedEventListener, NULL);
 
-    PropertiesAddProperty("commands.scanning", "removefailed", "Whether frequencies currently in the database that fail to lock should be removed.",
+    PropertiesAddProperty(propertyParent, "removefailed", "Whether frequencies currently in the database that fail to lock should be removed.",
         PropertyType_Boolean, &removeFailedFreqs, PropertiesSimplePropertyGet, PropertiesSimplePropertySet);
-    PropertiesAddProperty("commands.scanning.dvb.t", "scanvhf", "Whether VHF channels should be scanned when doing a full spectrum scan",
+#if defined(ENABLE_DVB)
+    /* DVB-T Properties */
+    sprintf(propertyName, "%s.dvb.t", propertyParent);
+    PropertiesAddProperty(propertyName, "scanvhf", "Whether VHF channels should be scanned when doing a full spectrum scan",
         PropertyType_Boolean, &DVBTScanVHF, PropertiesSimplePropertyGet, PropertiesSimplePropertySet);
-    PropertiesAddProperty("commands.scanning.dvb.t", "scanuhf", "Whether UHF channels should be scanned when doing a full spectrum scan",
+    PropertiesAddProperty(propertyName, "scanuhf", "Whether UHF channels should be scanned when doing a full spectrum scan",
         PropertyType_Boolean, &DVBTScanUHF, PropertiesSimplePropertyGet, PropertiesSimplePropertySet);
 
-    PropertiesAddProperty("commands.scanning.dvb.s", "scansatnumber", "The switch position/satellite number to scan.",
+    /* DVB-S Properties */
+    sprintf(propertyName, "%s.dvb.s", propertyParent);
+    PropertiesAddProperty(propertyName, "scansatnumber", "The switch position/satellite number to scan.",
         PropertyType_Int, &DVBSSatNumber, PropertiesSimplePropertyGet, PropertiesSimplePropertySet);
-
-    PropertiesAddProperty("commands.scanning.atsc", "scanota", "Whether OTA ATSC signals should be scanned for.",
+#endif
+    /* ATSC Properties */
+#if defined(ENABLE_ATSC)
+    sprintf(propertyName, "%s.atsc", propertyParent);
+    PropertiesAddProperty(propertyName, "scanota", "Whether OTA ATSC signals should be scanned for.",
         PropertyType_Boolean, &ATSCScanOTA, PropertiesSimplePropertyGet, PropertiesSimplePropertySet);
-
-    PropertiesAddProperty("commands.scanning.atsc", "scancable", "Whether ATSC cable signals should be scanned for.",
+    PropertiesAddProperty(propertyName, "scancable", "Whether ATSC cable signals should be scanned for.",
         PropertyType_Boolean, &ATSCScanOTA, PropertiesSimplePropertyGet, PropertiesSimplePropertySet);
+#endif
 
-    LogModule(LOG_DEBUG,SCANNING,"Installing commands.\n");
     CommandRegisterCommands(CommandDetailsScanning);
 }
 
 void CommandUnInstallScanning(void)
 {
     CommandUnRegisterCommands(CommandDetailsScanning);
-    PropertiesRemoveAllProperties("commands.scanning");
+    PropertiesRemoveAllProperties(propertyParent);
     scanning = FALSE;
     PATProcessorUnRegisterPATCallback(PATCallback);
     PMTProcessorUnRegisterPMTCallback(PMTCallback);
     if (MainIsDVB())
     {
+#if defined(ENABLE_DVB)
         SDTProcessorUnRegisterSDTCallback(SDTCallback);
         NITProcessorUnRegisterNITCallback(NITCallback);
+#endif
     }
     else
     {
+#if defined(ENABLE_ATSC)
         PSIPProcessorUnRegisterVCTCallback(VCTCallback);
+#endif
     }
 }
 /*******************************************************************************
@@ -243,15 +275,19 @@ static void CommandScan(int argc, char **argv)
         adapter = MainDVBAdapterGet();
         switch(adapter->info.type)
         {
+#if defined(ENABLE_DVB)
             case FE_OFDM:
                 ScanFullDVBT();
                 break;
             case FE_QAM:
                 ScanFullDVBC();
                 break;
+#endif
+#if defined(ENABLE_ATSC)
             case FE_ATSC:
                 ScanFullATSC();
                 break;
+#endif
             default:
                 CommandError(COMMAND_ERROR_GENERIC, "Frontend type doesn't support a full spectrum scan mode!");
                 break;
@@ -330,7 +366,7 @@ static void ScanCurrentMultiplexes(void)
         ObjectFree(multiplexes);
     }
 }
-
+#if defined(ENABLE_DVB)
 static void ScanFullDVBT(void)
 {
     fe_spectral_inversion_t inversion;
@@ -602,7 +638,9 @@ static void TryTuneDVBC(int channelCount, struct dvb_frontend_parameters *fepara
     }
     MultiplexRefDec(mux);
 }
+#endif
 
+#if defined(ENABLE_ATSC)
 static void ScanFullATSC(void)
 {
     Multiplex_t *mux;
@@ -690,7 +728,7 @@ static void ScanFullATSC(void)
             TuneFrequency(FE_ATSC, &feparams, NULL, mux, FALSE);
     } }
 }
-
+#endif
 /** Following code shameless copied from  linuxtv dvb-utils (scan.c)*/
 struct strtab {
     const char *str;
@@ -707,23 +745,6 @@ static int str2enum(const char *str, const struct strtab *tab, int deflt)
     return deflt;
 }
 
-static enum fe_code_rate str2fec(const char *fec)
-{
-    struct strtab fectab[] = {
-        { "NONE", FEC_NONE },
-        { "1/2",  FEC_1_2 },
-        { "2/3",  FEC_2_3 },
-        { "3/4",  FEC_3_4 },
-        { "4/5",  FEC_4_5 },
-        { "5/6",  FEC_5_6 },
-        { "6/7",  FEC_6_7 },
-        { "7/8",  FEC_7_8 },
-        { "8/9",  FEC_8_9 },
-        { "AUTO", FEC_AUTO },
-        { NULL, 0 }
-    };
-    return str2enum(fec, fectab, FEC_AUTO);
-}
 
 static enum fe_modulation str2qam(const char *qam)
 {
@@ -740,6 +761,24 @@ static enum fe_modulation str2qam(const char *qam)
         { NULL, 0 }
     };
     return str2enum(qam, qamtab, QAM_AUTO);
+}
+#if defined(ENABLE_DVB)
+static enum fe_code_rate str2fec(const char *fec)
+{
+    struct strtab fectab[] = {
+        { "NONE", FEC_NONE },
+        { "1/2",  FEC_1_2 },
+        { "2/3",  FEC_2_3 },
+        { "3/4",  FEC_3_4 },
+        { "4/5",  FEC_4_5 },
+        { "5/6",  FEC_5_6 },
+        { "6/7",  FEC_6_7 },
+        { "7/8",  FEC_7_8 },
+        { "8/9",  FEC_8_9 },
+        { "AUTO", FEC_AUTO },
+        { NULL, 0 }
+    };
+    return str2enum(fec, fectab, FEC_AUTO);
 }
 
 static enum fe_bandwidth str2bandwidth(const char *bw)
@@ -790,7 +829,7 @@ static enum fe_hierarchy str2hier(const char *hier)
     };
     return str2enum(hier, hiertab, HIERARCHY_AUTO);
 }
-
+#endif
 /* end shameless copy */
 
 static void ScanNetwork(char *initialdata)
@@ -798,15 +837,17 @@ static void ScanNetwork(char *initialdata)
     Multiplex_t *mux;
     bool parsed = FALSE;
     __u32 freq;
+    char modStr[7];
+#if defined(ENABLE_DVB)
     __u32 symbolRate;
     char bwStr[5];
     char fecHiStr[5];
     char fecLoStr[5];
-    char modStr[7];
     char transModeStr[5];
     char guardIntStr[5];
     char hierarchyStr[5];
     char polarisationStr[2];
+#endif
     fe_type_t feType;
     struct dvb_frontend_parameters feparams;
     DVBDiSEqCSettings_t diseqcSettings;
@@ -831,6 +872,7 @@ static void ScanNetwork(char *initialdata)
      */
     switch (initialdata[0])
     {
+#if defined(ENABLE_DVB)
         case 'T':
             if (sscanf(initialdata, "T %u %4s %4s %4s %6s %4s %4s %4s",
                     &freq, bwStr, fecHiStr, fecLoStr, modStr, transModeStr, guardIntStr, hierarchyStr) == 8)
@@ -883,7 +925,9 @@ static void ScanNetwork(char *initialdata)
                 parsed = TRUE;
             }
             break;
+#endif
 
+#if defined(ENABLE_ATSC)
         case 'A':
             if (sscanf(initialdata, "A %u %7s\n", &freq, modStr) == 2)
             {
@@ -894,7 +938,7 @@ static void ScanNetwork(char *initialdata)
                 parsed = TRUE;
             }
             break;
-
+#endif
         default:
             break;
     }
@@ -912,7 +956,7 @@ static void ScanNetwork(char *initialdata)
                 LogModule(LOG_INFO, SCANNING, "INVERSION_AUTO not supported, trying INVERSION_OFF.\n");
                 feparams.inversion = INVERSION_OFF;
             }
-            
+
             transponderList = ListCreate();
             mux = MultiplexFindFrequencyRange(feparams.frequency, muxFindRange);
             CommandPrintf("Scanning 1 frequencies\n");
@@ -920,8 +964,9 @@ static void ScanNetwork(char *initialdata)
             if (TuneFrequency(feType, &feparams, &diseqcSettings, mux, TRUE) == 0)
             {
                  if (ListCount(transponderList) > 0)
+
                 {
-                    CommandPrintf("Scanning %d frequencies\n", ListCount(transponderList));            
+                    CommandPrintf("Scanning %d frequencies\n", ListCount(transponderList));
                     for (ListIterator_Init(iterator, transponderList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
                     {
                         TransponderEntry_t *entry = (TransponderEntry_t*)ListIterator_Current(iterator);
@@ -1045,8 +1090,11 @@ static void ScanMultiplex(Multiplex_t *multiplex, bool needNIT)
     PATReceived = FALSE;
     SDTReceived = FALSE;
     AllPMTReceived = FALSE;
+#if defined(ENABLE_DVB)
     NITneeded = needNIT;
-    NITReceived = FALSE;
+#else
+    (void)needNIT; /* To prevent compiler warning */
+#endif
     PMTCount = 0;
     PMTsReceived = NULL;
     if (!needNIT || !MainIsDVB())
@@ -1213,7 +1261,7 @@ static void PMTCallback(dvbpsi_pmt_t* newpmt)
         }
     }
 }
-
+#if defined(ENABLE_DVB)
 static void SDTCallback(dvbpsi_sdt_t* newsdt)
 {
     if (scanning && !SDTReceived)
@@ -1225,25 +1273,25 @@ static void SDTCallback(dvbpsi_sdt_t* newsdt)
     }
 }
 
-static fe_bandwidth_t bandwidthTable[] = {BANDWIDTH_8_MHZ, BANDWIDTH_7_MHZ, BANDWIDTH_6_MHZ, 
-                                          BANDWIDTH_AUTO, BANDWIDTH_AUTO, BANDWIDTH_AUTO, 
+static fe_bandwidth_t bandwidthTable[] = {BANDWIDTH_8_MHZ, BANDWIDTH_7_MHZ, BANDWIDTH_6_MHZ,
+                                          BANDWIDTH_AUTO, BANDWIDTH_AUTO, BANDWIDTH_AUTO,
                                           BANDWIDTH_AUTO, BANDWIDTH_AUTO};
-static fe_code_rate_t ofdmCodeRateTable[] = {FEC_1_2, FEC_2_3, FEC_3_4, FEC_4_5, 
+static fe_code_rate_t ofdmCodeRateTable[] = {FEC_1_2, FEC_2_3, FEC_3_4, FEC_4_5,
                                              FEC_5_6, FEC_7_8, FEC_NONE, FEC_NONE};
 static fe_modulation_t ofdmConstellationTable[] = {QPSK, QAM_16, QAM_64, QAM_AUTO};
-static fe_hierarchy_t ofdmHierarchyTable[] = {HIERARCHY_NONE, HIERARCHY_1, HIERARCHY_2, HIERARCHY_4, 
+static fe_hierarchy_t ofdmHierarchyTable[] = {HIERARCHY_NONE, HIERARCHY_1, HIERARCHY_2, HIERARCHY_4,
                                               HIERARCHY_NONE, HIERARCHY_1, HIERARCHY_2, HIERARCHY_4};
-static fe_guard_interval_t ofdmGuardIntTable[] = {GUARD_INTERVAL_1_32, GUARD_INTERVAL_1_16, 
+static fe_guard_interval_t ofdmGuardIntTable[] = {GUARD_INTERVAL_1_32, GUARD_INTERVAL_1_16,
                                                   GUARD_INTERVAL_1_8, GUARD_INTERVAL_1_4};
 static fe_transmit_mode_t  ofdmTransmitModeTable[] = { TRANSMISSION_MODE_2K, TRANSMISSION_MODE_8K,
                                                        TRANSMISSION_MODE_AUTO,TRANSMISSION_MODE_AUTO};
-
-static fe_code_rate_t fecInnerTable[] = {FEC_NONE, FEC_1_2, FEC_2_3, FEC_3_4, 
+static fe_code_rate_t fecInnerTable[] = {FEC_NONE, FEC_1_2, FEC_2_3, FEC_3_4,
                                          FEC_5_6, FEC_7_8, FEC_8_9, FEC_AUTO,
                                          FEC_4_5, FEC_AUTO,FEC_NONE, FEC_NONE,
                                          FEC_NONE, FEC_NONE,FEC_NONE, FEC_NONE};
 
 static enum Polarisation_e polarisationTable[] = {POL_HORIZONTAL, POL_VERTICAL, POL_HORIZONTAL, POL_VERTICAL};
+
 static void NITCallback(dvbpsi_nit_t* newnit)
 {
     DVBAdapter_t *adapter = MainDVBAdapterGet();
@@ -1271,7 +1319,7 @@ static void NITCallback(dvbpsi_nit_t* newnit)
         }\
     }while(FALSE)
 
-    if (NITneeded && scanning && !NITReceived)
+    if (NITneeded && scanning)
     {
         for (transport = newnit->p_first_transport; transport; transport = transport->p_next)
         {
@@ -1322,7 +1370,7 @@ static void NITCallback(dvbpsi_nit_t* newnit)
                             dvbpsi_sat_deliv_sys_dr_t *satDelSysDr = dvbpsi_DecodeSatDelivSysDr(descriptor);
                             double freq = BCDFixedPoint3_7ToDouble(satDelSysDr->i_frequency);
                             double symbolRate =BCDFixedPoint3_7ToDouble(satDelSysDr->i_symbol_rate << 4);
-                            
+
                             feparams.frequency = (__u32)(freq * 1000000.0);
                             feparams.u.qpsk.fec_inner = fecInnerTable[satDelSysDr->i_fec_inner];
                             feparams.u.qpsk.symbol_rate = (__u32)(symbolRate * 1000000.0);
@@ -1345,7 +1393,7 @@ static void NITCallback(dvbpsi_nit_t* newnit)
                             }
                         }
                         break;
-                        
+
                     case FE_QAM:
                         if (descriptor->i_tag == 0x44)
                         {
@@ -1356,28 +1404,6 @@ static void NITCallback(dvbpsi_nit_t* newnit)
                 }
             }
         }
-    }
-}
-
-static void VCTCallback(dvbpsi_atsc_vct_t* newvct)
-{
-    if (scanning && !SDTReceived)
-    {
-        SDTReceived = TRUE;
-        pthread_mutex_lock(&scanningmutex);
-        pthread_cond_signal(&scanningcond);
-        pthread_mutex_unlock(&scanningmutex);
-    }
-}
-
-static void FELockedEventListener(void *arg, Event_t event, void *payload)
-{
-    if (waitingForFELocked)
-    {
-        FELocked = TRUE;
-        pthread_mutex_lock(&scanningmutex);
-        pthread_cond_signal(&scanningcond);
-        pthread_mutex_unlock(&scanningmutex);
     }
 }
 
@@ -1409,5 +1435,30 @@ static double BCDFixedPoint3_7ToDouble(uint32_t bcd)
                (((bcd      ) & 0xf));
 
     return (double)integer + ((double)fraction / 100000.0);
+}
+#endif
+
+#if defined(ENABLE_ATSC)
+static void VCTCallback(dvbpsi_atsc_vct_t* newvct)
+{
+    if (scanning && !SDTReceived)
+    {
+        SDTReceived = TRUE;
+        pthread_mutex_lock(&scanningmutex);
+        pthread_cond_signal(&scanningcond);
+        pthread_mutex_unlock(&scanningmutex);
+    }
+}
+#endif
+
+static void FELockedEventListener(void *arg, Event_t event, void *payload)
+{
+    if (waitingForFELocked)
+    {
+        FELocked = TRUE;
+        pthread_mutex_lock(&scanningmutex);
+        pthread_cond_signal(&scanningcond);
+        pthread_mutex_unlock(&scanningmutex);
+    }
 }
 
