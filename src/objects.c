@@ -86,7 +86,7 @@ static Class_t classes[MAX_CLASSES];
 static unsigned int classesCount = 0;
 static Object_t *referencedObjects = NULL;
 
-static pthread_mutex_t objectMutex;
+static pthread_mutex_t objectMutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 
 /*******************************************************************************
 * Global functions                                                             *
@@ -94,7 +94,6 @@ static pthread_mutex_t objectMutex;
 int ObjectInit(void)
 {
     memset(classes, 0, sizeof(classes));
-    pthread_mutex_init(&objectMutex, NULL);
     classesCount = 0;
     referencedObjects = NULL;
 
@@ -215,7 +214,6 @@ bool ObjectRefDecImpl(void *ptr, char *file, int line)
     bool result = TRUE;
     Object_t *object;
     char *clazzName = "<Malloc>";
-
     if (ptr == NULL)
     {
         LogModule(LOG_ERROR, OBJECT, "Attempt to decrement the reference of NULL! Offending code %s:%d\n", file, line);        
