@@ -154,11 +154,11 @@ int main(int argc, char *argv[])
     DeliveryMethodInstance_t *dmInstance;
     PIDFilter_t *PIDFilters[MAX_PIDFILTERS];
     char logFilename[PATH_MAX] = {0};
-    
+
     /* Create the data directory */
     sprintf(DataDirectory, "%s/.dvbstreamer", getenv("HOME"));
     mkdir(DataDirectory, S_IRWXU);
-    
+
     installsighandler();
 
     while (!ExitProgram)
@@ -184,8 +184,8 @@ int main(int argc, char *argv[])
                 case 'a': adapterNumber = atoi(optarg);
 
                 break;
-                case 'R': 
-#if defined(ENABLE_DVB)   
+                case 'R':
+#if defined(ENABLE_DVB)
                 hwRestricted = TRUE;
 #else
                 fprintf(stderr, "Hardware restricted mode only supported for DVB!\n");
@@ -200,7 +200,7 @@ int main(int argc, char *argv[])
                 case 'r': remoteInterface = TRUE;
                 break;
                 case 'D': disableConsoleInput = TRUE;
-                remoteInterface = TRUE;            
+                remoteInterface = TRUE;
                 break;
                 case 'u': username = optarg;
                 break;
@@ -233,7 +233,7 @@ int main(int argc, char *argv[])
     }
 
     StartTime = time(NULL);
-    
+
     if (logFilename[0])
     {
         if (LoggingInitFile(logFilename, logLevel))
@@ -251,13 +251,13 @@ int main(int argc, char *argv[])
             exit(1);
         }
     }
-    
+
     LogModule(LOG_INFOV, MAIN, "Using adapter %d\n", adapterNumber);
     if (startupFile)
     {
         LogModule(LOG_INFOV, MAIN, "Using startup script %s\n", startupFile);
     }
-    
+
 
     if (primaryMRL == NULL)
     {
@@ -265,8 +265,8 @@ int main(int argc, char *argv[])
         usage(argv[0]);
         exit(1);
     }
-    
-    INIT(ObjectInit(), "objects");    
+
+    INIT(ObjectInit(), "objects");
     INIT(EventsInit(), "events");
     INIT(PropertiesInit(), "properties");
     INIT(DBaseInit(adapterNumber), "database");
@@ -293,7 +293,7 @@ int main(int argc, char *argv[])
         int lowFreq = 0;
         int highFreq = 0;
         int switchFreq = 0;
-        
+
         DBaseMetadataGetInt(METADATA_NAME_LNB_LOW_FREQ, &lowFreq);
         DBaseMetadataGetInt(METADATA_NAME_LNB_HIGH_FREQ, &highFreq);
         DBaseMetadataGetInt(METADATA_NAME_LNB_SWITCH_FREQ, &switchFreq);
@@ -306,31 +306,31 @@ int main(int argc, char *argv[])
 
     /* Create PAT/PMT filters */
     memset(&PIDFilters, 0, sizeof(PIDFilters));
-    
+
     PIDFilters[PIDFILTER_INDEX_PAT] = PATProcessorCreate(TSFilter);
     PIDFilters[PIDFILTER_INDEX_PMT] = PMTProcessorCreate(TSFilter);
     if (MainIsDVB())
     {
-#if defined(ENABLE_DVB)        
+#if defined(ENABLE_DVB)
         LogModule(LOG_INFO, MAIN, "Starting DVB filters\n");
         INIT(SDTProcessorInit(), "SDT Processor");
         INIT(TDTProcessorInit(), "TDT Processor");
         INIT(NITProcessorInit(), "NIT Processor");
-        
+
         PIDFilters[PIDFILTER_INDEX_SDT] = SDTProcessorCreate(TSFilter);
         PIDFilters[PIDFILTER_INDEX_NIT] = NITProcessorCreate(TSFilter);
         PIDFilters[PIDFILTER_INDEX_TDT] = TDTProcessorCreate(TSFilter);
-#endif        
+#endif
     }
     else
     {
-#if defined(ENABLE_ATSC)        
-        LogModule(LOG_INFO, MAIN, "Starting ATSC filters\n");        
+#if defined(ENABLE_ATSC)
+        LogModule(LOG_INFO, MAIN, "Starting ATSC filters\n");
         INIT(ATSCMultipleStringsInit(), "ATSC Strings");
-        INIT(PSIPProcessorInit(), "PSIP Processor");     
-        
+        INIT(PSIPProcessorInit(), "PSIP Processor");
+
         PIDFilters[PIDFILTER_INDEX_PSIP] = PSIPProcessorCreate(TSFilter);
-#endif        
+#endif
     }
 
     /* Enable all the filters */
@@ -348,7 +348,7 @@ int main(int argc, char *argv[])
     INIT(TuningInit(), "tuning");
 
     InstallSysProperties();
-    
+
     /*
      * Start plugins after outputs but before creating the primary output to
      * allow pugins to create outputs and allow new delivery methods to be
@@ -380,10 +380,10 @@ int main(int argc, char *argv[])
             exit(1);
         }
     }
-    
+
     ServiceFilterDeliveryMethodSet(primaryServiceFilter, dmInstance);
     primaryServiceFilter->enabled = TRUE;
-    
+
     if (DaemonMode || remoteInterface)
     {
         char serverNameBuffer[40];
@@ -450,13 +450,13 @@ int main(int argc, char *argv[])
     }
 
     TSFilterEnable(TSFilter, FALSE);
-    
+
     ServiceFilterDestroyAll(TSFilter);
     SectionProcessorDestroyAllProcessors();
     PESProcessorDestroyAllProcessors();
 
-    /* Stop the deferred processing as when we unload the plugins we may be 
-     * unloading code that is required by any jobs left on the queue 
+    /* Stop the deferred processing as when we unload the plugins we may be
+     * unloading code that is required by any jobs left on the queue
      */
     DEINIT(DeferredProcessingDeinit(), "deferred processing");
 
@@ -489,35 +489,35 @@ int main(int argc, char *argv[])
     PMTProcessorDestroy( PIDFilters[PIDFILTER_INDEX_PMT]);
     if (MainIsDVB())
     {
-#if defined(ENABLE_DVB)        
+#if defined(ENABLE_DVB)
         SDTProcessorDestroy( PIDFilters[PIDFILTER_INDEX_SDT]);
         NITProcessorDestroy( PIDFilters[PIDFILTER_INDEX_NIT]);
-        TDTProcessorDestroy( PIDFilters[PIDFILTER_INDEX_TDT]); 
+        TDTProcessorDestroy( PIDFilters[PIDFILTER_INDEX_TDT]);
         DEINIT(SDTProcessorDeInit(), "SDT Processor");
         DEINIT(TDTProcessorDeInit(), "TDT Processor");
-        DEINIT(NITProcessorDeInit(), "NIT Processor");        
-#endif        
+        DEINIT(NITProcessorDeInit(), "NIT Processor");
+#endif
     }
     else
     {
-#if defined(ENABLE_ATSC)        
+#if defined(ENABLE_ATSC)
         PSIPProcessorDestroy( PIDFilters[PIDFILTER_INDEX_PSIP]);
         DEINIT(PSIPProcessorDeInit(), "PSIP Processor");
-        DEINIT(ATSCMultipleStringsDeInit(), "ATSC Strings");        
-#endif        
+        DEINIT(ATSCMultipleStringsDeInit(), "ATSC Strings");
+#endif
     }
 
-    
+
     LogModule(LOG_DEBUGV, MAIN, "Processors destroyed\n");
     /* Close the adapter and shutdown the filter etc*/
     DEINIT(TSFilterDestroy(TSFilter), "TS filter");
     DEINIT(DVBDispose(DVBAdapter), "DVB adapter");
-    
-    DEINIT(CacheDeInit(), "cache");    
+
+    DEINIT(CacheDeInit(), "cache");
 
     DEINIT(ServiceDeinit(), "service");
     DEINIT(MultiplexDeinit(), "multiplex");
-    DEINIT(EPGDBaseDeInit(), "EPG database");    
+    DEINIT(EPGDBaseDeInit(), "EPG database");
     DEINIT(DBaseDeInit(), "database");
     DEINIT(PropertiesDeInit(), "properties");
     DEINIT(EventsDeInit(), "events");
@@ -527,7 +527,7 @@ int main(int argc, char *argv[])
     {
         DeInitDaemon();
     }
-    
+
     LoggingDeInit();
     return 0;
 }
@@ -549,7 +549,7 @@ static void InstallSysProperties(void)
     PropertiesAddProperty("sys", "uptime", "The time that this instance has been running in days/hours/minutes/seconds.",
                       PropertyType_String, NULL, SysPropertyGetUptime, NULL);
     PropertiesAddProperty("sys.uptime", "seconds", "The time that this instance has been running in seconds.",
-                          PropertyType_Int, NULL, SysPropertyGetUptimeSecs, NULL);  
+                          PropertyType_Int, NULL, SysPropertyGetUptimeSecs, NULL);
 }
 
 static int SysPropertyGetUptime(void *userArg, PropertyValue_t *value)
@@ -566,7 +566,7 @@ static int SysPropertyGetUptime(void *userArg, PropertyValue_t *value)
     s = (seconds - ((d * 24 * 60 * 60) + (h * 60 * 60) + (m * 60)));
 
     asprintf(&uptimeStr, "%d Days %d Hours %d Minutes %d seconds", d, h, m, s);
-    value->u.string = uptimeStr; 
+    value->u.string = uptimeStr;
     return 0;
 }
 
@@ -601,7 +601,7 @@ bool MainIsDVB()
 
 #elif defined(ENABLE_ATSC)
 
-    return FALSE:
+    return FALSE;
 
 #else
 
