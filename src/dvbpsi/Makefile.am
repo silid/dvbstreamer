@@ -2,8 +2,8 @@ AM_CFLAGS =\
      -I$(top_srcdir)/include \
      -I$(top_srcdir)/include/dvbpsi \
      -Wall -Werror
-     
-noinst_LIBRARIES = libdvbpsi.a 
+
+noinst_LIBRARIES = libdvbpsi.a
 
 libdvbpsi_a_SOURCES= \
 	demux.c \
@@ -14,7 +14,7 @@ libdvbpsi_a_SOURCES= \
 	$(mpeg2_tables_src) \
 	$(dvb_src) \
 	$(atsc_src)
-	
+
 if ENABLE_DVB
 dvb_src = \
 	datetime.c \
@@ -24,7 +24,7 @@ else
 dvb_src =
 endif
 
-if ENABLE_DVB
+if ENABLE_ATSC
 atsc_src = \
 	$(atsc_tables_src) \
 	$(atsc_descriptors_src)
@@ -72,7 +72,7 @@ mpeg2_tables_src =  \
 	tables/pat.c \
 	tables/pmt.c \
 	tables/cat.c
-	
+
 dvb_tables_src = \
 	tables/eit.c \
 	tables/sdt.c \

@@ -83,11 +83,13 @@ int main(int argc, char *argv[])
     fe_type_t channelsFileType = FE_OFDM;
     char *channelsFile = NULL;
     int adapterNumber = 0;
+#if defined(ENABLE_DVB)
     LNBInfo_t lnbInfo = {NULL,NULL,0,0,0};
+#endif
     int rc;
     int logLevel = 0;
     char logFilename[PATH_MAX] = {0};
-    
+
     /* Create the data directory */
     sprintf(DataDirectory, "%s/.dvbstreamer", getenv("HOME"));
     mkdir(DataDirectory, S_IRWXU);
@@ -162,7 +164,7 @@ int main(int argc, char *argv[])
                     exit(1);
                 }
                 break;
-#endif                
+#endif
             case 'h':
             default:
                 usage(argv[0]);
@@ -188,7 +190,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    
+
 #if defined(ENABLE_DVB)
     if ((channelsFileType == FE_QPSK) && (lnbInfo.lowFrequency == 0))
     {
@@ -213,7 +215,7 @@ int main(int argc, char *argv[])
     {
         LogModule(LOG_ERROR, SETUP, "Begin Transaction failed (%d:%s)\n", rc, sqlite3_errmsg(DBaseConnectionGet()));
     }
-    
+
     LogModule(LOG_INFO, SETUP, "Importing services from %s\n", channelsFile);
     if (!parsezapfile(channelsFile, channelsFileType))
     {
@@ -226,17 +228,17 @@ int main(int argc, char *argv[])
         /* Write out LNB settings. */
         DBaseMetadataSetInt(METADATA_NAME_LNB_LOW_FREQ, lnbInfo.lowFrequency * 1000);
         DBaseMetadataSetInt(METADATA_NAME_LNB_HIGH_FREQ, lnbInfo.highFrequency * 1000);
-        DBaseMetadataSetInt(METADATA_NAME_LNB_SWITCH_FREQ, lnbInfo.switchFrequency * 1000);        
+        DBaseMetadataSetInt(METADATA_NAME_LNB_SWITCH_FREQ, lnbInfo.switchFrequency * 1000);
     }
 #endif
 
     DBaseMetadataSetInt(METADATA_NAME_SCAN_ALL, 1);
-    
+
     rc = DBaseTransactionCommit();
     if (rc != SQLITE_OK)
     {
         LogModule(LOG_ERROR, SETUP, "Begin Transaction failed (%d:%s)\n", rc, sqlite3_errmsg(DBaseConnectionGet()));
-    }    
+    }
     printf("%d Services available on %d Multiplexes\n", ServiceCount(), MultiplexCount());
 
     DEINIT(ServiceDeinit(), "service");
@@ -257,12 +259,12 @@ static void usage(char *appname)
             "      Options:\n"
             "      -v            : Increase the amount of debug output, can be used multiple\n"
             "                      times for more output\n"
-            "      -L <file>     : Set the location of the log file.\n"            
+            "      -L <file>     : Set the location of the log file.\n"
             "      -V            : Print version information then exit\n"
             "\n"
             "      -a <adapter>  : Use adapter number (ie /dev/dvb/adapter<adapter>/...)\n"
             "\n"
-#if defined(ENABLE_DVB)            
+#if defined(ENABLE_DVB)
             "      -t <file>     : Terrestrial channels.conf file to import services and \n"
             "                      multiplexes from. (DVB-T)\n"
             "\n"
@@ -279,7 +281,7 @@ static void usage(char *appname)
 #if defined(ENABLE_ATSC)
             "      -A <file>     : ATSC channels.conf file to import services and \n"
             "                      multiplexes from. (ATSC) (EXPERIMENTAL)\n"
-#endif           
+#endif
             ,appname );
 }
 
