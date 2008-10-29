@@ -475,7 +475,8 @@ static void ScanFullDVBT(void)
             for (offsetIndex = 0; offsetIndex < 3; offsetIndex ++)
             {
                 feparams.frequency = frequency + offsets[offsetIndex];
-                if (TuneFrequency(FE_OFDM, &feparams, NULL, mux, FALSE))
+                TuneFrequency(FE_OFDM, &feparams, NULL, mux, FALSE);
+                if (FELocked)
                 {
                     break;
                 }
@@ -503,7 +504,8 @@ static void ScanFullDVBT(void)
             for (offsetIndex = 0; offsetIndex < 3; offsetIndex ++)
             {
                 feparams.frequency = frequency + offsets[offsetIndex];
-                if (TuneFrequency(FE_OFDM, &feparams, NULL, mux, FALSE))
+                TuneFrequency(FE_OFDM, &feparams, NULL, mux, FALSE);
+                if (FELocked)
                 {
                     break;
                 }
@@ -1013,7 +1015,7 @@ static int TuneFrequency(fe_type_t type, struct dvb_frontend_parameters *feparam
     DVBAdapter_t *adapter = MainDVBAdapterGet();
     int result;
     int muxUID;
-    bool tuneFailed = TRUE;
+    bool lockFailed = TRUE;
     TSFilter_t *tsFilter = MainTSFilterGet();
 
 
@@ -1044,7 +1046,7 @@ static int TuneFrequency(fe_type_t type, struct dvb_frontend_parameters *feparam
         if (FELocked && !cancelScan)
         {
             CommandPrintf(" FE Locked\n");
-            tuneFailed = FALSE;
+            lockFailed = FALSE;
             if (mux == NULL)
             {
                 /* Add multiplex to DBase, set the new multiplex as current and reenabled TSFilter */
@@ -1063,7 +1065,7 @@ static int TuneFrequency(fe_type_t type, struct dvb_frontend_parameters *feparam
         }
     }
 
-    if (tuneFailed && removeFailedFreqs && (mux != NULL) && !cancelScan)
+    if (lockFailed && removeFailedFreqs && (mux != NULL) && !cancelScan)
     {
         MultiplexDelete(mux);
     }
