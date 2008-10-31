@@ -20,7 +20,7 @@ cache.c
 Caches service and PID information from the database for the current multiplex.
 
 */
-    
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,13 +51,13 @@ enum CacheFlags
     CacheFlag_Dirty_PMTPID    = 0x0001,
     CacheFlag_Dirty_PIDs      = 0x0002, /* Also means PMT Version and PCR PID needs to be updated */
     CacheFlag_Dirty_Name      = 0x0004,
-    CacheFlag_Dirty_Source    = 0x0008,    
+    CacheFlag_Dirty_Source    = 0x0008,
     CacheFlag_Dirty_CA        = 0x0010,
     CacheFlag_Dirty_Type      = 0x0020,
     CacheFlag_Dirty_Provider  = 0x0040,
     CacheFlag_Dirty_DefAuth   = 0x0060,
-    CacheFlag_Not_Seen_In_SDT = 0x2000, 
-    CacheFlag_Not_Seen_In_PAT = 0x4000, 
+    CacheFlag_Not_Seen_In_SDT = 0x2000,
+    CacheFlag_Not_Seen_In_PAT = 0x4000,
     CacheFlag_Dirty_Added     = 0x8000,
 };
 
@@ -95,7 +95,7 @@ typedef struct CacheUpdateMessage_s
             Multiplex_t *multiplex;
             int networkId;
         }multiplexNetworkId;
-        
+
         struct
         {
             Service_t *service;
@@ -153,11 +153,11 @@ typedef struct CacheUpdateMessage_s
             int multiplexUID;
             char *name;
         }serviceAdd;
-        
+
         struct
         {
             Service_t *service;
-        }serviceDelete;            
+        }serviceDelete;
     }details;
 }CacheUpdateMessage_t;
 
@@ -202,11 +202,11 @@ void CacheDeInit()
     MessageQSetQuit(cacheUpdateQ);
     pthread_join(cacheUpdateThread, NULL);
     MessageQDestroy(cacheUpdateQ);
-    
+
     CacheServicesFree();
     pthread_mutex_destroy(&cacheUpdateMutex);
     pthread_detach(cacheUpdateThread);
-    
+
 }
 
 int CacheLoad(Multiplex_t *multiplex)
@@ -236,13 +236,13 @@ int CacheLoad(Multiplex_t *multiplex)
         }
         ServiceEnumeratorDestroy(enumerator);
     }
-    
+
     cachedServicesCount = count;
 
     MultiplexRefInc(multiplex);
     cachedServicesMultiplex = multiplex;
     result = 0;
-    
+
     pthread_mutex_unlock(&cacheUpdateMutex);
 
     return result;
@@ -356,7 +356,7 @@ void CachePIDsRelease(void)
 
 void CacheUpdateMultiplex(Multiplex_t *multiplex, int patversion, int tsid)
 {
-    CacheUpdateMessage_t *msg;    
+    CacheUpdateMessage_t *msg;
     pthread_mutex_lock(&cacheUpdateMutex);
 
     if (cachedServicesMultiplex && MultiplexAreEqual(multiplex, cachedServicesMultiplex))
@@ -381,7 +381,7 @@ void CacheUpdateMultiplex(Multiplex_t *multiplex, int patversion, int tsid)
 
 void CacheUpdateNetworkId(Multiplex_t *multiplex, int netid)
 {
-    CacheUpdateMessage_t *msg;    
+    CacheUpdateMessage_t *msg;
     pthread_mutex_lock(&cacheUpdateMutex);
 
     if (cachedServicesMultiplex && MultiplexAreEqual(multiplex, cachedServicesMultiplex))
@@ -404,7 +404,7 @@ void CacheUpdateNetworkId(Multiplex_t *multiplex, int netid)
 
 void CacheUpdateServicePMTPID(Service_t *service, int pmtpid)
 {
-    CacheUpdateMessage_t *msg;    
+    CacheUpdateMessage_t *msg;
     int i;
     pthread_mutex_lock(&cacheUpdateMutex);
 
@@ -432,7 +432,7 @@ void CacheUpdateServicePMTPID(Service_t *service, int pmtpid)
 
 void CacheUpdateServiceName(Service_t *service, char *name)
 {
-    CacheUpdateMessage_t *msg;    
+    CacheUpdateMessage_t *msg;
     int i;
     pthread_mutex_lock(&cacheUpdateMutex);
 
@@ -464,7 +464,7 @@ void CacheUpdateServiceName(Service_t *service, char *name)
                 }
                 MessageQSend(cacheUpdateQ, msg);
                 ObjectRefDec(msg);
-            } 
+            }
             break;
         }
     }
@@ -474,7 +474,7 @@ void CacheUpdateServiceName(Service_t *service, char *name)
 
 void CacheUpdateServiceProvider(Service_t *service, char *provider)
 {
-    CacheUpdateMessage_t *msg;    
+    CacheUpdateMessage_t *msg;
     int i;
     pthread_mutex_lock(&cacheUpdateMutex);
 
@@ -506,7 +506,7 @@ void CacheUpdateServiceProvider(Service_t *service, char *provider)
                 }
                 MessageQSend(cacheUpdateQ, msg);
                 ObjectRefDec(msg);
-            } 
+            }
             break;
         }
     }
@@ -548,7 +548,7 @@ void CacheUpdateServiceDefaultAuthority(Service_t *service, char *defaultAuthori
                 }
                 MessageQSend(cacheUpdateQ, msg);
                 ObjectRefDec(msg);
-            }  
+            }
             break;
         }
     }
@@ -576,7 +576,7 @@ void CacheUpdateServiceSource(Service_t *service, uint16_t source)
                 msg->details.serviceSource.source = source;
                 MessageQSend(cacheUpdateQ, msg);
                 ObjectRefDec(msg);
-            }            
+            }
             break;
         }
     }
@@ -695,9 +695,13 @@ Service_t *CacheServiceAdd(int id)
         }
         result->pmtVersion = -1;
         result->pmtPid = 8192;
-        asprintf(&result->name, "%04x", id);
+        if (asprintf(&result->name, "%04x", id) == -1)
+        {
+            LogModule(LOG_ERROR, CACHE, "Failed to allocate memory for default service name (0x%04x).\n", result->id);
+            result->name = NULL;
+        }
         result->multiplexUID = cachedServicesMultiplex->uid;
-        
+
         pthread_mutex_lock(&cacheUpdateMutex);
 
         LogModule(LOG_DEBUG, CACHE, "Added service %04x at %d\n", result->id, cachedServicesCount);
@@ -718,7 +722,7 @@ Service_t *CacheServiceAdd(int id)
             MessageQSend(cacheUpdateQ, msg);
             ObjectRefDec(msg);
         }
-        
+
         pthread_mutex_unlock(&cacheUpdateMutex);
     }
     return result;
@@ -747,10 +751,10 @@ bool CacheServiceSeen(Service_t *service, bool seen, bool pat)
         }
         else
         {
-            cacheFlags[seenIndex] |= flag;            
+            cacheFlags[seenIndex] |= flag;
         }
-        
-        if ((cacheFlags[seenIndex] & CacheFlag_Not_Seen_In_PAT) && 
+
+        if ((cacheFlags[seenIndex] & CacheFlag_Not_Seen_In_PAT) &&
             (cacheFlags[seenIndex] & CacheFlag_Not_Seen_In_SDT))
         {
             exists = FALSE;
@@ -847,7 +851,7 @@ static void *CacheUpdateProcessor(void *arg)
             CacheProcessUpdateMessage(msg);
         }
     }
-    
+
     MessageQResetQuit(cacheUpdateQ);
     while(MessageQAvailable(cacheUpdateQ))
     {
@@ -863,7 +867,7 @@ static void CacheProcessUpdateMessage(CacheUpdateMessage_t *msg)
     int rc;
     Multiplex_t *mux = NULL;
     Service_t *service = NULL;
-    
+
     DBaseTransactionBegin();
     switch(msg->type)
     {
@@ -881,7 +885,7 @@ static void CacheProcessUpdateMessage(CacheUpdateMessage_t *msg)
                 LogModule(LOG_ERROR, CACHE, "Failed to update Multiplex TS id (0x%x)\n", rc);
             }
             break;
-            
+
         case CacheUpdate_Multiplex_Network_id:
             LogModule(LOG_DEBUG, CACHE, "Updating Multiplex Original Network id\n");
             mux = msg->details.multiplexNetworkId.multiplex;
@@ -891,13 +895,13 @@ static void CacheProcessUpdateMessage(CacheUpdateMessage_t *msg)
                 LogModule(LOG_ERROR, CACHE, "Failed to update Multiplex Original Network id (0x%x)\n", rc);
             }
             break;
-            
+
         case CacheUpdate_Service_PMT_PID:
             service = msg->details.servicePMTPID.service;
             LogModule(LOG_DEBUG, CACHE, "Updating PMT PID for %s\n", service->name);
             ServicePMTPIDSet(service,  msg->details.servicePMTPID.pmtPid);
             break;
-            
+
         case CacheUpdate_Service_PIDs:
             service = msg->details.servicePIDs.service;
             LogModule(LOG_DEBUG, CACHE, "Updating PIDs for %s\n", service->name);
@@ -907,55 +911,55 @@ static void CacheProcessUpdateMessage(CacheUpdateMessage_t *msg)
             ServicePCRPIDSet(service, msg->details.servicePIDs.pcrPid);
             PIDListFree(msg->details.servicePIDs.pids);
             break;
-            
+
         case CacheUpdate_Service_Name:
-            service = msg->details.serviceName.service;      
-            LogModule(LOG_DEBUG, CACHE, "Updating name for 0x%04x new name %s\n", 
+            service = msg->details.serviceName.service;
+            LogModule(LOG_DEBUG, CACHE, "Updating name for 0x%04x new name %s\n",
                 service->id, msg->details.serviceName.name);
             ServiceNameSet(service, msg->details.serviceName.name);
             free(msg->details.serviceName.name);
             break;
-            
+
         case CacheUpdate_Service_Source:
             service = msg->details.serviceSource.service;
-            LogModule(LOG_DEBUG, CACHE, "Updating source for 0x%04x new source %x\n", 
+            LogModule(LOG_DEBUG, CACHE, "Updating source for 0x%04x new source %x\n",
                 service->id, msg->details.serviceSource.source);
             ServiceSourceSet(service, msg->details.serviceSource.source);
             break;
-            
+
         case CacheUpdate_Service_CA:
             service = msg->details.serviceCA.service;
-            LogModule(LOG_DEBUG, CACHE, "Updating CA state for 0x%04x new CA state %s\n", 
+            LogModule(LOG_DEBUG, CACHE, "Updating CA state for 0x%04x new CA state %s\n",
                 service->id, msg->details.serviceCA.ca ? "CA":"FTA");
             ServiceConditionalAccessSet(service, msg->details.serviceCA.ca);
             break;
-            
+
         case CacheUpdate_Service_Type:
             service = msg->details.serviceType.service;
-            LogModule(LOG_DEBUG, CACHE, "Updating Type for 0x%04x new Type %d\n", 
+            LogModule(LOG_DEBUG, CACHE, "Updating Type for 0x%04x new Type %d\n",
                 service->id, msg->details.serviceType.type);
             ServiceTypeSet(service, msg->details.serviceType.type);
             break;
-            
+
         case CacheUpdate_Service_Provider:
             service = msg->details.serviceProvider.service;
-            LogModule(LOG_DEBUG, CACHE, "Updating provider for 0x%04x new provider %s\n", 
+            LogModule(LOG_DEBUG, CACHE, "Updating provider for 0x%04x new provider %s\n",
                 service->id, service->provider);
             ServiceProviderSet(service, msg->details.serviceProvider.provider);
             free(msg->details.serviceProvider.provider);
             break;
-            
+
         case CacheUpdate_Service_Default_Auth:
             service = msg->details.serviceDefaultAuthority.service;
-            LogModule(LOG_DEBUG, CACHE, "Updating default authority for 0x%04x new authority %s\n", 
+            LogModule(LOG_DEBUG, CACHE, "Updating default authority for 0x%04x new authority %s\n",
                 service->id, msg->details.serviceDefaultAuthority.defaultAuthority);
-            ServiceDefaultAuthoritySet(service, msg->details.serviceDefaultAuthority.defaultAuthority);            
+            ServiceDefaultAuthoritySet(service, msg->details.serviceDefaultAuthority.defaultAuthority);
             free(msg->details.serviceDefaultAuthority.defaultAuthority);
             break;
 
         case CacheUpdate_Service_Added:
             LogModule(LOG_DEBUG, CACHE, "Adding service 0x%04x\n", msg->details.serviceAdd.id);
-            ServiceAdd(msg->details.serviceAdd.multiplexUID, 
+            ServiceAdd(msg->details.serviceAdd.multiplexUID,
                        msg->details.serviceAdd.name, msg->details.serviceAdd.id,
                        msg->details.serviceAdd.source, FALSE, ServiceType_Unknown,
                        -1, 8192, 8192);
@@ -964,7 +968,7 @@ static void CacheProcessUpdateMessage(CacheUpdateMessage_t *msg)
 
         case CacheUpdate_Service_Deleted:
             service = msg->details.serviceDelete.service;
-            LogModule(LOG_DEBUG, CACHE, "Deleting service %s (0x%04x)\n", service->name, service->id);            
+            LogModule(LOG_DEBUG, CACHE, "Deleting service %s (0x%04x)\n", service->name, service->id);
             ServiceDelete(service);
             PIDListRemove(service);
             break;
@@ -975,11 +979,11 @@ static void CacheProcessUpdateMessage(CacheUpdateMessage_t *msg)
     {
         ObjectRefDec(mux);
     }
-    
+
     if (service)
     {
         ObjectRefDec(service);
     }
-    
-    ObjectRefDec(msg);            
+
+    ObjectRefDec(msg);
 }

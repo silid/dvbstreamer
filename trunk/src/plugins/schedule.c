@@ -82,7 +82,7 @@ static const char ISO639NoLinguisticContent[] = "zxx";
 static char *RatingsTable[] = {
     "Undefined",
     "4",
-    "5",    
+    "5",
     "6",
     "7",
     "8",
@@ -110,8 +110,8 @@ PLUGIN_FEATURES(
 
 PLUGIN_INTERFACE_F(
     PLUGIN_FOR_DVB,
-    "DVBSchedule", "0.2", 
-    "Plugin to capture DVB EPG schedule information.", 
+    "DVBSchedule", "0.2",
+    "Plugin to capture DVB EPG schedule information.",
     "charrea6@users.sourceforge.net"
     );
 /*******************************************************************************
@@ -126,7 +126,7 @@ static void Init0x12Filter(PIDFilter_t *filter)
     if (filter->tsFilter->adapter->hardwareRestricted)
     {
         DVBDemuxAllocateFilter(filter->tsFilter->adapter, EIT_PID, TRUE);
-    }      
+    }
 }
 
 static void Deinit0x12Filter(PIDFilter_t *filter)
@@ -135,7 +135,7 @@ static void Deinit0x12Filter(PIDFilter_t *filter)
     if (filter->tsFilter->adapter->hardwareRestricted)
     {
         DVBDemuxReleaseFilter(filter->tsFilter->adapter, EIT_PID);
-    }                
+    }
     SubTableProcessorDeinit(filter);
 }
 
@@ -165,7 +165,7 @@ static void DeferredProcessEIT(void *arg)
 
     LogModule(LOG_DEBUG, DVBSCHEDULE, "Processing EIT (version %d) net id %x ts id %x service id %x\n",
     eit->i_version, eit->i_network_id, eit->i_ts_id, eit->i_service_id);
-    
+
     EPGDBaseTransactionStart();
     serviceRef.netId = eit->i_network_id;
     serviceRef.tsId = eit->i_ts_id;
@@ -196,12 +196,12 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *eiteve
     LogModule(LOG_DEBUG, DVBSCHEDULE, "(%x:%x:%x) Event %x Start Time %s End Time %s\n",
         serviceRef->netId, serviceRef->tsId, serviceRef->serviceId, epgevent.eventId,
         startTimeStr, endTimeStr);
-    
+
     if (EPGDBaseEventAdd(&epgevent) != 0)
     {
         return;
     }
-        
+
     for (descriptor = eitevent->p_first_descriptor; descriptor; descriptor = descriptor->p_next)
     {
         switch(descriptor->i_tag)
@@ -235,7 +235,7 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *eiteve
                     char cc[4];
                     int i;
                     cc[3] = 0;
-                    
+
                     for (i=0; i < prd->i_ratings_number; i ++)
                     {
                         cc[0] = prd->p_parental_rating[i].i_country_code >> 16;
@@ -267,12 +267,12 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *eiteve
                             case UK_FREEVIEW_SERIES:
                             case CRID_TYPE_SERIES:
                                 type = "series";
-                                break;                                
+                                break;
                             default:
                                 type = NULL;
                                 break;
                         }
-                        LogModule(LOG_DEBUG, DVBSCHEDULE, "%d) Location: %d\n", i, cridd->p_entries[i].i_location);                        
+                        LogModule(LOG_DEBUG, DVBSCHEDULE, "%d) Location: %d\n", i, cridd->p_entries[i].i_location);
 
                         if (cridd->p_entries[i].i_location == CRID_LOCATION_DESCRIPTOR)
                         {
@@ -284,15 +284,15 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *eiteve
                                     char *crid = ResolveCRID(serviceRef, (char*)cridd->p_entries[i].value.path);
                                     if (crid)
                                     {
-                                        EPGDBaseDetailAdd(serviceRef, epgevent.eventId, (char*)ISO639NoLinguisticContent, 
+                                        EPGDBaseDetailAdd(serviceRef, epgevent.eventId, (char*)ISO639NoLinguisticContent,
                                         type, crid);
                                         free(crid);
                                     }
-                                    
+
                                 }
                                 else
                                 {
-                                    EPGDBaseDetailAdd(serviceRef, epgevent.eventId, (char*)ISO639NoLinguisticContent, 
+                                    EPGDBaseDetailAdd(serviceRef, epgevent.eventId, (char*)ISO639NoLinguisticContent,
                                         type, (char *)cridd->p_entries[i].value.path);
                                 }
                             }
@@ -302,11 +302,11 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *eiteve
                             LogModule(LOG_DEBUG, DVBSCHEDULE, "%d) Ref     : %d\n", i, cridd->p_entries[i].value.ref);
                         }
                     }
-                    
+
                 }
                 break;
         }
-            
+
     }
 }
 
@@ -324,7 +324,7 @@ static void ConvertToTM(dvbpsi_date_time_t *datetime, dvbpsi_eit_event_duration_
     startTime->tm_sec  = datetime->i_second;
 
     secs = mktime(startTime);
-    
+
     secs += (duration->i_hours * 60 * 60) + (duration->i_minutes* 60) + duration->i_seconds;
 
     temp_time = gmtime(&secs);
@@ -340,7 +340,10 @@ static char *ResolveCRID(EPGServiceRef_t *serviceRef, char *relativeCRID)
     {
         if (service->defaultAuthority)
         {
-            asprintf(&result, "%s%s", service->defaultAuthority,relativeCRID);
+            if (asprintf(&result, "%s%s", service->defaultAuthority,relativeCRID) == -1)
+            {
+                LogModule(LOG_INFO, DVBSCHEDULE, "Failed to allocate memory for resolved CRID string.");
+            }
         }
         ServiceRefDec(service);
     }

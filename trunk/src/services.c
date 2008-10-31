@@ -63,20 +63,22 @@ static Event_t serviceAddedEvent;
 static Event_t serviceDeletedEvent;
 static Event_t serviceAllDeletedEvent;
 
+static const char SERVICES[] = "Services";
+
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
 
 int ServiceInit(void)
 {
-    int result = 0;   
+    int result = 0;
     result = ObjectRegisterTypeDestructor(Service_t, ServiceDestructor);
     if (!result)
     {
         servicesSource = EventsRegisterSource("Services");
         serviceAddedEvent = EventsRegisterEvent(servicesSource, "Added", ServiceEventToString);
         serviceDeletedEvent = EventsRegisterEvent(servicesSource, "Deleted", ServiceEventToString);
-        serviceAllDeletedEvent = EventsRegisterEvent(servicesSource, "AllDeleted", ServiceEventAllDeletedToString);        
+        serviceAllDeletedEvent = EventsRegisterEvent(servicesSource, "AllDeleted", ServiceEventAllDeletedToString);
     }
     return  result;
 }
@@ -118,14 +120,14 @@ int ServiceDelete(Service_t  *service)
 
     STATEMENT_FINALIZE();
     EventsFireEventListeners(serviceDeletedEvent, service);
-    
+
     return 0;
 }
 
 int ServiceDeleteAll(Multiplex_t *mux)
 {
     STATEMENT_INIT;
-    
+
     STATEMENT_PREPAREVA("DELETE FROM " SERVICES_TABLE " "
                         "WHERE " SERVICE_MULTIPLEXUID "=%d;",
                         mux->uid);
@@ -136,10 +138,10 @@ int ServiceDeleteAll(Multiplex_t *mux)
     STATEMENT_FINALIZE();
 
     EventsFireEventListeners(serviceAllDeletedEvent, mux);
-    return 0;    
+    return 0;
 }
 
-int ServiceAdd(int uid, char *name, int id, int source, bool ca, ServiceType type, 
+int ServiceAdd(int uid, char *name, int id, int source, bool ca, ServiceType type,
                     int pmtversion, int pmtpid, int pcrpid)
 {
     Service_t *service = NULL;
@@ -178,7 +180,7 @@ int ServiceAdd(int uid, char *name, int id, int source, bool ca, ServiceType typ
     service->pcrPid = pcrpid;
     EventsFireEventListeners(serviceAddedEvent, service);
     ServiceRefDec(service);
-    
+
     return 0;
 }
 
@@ -476,7 +478,7 @@ Service_t *ServiceFindFQID(uint16_t networkId, uint16_t tsId, uint16_t serviceId
     RETURN_ON_ERROR(NULL);
 
     result = ServiceGetNext((ServiceEnumerator_t) stmt);
-    
+
     STATEMENT_FINALIZE();
     return result;
 }
@@ -487,7 +489,7 @@ Service_t *ServiceFindFQIDStr(char *FQIdStr)
     uint16_t tsId = 0;
     uint16_t serviceId = 0;
     Service_t *service = NULL;
-    
+
     if (sscanf(FQIdStr, "%hx.%hx.%hx", &networkId, &tsId, &serviceId) == 3)
     {
         service = ServiceFindFQID(networkId, tsId, serviceId);
@@ -542,34 +544,34 @@ ServiceEnumerator_t ServiceFindByPID(int pid, Multiplex_t *multiplex)
     STATEMENT_INIT;
     char * multiplexClause;
 
-    if (multiplex) 
+    if (multiplex)
     {
-        multiplexClause = sqlite3_mprintf("AND " SERVICES_TABLE "." 
+        multiplexClause = sqlite3_mprintf("AND " SERVICES_TABLE "."
                                        SERVICE_MULTIPLEXUID "=%d "
-                                       "AND " PIDS_TABLE "." 
+                                       "AND " PIDS_TABLE "."
                                        PID_MULTIPLEXUID "=%d ",
                                        multiplex->uid, multiplex->uid);
     }
     else
     {
-        multiplexClause = sqlite3_mprintf("AND " SERVICES_TABLE "." 
+        multiplexClause = sqlite3_mprintf("AND " SERVICES_TABLE "."
                                        SERVICE_MULTIPLEXUID "="
                                        PIDS_TABLE "." PID_MULTIPLEXUID);
     }
-    
+
     if (!multiplexClause)
     {
         return NULL;
     }
 
-    
 
-    STATEMENT_PREPAREVA("SELECT DISTINCT " SERVICE_FIELDS 
+
+    STATEMENT_PREPAREVA("SELECT DISTINCT " SERVICE_FIELDS
                         "FROM " SERVICES_TABLE "," PIDS_TABLE " "
                         "WHERE " SERVICE_ID "=" PID_SERVICEID " %s AND "
                         "(" PIDS_TABLE "." PID_PID "=%d "
                         "OR " SERVICES_TABLE "." SERVICE_PMTPID "=%d "
-                        "OR " SERVICES_TABLE "." SERVICE_PCRPID "=%d );", 
+                        "OR " SERVICES_TABLE "." SERVICE_PCRPID "=%d );",
                         multiplexClause, pid, pid, pid);
     sqlite3_free(multiplexClause);
 
@@ -666,7 +668,10 @@ static char *ServiceEventToString(Event_t event,void * payload)
 {
     char *result=NULL;
     Service_t *service = payload;
-    asprintf(&result, "%d %04x %s",service->multiplexUID, service->id, service->name);
+    if (asprintf(&result, "%d %04x %s",service->multiplexUID, service->id, service->name) == -1)
+    {
+        LogModule(LOG_INFO, SERVICES, "Failed to allocate memory for service event description string.\n");
+    }
     return result;
 }
 
@@ -675,7 +680,10 @@ static char *ServiceEventAllDeletedToString(Event_t event,void * payload)
 {
     char *result=NULL;
     Multiplex_t *mux = payload;
-    asprintf(&result, "%d", mux->uid);
+    if (asprintf(&result, "%d", mux->uid) == -1)
+    {
+        LogModule(LOG_INFO, SERVICES, "Failed to allocate memory for service all deleted event description string.\n");
+    }
     return result;
 }
 

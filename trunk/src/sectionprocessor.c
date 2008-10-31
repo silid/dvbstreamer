@@ -35,6 +35,11 @@ Process PSI/SI sections.
 #include "ts.h"
 #include "plugin.h"
 #include "multiplexes.h"
+#include "logging.h"
+
+/*******************************************************************************
+* Typedefs                                                                     *
+*******************************************************************************/
 
 typedef struct SectionProcessor_t
 {
@@ -51,6 +56,10 @@ typedef struct CallbackDetails_t
     void *userarg;
 }CallbackDetails_t;
 
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
+
 static PIDFilter_t *SectionProcessorFind(uint16_t pid);
 static PIDFilter_t *SectionProcessorCreate(TSFilter_t *tsfilter, uint16_t pid);
 static void SectionProcessorDestroy(PIDFilter_t *filter);
@@ -60,7 +69,15 @@ static void SectionProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, 
 static TSPacket_t * SectionProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
 static void SectionHandler(dvbpsi_decoder_t* p_decoder, dvbpsi_psi_section_t* newSection);
 
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
 static List_t *SectionProcessorsList = NULL;
+static const char SECTIONPROC[] = "SectionProcessor";
+
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
 
 void SectionProcessorStartPID(uint16_t pid, PluginSectionProcessor_t callback, void *userarg)
 {
@@ -130,7 +147,7 @@ static PIDFilter_t *SectionProcessorCreate(TSFilter_t *tsfilter, uint16_t pid)
 {
     PIDFilter_t *result = NULL;
     SectionProcessor_t *state;
-    
+
     ObjectRegisterType(SectionProcessor_t);
     state = ObjectCreateType(SectionProcessor_t);
     if (state)
@@ -145,7 +162,10 @@ static PIDFilter_t *SectionProcessorCreate(TSFilter_t *tsfilter, uint16_t pid)
         {
             ObjectRefDec(state);
         }
-        asprintf( &result->name, "Section(PID 0x%04x)", pid);
+        if (asprintf( &result->name, "Section(PID 0x%04x)", pid) == -1)
+        {
+            LogModule(LOG_INFO, SECTIONPROC, "Failed to allocate memory for filter name.\n");
+        }
         result->type = "Section";
         PIDFilterMultiplexChangeSet(result,SectionProcessorMultiplexChanged, state);
     }
@@ -172,9 +192,9 @@ static void SectionProcessorRegisterSectionCallback(PIDFilter_t *filter,PluginSe
 {
     SectionProcessor_t *state = (SectionProcessor_t *)filter->ppArg;
     CallbackDetails_t *details;
-    
+
     assert(filter->processPacket == SectionProcessorProcessPacket);
-    
+
     details = malloc(sizeof(CallbackDetails_t));
     if (details)
     {
