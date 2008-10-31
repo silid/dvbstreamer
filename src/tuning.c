@@ -118,25 +118,25 @@ void TuningCurrentServiceSet(Service_t *service)
 
         multiplex = MultiplexFindUID(service->multiplexUID);
         primaryServiceFilter = TSFilterFindPIDFilter(tsFilter, PrimaryService, ServicePIDFilterType);
-        
+
         if ((CurrentMultiplex!= NULL) && MultiplexAreEqual(multiplex, CurrentMultiplex))
         {
             LogModule(LOG_DEBUGV, TUNING, "Same multiplex\n");
             /* Reset primary service filter stats */
             primaryServiceFilter->packetsFiltered  = 0;
             primaryServiceFilter->packetsProcessed = 0;
-            primaryServiceFilter->packetsOutput    = 0;            
+            primaryServiceFilter->packetsOutput    = 0;
         }
         else
         {
-            LogModule(LOG_DEBUG, TUNING, "New Multiplex UID = %d (%04x.%04x)\n", multiplex->uid, 
+            LogModule(LOG_DEBUG, TUNING, "New Multiplex UID = %d (%04x.%04x)\n", multiplex->uid,
                 multiplex->networkId & 0xffff, multiplex->tsId & 0xffff);
 
             TuneMultiplex(multiplex);
             /* Reset all stats as this is a new TS */
-            TSFilterZeroStats(tsFilter);            
+            TSFilterZeroStats(tsFilter);
         }
-        
+
         MultiplexRefDec(multiplex);
 
         if (CurrentService)
@@ -146,7 +146,7 @@ void TuningCurrentServiceSet(Service_t *service)
 
         CurrentService = CacheServiceFindId(service->id);
         ServiceFilterServiceSet(primaryServiceFilter, CurrentService);
-        
+
 
         /*
          * Inform any interested parties that we have now changed the current
@@ -169,7 +169,7 @@ void TuningCurrentMultiplexSet(Multiplex_t *multiplex)
 {
     TSFilter_t *tsFilter = MainTSFilterGet();
     PIDFilter_t *primaryServiceFilter;
-        
+
     TSFilterLock(tsFilter);
     LogModule(LOG_DEBUG, TUNING, "Writing changes back to database.\n");
     CacheWriteback();
@@ -177,7 +177,7 @@ void TuningCurrentMultiplexSet(Multiplex_t *multiplex)
 
     LogModule(LOG_DEBUGV, TUNING, "Disabling filters\n");
     TSFilterEnable(tsFilter, FALSE);
-    
+
     primaryServiceFilter = TSFilterFindPIDFilter(tsFilter, PrimaryService, ServicePIDFilterType);
     ServiceFilterServiceSet(primaryServiceFilter, NULL);
 
@@ -191,7 +191,7 @@ void TuningCurrentMultiplexSet(Multiplex_t *multiplex)
      */
     ChannelChangedDoCallbacks((Multiplex_t *)CurrentMultiplex, NULL);
     EventsFireEventListeners(serviceChangedEvent, NULL);
-    
+
     LogModule(LOG_DEBUGV, TUNING, "Enabling filters\n");
     TSFilterEnable(tsFilter, TRUE);
 }
@@ -217,12 +217,12 @@ static void TuneMultiplex(Multiplex_t *multiplex)
     DVBDiSEqCSettings_t diseqc;
     DVBAdapter_t *dvbAdapter = MainDVBAdapterGet();
     TSFilter_t *tsFilter = MainTSFilterGet();
-    
+
     MultiplexRefDec(CurrentMultiplex);
 
     LogModule(LOG_DEBUGV, TUNING, "Caching Services\n");
     CacheLoad(multiplex);
-    
+
     MultiplexRefInc(multiplex);
     CurrentMultiplex = multiplex;
 
@@ -245,7 +245,10 @@ static char *MultiplexChangedEventToString(Event_t event,void * payload)
 {
     char *result=NULL;
     Multiplex_t *mux = payload;
-    asprintf(&result, "%d", mux->uid);
+    if (asprintf(&result, "%d", mux->uid) == -1)
+    {
+        LogModule(LOG_INFO, TUNING, "Failed to allocate memory for multiplex changed event description string.\n");
+    }
     return result;
 }
 
@@ -253,6 +256,9 @@ static char *ServiceChangedEventToString(Event_t event,void * payload)
 {
     char *result=NULL;
     Service_t *service = payload;
-    asprintf(&result, "%d %04x %s",service->multiplexUID, service->id, service->name);
+    if (asprintf(&result, "%d %04x %s",service->multiplexUID, service->id, service->name) == -1)
+    {
+        LogModule(LOG_INFO, TUNING, "Failed to allocate memory for service changed event description string.\n");
+    }
     return result;
 }

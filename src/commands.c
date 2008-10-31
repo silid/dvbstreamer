@@ -73,7 +73,7 @@ void CommandUnInstallServiceFilter(void);
 extern void CommandInstallScanning(void);
 extern void CommandUnInstallScanning(void);
 
-/* File Prototypes */    
+/* File Prototypes */
 static char **AttemptComplete (const char *text, int start, int end);
 static char *CompleteCommand(const char *text, int state);
 static bool ProcessCommand(CommandContext_t *context, char *command, char *argument);
@@ -96,20 +96,20 @@ static char *CommandConsoleGets(CommandContext_t *context, char *buffer, int len
 * Global variables                                                             *
 *******************************************************************************/
 
-static CommandContext_t ConsoleCommandContext = 
+static CommandContext_t ConsoleCommandContext =
 {
-    "console", 
-    FALSE, 
-    CommandConsolePrintf, 
+    "console",
+    FALSE,
+    CommandConsolePrintf,
     CommandConsoleGets,
-    NULL, 
-    NULL, 
-    TRUE, 
-    0, 
+    NULL,
+    NULL,
+    TRUE,
+    0,
     {0}
 };
 
-static Command_t coreCommands[] = 
+static Command_t coreCommands[] =
 {
     {
         "quit",
@@ -149,7 +149,7 @@ static Command_t coreCommands[] =
         "List available settings/variables",
         "List all available variables and whether they are read only.",
         CommandVars
-    },                                  
+    },
     {NULL, FALSE, 0, 0, NULL,NULL}
 };
 
@@ -182,13 +182,13 @@ int CommandInit(void)
         LogModule(LOG_ERROR, COMMAND, "Failed to allocate VariableHandlers!\n");
         return -1;
     }
-    
+
     ListAdd( CommandsList, coreCommands);
 
     pthread_key_create(&commandContextKey, NULL);
-    
+
     CommandInstallServiceFilter();
-    CommandInstallInfo();    
+    CommandInstallInfo();
     CommandInstallScanning();
 
     return 0;
@@ -197,11 +197,11 @@ int CommandInit(void)
 void CommandDeInit(void)
 {
     CommandUnInstallServiceFilter();
-    CommandUnInstallInfo();    
+    CommandUnInstallInfo();
     CommandUnInstallScanning();
     ListFree( CommandsList, NULL);
     ListFree( VariableHandlers, NULL);
-    
+
 }
 
 void CommandRegisterCommands(Command_t *commands)
@@ -222,7 +222,7 @@ void CommandRegisterVariable(CommandVariable_t *handler)
 {
     pthread_mutex_lock(&CommandMutex);
     ListAdd(VariableHandlers, handler);
-    pthread_mutex_unlock(&CommandMutex);    
+    pthread_mutex_unlock(&CommandMutex);
 }
 
 void CommandUnRegisterVariable(CommandVariable_t *handler)
@@ -246,7 +246,7 @@ int CommandPrintf(const char* fmt, ...)
 {
     va_list args;
     int result = 0;
-    
+
     CommandContext_t *context = CommandContextGet();
     va_start(args, fmt);
     result = context->printf(context, fmt, args);
@@ -296,31 +296,33 @@ int CommandProcessFile(char *file)
     quit = FALSE;
     while(!feof(fp) && !quit)
     {
-        fgets(line, sizeof(line), fp);
-        nl = strchr(line, '\n');
-        if (nl)
+        if (fgets(line, sizeof(line), fp))
         {
-            *nl = 0;
-        }
-        nl = strchr(line, '\r');
-        if (nl)
-        {
-            *nl = 0;
-        }
-        lineno ++;
-        if (strlen(line) > 0)
-        {
-            CommandExecute(&ConsoleCommandContext, line);
-            
-            if (ConsoleCommandContext.errorNumber != COMMAND_OK)
+            nl = strchr(line, '\n');
+            if (nl)
             {
-                if (ConsoleCommandContext.errorNumber == COMMAND_ERROR_UNKNOWN_COMMAND)
+                *nl = 0;
+            }
+            nl = strchr(line, '\r');
+            if (nl)
+            {
+                *nl = 0;
+            }
+            lineno ++;
+            if (strlen(line) > 0)
+            {
+                CommandExecute(&ConsoleCommandContext, line);
+
+                if (ConsoleCommandContext.errorNumber != COMMAND_OK)
                 {
-                    fprintf(stderr, "%s(%d): Unknown command \"%s\"\n", file, lineno, line);
-                }
-                else
-                {
-                    fprintf(stderr, "%s(%d): %s\n", file, lineno, ConsoleCommandContext.errorMessage);
+                    if (ConsoleCommandContext.errorNumber == COMMAND_ERROR_UNKNOWN_COMMAND)
+                    {
+                        fprintf(stderr, "%s(%d): Unknown command \"%s\"\n", file, lineno, line);
+                    }
+                    else
+                    {
+                        fprintf(stderr, "%s(%d): %s\n", file, lineno, ConsoleCommandContext.errorMessage);
+                    }
                 }
             }
         }
@@ -354,10 +356,10 @@ bool CommandExecute(CommandContext_t *context, char *line)
     char *argument = NULL;
 
     CommandContextSet(context);
-    
+
     CommandError(COMMAND_OK, "OK");
     ParseLine(line, &command, &argument);
-    
+
     if (command && (strlen(command) > 0))
     {
         commandFound = ProcessCommand(context, command, argument);
@@ -372,7 +374,7 @@ bool CommandExecute(CommandContext_t *context, char *line)
         }
     }
 
-    CommandContextSet(NULL);    
+    CommandContextSet(NULL);
     return commandFound;
 }
 
@@ -453,8 +455,8 @@ static bool ProcessCommand(CommandContext_t *context, char *command, char *argum
         }
     }
     pthread_mutex_unlock(&CommandMutex);
-        
-    
+
+
     if (commandInfo)
     {
         if (argument)
@@ -476,7 +478,7 @@ static bool ProcessCommand(CommandContext_t *context, char *command, char *argum
             argv = calloc(sizeof(char*), 1);
             argv[0] = NULL;
         }
-    
+
         if ((argc >= commandInfo->minArgs) && (argc <= commandInfo->maxArgs))
         {
             commandInfo->commandfunc(argc, argv );
@@ -485,21 +487,21 @@ static bool ProcessCommand(CommandContext_t *context, char *command, char *argum
         {
             CommandError(COMMAND_ERROR_WRONG_ARGS, "Incorrect number of arguments!");
         }
-    
+
         if (commandInfo->tokenise)
         {
             int a;
-    
+
             for (a = 0; a < argc; a ++)
             {
                 free(argv[a]);
             }
             free(argv);
         }
-    
+
         commandFound = TRUE;
     }
-    
+
     return commandFound;
 }
 
@@ -534,7 +536,7 @@ static void ParseLine(char *line, char **command, char **argument)
 
     /* Handle end of line comments */
     for (eol = 0; line[eol] && (line[eol] != '#'); eol ++);
-    
+
     /* Find first space after command */
     for (eoc = 0; line[eoc] && (eoc < eol); eoc ++)
     {
@@ -543,13 +545,13 @@ static void ParseLine(char *line, char **command, char **argument)
             break;
         }
     }
-   
+
     if (eoc != eol)
     {
         long argStart;
         long argEnd;
         long argLen;
-                
+
         for (argStart = eoc + 1;(argStart < eol) && isspace(line[argStart]); argStart ++);
 
         for (argEnd = eol - 1; (argEnd > argStart) && isspace(line[argEnd]); argEnd --);
@@ -585,22 +587,22 @@ static char **Tokenise(char *arguments, int *argc)
     char *end;
     char t;
     char **args;
-    
+
     args = calloc(sizeof(char *), MAX_ARGS);
-    
+
     while (*start)
     {
         bool quotesOpen = FALSE;
-        
+
         /* Trim spaces from the start */
         for (; *start && isspace(*start); start ++);
-        
+
         if (start[0] == '"')
         {
             quotesOpen = TRUE;
             start ++;
         }
-        
+
         /* Work out the end of the argument */
         for (end = start; *end; end ++)
         {
@@ -661,17 +663,17 @@ static void CommandHelp(int argc, char **argv)
     int i;
     ListIterator_t iterator;
     CommandContext_t *context = CommandContextGet();
-    
+
     if (argc)
     {
         Command_t *requestedcmd = NULL;
 
-        
+
         if (context->commands)
         {
             requestedcmd = FindCommand( context->commands, argv[0]);
         }
-        
+
         if (!requestedcmd)
         {
             for ( ListIterator_Init(iterator, CommandsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
@@ -704,7 +706,7 @@ static void CommandHelp(int argc, char **argv)
                 CommandPrintf("%12s - %s\n", commands[i].command, commands[i].shortHelp);
             }
         }
-        
+
         if (context->commands)
         {
             for (i = 0; context->commands[i].command; i ++)
@@ -720,7 +722,7 @@ static void CommandGet(int argc, char **argv)
 {
     ListIterator_t iterator;
     bool found = FALSE;
-    for (ListIterator_Init(iterator, VariableHandlers); 
+    for (ListIterator_Init(iterator, VariableHandlers);
          ListIterator_MoreEntries(iterator);
          ListIterator_Next(iterator))
     {
@@ -749,7 +751,7 @@ static void CommandSet(int argc, char **argv)
 {
     ListIterator_t iterator;
     bool found = FALSE;
-    for (ListIterator_Init(iterator, VariableHandlers); 
+    for (ListIterator_Init(iterator, VariableHandlers);
          ListIterator_MoreEntries(iterator);
          ListIterator_Next(iterator))
     {
@@ -764,21 +766,21 @@ static void CommandSet(int argc, char **argv)
             {
                 CommandError(COMMAND_ERROR_GENERIC, "Variable \"%s\" is read-only!\n", handler->name);
             }
-            found = TRUE;            
+            found = TRUE;
         }
     }
     if (!found)
     {
         CommandError(COMMAND_ERROR_GENERIC, "Unknown variable \"%s\"", argv[0]);
     }
-         
+
 }
 
 static void CommandVars(int argc, char **argv)
 {
     ListIterator_t iterator;
 
-    for (ListIterator_Init(iterator, VariableHandlers); 
+    for (ListIterator_Init(iterator, VariableHandlers);
          ListIterator_MoreEntries(iterator);
          ListIterator_Next(iterator))
     {

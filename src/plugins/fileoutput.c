@@ -29,6 +29,7 @@ File Delivery Method handler, all packets are written to the file of choosing.
 #include "plugin.h"
 #include "ts.h"
 #include "deliverymethod.h"
+#include "logging.h"
 
 /*******************************************************************************
 * Typedefs                                                                     *
@@ -36,9 +37,9 @@ File Delivery Method handler, all packets are written to the file of choosing.
 struct FileOutputInstance_t
 {
     /* !!! MUST BE THE FIRST FIELD IN THE STRUCTURE !!!
-     * As the address of this field will be passed to all delivery method 
+     * As the address of this field will be passed to all delivery method
      * functions and a 0 offset is assumed!
-     */    
+     */
     DeliveryMethodInstance_t instance;
 
     FILE *fp;
@@ -54,7 +55,7 @@ void FileOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet);
 void FileOutputSendBlock(DeliveryMethodInstance_t *this, void *block, unsigned long blockLen);
 void FileOutputDestroy(DeliveryMethodInstance_t *this);
 void FileReserveHeaderSpace(DeliveryMethodInstance_t *this, int packets);
-void FileSetHeader(struct DeliveryMethodInstance_t *this, 
+void FileSetHeader(struct DeliveryMethodInstance_t *this,
                         TSPacket_t *packets, int count);
 
 /*******************************************************************************
@@ -69,7 +70,7 @@ DeliveryMethodHandler_t FileOutputHandler = {
             FileOutputCanHandle,
             FileOutputCreate
         };
-
+static const char FILEOUTPUT[] = "FileOutput";
 
 /*******************************************************************************
 * Plugin Setup                                                                 *
@@ -80,12 +81,12 @@ PLUGIN_FEATURES(
 
 PLUGIN_INTERFACE_F(
     PLUGIN_FOR_ALL,
-    "FileOutput", 
-    "0.1", 
+    "FileOutput",
+    "0.1",
     "File Delivery method.\nUse file://<file name>\n"
     "File name can be in absolute or relative.\n"
     "For an absolute file name use file:///home/user/myts.ts.\n"
-    "For a relative file name use file://myts.ts.", 
+    "For a relative file name use file://myts.ts.",
     "charrea6@users.sourceforge.net"
 );
 
@@ -111,7 +112,7 @@ DeliveryMethodInstance_t *FileOutputCreate(char *arg)
     instance->instance.DestroyInstance = FileOutputDestroy;
     instance->instance.ReserveHeaderSpace = FileReserveHeaderSpace;
     instance->instance.SetHeader = FileSetHeader;
-    
+
     instance->fp = fopen((char*)(arg + PREFIX_LEN), "wb");
 
     if (!instance->fp)
@@ -131,7 +132,10 @@ void FileOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet)
 void FileOutputSendBlock(DeliveryMethodInstance_t *this, void *block, unsigned long blockLen)
 {
     struct FileOutputInstance_t *instance = (struct FileOutputInstance_t*)this;
-    fwrite(block, blockLen, 1, instance->fp);
+    if (fwrite(block, blockLen, 1, instance->fp) != blockLen)
+    {
+        LogModule(LOG_INFO, FILEOUTPUT, "Failed to write entire block to file!\n");
+    }
 }
 
 void FileOutputDestroy(DeliveryMethodInstance_t *this)
@@ -154,11 +158,14 @@ void FileReserveHeaderSpace(DeliveryMethodInstance_t *this, int packets)
 
     for (i=0; i< packets; i ++)
     {
-        fwrite(&nullPacket, TSPACKET_SIZE, 1, instance->fp);
+        if (fwrite(&nullPacket, TSPACKET_SIZE, 1, instance->fp) != TSPACKET_SIZE)
+        {
+            LogModule(LOG_INFO, FILEOUTPUT, "Failed to write all of null packet to start of file.\n");
+        }
     }
 }
 
-void FileSetHeader(struct DeliveryMethodInstance_t *this, 
+void FileSetHeader(struct DeliveryMethodInstance_t *this,
                         TSPacket_t *packets, int count)
 {
     struct FileOutputInstance_t *instance = (struct FileOutputInstance_t*)this;
@@ -167,7 +174,10 @@ void FileSetHeader(struct DeliveryMethodInstance_t *this,
 
     rewind(instance->fp);
 
-    fwrite(packets, TSPACKET_SIZE, count, instance->fp);
+    if (fwrite(packets, TSPACKET_SIZE, count, instance->fp))
+    {
+        LogModule(LOG_INFO, FILEOUTPUT, "Failed to write all of packet to file.\n");
+    }
 
-    fsetpos(instance->fp, &current);    
+    fsetpos(instance->fp, &current);
 }

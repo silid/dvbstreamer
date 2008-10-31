@@ -130,7 +130,7 @@ static DVBAdapter_t *DVBAdapter;
 static const char MAIN[] = "Main";
 static time_t StartTime;
 static char *versionStr = VERSION;
-static char *hexVersionStr;
+static char hexVersionStr[5]; /* XXXX\0 */
 
 /*******************************************************************************
 * Global functions                                                             *
@@ -226,7 +226,10 @@ int main(int argc, char *argv[])
         if (startupFile && (startupFile[0] != '/'))
         {
             char *cwd = getcwd(NULL, 0);
-            asprintf(&startupFile, "%s/%s", cwd, startupFile);
+            if (asprintf(&startupFile, "%s/%s", cwd, startupFile) == -1)
+            {
+                LogModule(LOG_ERROR, MAIN, "Failed to allocate memory for startup file path!\n");
+            }
             free(cwd);
         }
         InitDaemon( adapterNumber);
@@ -541,7 +544,7 @@ void UpdateDatabase()
 
 static void InstallSysProperties(void)
 {
-    asprintf(&hexVersionStr, "%02x%02x", DVBSTREAMER_MAJOR, DVBSTREAMER_MINOR);
+    sprintf(hexVersionStr, "%02x%02x", DVBSTREAMER_MAJOR, DVBSTREAMER_MINOR);
     PropertiesAddProperty("sys", "version", "Version of this instance of DVBStreamer", PropertyType_String,
                         &versionStr, PropertiesSimplePropertyGet, NULL);
     PropertiesAddProperty("sys", "hexversion", "Version of this instance of DVBStreamer as a 16 bit hex number", PropertyType_String,
@@ -565,7 +568,10 @@ static int SysPropertyGetUptime(void *userArg, PropertyValue_t *value)
     m = (seconds - ((d * 24 * 60 * 60) + (h * 60 * 60))) / 60;
     s = (seconds - ((d * 24 * 60 * 60) + (h * 60 * 60) + (m * 60)));
 
-    asprintf(&uptimeStr, "%d Days %d Hours %d Minutes %d seconds", d, h, m, s);
+    if (asprintf(&uptimeStr, "%d Days %d Hours %d Minutes %d seconds", d, h, m, s) == -1)
+    {
+        LogModule(LOG_INFO, MAIN, "Failed to allocate memory for uptime string.\n");
+    }
     value->u.string = uptimeStr;
     return 0;
 }

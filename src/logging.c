@@ -66,7 +66,7 @@ int LoggingInitFile(char *filepath, int logLevel)
         {
             return -1;
         }
-        
+
         /* Turn off buffering */
         setbuf(logFP, NULL);
     }
@@ -77,7 +77,7 @@ int LoggingInitFile(char *filepath, int logLevel)
 int LoggingInit(char *filename, int logLevel)
 {
     char logFile[PATH_MAX];
-    
+
     /* Try /var/log first then users home directory */
     sprintf(logFile, "/var/log/%s", filename);
     logFP = freopen(logFile, "a", stderr);
@@ -96,7 +96,7 @@ int LoggingInit(char *filename, int logLevel)
     verbosity = logLevel;
     return 0;
 }
-    
+
 void LoggingDeInit(void)
 {
     fclose(logFP);
@@ -164,9 +164,14 @@ static void LogImpl(int level, const char *module, const char * format, va_list 
 
     vfprintf(logFP, format, valist);
 
+    if (strchr(format, '\n') == NULL)
+    {
+        fprintf(logFP, "\n");
+    }
+
     if ((level == LOG_ERROR) && (errno != 0))
     {
-        fprintf(logFP, "%s %-15s : %2d : errno = %d (%s)\n", timeBuffer, 
+        fprintf(logFP, "%s %-15s : %2d : errno = %d (%s)\n", timeBuffer,
             module ? module:"<Unknown>", level, errno, strerror(errno));
     }
 

@@ -120,7 +120,7 @@ void EventsUnregisterListener(EventListener_t listener, void *arg)
 {
     pthread_mutex_lock(&eventsMutex);
     UnRegisterEventListener(globalListenersList, listener, arg);
-    pthread_mutex_unlock(&eventsMutex);   
+    pthread_mutex_unlock(&eventsMutex);
 }
 
 EventSource_t EventsRegisterSource(char *name)
@@ -136,7 +136,7 @@ EventSource_t EventsRegisterSource(char *name)
         ListAdd(sourcesList, result);
         LogModule(LOG_DEBUG, EVENTS, "New event source registered (%s)\n", name);
     }
-    pthread_mutex_unlock(&eventsMutex);    
+    pthread_mutex_unlock(&eventsMutex);
     return result;
 }
 
@@ -153,7 +153,7 @@ EventSource_t EventsFindSource(char *name)
 {
     ListIterator_t iterator;
     EventSource_t result = NULL;
-    
+
     pthread_mutex_lock(&eventsMutex);
     for (ListIterator_Init(iterator, sourcesList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
@@ -203,7 +203,7 @@ Event_t EventsRegisterEvent(EventSource_t source, char *name, EventToString_t to
 void EventsUnregisterEvent(Event_t event)
 {
    pthread_mutex_lock(&eventsMutex);
-   LogModule(LOG_DEBUG, EVENTS, "Event unregistered (%s.%s)\n", event->source->name, event->name);   
+   LogModule(LOG_DEBUG, EVENTS, "Event unregistered (%s.%s)\n", event->source->name, event->name);
    ListRemove(event->source->events, event);
    EventFree(event);
    pthread_mutex_unlock(&eventsMutex);
@@ -215,7 +215,7 @@ Event_t EventsFindEvent(char *name)
     int sourceNameLen;
     EventSource_t source = NULL;
     Event_t result = NULL;
-    
+
     pthread_mutex_lock(&eventsMutex);
     for (sourceNameLen = 0; name[sourceNameLen];sourceNameLen ++)
     {
@@ -246,7 +246,7 @@ Event_t EventsFindEvent(char *name)
                 }
             }
         }
-        ObjectFree(sourceName);    
+        ObjectFree(sourceName);
     }
     pthread_mutex_unlock(&eventsMutex);
     return result;
@@ -255,10 +255,10 @@ Event_t EventsFindEvent(char *name)
 void EventsFireEventListeners(Event_t event, void *payload)
 {
     pthread_mutex_lock(&eventsMutex);
-    LogModule(LOG_DEBUG, EVENTS, "Firing event %s.%s\n", event->source->name, event->name);   
+    LogModule(LOG_DEBUG, EVENTS, "Firing event %s.%s\n", event->source->name, event->name);
     FireEventListeners(globalListenersList, event, payload);
     FireEventListeners(event->source->listeners, event, payload);
-    FireEventListeners(event->listeners, event, payload);   
+    FireEventListeners(event->listeners, event, payload);
 
     pthread_mutex_unlock(&eventsMutex);
 }
@@ -280,15 +280,21 @@ void EventsUnregisterEventListener(Event_t event, EventListener_t listener, void
 char *EventsEventToString(Event_t event, void *payload)
 {
     char *result = NULL;
+    int ret;
     if (payload && event->toString)
     {
         char *payloadStr = event->toString(event, payload);
-        asprintf(&result, "%s.%s %s", event->source->name, event->name, payloadStr);
+        ret = asprintf(&result, "%s.%s %s", event->source->name, event->name, payloadStr);
         free(payloadStr);
     }
     else
     {
-        asprintf(&result, "%s.%s", event->source->name, event->name);
+        ret = asprintf(&result, "%s.%s", event->source->name, event->name);
+    }
+
+    if (ret == -1)
+    {
+        LogModule(LOG_INFO, EVENTS, "Failed to allocate memory for event description string.");
     }
     return result;
 }
@@ -299,7 +305,7 @@ char *EventsEventToString(Event_t event, void *payload)
 static void EventSourceFree(EventSource_t source)
 {
    free(source->name);
-   ListFree(source->listeners,(void (*)(void*))EventListenerDetailsFree);   
+   ListFree(source->listeners,(void (*)(void*))EventListenerDetailsFree);
    ListFree(source->events, (void (*)(void*))EventFree);
    ObjectRefDec(source);
 }

@@ -36,7 +36,11 @@ Process PES sections.
 #include "ts.h"
 #include "plugin.h"
 #include "multiplexes.h"
+#include "logging.h"
 
+/*******************************************************************************
+* Typedefs                                                                     *
+*******************************************************************************/
 typedef struct PESProcessor_t
 {
     PIDFilterSimpleFilter_t simplefilter;
@@ -55,6 +59,9 @@ typedef struct CallbackDetails_t
     void *userarg;
 }CallbackDetails_t;
 
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
 static PIDFilter_t *PESProcessorFind(uint16_t pid);
 static PIDFilter_t *PESProcessorCreate(TSFilter_t *tsfilter, uint16_t pid);
 static void PESProcessorDestroy(PIDFilter_t *filter);
@@ -63,8 +70,15 @@ static void PESProcessorUnRegisterCallback(PIDFilter_t *filter,PluginPESProcesso
 static void PESProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex);
 static TSPacket_t * PESProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
 
+/*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
 static List_t *SectionProcessorsList = NULL;
+static const char PESPROCESSOR[] = "PESProcessor";
 
+/*******************************************************************************
+* Global functions                                                             *
+*******************************************************************************/
 void PESProcessorStartPID(uint16_t pid, PluginPESProcessor_t callback, void *userarg)
 {
     PIDFilter_t *processor = PESProcessorFind(pid);
@@ -73,7 +87,7 @@ void PESProcessorStartPID(uint16_t pid, PluginPESProcessor_t callback, void *use
     {
         SectionProcessorsList = ListCreate();
     }
-    
+
     if (processor == NULL)
     {
         processor = PESProcessorCreate(MainTSFilterGet(), pid);
@@ -155,7 +169,12 @@ static PIDFilter_t *PESProcessorCreate(TSFilter_t *tsfilter, uint16_t pid)
         {
             ObjectRefDec(state);
         }
-        asprintf(&result->name, "PES(PID 0x%04x)", pid);
+
+        if (asprintf(&result->name, "PES(PID 0x%04x)", pid) == -1)
+        {
+            LogModule(LOG_INFO, PESPROCESSOR, "Failed to allocate memory for filter name.");
+        }
+
         result->type = "PES";
         result->enabled = TRUE;
         PIDFilterMultiplexChangeSet(result,PESProcessorMultiplexChanged, state);
@@ -226,7 +245,7 @@ static TSPacket_t * PESProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg,
     PESProcessor_t *state = (PESProcessor_t *)arg;
     uint8_t expectedCounter;
     int payloadStart = 0;
-    
+
     /* Continuity check */
     expectedCounter = (state->counter + 1) & 0xf;
     state->counter = TSPACKET_GETCOUNT(*packet);
