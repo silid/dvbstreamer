@@ -6,15 +6,11 @@ AM_CFLAGS =\
 
 pluginsdir = @DVBSTREAMER_PLUGINDIR@
 
-if CYGWIN
-plugins_LTLIBRARIES = \
-	nulloutput.la \
-	fileoutput.la
-else
 plugins_LTLIBRARIES = \
 	udpoutput.la \
 	nulloutput.la \
 	fileoutput.la \
+	outputs.la \
 	extractpes.la \
 	epgtoxmltv.la \
 	manualfilters.la \
@@ -24,7 +20,6 @@ plugins_LTLIBRARIES = \
 	eventsdispatcher.la \
 	$(atsc_plugins) \
 	$(dvb_plugins)
-endif
 
 if ENABLE_ATSC
 atsc_plugins=\
@@ -59,6 +54,11 @@ fileoutput_la_SOURCES = \
     fileoutput.c
 
 fileoutput_la_LDFLAGS = -module -no-undefined -avoid-version
+
+outputs_la_SOURCES = \
+    outputs.c
+
+outputs_la_LDFLAGS = -module -no-undefined -avoid-version
 
 lcnquery_la_SOURCES = \
     lcnquery.c
