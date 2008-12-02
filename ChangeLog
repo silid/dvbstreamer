@@ -1,3 +1,13 @@
+2.0
+---
+* New scanning feature
+   - Can now perform a full spectrum scan (ATSC, DVB-C/T)
+   - Can now perform a network scan using information from dvb-utils (All)
+* New properties API and commands allows easier access to internal properties.
+  (vars are now deprecated.)
+* Ability to release (and reacquire) the frontend to save energy.
+* Fix [2377653] ATSC EPG xmltv output shows programs on wrong channel
+
 1.0
 ---
 * New Plugin - Traffic Monitor/Capture (thanks to Steve VanDeBogart)

@@ -55,6 +55,16 @@ typedef struct TableInfo_s
     dvbpsi_handle decoder;
 }TableInfo_t;
 
+typedef struct TSCEPGDeferredInfo_s
+{
+    uint16_t netId;
+    uint16_t tsId;
+    union {
+    dvbpsi_atsc_ett_t *ett;
+    dvbpsi_atsc_eit_t *eit;
+    } u;
+}ATSCEPGDeferredInfo_t;
+
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
@@ -98,10 +108,6 @@ static time_t UnixEpochOffset = 315964800;
 /*******************************************************************************
 * Plugin Setup                                                                 *
 *******************************************************************************/
-#ifdef __CYGWIN__
-#define PluginInterface ATSCtoEPGPluginInterface
-#endif
-
 PLUGIN_FEATURES(
     PLUGIN_FEATURE_FILTER(filter),
     PLUGIN_FEATURE_MGTPROCESSOR(NewMGT),
@@ -110,8 +116,8 @@ PLUGIN_FEATURES(
 
 PLUGIN_INTERFACE_F(
     PLUGIN_FOR_ATSC,
-    "ATSCtoEPG", "0.1", 
-    "Plugin to capture ATSC EPG schedule information.", 
+    "ATSCtoEPG", "0.2",
+    "Plugin to capture ATSC EPG schedule information.",
     "charrea6@users.sourceforge.net"
     );
 /*******************************************************************************
@@ -123,7 +129,8 @@ static void InitEITFilter(PIDFilter_t *filter)
     filter->enabled = TRUE;
     PIDFilterFilterPacketSet(filter, ATSCtoEPGFilterPacket, NULL);
     PIDFilterMultiplexChangeSet(filter, ATSCtoEPGMultiplexChanged, NULL);
-    PIDFilterProcessPacketSet(filter, ATSCtoEPGProcessPacket, NULL);   
+    PIDFilterProcessPacketSet(filter, ATSCtoEPGProcessPacket, NULL);
+    ObjectRegisterType(ATSCEPGDeferredInfo_t);
 }
 
 static void DeinitEITFilter(PIDFilter_t *filter)
@@ -168,7 +175,7 @@ static void NewMGT(dvbpsi_atsc_mgt_t *newMGT)
             ExtendedTextTableInfo[ExtendedTextTableCount].decoder = dvbpsi_atsc_AttachETT(ProcessETT, NULL);
             ExtendedTextTableCount ++;
         }
-        
+
     }
 }
 
@@ -194,7 +201,7 @@ static int ATSCtoEPGFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid
             return TRUE;
         }
     }
-    
+
     return FALSE;
 }
 
@@ -218,7 +225,7 @@ static TSPacket_t * ATSCtoEPGProcessPacket(PIDFilter_t *pidfilter, void *arg, TS
     {
         if (ExtendedTextTableInfo[i].pid == pid)
         {
-            dvbpsi_PushPacket(ExtendedTextTableInfo[i].decoder, (uint8_t*)packet);            
+            dvbpsi_PushPacket(ExtendedTextTableInfo[i].decoder, (uint8_t*)packet);
         }
     }
     return NULL;
@@ -231,63 +238,76 @@ static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t table
 
 static void ProcessETT(void *arg, dvbpsi_atsc_ett_t *newETT)
 {
-    DeferredProcessingAddJob(DeferredProcessETT, newETT);
-    ObjectRefDec(newETT);    
+    Multiplex_t *multiplex = TuningCurrentMultiplexGet();
+    ATSCEPGDeferredInfo_t *info = ObjectCreateType(ATSCEPGDeferredInfo_t);
+    info->netId = multiplex->networkId;
+    info->tsId = multiplex->tsId;
+    info->u.ett = newETT;
+    DeferredProcessingAddJob(DeferredProcessETT, info);
+    ObjectRefDec(info);
+    MultiplexRefDec(multiplex);    
 }
 
 static void ProcessEIT(void *arg, dvbpsi_atsc_eit_t *newEIT)
 {
-    DeferredProcessingAddJob(DeferredProcessEIT, newEIT);
-    ObjectRefDec(newEIT);
+    Multiplex_t *multiplex = TuningCurrentMultiplexGet();
+    ATSCEPGDeferredInfo_t *info = ObjectCreateType(ATSCEPGDeferredInfo_t);
+    info->netId = multiplex->networkId;
+    info->tsId = multiplex->tsId;
+    info->u.eit = newEIT;
+    DeferredProcessingAddJob(DeferredProcessEIT, info);
+    ObjectRefDec(info);
+    MultiplexRefDec(multiplex);    
 }
 
 static void DeferredProcessEIT(void *arg)
 {
-    dvbpsi_atsc_eit_t *eit = (dvbpsi_atsc_eit_t *)arg;
-    Multiplex_t *multiplex = TuningCurrentMultiplexGet();
+    ATSCEPGDeferredInfo_t *info = (ATSCEPGDeferredInfo_t*)arg;
+    dvbpsi_atsc_eit_t *eit = info->u.eit;
+    
     EPGServiceRef_t serviceRef;
     dvbpsi_atsc_eit_event_t *event;
 
     LogModule(LOG_DEBUG, ATSCTOEPG, "Processing EIT (version %d) source id %x\n",
     eit->i_version, eit->i_source_id);
-    
+
     EPGDBaseTransactionStart();
 
-    serviceRef.netId = multiplex->networkId;
-    serviceRef.tsId = multiplex->tsId;
+    serviceRef.netId = info->netId;
+    serviceRef.tsId = info->tsId;
     serviceRef.serviceId = eit->i_source_id;
     for (event = eit->p_first_event; event; event = event->p_next)
     {
         ProcessEvent(&serviceRef, event);
     }
     ObjectRefDec(eit);
+    ObjectRefDec(info);
     EPGDBaseTransactionCommit();
 
-    MultiplexRefDec(multiplex);
 }
 
 static void DeferredProcessETT(void *arg)
 {
+    ATSCEPGDeferredInfo_t *info = (ATSCEPGDeferredInfo_t*)arg;
     ATSCMultipleStrings_t *description;
-    dvbpsi_atsc_ett_t *ett = (dvbpsi_atsc_ett_t*) arg;
-    Multiplex_t *multiplex = TuningCurrentMultiplexGet();
+    dvbpsi_atsc_ett_t *ett = info->u.ett;
     EPGServiceRef_t serviceRef;
-    unsigned int eventId; 
+    unsigned int eventId;
     char lang[4];
     int i;
-    
-    serviceRef.netId = multiplex->networkId;
-    serviceRef.tsId = multiplex->tsId;
+
+    serviceRef.netId = info->netId;
+    serviceRef.tsId = info->tsId;
     serviceRef.serviceId = (ett->i_etm_id >> 16) & 0xffff;
     eventId = (ett->i_etm_id & 0xffff) >> 2;
     lang[3] = 0;
-    EPGDBaseTransactionStart();    
+    EPGDBaseTransactionStart();
     description = ATSCMultipleStringsConvert(ett->p_etm, ett->i_etm_length);
     LogModule(LOG_DEBUG, ATSCTOEPG,"Processing ETT for %04x.%04x.%04x.%04x (%08x): Number of strings %d\n",
         serviceRef.netId, serviceRef.tsId, serviceRef.serviceId, eventId,ett->i_etm_id, description->number_of_strings);
     for (i = 0; i < description->number_of_strings; i ++)
     {
-        
+
         LogModule(LOG_DEBUG, ATSCTOEPG, "%d : (%c%c%c) %s\n",
             i + 1, description->strings[i].lang[0],description->strings[i].lang[1],description->strings[i].lang[2],
             description->strings[i].text);
@@ -299,8 +319,8 @@ static void DeferredProcessETT(void *arg)
     EPGDBaseTransactionCommit();
     ObjectRefDec(description);
 
-    MultiplexRefDec(multiplex);    
     ObjectRefDec(ett);
+    ObjectRefDec(info);
 }
 
 /*******************************************************************************
@@ -315,7 +335,7 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_atsc_eit_event_t *e
     ATSCMultipleStrings_t *title;
     int i;
     char lang[4];
-    
+
     epgevent.serviceRef = *serviceRef;
     epgevent.eventId = eitevent->i_event_id;
     ConvertToTM(eitevent->i_start_time, eitevent->i_length_seconds, &epgevent.startTime, &epgevent.endTime);
@@ -325,7 +345,7 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_atsc_eit_event_t *e
     LogModule(LOG_DEBUG, ATSCTOEPG, "Processing EIT for %04x.%04x.%04x.%04x Start Time %s (%d) End Time %s (duration %d) Title Length %d ETM location=%d\n",
         serviceRef->netId, serviceRef->tsId, serviceRef->serviceId, epgevent.eventId,
         startTimeStr,eitevent->i_start_time, endTimeStr,eitevent->i_length_seconds, eitevent->i_title_length, eitevent->i_etm_location);
-    
+
     if (EPGDBaseEventAdd(&epgevent) != 0)
     {
         return;
@@ -335,7 +355,7 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_atsc_eit_event_t *e
     title = ATSCMultipleStringsConvert(eitevent->i_title, eitevent->i_title_length);
     for (i = 0; i < title->number_of_strings; i ++)
     {
-        
+
         LogModule(LOG_DEBUG, ATSCTOEPG, "%d : (%c%c%c) %s\n",
             i + 1, title->strings[i].lang[0],title->strings[i].lang[1],title->strings[i].lang[2],
             title->strings[i].text);
@@ -345,13 +365,13 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_atsc_eit_event_t *e
         EPGDBaseDetailAdd(serviceRef,epgevent.eventId, lang, EPG_EVENT_DETAIL_TITLE,title->strings[i].text);
     }
     ObjectRefDec(title);
-    
+
     LogModule(LOG_DEBUGV, ATSCTOEPG, "Start of Descriptors\n");
     for (descriptor = eitevent->p_first_descriptor; descriptor; descriptor = descriptor->p_next)
     {
         DumpDescriptor("\t", descriptor);
     }
-    LogModule(LOG_DEBUGV, ATSCTOEPG, "End of Descriptors:\n");    
+    LogModule(LOG_DEBUGV, ATSCTOEPG, "End of Descriptors:\n");
 }
 
 static void ConvertToTM(uint32_t startSeconds, uint32_t duration,
@@ -363,7 +383,7 @@ static void ConvertToTM(uint32_t startSeconds, uint32_t duration,
     secs = startSeconds + UnixEpochOffset - GPStoUTCSecondsOffset;
     temp_time = gmtime(&secs);
     *startTime = *temp_time;
-    
+
     secs += duration;
 
     temp_time = gmtime(&secs);
