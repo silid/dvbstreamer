@@ -100,10 +100,6 @@ static char *RatingsTable[] = {
 /*******************************************************************************
 * Plugin Setup                                                                 *
 *******************************************************************************/
-#ifdef __CYGWIN__
-#define PluginInterface DVBSchedulePluginInterface
-#endif
-
 PLUGIN_FEATURES(
     PLUGIN_FEATURE_FILTER(filter)
     );
@@ -323,7 +319,7 @@ static void ConvertToTM(dvbpsi_date_time_t *datetime, dvbpsi_eit_event_duration_
     startTime->tm_min  = datetime->i_minute;
     startTime->tm_sec  = datetime->i_second;
 
-    secs = mktime(startTime);
+    secs = mktime(startTime) + startTime->tm_gmtoff;
 
     secs += (duration->i_hours * 60 * 60) + (duration->i_minutes* 60) + duration->i_seconds;
 
