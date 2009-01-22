@@ -115,17 +115,14 @@ PLUGIN_COMMANDS(
         "Select the service from a logical channel number.",
         "Select service refered to by the logical channel number as the primary service.",
         CommandSelectLCN
-    } 
+    }
 );
-#ifdef __CYGWIN__
-#define PluginInterface LCNQueryPluginInterface
-#endif
 
 PLUGIN_INTERFACE_CF(
     PLUGIN_FOR_DVB,
-    "LCNQuery", 
-    "0.2", 
-    "Logical Channel Number look-up/list", 
+    "LCNQuery",
+    "0.2",
+    "Logical Channel Number look-up/list",
     "charrea6@users.sourceforge.net"
 );
 
@@ -179,8 +176,8 @@ static void LCNQueryInstalled(bool installed)
                 {
                     more = FALSE;
                 }
-            } 
-            
+            }
+
          }
          STATEMENT_FINALIZE();
     }
@@ -189,14 +186,14 @@ static void LCNQueryInstalled(bool installed)
         int i;
         // Store to the database
         sqlite3_exec(DBaseConnectionGet(), "BEGIN TRANSACTION;", NULL, NULL, NULL);
-        
+
         sqlite3_exec(DBaseConnectionGet(), "DELETE * FROM " LCNENTRIES_TABLE ";", NULL, NULL, NULL);
 
         for (i = 0; i < MAX_ENTRIES; i ++)
         {
             if (entries[i].networkId != ONETID_INVALID)
             {
-                STATEMENT_PREPAREVA("INSERT INTO " LCNENTRIES_TABLE " VALUES (%d,%d,%d,%d,%d);", i + 1, 
+                STATEMENT_PREPAREVA("INSERT INTO " LCNENTRIES_TABLE " VALUES (%d,%d,%d,%d,%d);", i + 1,
                     entries[i].networkId, entries[i].tsId, entries[i].serviceId, entries[i].visible);
                 STATEMENT_STEP();
                 STATEMENT_FINALIZE();
@@ -205,7 +202,7 @@ static void LCNQueryInstalled(bool installed)
 
         sqlite3_exec(DBaseConnectionGet(), "COMMIT TRANSACTION;", NULL, NULL, NULL);
     }
-    
+
 }
 
 /*******************************************************************************
@@ -301,7 +298,7 @@ static void CommandFindLCN(int argc, char **argv)
         CommandPrintf("%s\n", service->name);
         ServiceRefDec(service);
     }
-    
+
 }
 
 static void CommandSelectLCN(int argc, char **argv)
@@ -330,7 +327,7 @@ static void CommandSelectLCN(int argc, char **argv)
     }
     else
     {
-        CommandError(COMMAND_ERROR_GENERIC, "Failed to find service!");        
+        CommandError(COMMAND_ERROR_GENERIC, "Failed to find service!");
     }
 }
 static LCNEntry_t *GetEntry(int lcn)

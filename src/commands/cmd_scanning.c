@@ -37,7 +37,7 @@ Command functions related to scanning multiplex and frequency bands.
 #include "commands.h"
 #include "multiplexes.h"
 #include "services.h"
-#include "dvb.h"
+#include "dvbadapter.h"
 #include "ts.h"
 #include "logging.h"
 #include "cache.h"
@@ -1029,7 +1029,7 @@ static int TuneFrequency(fe_type_t type, struct dvb_frontend_parameters *feparam
     FELocked = FALSE;
     waitingForFELocked = TRUE;
     LogModule(LOG_DEBUG, SCANNING, "Trying frequency %d\n", feparams->frequency);
-    result = DVBFrontEndTune(adapter, feparams, NULL);
+    result = DVBFrontEndTune(adapter, feparams, diseqc);
     if (result == 0)
     {
         clock_gettime( CLOCK_REALTIME, &timeout);
@@ -1086,8 +1086,6 @@ static void ScanMultiplex(Multiplex_t *multiplex, bool needNIT)
     bool seenSDTReceived = FALSE;
     bool seenNITReceived = FALSE;
     int ret = 0;
-
-    TuningCurrentMultiplexSet(multiplex);
 
     PATReceived = FALSE;
     SDTReceived = FALSE;

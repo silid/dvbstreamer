@@ -70,9 +70,6 @@ static uint16_t channelETT = 0;
 /*******************************************************************************
 * Plugin Setup                                                                 *
 *******************************************************************************/
-#ifdef __CYGWIN__
-#define PluginInterface SICapturePluginInterface
-#endif
 
 PLUGIN_FEATURES(
     PLUGIN_FEATURE_FILTER(CaptureFilter),
@@ -100,8 +97,8 @@ PLUGIN_COMMANDS(
 
 PLUGIN_INTERFACE_CF(
     PLUGIN_FOR_ALL,
-    "SICapture", "0.1", 
-    "Plugin to capture PSI/SI to an MRL.", 
+    "SICapture", "0.1",
+    "Plugin to capture PSI/SI to an MRL.",
     "charrea6@users.sourceforge.net"
     );
 /*******************************************************************************
@@ -111,7 +108,7 @@ static void InitFilter(PIDFilter_t *filter)
 {
     filter->name = "PSI/SI Capture";
 
-    PIDFilterFilterPacketSet(filter, FilterPacket, NULL);   
+    PIDFilterFilterPacketSet(filter, FilterPacket, NULL);
 }
 
 static void DeinitFilter(PIDFilter_t *filter)
@@ -164,7 +161,7 @@ static int FilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacke
     {
         result = 1;
     }
-    
+
     /* Handle PMTs */
     if(result == 0)
     {
@@ -189,7 +186,7 @@ static int FilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacke
         }
     }
 
-    /* Standard specific PIDs */    
+    /* Standard specific PIDs */
     if (result == 0)
     {
         if (MainIsDVB())
@@ -242,7 +239,7 @@ static int FilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacke
                         }
                     }
                 }
-                
+
             }
         }
     }

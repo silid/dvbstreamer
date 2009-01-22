@@ -50,9 +50,6 @@ static bool FilterEvent(time_t startTime, time_t endTime, EPGEvent_t *event);
 /*******************************************************************************
 * Plugin Setup                                                                 *
 *******************************************************************************/
-#ifdef __CYGWIN__
-#define PluginInterface QueryEPGPluginInterface
-#endif
 
 PLUGIN_COMMANDS(
     {
@@ -84,8 +81,8 @@ PLUGIN_COMMANDS(
 
 PLUGIN_INTERFACE_C(
     PLUGIN_FOR_ALL,
-    "QueryEPG", "0.1", 
-    "Plugin to query the EPG Database.", 
+    "QueryEPG", "0.1",
+    "Plugin to query the EPG Database.",
     "charrea6@users.sourceforge.net"
     );
 
@@ -159,20 +156,20 @@ static void CommandListEvents(int argc, char **argv)
         if (startTime == -1)
         {
             CommandError(COMMAND_ERROR_GENERIC, "Failed to parse start time!");
-            return; 
+            return;
         }
     }
-    
+
     endTime = ParseTime(endTimeStr);
     if (endTime == -1)
 
     {
         CommandError(COMMAND_ERROR_GENERIC, "Failed to parse end time!");
-        return; 
+        return;
     }
 
     /* Search for events */
-    EPGDBaseTransactionStart();    
+    EPGDBaseTransactionStart();
     if (serviceName)
     {
         Multiplex_t *mux;
@@ -183,7 +180,7 @@ static void CommandListEvents(int argc, char **argv)
             mux = MultiplexFindUID(service->multiplexUID);
 
             OutputServiceEvents(mux, service, startTime, endTime);
-            
+
             MultiplexRefDec(mux);
             ServiceRefDec(service);
         }
@@ -196,7 +193,7 @@ static void CommandListEvents(int argc, char **argv)
     {
         Multiplex_t *mux;
         MultiplexEnumerator_t enumerator = MultiplexEnumeratorGet();
-        
+
         do
         {
             mux = MultiplexGetNext(enumerator);
@@ -216,10 +213,10 @@ static void CommandListEvents(int argc, char **argv)
                 MultiplexRefDec(mux);
             }
         }while(mux && !ExitProgram);
-        
+
     MultiplexEnumeratorDestroy(enumerator);
     }
-    EPGDBaseTransactionCommit();    
+    EPGDBaseTransactionCommit();
 }
 
 static void CommandEventDetails(int argc, char **argv)
@@ -230,13 +227,13 @@ static void CommandEventDetails(int argc, char **argv)
     unsigned int eventId;
     bool displayLangs = (argc == 2);
     bool displayDetails = (argc == 1);
-    
+
     if (sscanf(argv[0], "%04x.%04x.%04x.%04x", &serviceRef.netId, &serviceRef.tsId, &serviceRef.serviceId, &eventId) != 4)
     {
         CommandError(COMMAND_ERROR_GENERIC, "Failed to parse event id!");
         return;
     }
-    EPGDBaseTransactionStart();    
+    EPGDBaseTransactionStart();
     if (displayDetails)
     {
         enumerator = EPGDBaseDetailEnumeratorGet(&serviceRef, eventId);
@@ -256,7 +253,7 @@ static void CommandEventDetails(int argc, char **argv)
             }
             else if (displayLangs)
             {
-                CommandPrintf("%s\n", detail->lang);                
+                CommandPrintf("%s\n", detail->lang);
             }
             else
             {
@@ -265,10 +262,10 @@ static void CommandEventDetails(int argc, char **argv)
             ObjectRefDec(detail);
         }
     }while(detail && !ExitProgram);
-    
+
     EPGDBaseEnumeratorDestroy(enumerator);
     EPGDBaseTransactionCommit();
-    
+
 }
 
 
@@ -288,7 +285,7 @@ static void OutputServiceEvents(Multiplex_t *multiplex, Service_t *service, time
         event = EPGDBaseEventGetNext(enumerator);
         if (event)
         {
-            
+
             if (FilterEvent(startTime, endTime, event))
             {
                 CommandPrintf("%04x.%04x.%04x.%04x %04d%02d%02d%02d%02d%02d %04d%02d%02d%02d%02d%02d %s\n",
@@ -298,7 +295,7 @@ static void OutputServiceEvents(Multiplex_t *multiplex, Service_t *service, time
                     event->endTime.tm_year + 1900, event->endTime.tm_mon + 1, event->endTime.tm_mday,
                     event->endTime.tm_hour, event->endTime.tm_min, event->endTime.tm_sec,
                     event->ca ? "ca":"fta");
-                    
+
             }
             ObjectRefDec(event);
         }
@@ -342,21 +339,21 @@ static time_t ParseTime(char *timeStr)
     if (sscanf(tmp, "%d", &timeTm.tm_mday) == 0)
     {
         return -1;
-    }    
+    }
 
     strncpy(tmp, timeStr + 8, 2);
     tmp[2] = 0;
     if (sscanf(tmp, "%d", &timeTm.tm_hour) == 0)
     {
         return -1;
-    } 
+    }
 
     strncpy(tmp, timeStr + 10, 2);
     tmp[2] = 0;
     if (sscanf(tmp, "%d", &timeTm.tm_min) == 0)
     {
         return -1;
-    }      
+    }
 
     timeTm.tm_sec = 0;
     timeTm.tm_isdst = 0;

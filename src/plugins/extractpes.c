@@ -49,10 +49,6 @@ static bool started = FALSE;
 /*******************************************************************************
 * Plugin Setup                                                                 *
 *******************************************************************************/
-#ifdef __CYGWIN__
-#define PluginInterface ExtractPESPluginInterface
-#endif
-
 PLUGIN_COMMANDS(
     {
         "startxpes",
@@ -80,9 +76,9 @@ PLUGIN_COMMANDS(
 
 PLUGIN_INTERFACE_C(
     PLUGIN_FOR_ALL,
-    "ExtractPES", 
-    "0.1", 
-    "Example usage of the PES Filter.", 
+    "ExtractPES",
+    "0.1",
+    "Example usage of the PES Filter.",
     "charrea6@users.sourceforge.net"
 );
 
@@ -103,11 +99,11 @@ static void CommandStartExtractingPes(int argc, char **argv)
     if (pid == 0)
     {
         CommandError(COMMAND_ERROR_GENERIC, "Unknown PID!");
-        return;        
+        return;
     }
 
     memset(&pesOutput, 0, sizeof(pesOutput));
-    
+
     if (!DeliveryMethodManagerFind(argv[1], &pesOutput))
     {
         CommandError(COMMAND_ERROR_GENERIC, "Failed to create output!");

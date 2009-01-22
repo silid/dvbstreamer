@@ -46,7 +46,7 @@ Plugin to allow manual filtering of PIDs.
         CommandError(COMMAND_ERROR_GENERIC, "Manual filter not found!");\
         return;\
     }
-    
+
 /*******************************************************************************
 * Typedefs                                                                     *
 *******************************************************************************/
@@ -78,9 +78,6 @@ static pthread_mutex_t manualFiltersMutex = PTHREAD_MUTEX_INITIALIZER;
 /*******************************************************************************
 * Plugin Setup                                                                 *
 *******************************************************************************/
-#ifdef __CYGWIN__
-#define PluginInterface ManualFilterPluginInterface
-#endif
 
 PLUGIN_COMMANDS(
     {
@@ -148,8 +145,8 @@ PLUGIN_COMMANDS(
 
 PLUGIN_INTERFACE_C(
     PLUGIN_FOR_ALL,
-    "ManualFilter", "0.1", 
-    "Plugin to allow manual filtering of PID.", 
+    "ManualFilter", "0.1",
+    "Plugin to allow manual filtering of PID.",
     "charrea6@users.sourceforge.net"
     );
 
@@ -177,7 +174,7 @@ static void CommandAddMF(int argc, char **argv)
         CommandError(COMMAND_ERROR_GENERIC, "A manual filter with this name exists!");
         return;
     }
-    
+
     filter = PIDFilterAllocate(tsFilter);
     if (!filter)
     {
@@ -197,10 +194,10 @@ static void CommandAddMF(int argc, char **argv)
     {
         dmInstance = DeliveryMethodCreate("null://");
     }
-    
+
     PIDFilterFilterPacketSet(filter, PIDFilterSimpleFilter, simplePIDFilter);
     PIDFilterOutputPacketSet(filter, DeliveryMethodOutputPacket, dmInstance);
-    
+
     filter->name = strdup(argv[0]);
     filter->type = ManualPIDFilterType;
     filter->enabled = TRUE;
@@ -212,7 +209,7 @@ static void CommandRemoveMF(int argc, char **argv)
     PIDFilterSimpleFilter_t *simplePIDFilter;
     DeliveryMethodInstance_t *deliveryMethod;
     char *name;
-    
+
     CommandCheckAuthenticated();
 
     FIND_MANUAL_FILTER(argv[0]);
@@ -228,12 +225,12 @@ static void CommandRemoveMF(int argc, char **argv)
 
 static void CommandListMF(int argc, char **argv)
 {
-    TSFilter_t *tsFilter = MainTSFilterGet();    
+    TSFilter_t *tsFilter = MainTSFilterGet();
     ListIterator_t iterator;
 
     TSFilterLock(tsFilter);
-    for ( ListIterator_Init(iterator, tsFilter->pidFilters); 
-          ListIterator_MoreEntries(iterator); 
+    for ( ListIterator_Init(iterator, tsFilter->pidFilters);
+          ListIterator_MoreEntries(iterator);
           ListIterator_Next(iterator))
     {
         PIDFilter_t *filter = (PIDFilter_t *)ListIterator_Current(iterator);
@@ -241,7 +238,7 @@ static void CommandListMF(int argc, char **argv)
         {
             CommandPrintf("%10s : %s\n", filter->name,  DeliveryMethodGetMRL(filter));
         }
-    }    
+    }
     TSFilterUnLock(tsFilter);
 }
 
@@ -249,7 +246,7 @@ static void CommandSetOutputMRL(int argc, char **argv)
 {
     PIDFilter_t *filter;
     DeliveryMethodInstance_t *instance;
-    
+
     CommandCheckAuthenticated();
 
     FIND_MANUAL_FILTER(argv[0]);
@@ -295,7 +292,7 @@ static void CommandAddMFPID(int argc, char **argv)
         else
         {
             simplePIDFilter->pids[simplePIDFilter->pidcount] = pid;
-            simplePIDFilter->pidcount ++;        
+            simplePIDFilter->pidcount ++;
         }
         pthread_mutex_unlock(&manualFiltersMutex);
     }
@@ -304,11 +301,11 @@ static void CommandAddMFPID(int argc, char **argv)
 static void CommandRemoveMFPID(int argc, char **argv)
 {
     PIDFilter_t *filter;
-    
+
     CommandCheckAuthenticated();
 
     FIND_MANUAL_FILTER(argv[0]);
-    
+
     if (filter)
     {
         int pid, i;
@@ -334,7 +331,7 @@ static void CommandRemoveMFPID(int argc, char **argv)
             }
         }
         pthread_mutex_unlock(&manualFiltersMutex);
-        
+
     }
 }
 

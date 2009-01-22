@@ -36,7 +36,7 @@ Command functions to supply the user with information about the system.
 #include "commands.h"
 #include "multiplexes.h"
 #include "services.h"
-#include "dvb.h"
+#include "dvbadapter.h"
 #include "ts.h"
 #include "logging.h"
 #include "cache.h"

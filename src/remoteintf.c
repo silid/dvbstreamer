@@ -50,7 +50,7 @@ Remote Interface functions.
 #define MAX_LINE_LENGTH 256
 
 /* Max connection string = [xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx:xxxx]:xxxxx */
-#define MAX_CONNECTION_STR_LENGTH 48 
+#define MAX_CONNECTION_STR_LENGTH 48
 
 /*******************************************************************************
 * Typedefs                                                                     *
@@ -150,14 +150,14 @@ static char REMOTEINTERFACE[] = "RemoteInterface";
 *******************************************************************************/
 int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char *username, char *password)
 {
-#ifndef __CYGWIN__
+#ifdef USE_GETADDRINFO
     socklen_t address_len;
     struct sockaddr_storage address;
     struct addrinfo *addrinfo, hints;
     char portnumber[10];
 
     sprintf(portnumber, "%d", REMOTEINTERFACE_PORT + adapter);
-    
+
     memset((void *)&hints, 0, sizeof(hints));
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_ADDRCONFIG | AI_PASSIVE;
@@ -229,23 +229,23 @@ int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char
 
     CommandRegisterCommands(RemoteInterfaceCommands);
     CommandRegisterVariable(&CommandVariableServerName);
-    PropertiesAddProperty("sys.rc", "servername", "Name of this dvbstreamer instance.", 
-                          PropertyType_String, &infoStreamerName, 
+    PropertiesAddProperty("sys.rc", "servername", "Name of this dvbstreamer instance.",
+                          PropertyType_String, &infoStreamerName,
                           PropertiesSimplePropertyGet, NULL);
 
-    PropertiesAddProperty("sys.rc", "username", "Username used to authenticate.", 
-                          PropertyType_String, &infoStreamerName, 
-                          NULL, PropertiesSimplePropertySet);    
-    PropertiesAddProperty("sys.rc", "password", "Password used to authenticate.", 
-                          PropertyType_String, &infoStreamerName, 
-                          NULL, PropertiesSimplePropertySet);    
+    PropertiesAddProperty("sys.rc", "username", "Username used to authenticate.",
+                          PropertyType_String, &infoStreamerName,
+                          NULL, PropertiesSimplePropertySet);
+    PropertiesAddProperty("sys.rc", "password", "Password used to authenticate.",
+                          PropertyType_String, &infoStreamerName,
+                          NULL, PropertiesSimplePropertySet);
     return 0;
 }
 
 void RemoteInterfaceDeInit(void)
 {
     ListIterator_t iterator;
-    
+
     CommandUnRegisterCommands(RemoteInterfaceCommands);
     CommandUnRegisterVariable(&CommandVariableServerName);
 
@@ -262,7 +262,7 @@ void RemoteInterfaceDeInit(void)
             Connection_t *connection = (Connection_t*)ListIterator_Current(iterator);
             close(connection->socketfd);
         }
-        
+
         pthread_cond_wait(&connectionCondVar, &connectionsMutex);
     }
     pthread_mutex_unlock(&connectionsMutex);
@@ -315,7 +315,7 @@ static void AddConnection(int socketfd, struct sockaddr_storage *clientAddress)
     Connection_t *connection = ObjectCreateType(Connection_t);
 
     GetConnectionString(clientAddress, connectionStr);
-    
+
     fp = fdopen(socketfd, "r+");
 
     if (connection)
@@ -326,12 +326,12 @@ static void AddConnection(int socketfd, struct sockaddr_storage *clientAddress)
         connection->clientAddress = *clientAddress;
         LogModule(LOG_INFO, REMOTEINTERFACE, "Connection attempt from %s accepted!\n",
                  connectionStr);
-        
+
         pthread_mutex_lock(&connectionsMutex);
         ListAdd(connectionsList, connection);
         pthread_mutex_unlock(&connectionsMutex);
-        
-        pthread_create(&connection->thread, NULL, (void*)HandleConnection, (void*)connection);        
+
+        pthread_create(&connection->thread, NULL, (void*)HandleConnection, (void*)connection);
     }
     else
     {
@@ -470,7 +470,7 @@ static void RemoteInterfaceWho(int argc, char **argv)
 {
     char connectionStr[MAX_CONNECTION_STR_LENGTH];
     ListIterator_t iterator;
-    
+
     for (ListIterator_Init(iterator, connectionsList);
          ListIterator_MoreEntries(iterator);
          ListIterator_Next(iterator))
@@ -485,7 +485,7 @@ static void RemoteInterfaceWho(int argc, char **argv)
 }
 static void RemoteInterfaceLogout(int argc, char **argv)
 {
-    CommandContext_t *context = CommandContextGet();    
+    CommandContext_t *context = CommandContextGet();
     if (context->remote)
     {
         Connection_t *connection = (Connection_t*)context->privateArg;
@@ -515,10 +515,9 @@ static void GetConnectionString(struct sockaddr_storage *connAddr, char *output)
     if (connAddr->ss_family == AF_INET)
     {
         inet_ntop(connAddr->ss_family, &((struct sockaddr_in*)connAddr)->sin_addr, output, INET_ADDRSTRLEN);
-        
+
         sprintf(output + strlen(output), ":%d", ((struct sockaddr_in*)connAddr)->sin_port);
     }
-#ifndef __CYGWIN__    
     else if (connAddr->ss_family == AF_INET6)
     {
         *output = '[';
@@ -526,7 +525,6 @@ static void GetConnectionString(struct sockaddr_storage *connAddr, char *output)
 
         sprintf(output + strlen(output), "]:%d", ((struct sockaddr_in*)connAddr)->sin_port);
     }
-#endif
     else
     {
         strcpy(output, "<unknown>");

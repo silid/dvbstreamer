@@ -41,7 +41,7 @@ Entry point to the application.
 #include "epgdbase.h"
 #include "multiplexes.h"
 #include "services.h"
-#include "dvb.h"
+#include "dvbadapter.h"
 #include "ts.h"
 #include "main.h"
 #include "patprocessor.h"

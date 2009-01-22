@@ -4,22 +4,26 @@ dnl ---------------------------------------------------------------------------
 dnl Versioning Information:
 dnl     Increment Major more radical changes (ie re-writes)
 dnl     Increment Minor more additional features which don't break things
+dnl     Increment Micro when changes are only to fix bugs/build breaks no new features.
 dnl
 dnl     Exception to this rule is the Major version 0, minor version will be
 dnl     incremented until we are ready to say DVBStreamer is no longer alpha.
 dnl ---------------------------------------------------------------------------
-AC_INIT(dvbstreamer, 0.9)
-DVBSTREAMER_MAJOR=0
-DVBSTREAMER_MINOR=9
+AC_INIT(dvbstreamer, 2.0.0)
+DVBSTREAMER_MAJOR=2
+DVBSTREAMER_MINOR=0
+DVBSTREAMER_MICRO=0
 
 AC_SUBST(DVBSTREAMER_MAJOR)
 AC_SUBST(DVBSTREAMER_MINOR)
+AC_SUBST(DVBSTREAMER_MICRO)
 
 AC_DEFINE_UNQUOTED(DVBSTREAMER_MAJOR, $DVBSTREAMER_MAJOR, [DVBStreamer Major version number])
 AC_DEFINE_UNQUOTED(DVBSTREAMER_MINOR, $DVBSTREAMER_MINOR, [DVBStreamer Minor version number])
-AC_DEFINE_UNQUOTED(DVBSTREAMER_VERSION, ((DVBSTREAMER_MAJOR<<16) | (DVBSTREAMER_MINOR)), [DVBStreamer combined version number as an int])
+AC_DEFINE_UNQUOTED(DVBSTREAMER_MICRO, $DVBSTREAMER_MINOR, [DVBStreamer Micro version number])
+AC_DEFINE_UNQUOTED(DVBSTREAMER_VERSION, ((DVBSTREAMER_MAJOR<<24) | (DVBSTREAMER_MINOR<<16) | DVBSTREAMER_MICRO ), [DVBStreamer combined version number as an int])
 
-SPEC_VERSION=$DVBSTREAMER_MAJOR.$DVBSTREAMER_MINOR
+SPEC_VERSION=$DVBSTREAMER_MAJOR.$DVBSTREAMER_MINOR.$DVBSTREAMER_MICRO
 AM_INIT_AUTOMAKE("dvbstreamer", $SPEC_VERSION)
 
 AC_CONFIG_SUBDIRS(libltdl)
@@ -29,12 +33,11 @@ AC_ISC_POSIX
 AC_PROG_CC
 AM_PROG_CC_STDC
 AC_HEADER_STDC
-AM_PROG_CC_C_O 
+AM_PROG_CC_C_O
 
 dnl ---------------------------------------------------------------------------
 dnl Libltdl setup
 dnl ---------------------------------------------------------------------------
-AC_LIBTOOL_WIN32_DLL dnl Make sure under cygwin we can load plugins !!!
 AC_LIBTOOL_DLOPEN
 AC_LIBLTDL_CONVENIENCE
 AC_PROG_LIBTOOL
@@ -70,16 +73,6 @@ powerpc64:yes | s390x:yes | sparc64:yes | x86_64:yes)
  ;;
 esac
 AC_MSG_RESULT([$DVBSTREAMER_LIBNAME])
-
-dnl ---------------------------------------------------------------------------
-dnl Check for Cygwin
-dnl ---------------------------------------------------------------------------
-case $host in
-*-*-cygwin*)
-cygwin=true
-;;
-esac
-AM_CONDITIONAL([CYGWIN],  [test x$cygwin = xtrue])
 
 dnl ---------------------------------------------------------------------------
 dnl ATSC/DVB Support
@@ -134,6 +127,16 @@ if test "${use_getaddrinfo}" != "false"; then
     AC_DEFINE(USE_GETADDRINFO, 1, Use getaddrinfo for address resolution)
 fi
 
+AC_ARG_ENABLE([file-streamer],
+	AS_HELP_STRING([--enable-file-streamer], [ Enable building fdvbstreamer to allow play back of captured TS files.]),
+	[case "${enableval}" in
+       	yes) enable_fstreamer=true ;;
+       	no)  enable_fstreamer=false ;;
+       	*) AC_MSG_ERROR([bad value ${enableval} for --enable-file-streamer]) ;;
+     	esac],[enable_fstreamer=false])
+
+AM_CONDITIONAL([ENABLE_FSTREAMER], [test x$enable_fstreamer = xtrue])
+
 dnl ---------------------------------------------------------------------------
 dnl Check for sqlite 3
 dnl ---------------------------------------------------------------------------
@@ -167,7 +170,7 @@ LIBS=""
 dnl ---------------------------------------------------------------------------
 dnl Check whether libiconv is needed.
 dnl ---------------------------------------------------------------------------
-AC_SEARCH_LIBS(iconv_open, [iconv], [ICONV_LIB=$LIBS], 
+AC_SEARCH_LIBS(iconv_open, [iconv], [ICONV_LIB=$LIBS],
 	AC_SEARCH_LIBS(libiconv_open, [iconv], [ICONV_LIB=$LIBS], [AC_MSG_FAILURE([Failed to find a library defining iconv_open])]))
 
 AC_SUBST(ICONV_LIB)

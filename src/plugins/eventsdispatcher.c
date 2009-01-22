@@ -49,7 +49,7 @@ typedef struct ConsoleContext_s {
 }ConsoleContext_t;
 
 typedef struct EventDescription_s {
-    struct timeval at; 
+    struct timeval at;
     char *description;
 }EventDescription_t;
 
@@ -97,9 +97,6 @@ static int ListenerPropertyTableCount(void *userArg);
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
-#ifdef __CYGWIN__
-#define PluginInterface EventsDispatcherPluginInterface
-#endif
 static List_t *listenersList;
 static pthread_mutex_t listenersMutex = PTHREAD_MUTEX_INITIALIZER;
 static const char console[] = "<Console>";
@@ -160,7 +157,7 @@ PLUGIN_COMMANDS(
         TRUE, 2, 2,
         "Add an internal event to monitor.",
         "addlistenevent <name> <event>\n"
-        "Add an internal event (<event>) to monitor to the listener specified by <name>.\n"       
+        "Add an internal event (<event>) to monitor to the listener specified by <name>.\n"
         "<event> can be either a full event name, an event source or the special name \"<all>\"",
         CommandAddListenEvent
     },
@@ -184,12 +181,12 @@ PLUGIN_COMMANDS(
 PLUGIN_FEATURES(
     PLUGIN_FEATURE_INSTALL(EventDispatcherInstalled)
     );
-    
+
 PLUGIN_INTERFACE_CF(
     PLUGIN_FOR_ALL,
-    "EventsDispatcher", 
-    "0.1", 
-    "Interface to internal events.", 
+    "EventsDispatcher",
+    "0.1",
+    "Interface to internal events.",
     "charrea6@users.sourceforge.net"
 );
 
@@ -204,7 +201,7 @@ static void EventDispatcherInstalled(bool installed)
     }
     else
     {
-        ListIterator_t iterator;        
+        ListIterator_t iterator;
         PropertiesRemoveAllProperties(propertiesParentPath);
         EventsUnregisterListener(EventCallback, NULL);
         for (ListIterator_Init(iterator, listenersList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
@@ -241,11 +238,11 @@ static void CommandListen(int argc, char **argv)
     listener->events = ListCreate();
     listener->console = TRUE;
     listener->arg.console = &context;
-    
+
     CommandPrintf("Listening\n");
     AddListener(listener);
 
-    
+
     while(!quit && !ExitProgram)
     {
         if (CommandGets(buffer, sizeof(buffer) - 1))
@@ -313,7 +310,7 @@ static void CommandListen(int argc, char **argv)
                     quit=TRUE;
                     break;
             }
-            pthread_mutex_unlock(&context.printMutex);            
+            pthread_mutex_unlock(&context.printMutex);
         }
     }
 
@@ -326,21 +323,21 @@ static void CommandAddListener(int argc, char **argv)
 {
     EventDispatcherListener_t *listener;
     DeliveryMethodInstance_t *mrlInstance;
-    
+
     listener = FindListener(argv[0]);
     if (listener)
     {
         CommandError(COMMAND_ERROR_GENERIC, "Listener already exists!");
         return;
     }
-    
+
     mrlInstance = DeliveryMethodCreate(argv[1]);
     if (!mrlInstance)
     {
         CommandError(COMMAND_ERROR_GENERIC, "Invalid MRL!");
         return;
     }
-    
+
     listener = ObjectCreateType(EventDispatcherListener_t);
     listener->name = strdup(argv[0]);
     listener->events = ListCreate();
@@ -350,7 +347,7 @@ static void CommandAddListener(int argc, char **argv)
     AddListener(listener);
     PropertiesAddTableProperty(propertiesParentPath, argv[0], "Event Listener", &tableDescription, listener,
         ListenerPropertyTableGet, NULL, ListenerPropertyTableCount);
-    
+
 }
 
 static void CommandRemoveListener(int argc, char **argv)
@@ -362,7 +359,7 @@ static void CommandRemoveListener(int argc, char **argv)
         CommandError(COMMAND_ERROR_GENERIC, "Listener not found!");
         return;
     }
-    
+
     RemoveListener(listener);
     ObjectRefDec(listener);
     PropertiesRemoveProperty(propertiesParentPath, argv[1]);
@@ -416,21 +413,21 @@ static void CommandListListenEvents(int argc, char **argv)
 {
     EventDispatcherListener_t *listener;
     ListIterator_t iterator;
-    
+
     listener = FindListener(argv[0]);
     if (!listener)
     {
         CommandError(COMMAND_ERROR_GENERIC, "Listener not found!");
         return;
     }
-    
+
     for (ListIterator_Init(iterator, listener->events);
          ListIterator_MoreEntries(iterator);
          ListIterator_Next(iterator))
     {
         char *eventStr = ListIterator_Current(iterator);
         CommandPrintf("%s\n", eventStr);
-    }    
+    }
 }
 /*******************************************************************************
 * Local Functions                                                              *
@@ -442,7 +439,7 @@ static void EventCallback(void *arg, Event_t event, void *payload)
     gettimeofday(&eventDesc->at, NULL);
     eventDesc->description = desc;
     DeferredProcessingAddJob(DeferredInformListeners, eventDesc);
-    ObjectRefDec(eventDesc);  
+    ObjectRefDec(eventDesc);
 }
 
 static void DeferredInformListeners(void * arg)
@@ -452,11 +449,11 @@ static void DeferredInformListeners(void * arg)
     char *outputLine = NULL;
     size_t outputLineLen = 0;
     DVBAdapter_t *adapter = MainDVBAdapterGet();
-    
-    LogModule(LOG_DEBUG, EVENTDISPATCH, "Processing event (%ld.%ld) %s\n", 
+
+    LogModule(LOG_DEBUG, EVENTDISPATCH, "Processing event (%ld.%ld) %s\n",
         eventDesc->at.tv_sec, eventDesc->at.tv_usec, eventDesc->description);
     pthread_mutex_lock(&listenersMutex);
-    
+
     for (ListIterator_Init(iterator, listenersList);
          ListIterator_MoreEntries(iterator);
          ListIterator_Next(iterator))
@@ -497,31 +494,31 @@ static void DeferredInformListeners(void * arg)
                     struct tm *localtm = localtime(&eventDesc->at.tv_sec);
                     char timeStr[21]; /* xxxx-xx-xx xx:xx:xx */
                     strftime(timeStr, sizeof(timeStr)-1, "%F %T", localtm);
-                    outputLineLen = asprintf(&outputLine, "%s.%ld %d %s\n", 
+                    outputLineLen = asprintf(&outputLine, "%s.%ld %d %s\n",
                         timeStr, eventDesc->at.tv_usec, adapter->adapter,
                         eventDesc->description);
                 }
                 if (outputLine)
                 {
-                    listener->arg.dmInstance->SendBlock(listener->arg.dmInstance, 
+                    listener->arg.dmInstance->SendBlock(listener->arg.dmInstance,
                         outputLine, outputLineLen);
                 }
             }
         }
     }
-         
+
     pthread_mutex_unlock(&listenersMutex);
     ObjectRefDec(eventDesc);
 }
 
 static void ConsoleContextEventPrint(ConsoleContext_t *context, ...)
 {
-    va_list args;    
+    va_list args;
     pthread_mutex_lock(&context->printMutex);
     va_start(args, context);
     context->context->printf(context->context, "!%s\n", args);
     va_end(args);
-    pthread_mutex_unlock(&context->printMutex);    
+    pthread_mutex_unlock(&context->printMutex);
 }
 
 static void EventDescriptionDestructor(void *arg)
@@ -585,7 +582,7 @@ static EventDispatcherListener_t *FindListener(char *name)
             break;
         }
     }
-    pthread_mutex_unlock(&listenersMutex);         
+    pthread_mutex_unlock(&listenersMutex);
     return result;
 }
 
@@ -630,7 +627,7 @@ static bool RemoveListenerEvent(EventDispatcherListener_t *listener, char *filte
             }
         }
     }
-    pthread_mutex_unlock(&listenersMutex);    
+    pthread_mutex_unlock(&listenersMutex);
     return found;
 }
 
@@ -658,8 +655,8 @@ static int ListenerPropertyTableGet(void *userArg, int row, int column, Property
     }
     if (value->u.string == NULL)
     {
-        
-        for (ListIterator_Init(iterator, listener->events); 
+
+        for (ListIterator_Init(iterator, listener->events);
              ListIterator_MoreEntries(iterator);
              ListIterator_Next(iterator))
         {

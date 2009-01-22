@@ -36,7 +36,7 @@ Process Service Description Tables and update the services information.
 
 #include "multiplexes.h"
 #include "services.h"
-#include "dvb.h"
+#include "dvbadapter.h"
 #include "ts.h"
 #include "main.h"
 #include "cache.h"

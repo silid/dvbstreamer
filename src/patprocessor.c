@@ -29,7 +29,7 @@ Process Program Association Tables and update the services information.
 
 #include "multiplexes.h"
 #include "services.h"
-#include "dvb.h"
+#include "dvbadapter.h"
 #include "ts.h"
 #include "patprocessor.h"
 #include "cache.h"
