@@ -34,7 +34,7 @@ Process Network Information Tables.
 #include "multiplexes.h"
 #include "services.h"
 #include "pids.h"
-#include "dvb.h"
+#include "dvbadapter.h"
 #include "ts.h"
 #include "main.h"
 #include "cache.h"

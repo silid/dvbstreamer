@@ -50,9 +50,6 @@ static void PrintXmlified(char *text);
 /*******************************************************************************
 * Plugin Setup                                                                 *
 *******************************************************************************/
-#ifdef __CYGWIN__
-#define PluginInterface EPGtoXMLTVPluginInterface
-#endif
 PLUGIN_COMMANDS(
     {
         "dumpxmltv",
@@ -65,8 +62,8 @@ PLUGIN_COMMANDS(
 
 PLUGIN_INTERFACE_C(
     PLUGIN_FOR_ALL,
-    "EPGtoXMLTV", "0.1", 
-    "Plugin to dump the EPG Database out in XMLTV format.", 
+    "EPGtoXMLTV", "0.1",
+    "Plugin to dump the EPG Database out in XMLTV format.",
     "charrea6@users.sourceforge.net"
     );
 
@@ -75,7 +72,7 @@ PLUGIN_INTERFACE_C(
 *******************************************************************************/
 static void CommandDump(int argc, char **argv)
 {
-    CommandPrintf("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n");    
+    CommandPrintf("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n");
     CommandPrintf("<tv generator-info-name=\"DVBStreamer-EPGSchedule\">\n");
     DumpChannels();
     DumpProgrammes();
@@ -149,14 +146,14 @@ static void DumpMultiplexProgrammes(Multiplex_t *multiplex)
         }
     }
     while(service && !ExitProgram);
-    ServiceEnumeratorDestroy(enumerator); 
-    
+    ServiceEnumeratorDestroy(enumerator);
+
     for (ListIterator_Init(iterator, services); ListIterator_MoreEntries(iterator);ListIterator_Next(iterator))
     {
         service = ListIterator_Current(iterator);
         DumpServiceProgrammes(multiplex, service);
         ServiceRefDec(service);
-    }    
+    }
     ListFree(services, NULL);
 
 }
@@ -197,7 +194,7 @@ static void DumpProgramme(Multiplex_t *multiplex, Service_t *service, EPGEvent_t
                     event->startTime.tm_year + 1900, event->startTime.tm_mon + 1, event->startTime.tm_mday,
                     event->startTime.tm_hour, event->startTime.tm_min, event->startTime.tm_sec,
                     event->endTime.tm_year + 1900, event->endTime.tm_mon + 1, event->endTime.tm_mday,
-                    event->endTime.tm_hour, event->endTime.tm_min, event->endTime.tm_sec,                    
+                    event->endTime.tm_hour, event->endTime.tm_min, event->endTime.tm_sec,
                     multiplex->networkId, multiplex->tsId, service->id);
 
     enumerator = EPGDBaseDetailGet(&serviceRef, event->eventId, EPG_EVENT_DETAIL_TITLE);
@@ -212,7 +209,7 @@ static void DumpProgramme(Multiplex_t *multiplex, Service_t *service, EPGEvent_t
             ObjectRefDec(detail);
         }
     }while(detail && !ExitProgram);
-    
+
     EPGDBaseEnumeratorDestroy(enumerator);
     enumerator = EPGDBaseDetailGet(&serviceRef, event->eventId, EPG_EVENT_DETAIL_DESCRIPTION);
     do
@@ -223,7 +220,7 @@ static void DumpProgramme(Multiplex_t *multiplex, Service_t *service, EPGEvent_t
             CommandPrintf("<desc lang=\"%s\">", detail->lang);
             PrintXmlified(detail->value);
             CommandPrintf("</desc>\n");
-            ObjectRefDec(detail);            
+            ObjectRefDec(detail);
         }
     }while(detail && !ExitProgram);
     EPGDBaseEnumeratorDestroy(enumerator);

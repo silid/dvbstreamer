@@ -36,7 +36,7 @@ Command Processing and command functions.
 #include "commands.h"
 #include "multiplexes.h"
 #include "services.h"
-#include "dvb.h"
+#include "dvbadapter.h"
 #include "ts.h"
 #include "logging.h"
 #include "cache.h"

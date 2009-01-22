@@ -94,10 +94,8 @@ bool IsMulticastAddress(struct sockaddr_storage *addr)
     }
     else
     {
-#ifndef __CYGWIN__        
         struct sockaddr_in6 *in6Addr = (struct sockaddr_in6*)addr;
         result = (in6Addr->sin6_addr.s6_addr[0] == 0xff);
-#endif        
     }
     return result;
 }
@@ -127,7 +125,7 @@ SAPSessionHandle_t SAPServerAddSession(struct sockaddr_storage *originatingSourc
         session->messageIdHash = nextMessageIdHash;
         nextMessageIdHash ++;
         memcpy(&session->originatingSource, originatingSource, sizeof(struct sockaddr_storage));
-        strcpy(session->sdp, sdp);    
+        strcpy(session->sdp, sdp);
 
         ListAdd(sessionList, session);
     }
@@ -145,7 +143,7 @@ void SAPServerDeleteSession(SAPSessionHandle_t handle)
     session->deleted = TRUE;
     ListIterator_Init(iterator, sessionList);
     ListInsertBeforeCurrent(&iterator, session);
-    pthread_mutex_unlock(&sessionListMutex);    
+    pthread_mutex_unlock(&sessionListMutex);
     LogModule(LOG_DEBUG, SAP, "Deleted SAP session %x\n", handle);
 }
 /*******************************************************************************
@@ -159,11 +157,11 @@ static void SAPSessionFree(void *data)
 static int CreateSAPPacket(SAPSession_t *session, uint8_t *packet)
 {
     int mimeTypeOffset = 0;
-    /* Byte 0 : Version number V1        = 001      (3 bits)     
-     *          Address type   IPv4/IPv6 = 0/1      (1 bit)     
-     *          Reserved                   0        (1 bit)     
-     *          Message Type   ann/del   = 0/1      (1 bit)     
-     *          Encryption     on/off    = 0/1      (1 bit)     
+    /* Byte 0 : Version number V1        = 001      (3 bits)
+     *          Address type   IPv4/IPv6 = 0/1      (1 bit)
+     *          Reserved                   0        (1 bit)
+     *          Message Type   ann/del   = 0/1      (1 bit)
+     *          Encryption     on/off    = 0/1      (1 bit)
      *          Compressed     on/off    = 0/1      (1 bit) */
     packet[0] = 0x20 | (session->deleted ? 4:0);
     packet[1] = 0x00; /* Authentication length (not supported) */
@@ -176,14 +174,12 @@ static int CreateSAPPacket(SAPSession_t *session, uint8_t *packet)
         mimeTypeOffset = 8;
         memcpy(&packet[4], &inAddr->sin_addr, 4);
     }
-#ifndef __CYGWIN__
     else
     {
         struct sockaddr_in6 *in6Addr =(struct sockaddr_in6 *)&session->originatingSource;
         mimeTypeOffset = 20;
         memcpy(&packet[4], &in6Addr->sin6_addr, 16);
     }
-#endif    
     memcpy(&packet[mimeTypeOffset], mimeType, sizeof(mimeType));
     memcpy(&packet[mimeTypeOffset + sizeof(mimeType)], session->sdp, strlen(session->sdp));
     return mimeTypeOffset + sizeof(mimeType) + strlen(session->sdp);
@@ -191,7 +187,7 @@ static int CreateSAPPacket(SAPSession_t *session, uint8_t *packet)
 
 static void DetermineSAPMulticast(SAPSession_t *session, struct sockaddr_storage *sockAddr)
 {
-    
+
     if (session->originatingSource.ss_family == PF_INET)
     {
         struct sockaddr_in *sessionAddr4 = (struct sockaddr_in*)&session->originatingSource;
@@ -227,43 +223,37 @@ static void DetermineSAPMulticast(SAPSession_t *session, struct sockaddr_storage
         sockAddr4->sin_port = htons (SAP_PORT);
         memcpy (&sockAddr4->sin_addr.s_addr, &ip, sizeof (ip));
     }
-#ifndef __CYGWIN__
     else
     {
-        struct sockaddr_in6 *sessionAddr6 = (struct sockaddr_in6*)&session->originatingSource;        
+        struct sockaddr_in6 *sessionAddr6 = (struct sockaddr_in6*)&session->originatingSource;
         struct sockaddr_in6 *sockAddr6 = (struct sockaddr_in6 *)sockAddr;
         memset (sockAddr6, 0, sizeof (struct sockaddr_in6));
         sockAddr6->sin6_family = AF_INET6;
         sockAddr6->sin6_scope_id = sessionAddr6->sin6_scope_id;
         sockAddr6->sin6_port = htons (SAP_PORT);
-        memcpy (&sockAddr6->sin6_addr.s6_addr, 
+        memcpy (&sockAddr6->sin6_addr.s6_addr,
                 "\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x7f\xfe",
                 16);
         sockAddr6->sin6_addr.s6_addr[1] = sessionAddr6->sin6_addr.s6_addr[1] & 0x0f;
     }
-#endif    
 }
 
 static void *SAPServer(void *arg)
 {
     struct timespec waitFor;
-    uint8_t packet[UDP_PAYLOAD_SIZE]; 
+    uint8_t packet[UDP_PAYLOAD_SIZE];
     int packetLen;
     SAPSession_t *session;
     int sessionCount;
     ListIterator_t iterator;
     struct sockaddr_storage sapMulticastAddr;
-    
+
     int socket4 = UDPCreateSocket(PF_INET);
-#ifndef __CYGWIN__    
     int socket6 = UDPCreateSocket(PF_INET6);
-#endif
     int ttl = 255;
-    
+
     setsockopt(socket4,IPPROTO_IP,IP_MULTICAST_TTL, &ttl,sizeof(ttl));
-#ifndef __CYGWIN__    
     setsockopt(socket4,IPPROTO_IPV6,IPV6_MULTICAST_HOPS, &ttl,sizeof(ttl));
-#endif
     LogModule(LOG_DEBUG, SAP, "Annoucement thread starting\n");
     while (!quit)
     {
@@ -272,8 +262,8 @@ static void *SAPServer(void *arg)
         sessionCount = ListCount(sessionList);
         if (sessionCount > 0)
         {
-            /* Remove the first message from the front of the list, send it and 
-             * add it to the back. 
+            /* Remove the first message from the front of the list, send it and
+             * add it to the back.
              */
             ListIterator_Init(iterator, sessionList);
             session = (SAPSession_t*)ListIterator_Current(iterator);
@@ -286,7 +276,7 @@ static void *SAPServer(void *arg)
             {
                 ListAdd(sessionList, session);
             }
-            
+
             packetLen = CreateSAPPacket(session, packet);
             DetermineSAPMulticast(session, &sapMulticastAddr);
             /* Send the message */
@@ -294,12 +284,10 @@ static void *SAPServer(void *arg)
             {
                 UDPSendTo(socket4, packet, packetLen, (struct sockaddr *)&sapMulticastAddr, sizeof(struct sockaddr_in));
             }
-#ifndef __CYGWIN__            
             else
             {
                 UDPSendTo(socket6, packet, packetLen, (struct sockaddr *)&sapMulticastAddr, sizeof(struct sockaddr_in6));
             }
-#endif
         }
         waitFor.tv_sec += 1;
         pthread_cond_timedwait(&messageDelayCond, &sessionListMutex, &waitFor);

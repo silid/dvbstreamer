@@ -95,9 +95,6 @@ static char NOWNEXT[]="NowNext";
 /*******************************************************************************
 * Plugin Setup                                                                 *
 *******************************************************************************/
-#ifdef __CYGWIN__
-#define PluginInterface NowNextPluginInterface
-#endif
 
 PLUGIN_COMMANDS(
     {
@@ -126,8 +123,8 @@ PLUGIN_FEATURES(
 
 PLUGIN_INTERFACE_CF(
     PLUGIN_FOR_DVB,
-    "NowNext", "0.2", 
-    "Plugin to display present/following EPG information.", 
+    "NowNext", "0.2",
+    "Plugin to display present/following EPG information.",
     "charrea6@users.sourceforge.net"
     );
 
@@ -153,11 +150,11 @@ static void CommandNext(int argc, char **argv)
     if (info)
     {
         PrintEvent(&info->next);
-    }    
+    }
     else
     {
         CommandError(COMMAND_ERROR_GENERIC, "No info found for \"%s\"", argv[0]);
-    }    
+    }
 }
 
 static void PrintEvent(Event_t *event)
@@ -166,7 +163,7 @@ static void PrintEvent(Event_t *event)
     CommandPrintf("Start time : %04d/%02d/%02d %02d:%02d:%02d\n",
         event->startTime.i_year, event->startTime.i_month, event->startTime.i_day,
         event->startTime.i_hour, event->startTime.i_minute, event->startTime.i_second);
-    CommandPrintf("Duration   : %02d:%02d:%02d\n", 
+    CommandPrintf("Duration   : %02d:%02d:%02d\n",
         event->duration.i_hours, event->duration.i_minutes, event->duration.i_seconds);
     CommandPrintf("Description:\n%s\n", event->description);
 }
@@ -182,7 +179,7 @@ static void Init0x12Filter(PIDFilter_t *filter)
     if (filter->tsFilter->adapter->hardwareRestricted)
     {
         DVBDemuxAllocateFilter(filter->tsFilter->adapter, EIT_PID, TRUE);
-    }       
+    }
 }
 
 static void Deinit0x12Filter(PIDFilter_t *filter)
@@ -191,7 +188,7 @@ static void Deinit0x12Filter(PIDFilter_t *filter)
     if (filter->tsFilter->adapter->hardwareRestricted)
     {
         DVBDemuxReleaseFilter(filter->tsFilter->adapter, EIT_PID);
-    }            
+    }
     SubTableProcessorDeinit(filter);
     ListFree(serviceNowNextInfoList, free);
 }
@@ -200,10 +197,10 @@ static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t table
 {
     switch (tableId)
     {
-        case TABLE_ID_PF_ACTUAL: 
+        case TABLE_ID_PF_ACTUAL:
             dvbpsi_AttachEIT(demuxHandle, tableId, extension, ProcessEIT, NULL);
             break;
-        case TABLE_ID_PF_OTHER: 
+        case TABLE_ID_PF_OTHER:
             dvbpsi_AttachEIT(demuxHandle, tableId, extension, ProcessEIT, NULL);
             break;
     }
@@ -251,7 +248,7 @@ static void UpdateEvent(Event_t *event, dvbpsi_eit_event_t *eitevent)
 
     event->startTime = eitevent->t_start_time;
     event->duration  = eitevent->t_duration;
-                        
+
     for (descriptor = eitevent->p_first_descriptor; descriptor; descriptor = descriptor->p_next)
     {
         if (descriptor->i_tag == 0x4d)
@@ -297,8 +294,8 @@ static ServiceNowNextInfo_t *FindService(uint16_t networkId, uint16_t tsId, uint
 {
     ListIterator_t iterator;
 
-    for (ListIterator_Init(iterator, serviceNowNextInfoList); 
-         ListIterator_MoreEntries(iterator); 
+    for (ListIterator_Init(iterator, serviceNowNextInfoList);
+         ListIterator_MoreEntries(iterator);
          ListIterator_Next(iterator))
     {
         ServiceNowNextInfo_t *info = ListIterator_Current(iterator);

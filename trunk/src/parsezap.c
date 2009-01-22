@@ -30,7 +30,7 @@ Majority of the parsing code taken from the xine input_dvb plugin code.
 #include "multiplexes.h"
 #include "services.h"
 #include "logging.h"
-#include "dvb.h"
+#include "dvbadapter.h"
 /*******************************************************************************
 * Typedefs                                                                     *
 *******************************************************************************/

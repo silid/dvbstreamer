@@ -27,7 +27,7 @@ Transport stream processing and filter management.
 #include <pthread.h>
 
 #include "types.h"
-#include "dvb.h"
+#include "dvbadapter.h"
 #include "services.h"
 #include "multiplexes.h"
 #include "list.h"

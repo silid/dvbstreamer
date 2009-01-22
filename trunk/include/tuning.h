@@ -26,7 +26,7 @@ Frontend Tuner control.
 #include <stdint.h>
 
 #include "types.h"
-#include "dvb.h"
+#include "dvbadapter.h"
 #include "multiplexes.h"
 #include "services.h"
 #include "plugin.h"

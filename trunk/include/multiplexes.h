@@ -26,7 +26,7 @@ Manage multiplexes and tuning parameters.
 #include <linux/dvb/dmx.h>
 #include <linux/dvb/frontend.h>
 #include "objects.h"
-#include "dvb.h"
+#include "dvbadapter.h"
 /**
  * @defgroup Multiplex Multiplex information
  * This module is used to store and retrieve the multiplex information in the 

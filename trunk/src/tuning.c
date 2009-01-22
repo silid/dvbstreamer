@@ -26,7 +26,7 @@ Control tuning of the dvb adapter.
 #include "tuning.h"
 #include "cache.h"
 #include "logging.h"
-#include "dvb.h"
+#include "dvbadapter.h"
 #include "ts.h"
 #include "servicefilter.h"
 #include "events.h"

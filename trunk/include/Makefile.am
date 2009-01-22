@@ -13,7 +13,7 @@ pkginclude_DATA = \
     multiplexes.h \
     pids.h \
     dbase.h \
-    dvb.h \
+    dvbadapter.h \
     main.h \
     plugin.h \
     types.h \

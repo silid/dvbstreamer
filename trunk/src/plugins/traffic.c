@@ -74,9 +74,6 @@ static bool serviceLock;
 /*******************************************************************************
 * Plugin Setup                                                                 *
 *******************************************************************************/
-#ifdef __CYGWIN__
-#define PluginInterface TrafficPluginInterface
-#endif
 
 PLUGIN_FEATURES(
     PLUGIN_FEATURE_FILTER(TrafficFilter)
@@ -96,8 +93,8 @@ PLUGIN_COMMANDS(
 
 PLUGIN_INTERFACE_CF(
     PLUGIN_FOR_ALL,
-    "Traffic", "0.1", 
-    "Plugin to display traffic on the current mux.", 
+    "Traffic", "0.1",
+    "Plugin to display traffic on the current mux.",
     "dvbstreamerplugin@nerdbox.net"
     );
 /*******************************************************************************
@@ -107,7 +104,7 @@ static void InitFilter(PIDFilter_t *filter)
 {
     filter->name = "Traffic Capture";
 
-    PIDFilterFilterPacketSet(filter, FilterPacket, NULL);   
+    PIDFilterFilterPacketSet(filter, FilterPacket, NULL);
     PIDFilterProcessPacketSet(filter, ProcessPacket, NULL);
     PIDFilterMultiplexChangeSet(filter, HandleMuxChange, NULL);
 
@@ -182,8 +179,8 @@ static TSPacket_t * ProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t 
     ListIterator_t iterator;
     TrafficPIDCount_t * data = NULL;
     uint16_t pid = TSPACKET_GETPID(*packet);
-    
-    if (PIDCounts != NULL) 
+
+    if (PIDCounts != NULL)
     {
         pthread_mutex_lock(&TrafficMutex);
         RotateData();
@@ -196,11 +193,11 @@ static TSPacket_t * ProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t 
                 break;
             }
         }
-        if (data && data->PID == pid) 
+        if (data && data->PID == pid)
         {
             data->count++;
-        } 
-        else 
+        }
+        else
         {
             data = calloc(1, sizeof(TrafficPIDCount_t));
             if (data)
@@ -218,7 +215,7 @@ static TSPacket_t * ProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t 
 }
 
 static void subtract_timeval(struct timeval a, struct timeval b,
-    struct timeval * result) 
+    struct timeval * result)
 {
     result->tv_sec = a.tv_sec - b.tv_sec;
     result->tv_usec = a.tv_usec - b.tv_usec;
@@ -248,7 +245,7 @@ static void RotateData()
     }
 
     subtract_timeval(now, currentStart, &tmp);
-    if (tmp.tv_sec) 
+    if (tmp.tv_sec)
     {
         lastStart = currentStart;
         currentStart = now;
@@ -283,7 +280,7 @@ static TrafficPIDCount_t * CopyPIDCounts(void)
         return NULL;
     }
     for (i = 0, ListIterator_Init(iterator, PIDCounts);
-         i < pidListLength && ListIterator_MoreEntries(iterator); 
+         i < pidListLength && ListIterator_MoreEntries(iterator);
          i++, ListIterator_Next(iterator))
     {
         data[i] = *(TrafficPIDCount_t *)ListIterator_Current(iterator);
@@ -332,11 +329,11 @@ static void CommandTraffic(int argc, char **argv)
 
     /* Ensure the database is up-to-date */
     UpdateDatabase();
-    
+
     /* Wait until there's data available */
     pthread_mutex_lock(&TrafficMutex);
-    if (lastStart.tv_sec == currentStart.tv_sec 
-            && lastStart.tv_usec == currentStart.tv_usec) 
+    if (lastStart.tv_sec == currentStart.tv_sec
+            && lastStart.tv_usec == currentStart.tv_usec)
     {
         RotateData();
         while (timeout > 0 && lastStart.tv_sec == currentStart.tv_sec
@@ -363,7 +360,7 @@ static void CommandTraffic(int argc, char **argv)
     data = CopyPIDCounts();
     pthread_mutex_unlock(&TrafficMutex);
 
-    CommandPrintf(" PID          Frequency Datarate%s\n", 
+    CommandPrintf(" PID          Frequency Datarate%s\n",
             printService ? "   Service" : "");
     CommandPrintf("               (pkts/s) (kbit/s)\n");
 
@@ -412,14 +409,14 @@ static void CommandTraffic(int argc, char **argv)
                         info = " (PCR)";
                     }
                 }
-                CommandPrintf("%4d (0x%04x)     %5lld    %5lld - %s%s\n", 
+                CommandPrintf("%4d (0x%04x)     %5lld    %5lld - %s%s\n",
                     data[i].PID, data[i].PID, freq, rate, name, info);
                 ServiceRefDec(service);
                 ServiceEnumeratorDestroy(enumerator);
             }
             else
             {
-                CommandPrintf("%4d (0x%04x)     %5lld    %5lld\n", 
+                CommandPrintf("%4d (0x%04x)     %5lld    %5lld\n",
                     data[i].PID, data[i].PID, freq, rate);
             }
         }

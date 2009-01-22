@@ -38,10 +38,6 @@ Simplify UDP socket creation and packet sending.
 
 #define PORT 54197 // 0xd3b5 ~= DVBS
 
-#ifdef __CYGWIN__
-#define LogModule(_l, _m, _f...) fprintf(stderr, "%-15s : ", _m); fprintf(stderr, _f)
-#endif
-
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
@@ -59,7 +55,7 @@ int UDPCreateSocket(sa_family_t family)
 #ifdef USE_GETADDRINFO
     struct addrinfo *addrinfo, hints;
     int ret;
-#else     
+#else
     struct sockaddr_in ip4addr;
 #endif
 
@@ -102,7 +98,7 @@ int UDPCreateSocket(sa_family_t family)
         close(socketfd);
         socketfd = -1;
     }
-    
+
 #ifdef USE_GETADDRINFO
     freeaddrinfo(addrinfo);
 #endif

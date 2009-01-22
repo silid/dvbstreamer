@@ -36,7 +36,7 @@ Generic Processor for PSI/SI tables that have several subtables on the same PID.
 
 #include "multiplexes.h"
 #include "services.h"
-#include "dvb.h"
+#include "dvbadapter.h"
 #include "ts.h"
 #include "main.h"
 #include "cache.h"

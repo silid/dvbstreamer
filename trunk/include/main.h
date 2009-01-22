@@ -24,7 +24,7 @@ Entry point to the application.
 #define _MAIN_H
 
 #include "types.h"
-#include "dvb.h"
+#include "dvbadapter.h"
 #include "ts.h"
 #include "services.h"
 #include "multiplexes.h"
