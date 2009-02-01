@@ -471,10 +471,10 @@ static void ScanFullDVBT(void)
             frequency = 142500000 + (channel * 7000000);
             CommandPrintf("%d %u\n", channelCount + 1, frequency);
             channelCount ++;
-            mux = MultiplexFindFrequencyRange(feparams.frequency, 166670);
             for (offsetIndex = 0; offsetIndex < 3; offsetIndex ++)
             {
                 feparams.frequency = frequency + offsets[offsetIndex];
+                mux = MultiplexFindFrequency(feparams.frequency);
                 TuneFrequency(FE_OFDM, &feparams, NULL, mux, FALSE);
                 if (FELocked)
                 {
@@ -500,10 +500,11 @@ static void ScanFullDVBT(void)
             frequency = 306000000 + (channel * 8000000);
             CommandPrintf("%d %u\n", channelCount + 1, frequency);
             channelCount ++;
-            mux = MultiplexFindFrequencyRange(feparams.frequency, 166670);
+
             for (offsetIndex = 0; offsetIndex < 3; offsetIndex ++)
             {
                 feparams.frequency = frequency + offsets[offsetIndex];
+                mux = MultiplexFindFrequency(feparams.frequency);                
                 TuneFrequency(FE_OFDM, &feparams, NULL, mux, FALSE);
                 if (FELocked)
                 {
