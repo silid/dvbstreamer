@@ -61,7 +61,7 @@ int LoggingInitFile(char *filepath, int logLevel)
     }
     else
     {
-        logFP = freopen(filepath, "a", stderr);
+        logFP = fopen(filepath, "a");
         if (logFP == NULL)
         {
             return -1;
@@ -80,11 +80,11 @@ int LoggingInit(char *filename, int logLevel)
 
     /* Try /var/log first then users home directory */
     sprintf(logFile, "/var/log/%s", filename);
-    logFP = freopen(logFile, "a", stderr);
+    logFP = fopen(logFile, "a");
     if (logFP == NULL)
     {
         sprintf(logFile, "%s/%s", DataDirectory, filename);
-        logFP = freopen(logFile, "a", stderr);
+        logFP = fopen(logFile, "a");
     }
     if (logFP == NULL)
     {
@@ -130,16 +130,24 @@ bool LogLevelIsEnabled(int level)
 void LogModule(int level, const char *module, char *format, ...)
 {
     va_list valist;
-    va_start(valist, format);
+
     if (level == 0)
     {
+        va_start(valist, format);
         vfprintf(stderr, format, valist);
+        va_end(valist);
+        if (strchr(format, '\n') == NULL)
+        {
+            fprintf(stderr, "\n");
+        }
     }
     if (level <= verbosity)
     {
+        va_start(valist, format);
         LogImpl(level, module, format, valist);
+        va_end(valist);
     }
-    va_end(valist);
+    
 }
 /*******************************************************************************
 * Local Functions                                                              *
