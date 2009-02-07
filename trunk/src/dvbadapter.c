@@ -254,7 +254,7 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
 {
     adapter->frontEndParams = *frontend;
     adapter->frontEndRequestedFreq = frontend->frequency;
-
+    LogModule(LOG_DEBUG, DVBADAPTER, "Tuning to %d", frontend->frequency);
     if (adapter->info.type == FE_QPSK)
     {
         adapter->diseqcSettings = *diseqc;
@@ -715,10 +715,10 @@ static void *DVBFrontEndMonitor(void *arg)
     int i;
     bool feLocked = FALSE;
 
-    pfd[0].fd = adapter->frontEndFd;
+    pfd[0].fd = adapter->monitorRecvFd;
     pfd[0].events = POLLIN;
 
-    pfd[1].fd = adapter->monitorRecvFd;
+    pfd[1].fd = adapter->frontEndFd;
     pfd[1].events = POLLIN;
 
     /* Read initial status */
@@ -799,6 +799,12 @@ static void *DVBFrontEndMonitor(void *arg)
                                 if (adapter->frontEndFd == -1)
                                 {
                                     DVBDemuxStopAllFilters(adapter);
+                                    nrofPfds = 1;
+                                }
+                                else
+                                {
+                                    nrofPfds = 2;
+                                    pfd[1].fd = adapter->frontEndFd;
                                 }
                                 break;
                         }
