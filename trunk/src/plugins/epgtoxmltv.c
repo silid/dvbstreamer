@@ -225,6 +225,34 @@ static void DumpProgramme(Multiplex_t *multiplex, Service_t *service, EPGEvent_t
     }while(detail && !ExitProgram);
     EPGDBaseEnumeratorDestroy(enumerator);
 
+    /* output seriesid and programid fields */
+    enumerator = EPGDBaseDetailGet(&serviceRef, event->eventId, "content");
+    do
+    {
+        detail = EPGDBaseDetailGetNext(enumerator);
+        if (detail)
+        {
+            CommandPrintf("<content lang=\"%s\">", detail->lang);
+            PrintXmlified(detail->value);
+            CommandPrintf("</content>\n");
+            ObjectRefDec(detail);            
+        }
+    }while(detail && !ExitProgram);
+    EPGDBaseEnumeratorDestroy(enumerator);
+    enumerator = EPGDBaseDetailGet(&serviceRef, event->eventId, "series");
+    do
+    {
+        detail = EPGDBaseDetailGetNext(enumerator);
+        if (detail)
+        {
+            CommandPrintf("<series lang=\"%s\">", detail->lang);
+            PrintXmlified(detail->value);
+            CommandPrintf("</series>\n");
+            ObjectRefDec(detail);            
+        }
+    }while(detail && !ExitProgram);
+    EPGDBaseEnumeratorDestroy(enumerator);
+
     CommandPrintf("</programme>\n");
 }
 
