@@ -610,9 +610,7 @@ static PropertyNode_t *PropertiesCreateNodes(const char *path)
     if (currentNode == NULL)
     {
         currentNode = &rootProperty;
-        printf("Current node is root node\n");
     }
-    printf("To create = %s\n", toCreate);
     if (toCreate != NULL)
     {
         for (elementStart = toCreate; elementStart != NULL; )
@@ -644,7 +642,6 @@ static PropertyNode_t *PropertiesCreateNode(PropertyNode_t *parentNode, const ch
     childNode->type = PropertyType_None;
     childNode->desc = NULL;
     childNode->parent = parentNode;
-    printf("Created node \"%s\"\n", newProp);
     if (parentNode->childNodes)
     {
         PropertyNode_t *node, *prevNode = NULL;
