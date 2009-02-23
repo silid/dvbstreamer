@@ -36,17 +36,26 @@ Plugin to dump the EPG Database out in XMLTV format.
 #include "list.h"
 #include "logging.h"
 
+/*******************************************************************************
+* Typedefs                                                                     *
+*******************************************************************************/
+typedef struct ServiceMultiplexInfo_s
+{
+    Service_t *service;
+    Multiplex_t *mux;
+}ServiceMultiplexInfo_t;
 
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
 static void CommandDump(int argc, char **argv);
-static void DumpChannels(void);
-static void DumpProgrammes(void);
-static void DumpMultiplexProgrammes(Multiplex_t *multiplex);
+static void DumpChannels(List_t *infoList);
+static void DumpProgrammes(List_t *infoList);
 static void DumpServiceProgrammes(Multiplex_t *multiplex, Service_t *service);
 static void DumpProgramme(Multiplex_t *multiplex, Service_t *service, EPGEvent_t *event);
 static void PrintXmlified(char *text);
+static List_t *GetServiceMultiplexInfo(void);
+static void ServiceMultiplexInfoDestructor(void *obj);
 /*******************************************************************************
 * Plugin Setup                                                                 *
 *******************************************************************************/
@@ -72,90 +81,55 @@ PLUGIN_INTERFACE_C(
 *******************************************************************************/
 static void CommandDump(int argc, char **argv)
 {
+    List_t *infoList;
+    ObjectRegisterTypeDestructor(ServiceMultiplexInfo_t, ServiceMultiplexInfoDestructor);
+    infoList = GetServiceMultiplexInfo();
     CommandPrintf("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n");
     CommandPrintf("<tv generator-info-name=\"DVBStreamer-EPGSchedule\">\n");
-    DumpChannels();
-    DumpProgrammes();
+    
+    DumpChannels(infoList);
+    DumpProgrammes(infoList);
     CommandPrintf("</tv>\n");
+    ObjectListFree(infoList);
 }
-static void DumpChannels(void)
+static void DumpChannels(List_t *infoList)
 {
-    ServiceEnumerator_t enumerator = ServiceEnumeratorGet();
-    Service_t *service;
-    do
-    {
-        service = ServiceGetNext(enumerator);
-        if (service)
-        {
-            Multiplex_t *multiplex = MultiplexFindUID(service->multiplexUID);
-            CommandPrintf("<channel id=\"%04x.%04x.%04x\">\n",
-                multiplex->networkId, multiplex->tsId, service->id);
-            CommandPrintf("<display-name>");
-            PrintXmlified(service->name);
-            CommandPrintf("</display-name>\n");
-            CommandPrintf("</channel>\n");
-            ServiceRefDec(service);
-            MultiplexRefDec(multiplex);
-        }
-    }
-    while(service);
-    ServiceEnumeratorDestroy(enumerator);
-}
-
-static void DumpProgrammes(void)
-{
-    MultiplexEnumerator_t enumerator = MultiplexEnumeratorGet();
-    List_t *multiplexes = ListCreate();
     ListIterator_t iterator;
+    ServiceMultiplexInfo_t *info;
+    Service_t *service;
     Multiplex_t *multiplex;
-    DBaseTransactionBegin();
-    EPGDBaseTransactionStart();
-    do
+    
+    for (ListIterator_Init(iterator, infoList);
+         ListIterator_MoreEntries(iterator);
+         ListIterator_Next(iterator))
     {
-        multiplex = MultiplexGetNext(enumerator);
-        if (multiplex)
-        {
-            ListAdd(multiplexes, multiplex);
-        }
-    }while(multiplex && !ExitProgram);
-    MultiplexEnumeratorDestroy(enumerator);
-
-    for (ListIterator_Init(iterator, multiplexes); ListIterator_MoreEntries(iterator);ListIterator_Next(iterator))
-    {
-        multiplex = ListIterator_Current(iterator);
-        DumpMultiplexProgrammes(multiplex);
-        MultiplexRefDec(multiplex);
+        info = ListIterator_Current(iterator);
+        service = info->service;
+        multiplex = info->mux;
+        CommandPrintf("<channel id=\"%04x.%04x.%04x\">\n",
+            multiplex->networkId, multiplex->tsId, service->id);
+        CommandPrintf("<display-name>");
+        PrintXmlified(service->name);
+        CommandPrintf("</display-name>\n");
+        CommandPrintf("</channel>\n");
     }
-    ListFree(multiplexes,NULL);
-    EPGDBaseTransactionCommit();
-    DBaseTransactionCommit();
 }
 
-static void DumpMultiplexProgrammes(Multiplex_t *multiplex)
+static void DumpProgrammes(List_t *infoList)
 {
-    Service_t *service;
-    ServiceEnumerator_t enumerator = ServiceEnumeratorForMultiplex(multiplex);
-    List_t *services = ListCreate();
     ListIterator_t iterator;
-    do
-    {
-        service = ServiceGetNext(enumerator);
-        if (service)
-        {
-            ListAdd(services, service);
-        }
-    }
-    while(service && !ExitProgram);
-    ServiceEnumeratorDestroy(enumerator);
+    ServiceMultiplexInfo_t *info;
 
-    for (ListIterator_Init(iterator, services); ListIterator_MoreEntries(iterator);ListIterator_Next(iterator))
+    EPGDBaseTransactionStart();
+    
+    for (ListIterator_Init(iterator, infoList);
+         ListIterator_MoreEntries(iterator);
+         ListIterator_Next(iterator))
     {
-        service = ListIterator_Current(iterator);
-        DumpServiceProgrammes(multiplex, service);
-        ServiceRefDec(service);
+        info = ListIterator_Current(iterator);
+        DumpServiceProgrammes(info->mux, info->service);
     }
-    ListFree(services, NULL);
-
+    EPGDBaseTransactionCommit();
 }
 
 static void DumpServiceProgrammes(Multiplex_t *multiplex, Service_t *service)
@@ -310,4 +284,60 @@ static void PrintXmlified(char *text)
     {
         CommandPrintf("%s", buffer);
     }
+}
+
+static List_t *GetServiceMultiplexInfo(void)
+{
+    Multiplex_t *multiplex;
+    Service_t *service;
+    List_t *multiplexes;
+    List_t *services;
+    ListIterator_t muxIterator;
+    ListIterator_t serviceIterator;    
+    ServiceMultiplexInfo_t *info;
+    
+    List_t *result = ObjectListCreate();
+    
+    DBaseTransactionBegin();
+
+    multiplexes = MultiplexListAll();
+    
+    for (ListIterator_Init(muxIterator, multiplexes); 
+         ListIterator_MoreEntries(muxIterator);
+         ListIterator_Next(muxIterator))
+    {
+        multiplex = ListIterator_Current(muxIterator);
+        services = ServiceListForMultiplex(multiplex);
+
+        for (ListIterator_Init(serviceIterator, services); 
+             ListIterator_MoreEntries(serviceIterator);
+             ListIterator_Next(serviceIterator))
+        {
+            service = ListIterator_Current(serviceIterator);
+            info = ObjectCreateType(ServiceMultiplexInfo_t);
+            if (info)
+            {
+                info->service = service;
+                info->mux = multiplex;
+                MultiplexRefInc(multiplex);
+                ListAdd(result, info);
+            }
+        }
+        /* Just free the list not the contained objects */
+        ListFree(services, NULL);
+    }
+    /* This won't actually free the objects, but reduces the ref count by 1 
+     * so that can be free'd later when the returned list is free'd.
+     */
+    ObjectListFree(multiplexes);   
+
+    DBaseTransactionCommit();
+    return result;
+}
+
+static void ServiceMultiplexInfoDestructor(void *obj)
+{
+    ServiceMultiplexInfo_t *info = obj;
+    ServiceRefDec(info->service);
+    MultiplexRefDec(info->mux);
 }
