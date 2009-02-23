@@ -147,7 +147,7 @@ int PropertiesRemoveProperty(const char *path, const char *name)
     PropertyNode_t *parentNode = PropertiesFindNode(path, &leftOver);
     if ((path == NULL) || (leftOver != NULL))
     {
-        LogModule(LOG_ERROR, PROPERTIES, "Couldn't find parent %s while trying to remove node %s", path, name);
+        LogModule(LOG_ERROR, PROPERTIES, "Couldn't find parent \"%s\" while trying to remove node %s", path, name);
         result = -1;
     }
     else
@@ -164,14 +164,14 @@ int PropertiesRemoveProperty(const char *path, const char *name)
         }
         if (currentNode == NULL)
         {
-            LogModule(LOG_ERROR, PROPERTIES, "Couldn't find %s with parent %s", name, path);
+            LogModule(LOG_ERROR, PROPERTIES, "Couldn't find \"%s\" with parent %s", name, path);
             result = -1;
         }
         else
         {
             if (currentNode->childNodes != NULL)
             {
-                LogModule(LOG_ERROR, PROPERTIES, "Not removing %s with parent %s as it has children", name, path);
+                LogModule(LOG_ERROR, PROPERTIES, "Not removing \"%s\" with parent %s as it has children", name, path);
                 result = -1;
             }
             else
@@ -196,7 +196,7 @@ int PropertiesRemoveAllProperties(const char *path)
     
     if ((node == NULL) || (leftOver != NULL))
     {
-        LogModule(LOG_ERROR, PROPERTIES, "Couldn't find parent %s while trying to remove nodes", path);
+        LogModule(LOG_ERROR, PROPERTIES, "Couldn't find parent \"%s\" while trying to remove nodes", path);
         result = -1;
     }
     else
@@ -301,7 +301,6 @@ int PropertiesGet(char *path, PropertyValue_t *value)
                 /* Check that all dimensions are specified */
                 if (sscanf(leftOver, "%d.%d", &row, &column) == 2)
                 {
-                    printf("row = %d column = %d nrofColumns = %d\n", row, column, node->accessors.table.tableDesc->nrofColumns);
                     if (column < node->accessors.table.tableDesc->nrofColumns)
                     {
                         value->type = node->accessors.table.tableDesc->columns[column].type;
@@ -611,7 +610,9 @@ static PropertyNode_t *PropertiesCreateNodes(const char *path)
     if (currentNode == NULL)
     {
         currentNode = &rootProperty;
+        printf("Current node is root node\n");
     }
+    printf("To create = %s\n", toCreate);
     if (toCreate != NULL)
     {
         for (elementStart = toCreate; elementStart != NULL; )
@@ -643,7 +644,7 @@ static PropertyNode_t *PropertiesCreateNode(PropertyNode_t *parentNode, const ch
     childNode->type = PropertyType_None;
     childNode->desc = NULL;
     childNode->parent = parentNode;
-
+    printf("Created node \"%s\"\n", newProp);
     if (parentNode->childNodes)
     {
         PropertyNode_t *node, *prevNode = NULL;
@@ -728,8 +729,12 @@ static PropertyNode_t *PropertiesFindNode(const char *path, char **leftOver)
     {
         result = currentNode;
     }
-
-
+    
+    if (*leftOver && (strlen(*leftOver) == 0))
+    {
+        *leftOver = NULL;
+    }
+    
     return result;
 }
 
