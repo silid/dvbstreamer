@@ -50,6 +50,7 @@ Manage services and PIDs.
 * Prototypes                                                                   *
 *******************************************************************************/
 
+static List_t *ServiceCreateList(ServiceEnumerator_t enumerator);
 static void ServiceDestructor(void * arg);
 static char *ServiceEventToString(Event_t event,void * payload);
 static char *ServiceEventAllDeletedToString(Event_t event,void * payload);
@@ -506,6 +507,13 @@ ServiceEnumerator_t ServiceEnumeratorGet()
     return stmt;
 }
 
+List_t *ServiceListAll()
+{
+    return ServiceCreateList(ServiceEnumeratorGet());
+}
+
+
+
 int ServiceForMultiplexCount(int uid)
 {
     STATEMENT_INIT;
@@ -537,6 +545,11 @@ ServiceEnumerator_t ServiceEnumeratorForMultiplex(Multiplex_t *multiplex)
     RETURN_ON_ERROR(NULL);
 
     return stmt;
+}
+
+List_t *ServiceListForMultiplex(Multiplex_t *multiplex)
+{
+    return ServiceCreateList(ServiceEnumeratorForMultiplex(multiplex));
 }
 
 ServiceEnumerator_t ServiceFindByPID(int pid, Multiplex_t *multiplex)
@@ -580,6 +593,12 @@ ServiceEnumerator_t ServiceFindByPID(int pid, Multiplex_t *multiplex)
     return stmt;
 }
 
+List_t *ServiceListForPID(int pid, Multiplex_t *multiplex)
+{
+    return ServiceCreateList(ServiceFindByPID(pid, multiplex));
+}
+
+
 ServiceEnumerator_t ServiceQueryNameLike(char *query)
 {
     STATEMENT_INIT;
@@ -590,6 +609,11 @@ ServiceEnumerator_t ServiceQueryNameLike(char *query)
     RETURN_ON_ERROR(NULL);
 
     return stmt;
+}
+
+List_t *ServiceListForNameLike(char *query)
+{
+    return ServiceCreateList(ServiceQueryNameLike(query));
 }
 
 void ServiceEnumeratorDestroy(ServiceEnumerator_t enumerator)
@@ -647,6 +671,25 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
 /*******************************************************************************
 * Local Functions                                                              *
 *******************************************************************************/
+static List_t *ServiceCreateList(ServiceEnumerator_t enumerator)
+{
+    List_t *list = ObjectListCreate();
+    Service_t *service = NULL;
+
+    do
+    {
+        service = ServiceGetNext(enumerator);
+        if (service)
+        {
+            ListAdd(list, service);
+        }
+    }
+    while (service != NULL);
+    
+    ServiceEnumeratorDestroy(enumerator);
+    return list;
+}
+
 static void ServiceDestructor(void * arg)
 {
     Service_t *service = arg;

@@ -142,6 +142,15 @@ void ListFreeObject(void *ptr);
 bool ListAdd(List_t *list, void *data);
 
 /**
+ * Retrieve data stored in the list at the specified index.
+ * @param list The list to retrieve the data from.
+ * @param index Index into the list.
+ * @param data Pointer to store the data pointer in.
+ * @return TRUE if the data was retrieved, FALSE otherwise.
+ */
+bool ListGet(List_t * list, int index, void * * data);
+
+/**
  * Remove the first instance of data from the list.
  * @param list The list to remove the data from.
  * @param data The data to remove.

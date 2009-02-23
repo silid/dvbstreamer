@@ -27,6 +27,8 @@ Manage multiplexes and tuning parameters.
 #include <linux/dvb/frontend.h>
 #include "objects.h"
 #include "dvbadapter.h"
+#include "list.h"
+
 /**
  * @defgroup Multiplex Multiplex information
  * This module is used to store and retrieve the multiplex information in the 
@@ -134,6 +136,14 @@ Multiplex_t *MultiplexFindDVBSMultiplex(int freq, DVBDiSEqCSettings_t *diseqc);
  * @return An enumerator instance or NULL if there was not enough memory.
  */
 MultiplexEnumerator_t MultiplexEnumeratorGet();
+
+/**
+ * Retrieve a List_t object containing all the multiplexes in the database.
+ * @return A List_t instance containing Multiplex_t objects or NULL if there was
+ * not enough memory. Use ObjectListFree() to free all the multiplex objects and 
+ * the list.
+ */
+List_t *MultiplexListAll();
 
 /**
  * Destroy an enumerator return by MultiplexEnumeratorGet().

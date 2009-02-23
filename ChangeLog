@@ -5,8 +5,12 @@
    - Can now perform a network scan using information from dvb-utils (All)
 * New properties API and commands allows easier access to internal properties.
   (vars are now deprecated.)
+* Deprecated the Enumerator APIs for DB access and replaced with APIs that
+   return a list, this is to prevent the database being locked by a running query
+   that hasn't been finalised.
 * Ability to release (and reacquire) the frontend to save energy.
 * Fix [2377653] ATSC EPG xmltv output shows programs on wrong channel
+* Added [2629610] epgtoxmltv patch to output seriesid and programid in UK EPG
 
 1.0
 ---

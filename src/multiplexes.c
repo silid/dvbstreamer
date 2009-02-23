@@ -244,6 +244,24 @@ Multiplex_t *MultiplexGetNext(MultiplexEnumerator_t enumerator)
     return NULL;
 }
 
+List_t *MultiplexListAll()
+{
+    List_t *list = ListCreate();
+    Multiplex_t *multiplex = NULL;
+    MultiplexEnumerator_t enumerator = MultiplexEnumeratorGet();
+    do
+    {
+        multiplex = MultiplexGetNext(enumerator);
+        if (multiplex)
+        {
+            ListAdd(list, multiplex);
+        }
+    }
+    while(multiplex);
+    
+    return list;
+}
+
 int MultiplexFrontendParametersGet(Multiplex_t *multiplex, struct dvb_frontend_parameters *feparams,  DVBDiSEqCSettings_t *diseqc)
 {
     int result = -1;

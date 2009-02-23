@@ -212,7 +212,7 @@ void CacheDeInit()
 int CacheLoad(Multiplex_t *multiplex)
 {
     int result = 1;
-    int count = ServiceForMultiplexCount(multiplex->uid);
+    List_t *list = NULL;
 
     pthread_mutex_lock(&cacheUpdateMutex);
     LogModule(LOG_DEBUG, CACHE, "Freeing services\n");
@@ -220,24 +220,30 @@ int CacheLoad(Multiplex_t *multiplex)
     /* Free the services and PIDs from the previous multiplex */
     CacheServicesFree();
 
-    LogModule(LOG_DEBUG, CACHE, "Loading %d services for %d\n", count, multiplex->uid);
-    if (count > 0)
+    list = ServiceListForMultiplex(multiplex);
+    
+    LogModule(LOG_DEBUG, CACHE, "Loading %d services for %d\n", ListCount(list), multiplex->uid);
+    if (ListCount(list) > 0)
     {
-        int i;
-        ServiceEnumerator_t enumerator;
-
-        enumerator = ServiceEnumeratorForMultiplex(multiplex);
-        for (i=0; i < count; i++)
+        ListIterator_t iterator;
+        int i = 0;
+        
+        for (ListIterator_Init(iterator, list); 
+             ListIterator_MoreEntries(iterator);
+             ListIterator_Next(iterator), i++)
         {
-            cachedServices[i] = ServiceGetNext(enumerator);
+            cachedServices[i] = (Service_t*)ListIterator_Current(iterator);
             LogModule(LOG_DEBUG,CACHE, "Loaded 0x%04x %s\n", cachedServices[i]->id, cachedServices[i]->name);
             cachedPIDs[i] = PIDListGet(cachedServices[i]);
             cacheFlags[i] = CacheFlag_Clean;
         }
-        ServiceEnumeratorDestroy(enumerator);
+        /* Use ListFree with no destructor as we don't want to free the objects 
+         * only the list.
+         */
+        ListFree(list, NULL);
     }
 
-    cachedServicesCount = count;
+    cachedServicesCount = ListCount(list);
 
     MultiplexRefInc(multiplex);
     cachedServicesMultiplex = multiplex;

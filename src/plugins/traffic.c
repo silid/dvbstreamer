@@ -390,12 +390,10 @@ static void CommandTraffic(int argc, char **argv)
                 char * name = "";
                 char * info = "";
                 Service_t *service;
-                ServiceEnumerator_t enumerator;
-
-                enumerator = ServiceFindByPID(data[i].PID, multiplex);
-                service = ServiceGetNext(enumerator);
-                if (service)
+                List_t *list = ServiceListForPID(data[i].PID, multiplex);
+                if (list && (ListCount(list) > 0))
                 {
+                    ListGet(list, 0, (void**)&service);
                     if (printServiceName)
                     {
                         name = service->name;
@@ -411,8 +409,11 @@ static void CommandTraffic(int argc, char **argv)
                 }
                 CommandPrintf("%4d (0x%04x)     %5lld    %5lld - %s%s\n",
                     data[i].PID, data[i].PID, freq, rate, name, info);
-                ServiceRefDec(service);
-                ServiceEnumeratorDestroy(enumerator);
+
+                if (list)
+                {
+                    ObjectListFree(list);
+                }
             }
             else
             {

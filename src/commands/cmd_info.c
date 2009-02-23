@@ -278,7 +278,7 @@ void CommandUnInstallInfo(void)
 *******************************************************************************/
 static void CommandListServices(int argc, char **argv)
 {
-    ServiceEnumerator_t enumerator = NULL;
+    List_t *list = NULL;
     Service_t *service;
     Multiplex_t *multiplex = NULL;
     int i;
@@ -377,45 +377,44 @@ static void CommandListServices(int argc, char **argv)
 
     if (query)
     {
-        enumerator = ServiceQueryNameLike(query);
+        list = ServiceListForNameLike(query);
     }
     else if (multiplex)
     {
-        enumerator = ServiceEnumeratorForMultiplex(multiplex);
+        list = ServiceListForMultiplex(multiplex);
         MultiplexRefDec(multiplex);
     }    
     else
     {
-        enumerator = ServiceEnumeratorGet();
+        list = ServiceListAll();
     }
 
-    if (enumerator != NULL)
+    if (list != NULL)
     {
-        do
+        ListIterator_t iterator;
+        for (ListIterator_Init(iterator, list); 
+             ListIterator_MoreEntries(iterator);
+             ListIterator_Next(iterator))
         {
-            service = ServiceGetNext(enumerator);
-            if (service)
+            service = ListIterator_Current(iterator);
+            if (FilterService(service, filterByType, filterByAccess, provider))
             {
-                if (FilterService(service, filterByType, filterByAccess, provider))
+                if (dvbIds)
                 {
-                    if (dvbIds)
-                    {
-                        multiplex = MultiplexFindUID(service->multiplexUID);
-                        CommandPrintf("%04x.%04x.%04x : %s\n", 
-                            multiplex->networkId & 0xffff, multiplex->tsId & 0xffff,
-                            service->id, service->name);
-                        MultiplexRefDec(multiplex);
-                    }
-                    else
-                    {
-                        CommandPrintf("%s\n", service->name);
-                    }
+                    multiplex = MultiplexFindUID(service->multiplexUID);
+                    CommandPrintf("%04x.%04x.%04x : %s\n", 
+                        multiplex->networkId & 0xffff, multiplex->tsId & 0xffff,
+                        service->id, service->name);
+                    MultiplexRefDec(multiplex);
                 }
-                ServiceRefDec(service);
+                else
+                {
+                    CommandPrintf("%s\n", service->name);
+                }
             }
+
         }
-        while(service && !ExitProgram);
-        ServiceEnumeratorDestroy(enumerator);
+        ObjectListFree(list);
     }
 }
 
@@ -478,31 +477,33 @@ static bool FilterService(Service_t *service, uint32_t filterByType, uint32_t fi
 
 static void CommandListMuxes(int argc, char **argv)
 {
-    MultiplexEnumerator_t enumerator = MultiplexEnumeratorGet();
-    Multiplex_t *multiplex;
+    Multiplex_t *multiplex = NULL;
     bool ids = FALSE;
+    List_t *list = NULL;
+    ListIterator_t iterator;
+    
     if ((argc == 1) && (strcmp(argv[0], "-id") == 0))
     {
         ids = TRUE;
     }
-    do
+
+    list = MultiplexListAll();
+    for (ListIterator_Init(iterator, list); 
+         ListIterator_MoreEntries(iterator);
+         ListIterator_Next(iterator))
     {
-        multiplex = MultiplexGetNext(enumerator);
-        if (multiplex)
+        multiplex = (Multiplex_t*)ListIterator_Current(iterator);
+        if (ids)
         {
-            if (ids)
-            {
-                CommandPrintf("%04x.%04x : %d \n", 
-                    multiplex->networkId & 0xffff, multiplex->tsId & 0xffff, multiplex->uid);
-            }
-            else
-            {
-                CommandPrintf("%d\n", multiplex->uid);
-            }
-            MultiplexRefDec(multiplex);
+            CommandPrintf("%04x.%04x : %d \n", 
+                multiplex->networkId & 0xffff, multiplex->tsId & 0xffff, multiplex->uid);
         }
-    }while(multiplex && ! ExitProgram);
-    MultiplexEnumeratorDestroy(enumerator);
+        else
+        {
+            CommandPrintf("%d\n", multiplex->uid);
+        }
+    }
+    ObjectListFree(list);
 }
 
 static void CommandCurrent(int argc, char **argv)

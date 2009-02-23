@@ -44,19 +44,22 @@ void ListFree(List_t *list, void (*destructor)(void *data))
 {
     ListEntry_t *entry;
     ListEntry_t *next;
-    for (entry = list->head; entry != NULL; entry = next)
+    if (list)
     {
-        next = entry->next;
-        if (destructor)
+        for (entry = list->head; entry != NULL; entry = next)
         {
-            destructor(entry->data);
+            next = entry->next;
+            if (destructor)
+            {
+                destructor(entry->data);
+            }
+            free(entry);
         }
-        free(entry);
+        list->count = 0;
+        list->head = NULL;
+        list->tail = NULL;
+        ObjectRefDec(list);
     }
-    list->count = 0;
-    list->head = NULL;
-    list->tail = NULL;
-    ObjectRefDec(list);
 }
 
 void ListFreeObject(void *ptr)
@@ -180,6 +183,25 @@ void ListRemoveCurrent(ListIterator_t *iterator)
     free(entry);
     iterator->list->count --;
 }
+
+
+bool ListGet(List_t *list, int index, void **data)
+{
+    int i;
+    ListEntry_t *entry = list->head;
+    bool result = FALSE;
+    for (i = 0; (i < index) && entry; i ++)
+    {
+        entry = entry->next;
+    }
+    if (entry)
+    {
+        *data = entry->data;
+        result = TRUE;
+    }
+    return result;
+}
+
 
 void ListDump(List_t *list)
 {
