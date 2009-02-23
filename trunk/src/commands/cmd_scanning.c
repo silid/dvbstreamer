@@ -338,32 +338,23 @@ static void CommandScanCancel(int argc, char **argv)
 
 static void ScanCurrentMultiplexes(void)
 {
+    List_t *list = NULL;
     Multiplex_t *multiplex;
-    int count = MultiplexCount();
-    Multiplex_t **multiplexes = ObjectAlloc(count * sizeof(Multiplex_t *));
-    if (multiplexes)
+    ListIterator_t iterator;
+    
+    list = MultiplexListAll();
+    if (list)
     {
-        int i =0;
-        MultiplexEnumerator_t enumerator = MultiplexEnumeratorGet();
-        do
+        for (ListIterator_Init(iterator, list);
+            ListIterator_MoreEntries(iterator) && !ExitProgram;
+            ListIterator_Next(iterator))
         {
-            multiplex = MultiplexGetNext(enumerator);
-            if (multiplex)
-            {
-                multiplexes[i] = multiplex;
-                i ++;
-            }
-        }while(multiplex && ! ExitProgram);
-        MultiplexEnumeratorDestroy(enumerator);
-
-        for (i = 0; (i < count) && ! ExitProgram; i ++)
-        {
-            CommandPrintf("Scanning %d\n", multiplexes[i]->uid);
-            ScanMultiplex(multiplexes[i], FALSE);
-            MultiplexRefDec(multiplexes[i]);
+            multiplex = (Multiplex_t*)ListIterator_Current(iterator);
+            CommandPrintf("Scanning %d\n", multiplex->uid);
+            ScanMultiplex(multiplex, FALSE);
         }
 
-        ObjectFree(multiplexes);
+        ObjectListFree(list);
     }
 }
 #if defined(ENABLE_DVB)

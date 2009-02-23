@@ -192,29 +192,36 @@ static void CommandListEvents(int argc, char **argv)
     else
     {
         Multiplex_t *mux;
-        MultiplexEnumerator_t enumerator = MultiplexEnumeratorGet();
+        ListIterator_t iterator;
+        List_t *list = MultiplexListAll();
 
-        do
+        if (list)
         {
-            mux = MultiplexGetNext(enumerator);
-            if (mux)
+            for (ListIterator_Init(iterator, list);
+                 ListIterator_MoreEntries(iterator);
+                 ListIterator_Next(iterator))
             {
                 Service_t *service;
-                ServiceEnumerator_t serviceEnumerator = ServiceEnumeratorForMultiplex(mux);
-                do
+                List_t *slist;
+                ListIterator_t siterator;
+                
+                mux = ListIterator_Current(iterator);
+                slist = ServiceListForMultiplex(mux);
+                if (slist)
                 {
-                    service = ServiceGetNext(serviceEnumerator);
-                    if (service)
-                    {
-                        OutputServiceEvents(mux, service, startTime, endTime);
-                        ServiceRefDec(service);
-                    }
-                }while(service && !ExitProgram);
-                MultiplexRefDec(mux);
-            }
-        }while(mux && !ExitProgram);
+                    for (ListIterator_Init(siterator, slist);
+                         ListIterator_MoreEntries(siterator);
+                         ListIterator_Next(siterator))
 
-    MultiplexEnumeratorDestroy(enumerator);
+                    {
+                        service = ListIterator_Current(siterator);
+                        OutputServiceEvents(mux, service, startTime, endTime);
+                    }
+                    ObjectListFree(slist);
+                }
+            }
+            ObjectListFree(list);
+        }
     }
     EPGDBaseTransactionCommit();
 }

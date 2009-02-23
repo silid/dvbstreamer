@@ -274,15 +274,32 @@ Service_t *ServiceFindFQIDStr(char *FQIdStr);
 /**
  * Retrieve an enumerator for the entire service table.
  * @return A service enumerator or NULL if there is not enough memory.
+ * @deprecated Please use ServiceListAll(). 
  */
 ServiceEnumerator_t ServiceEnumeratorGet();
+
+/**
+ * Retrieve a List_t object containing all services in the service table.
+ * @return A List_t object of Service_t objects, use ObjectListFree() to 
+ * free the list and the Service objects.
+ */
+List_t *ServiceListAll();
 
 /**
  * Retrieve an enumerator for the specified multiplex.
  * @param multiplex The multiplex the service is broadcast on.
  * @return A service enumerator or NULL if there is not enough memory.
+ * @deprecated Please use ServiceListForMultiplex.
  */
 ServiceEnumerator_t ServiceEnumeratorForMultiplex(Multiplex_t *multiplex);
+
+/**
+ * Retrieve a List_t object containing all services for the specified multiplex.
+ * @param multiplex The multiplex the service is broadcast on.
+ * @return A List_t object of Service_t objects, use ObjectListFree() to 
+ * free the list and the Service objects.
+ */
+List_t *ServiceListForMultiplex(Multiplex_t * multiplex);
 
 /**
  * Retrieve an enumerator for the services known to be assosciated with the
@@ -290,16 +307,38 @@ ServiceEnumerator_t ServiceEnumeratorForMultiplex(Multiplex_t *multiplex);
  * @param pid The PID to search for.
  * @param opt_multiplex Optional. The multiplex the service is broadcast on.
  * @return A service enumerator or NULL if there is not enough memory.
+ * @deprecated Please use ServiceListForPID. 
  */
 ServiceEnumerator_t ServiceFindByPID(int pid, Multiplex_t *opt_multiplex);
+
+/**
+ * Retrieve a List_t object containing all services  known to be assosciated 
+ * with the given PID.  Optionally restrict the search to a given multiplex.
+ * @param pid The PID to search for. 
+ * @param opt_multiplex Optional. The multiplex the service is broadcast on. 
+ * @return A List_t object of Service_t objects, use ObjectListFree() to 
+ * free the list and the Service objects.
+ */
+List_t *ServiceListForPID(int pid, Multiplex_t *opt_multiplex);
 
 /**
  * Retrieve an enumerator for the names that match the query string.
  * This function uses the SQL LIKE syntax for the query string.
  * @param query An SQL LIKE formated string of the name to search for.
- *@return A service enumerator or NULL if there is not enough memory.
+ * @return A service enumerator or NULL if there is not enough memory.
+ * @deprecated Please use ServiceListForNameLike.
  */
 ServiceEnumerator_t ServiceQueryNameLike(char *query);
+
+/**
+ * Retrieve a List_t object containing all services with names that match the 
+ * query string.
+ * This function uses the SQL LIKE syntax for the query string.
+ * @param query An SQL LIKE formated string of the name to search for.
+ * @return A List_t object of Service_t objects, use ObjectListFree() to 
+ * free the list and the Service objects.
+ */
+List_t *ServiceListForNameLike(char * query);
 
 /**
  * Free an enumerator.
@@ -312,6 +351,7 @@ void ServiceEnumeratorDestroy(ServiceEnumerator_t enumerator);
  * @param enumerator The enumerator to retrieve the next service from.
  * @return A Service_t structure or NULL if there are no more services (with 
  * the reference count set to 1)
+ * @deprecated Please use the ServiceList* equivalent functions.
  */
 Service_t *ServiceGetNext(ServiceEnumerator_t enumerator);
 

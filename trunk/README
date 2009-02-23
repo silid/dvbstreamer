@@ -294,11 +294,14 @@ Steve VanDeBogart - Several patches and the traffic monitor plugin.
 Ramsey Ammar     - DVBStreamer first donor :-) many thanks.
 Paul Kelly       - Patch to make festatus command work on DVB-S
 Louis Croisez    - Help finding critical MRL bug and other testing.
+Chris Allison    - Patch to add Series/Content ids to xmltv output.
 
 VideoLan libdvbpsi Team for the excellent libdvbpsi. (http://www.videolan.org/developers/libdvbpsi.html)
 
 History
 -------
+2.0 Next Gen Release
+1.1 Ubuntu build fix Release
 1.0 The first .0 Release
 0.9 EPG Release
 0.8 ATSC/DVB-S Release
