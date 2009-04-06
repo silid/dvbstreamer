@@ -138,6 +138,33 @@ void *MessageQReceive(MessageQ_t msgQ)
     return result;
 }
 
+void *MessageQReceiveTimed(MessageQ_t msgQ, ulong timeout)
+{
+    void *result = NULL;
+    struct timespec tilltime;
+
+    pthread_mutex_lock(&msgQ->mutex);
+    if (!msgQ->quit)
+    {
+        if (ListCount(msgQ->messages) == 0)
+        {
+            clock_gettime(CLOCK_REALTIME, &tilltime);
+            tilltime.tv_nsec += timeout * 1000000;
+            pthread_cond_timedwait(&msgQ->availableCond, &msgQ->mutex, &tilltime);
+        }
+        if ((!msgQ->quit) && (ListCount(msgQ->messages) > 0))
+        {
+            ListIterator_t iterator;
+            ListIterator_Init(iterator, msgQ->messages);
+            result = ListIterator_Current(iterator);
+            ListRemoveCurrent(&iterator);
+        }
+    }
+    pthread_mutex_unlock(&msgQ->mutex);       
+    return result;
+}
+
+
 void MessageQSetQuit(MessageQ_t msgQ)
 {
     pthread_mutex_lock(&msgQ->mutex);

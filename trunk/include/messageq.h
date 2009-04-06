@@ -76,6 +76,17 @@ int MessageQAvailable(MessageQ_t msgQ);
 void *MessageQReceive(MessageQ_t msgQ);
 
 /**
+ * Receive a message from the queue waiting for upto timeout milliseconds. 
+ * The return object should be unref'ed once finished with via ObjectRefDec.
+ * If the quit flag is set on the message queue NULL will be returned.
+ * @param msgQ The queue to receive a message from.
+ * @param timeout The number of milliseconds to wait for a message.
+ * @return A pointer to an object or NULL if quit is set.
+ */
+
+void *MessageQReceiveTimed(MessageQ_t msgQ, ulong timeout);
+
+/**
  * Set the quit flag on the specified message queue. Once set all current and 
  * future calls to MessageQReceive will return NULL.
  * @param msgQ The message queue to set the quit flag on.
