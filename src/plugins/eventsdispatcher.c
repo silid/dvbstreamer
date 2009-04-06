@@ -516,7 +516,7 @@ static void ConsoleContextEventPrint(ConsoleContext_t *context, ...)
     va_list args;
     pthread_mutex_lock(&context->printMutex);
     va_start(args, context);
-    context->context->printf(context->context, "!%s\n", args);
+    vfprintf(context->context->outfp, "!%s\n", args);
     va_end(args);
     pthread_mutex_unlock(&context->printMutex);
 }

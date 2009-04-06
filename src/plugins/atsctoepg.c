@@ -28,7 +28,7 @@ Plugin to collect EPG schedule information from ATSC/PSIP.
 #include <time.h>
 
 #include "plugin.h"
-#include "epgdbase.h"
+#include "epgchannel.h"
 #include "dvbpsi/atsc/ett.h"
 #include "dvbpsi/atsc/eit.h"
 
@@ -116,7 +116,7 @@ PLUGIN_FEATURES(
 
 PLUGIN_INTERFACE_F(
     PLUGIN_FOR_ATSC,
-    "ATSCtoEPG", "0.2",
+    "ATSCtoEPG", "0.3",
     "Plugin to capture ATSC EPG schedule information.",
     "charrea6@users.sourceforge.net"
     );
@@ -271,8 +271,6 @@ static void DeferredProcessEIT(void *arg)
     LogModule(LOG_DEBUG, ATSCTOEPG, "Processing EIT (version %d) source id %x\n",
     eit->i_version, eit->i_source_id);
 
-    EPGDBaseTransactionStart();
-
     serviceRef.netId = info->netId;
     serviceRef.tsId = info->tsId;
     serviceRef.serviceId = eit->i_source_id;
@@ -282,8 +280,6 @@ static void DeferredProcessEIT(void *arg)
     }
     ObjectRefDec(eit);
     ObjectRefDec(info);
-    EPGDBaseTransactionCommit();
-
 }
 
 static void DeferredProcessETT(void *arg)
@@ -291,20 +287,21 @@ static void DeferredProcessETT(void *arg)
     ATSCEPGDeferredInfo_t *info = (ATSCEPGDeferredInfo_t*)arg;
     ATSCMultipleStrings_t *description;
     dvbpsi_atsc_ett_t *ett = info->u.ett;
-    EPGServiceRef_t serviceRef;
-    unsigned int eventId;
+    EPGEventRef_t eventRef;
     char lang[4];
     int i;
 
-    serviceRef.netId = info->netId;
-    serviceRef.tsId = info->tsId;
-    serviceRef.serviceId = (ett->i_etm_id >> 16) & 0xffff;
-    eventId = (ett->i_etm_id & 0xffff) >> 2;
+    eventRef.serviceRef.netId = info->netId;
+    eventRef.serviceRef.tsId = info->tsId;
+    eventRef.serviceRef.serviceId = (ett->i_etm_id >> 16) & 0xffff;
+    eventRef.eventId = (ett->i_etm_id & 0xffff) >> 2;
     lang[3] = 0;
-    EPGDBaseTransactionStart();
+
     description = ATSCMultipleStringsConvert(ett->p_etm, ett->i_etm_length);
     LogModule(LOG_DEBUG, ATSCTOEPG,"Processing ETT for %04x.%04x.%04x.%04x (%08x): Number of strings %d\n",
-        serviceRef.netId, serviceRef.tsId, serviceRef.serviceId, eventId,ett->i_etm_id, description->number_of_strings);
+        eventRef.serviceRef.netId, eventRef.serviceRef.tsId, eventRef.serviceRef.serviceId, eventRef.eventId,
+        ett->i_etm_id, description->number_of_strings);
+    
     for (i = 0; i < description->number_of_strings; i ++)
     {
 
@@ -314,9 +311,9 @@ static void DeferredProcessETT(void *arg)
         lang[0] = description->strings[i].lang[0];
         lang[1] = description->strings[i].lang[1];
         lang[2] = description->strings[i].lang[2];
-        EPGDBaseDetailAdd(&serviceRef,eventId, lang, EPG_EVENT_DETAIL_DESCRIPTION,description->strings[i].text);
+        EPGChannelNewDetail(&eventRef, lang, EPG_EVENT_DETAIL_DESCRIPTION,description->strings[i].text);
     }
-    EPGDBaseTransactionCommit();
+
     ObjectRefDec(description);
 
     ObjectRefDec(ett);
@@ -328,25 +325,28 @@ static void DeferredProcessETT(void *arg)
 *******************************************************************************/
 static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_atsc_eit_event_t *eitevent)
 {
-    EPGEvent_t epgevent;
+    EPGEventRef_t eventRef;
     dvbpsi_descriptor_t *descriptor;
+    struct tm startTime;
+    struct tm endTime;
     char startTimeStr[25];
     char endTimeStr[25];
     ATSCMultipleStrings_t *title;
     int i;
     char lang[4];
 
-    epgevent.serviceRef = *serviceRef;
-    epgevent.eventId = eitevent->i_event_id;
-    ConvertToTM(eitevent->i_start_time, eitevent->i_length_seconds, &epgevent.startTime, &epgevent.endTime);
-    epgevent.ca = FALSE;
-    strftime(startTimeStr, sizeof(startTimeStr), "%Y-%m-%d %T", &epgevent.startTime);
-    strftime(endTimeStr, sizeof(startTimeStr), "%Y-%m-%d %T", &epgevent.endTime);
-    LogModule(LOG_DEBUG, ATSCTOEPG, "Processing EIT for %04x.%04x.%04x.%04x Start Time %s (%d) End Time %s (duration %d) Title Length %d ETM location=%d\n",
-        serviceRef->netId, serviceRef->tsId, serviceRef->serviceId, epgevent.eventId,
-        startTimeStr,eitevent->i_start_time, endTimeStr,eitevent->i_length_seconds, eitevent->i_title_length, eitevent->i_etm_location);
+    eventRef.serviceRef = *serviceRef;
+    eventRef.eventId = eitevent->i_event_id;
+    
+    ConvertToTM(eitevent->i_start_time, eitevent->i_length_seconds, &startTime, &endTime);
 
-    if (EPGDBaseEventAdd(&epgevent) != 0)
+    strftime(startTimeStr, sizeof(startTimeStr), "%Y-%m-%d %T", &startTime);
+    strftime(endTimeStr, sizeof(startTimeStr), "%Y-%m-%d %T", &endTime);
+    LogModule(LOG_DEBUG, ATSCTOEPG, "Processing EIT for %04x.%04x.%04x.%04x Start Time %s (%d) End Time %s (duration %d) Title Length %d ETM location=%d\n",
+        eventRef.serviceRef.netId, eventRef.serviceRef.tsId, eventRef.serviceRef.serviceId, eventRef.eventId,
+        startTimeStr,eitevent->i_start_time, endTimeStr, eitevent->i_length_seconds, eitevent->i_title_length, eitevent->i_etm_location);
+
+    if (EPGChannelNewEvent(&eventRef, &startTime, &endTime, FALSE) != 0)
     {
         return;
     }
@@ -362,7 +362,7 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_atsc_eit_event_t *e
         lang[0] = title->strings[i].lang[0];
         lang[1] = title->strings[i].lang[1];
         lang[2] = title->strings[i].lang[2];
-        EPGDBaseDetailAdd(serviceRef,epgevent.eventId, lang, EPG_EVENT_DETAIL_TITLE,title->strings[i].text);
+        EPGChannelNewDetail(&eventRef, lang, EPG_EVENT_DETAIL_TITLE,title->strings[i].text);
     }
     ObjectRefDec(title);
 

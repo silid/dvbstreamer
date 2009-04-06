@@ -30,6 +30,7 @@ dvbstreamer_SOURCES = \
     commands/cmd_servicefilter.c\
     commands/cmd_info.c\
     commands/cmd_scanning.c\
+    commands/cmd_epg.c\
     remoteintf.c\
     list.c\
     deliverymethod.c\
@@ -37,7 +38,8 @@ dvbstreamer_SOURCES = \
     sectionprocessor.c \
     pesprocessor.c \
     subtableprocessor.c \
-    epgdbase.c \
+    epgtypes.c \
+    epgchannel.c \
     utf8.c \
     events.c \
     properties.c \
@@ -93,6 +95,7 @@ fdvbstreamer_SOURCES = \
     commands/cmd_servicefilter.c\
     commands/cmd_info.c\
     commands/cmd_scanning.c\
+    commands/cmd_epg.c\
     remoteintf.c\
     list.c\
     deliverymethod.c\
@@ -100,7 +103,8 @@ fdvbstreamer_SOURCES = \
     sectionprocessor.c \
     pesprocessor.c \
     subtableprocessor.c \
-    epgdbase.c \
+    epgtypes.c \
+    epgchannel.c \
     utf8.c \
     events.c \
     properties.c \
