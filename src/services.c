@@ -84,7 +84,7 @@ int ServiceInit(void)
     return  result;
 }
 
-int ServiceDeinit(void)
+int ServiceDeInit(void)
 {
     EventsUnregisterSource(servicesSource);
     return 0;

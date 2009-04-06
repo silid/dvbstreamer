@@ -108,7 +108,7 @@ int ServiceInit(void);
  * Release resources used by the service module.
  * @return 0 on success.
  */
-int ServiceDeinit(void);
+int ServiceDeInit(void);
 
 
 /**
