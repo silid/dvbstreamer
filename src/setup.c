@@ -241,8 +241,8 @@ int main(int argc, char *argv[])
     }
     printf("%d Services available on %d Multiplexes\n", ServiceCount(), MultiplexCount());
 
-    DEINIT(ServiceDeinit(), "service");
-    DEINIT(MultiplexDeinit(), "multiplex");
+    DEINIT(ServiceDeInit(), "service");
+    DEINIT(MultiplexDeInit(), "multiplex");
     DEINIT(DBaseDeInit(), "database");
     DEINIT(EventsDeInit(), "events");
     DEINIT(ObjectDeinit(), "objects");
