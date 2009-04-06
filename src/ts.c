@@ -212,6 +212,8 @@ static void *FilterTS(void *arg)
     DVBAdapter_t *adapter = state->adapter;
     int count = 0;
 
+    LogRegisterThread(pthread_self(), "Filter");
+    
     DVBDemuxSetBufferSize(adapter, sizeof(state->readBuffer) * 2);
 
     gettimeofday(&last, 0);
