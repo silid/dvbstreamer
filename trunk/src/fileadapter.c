@@ -183,7 +183,7 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
 
         /* Start monitoring thread */
         pthread_create(&result->monitorThread, NULL, DVBFrontEndMonitor, result);
-
+        LogRegisterThread(result->monitorThread, "AdapterMonitor");
         /* Add properties */
         PropertiesAddProperty(propertyParent, "number", "The number of the adapter being used",
             PropertyType_Int, &result->adapter, PropertiesSimplePropertyGet, NULL);
