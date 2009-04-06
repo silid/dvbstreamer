@@ -24,6 +24,7 @@ Command Processing and command functions.
 #define _COMMANDS_H
 #include <stdint.h>
 #include <stdarg.h>
+#include <stdio.h>
 #include "types.h"
 /**
  * @defgroup Commands Command Processing
@@ -89,11 +90,10 @@ typedef struct CommandContext_t
     char *interface;     /**< Human readable string containing the interface name,
                               ie Console for console or an IP address if a remote connection.*/
     bool remote;         /**< Whether this is a remote connection, ie not via the console. */
-                         
-    int (*printf)(struct CommandContext_t *context, const char *fmt, va_list arg_ptr); 
-                         /**< Printf style function used by commands for output. */
-    char *(*gets)(struct CommandContext_t *context,char *buffer, int len);
-                         /**< fgets style function used to retrieve data from the control connection. */
+
+    FILE *infp;          /**< FILE pointer to read data */
+    FILE *outfp;         /**< FILE pointer to write data */
+    
     void *privateArg;    /**< Private pointer for use by the owner of the context. */
     Command_t *commands; /**< Commands specific to this context */
     bool authenticated;  /**< Whether this context has been authenticated against the admin username/password.*/

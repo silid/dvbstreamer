@@ -78,11 +78,7 @@ static void GetConnectionString(struct sockaddr_storage *connAddr, char *output)
 static void RemoteInterfaceAuthenticate(int argc, char **argv);
 static void RemoteInterfaceWho(int argc, char **argv);
 static void RemoteInterfaceLogout(int argc, char **argv);
-static void RemoteInterfaceServerNameGet(char *name);
-static void RemoteInterfaceServerNameSet(char *name, int argc, char **argcv);
 static void PrintResponse(FILE *fp, uint16_t errno, char * msg);
-static int RemoteInterfacePrintfImpl(CommandContext_t *context, const char *format, va_list args);
-static char *RemoteInterfaceGetsImpl(CommandContext_t *context, char *buffer, int len);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -97,13 +93,6 @@ static Command_t RemoteInterfaceCommands[] = {
         },
         {NULL, FALSE, 0, 0, NULL, NULL}
     };
-
-static CommandVariable_t CommandVariableServerName = {
-    "name",
-    "Server Name",
-    RemoteInterfaceServerNameGet,
-    RemoteInterfaceServerNameSet
-};
 
 static Command_t ConnectionCommands[] = {
     {
@@ -228,7 +217,6 @@ int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char
     LogModule(LOG_DEBUG, REMOTEINTERFACE, "Server Name : %s\n", infoStreamerName);
 
     CommandRegisterCommands(RemoteInterfaceCommands);
-    CommandRegisterVariable(&CommandVariableServerName);
     PropertiesAddProperty("sys.rc", "servername", "Name of this dvbstreamer instance.",
                           PropertyType_String, &infoStreamerName,
                           PropertiesSimplePropertyGet, NULL);
@@ -247,7 +235,6 @@ void RemoteInterfaceDeInit(void)
     ListIterator_t iterator;
 
     CommandUnRegisterCommands(RemoteInterfaceCommands);
-    CommandUnRegisterVariable(&CommandVariableServerName);
 
     remoteIntfExit = TRUE;
     close(serverSocket);
@@ -276,6 +263,7 @@ void RemoteInterfaceDeInit(void)
 void RemoteInterfaceAsyncAcceptConnections(void)
 {
     pthread_create(&acceptThread, NULL, (void*)RemoteInterfaceAcceptConnections, NULL);
+    LogRegisterThread(acceptThread, "RemoteIntfSvr");    
 }
 
 void RemoteInterfaceAcceptConnections(void)
@@ -332,6 +320,7 @@ static void AddConnection(int socketfd, struct sockaddr_storage *clientAddress)
         pthread_mutex_unlock(&connectionsMutex);
 
         pthread_create(&connection->thread, NULL, (void*)HandleConnection, (void*)connection);
+        LogRegisterThread(connection->thread, connectionStr);
     }
     else
     {
@@ -371,8 +360,8 @@ static void HandleConnection(Connection_t *connection)
     context.interface = connectionStr;
     context.authenticated = FALSE;
     context.remote = TRUE;
-    context.printf = RemoteInterfacePrintfImpl;
-    context.gets = RemoteInterfaceGetsImpl;
+    context.infp = connection->fp;
+    context.outfp = connection->fp;
     context.privateArg = connection;
     context.commands = ConnectionCommands;
 
@@ -425,6 +414,7 @@ static void HandleConnection(Connection_t *connection)
     connection->connected = FALSE;
 
     LogModule(LOG_DEBUG,REMOTEINTERFACE,"Connection thread exiting.\n");
+    LogUnregisterThread(pthread_self());    
     pthread_detach(connection->thread);
     RemoveConnection(connection);
 }
@@ -433,18 +423,6 @@ static void PrintResponse(FILE *fp, uint16_t errno, char * msg)
 {
     fprintf(fp, "%s%d %s\n", responselineStart, errno, msg);
     fflush(fp);
-}
-
-static int RemoteInterfacePrintfImpl(CommandContext_t *context, const char *format, va_list args)
-{
-    Connection_t *connection = (Connection_t*)context->privateArg;
-    return vfprintf(connection->fp, format, args);
-}
-
-static char *RemoteInterfaceGetsImpl(CommandContext_t *context, char *buffer, int len)
-{
-    Connection_t *connection = (Connection_t*)context->privateArg;
-    return fgets(buffer, len, connection->fp);
 }
 
 /******************************************************************************
@@ -496,18 +474,6 @@ static void RemoteInterfaceLogout(int argc, char **argv)
     {
         CommandError(COMMAND_ERROR_GENERIC, "Not a remote connection!");
     }
-}
-
-static void RemoteInterfaceServerNameGet(char *name)
-{
-    CommandPrintf("%s\n", infoStreamerName);
-}
-
-static void RemoteInterfaceServerNameSet(char *name, int argc, char **argv)
-{
-    free(infoStreamerName);
-    infoStreamerName = strdup(argv[0]);
-    CommandPrintf("%s\n", infoStreamerName);
 }
 
 static void GetConnectionString(struct sockaddr_storage *connAddr, char *output)

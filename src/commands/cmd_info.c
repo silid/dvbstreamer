@@ -79,10 +79,6 @@ static void CommandSetProperty(int argc, char **argv);
 static void CommandPropertyInfo(int argc, char **argv);
 static char* GetPropertyTypeString(PropertyType_e type);
 
-static void CommandVariableUptimeGet(char *name);
-static void CommandVariableFETypeGet(char *name);
-static void CommandVariableFENameGet(char *name);
-static void CommandVariableTSModeGet(char *name);
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
@@ -212,40 +208,6 @@ static char *FETypesStr[] = {
     "ATSC"
 };
 
-static CommandVariable_t VariableUptime = {
-    "uptime", 
-    "Number of days/hours/minutes/seconds this instance has been running.", 
-    CommandVariableUptimeGet, 
-    NULL
-    };
-
-static CommandVariable_t VariableUpsecs = {
-    "upsecs", 
-    "Number of seconds this instance has been running.",
-    CommandVariableUptimeGet, 
-    NULL
-    };
-
-static CommandVariable_t VariableFEType = {
-    "fetype", 
-    "Type of the tuner this instance is using.",
-    CommandVariableFETypeGet, 
-    NULL
-    };
-
-static CommandVariable_t VariableFEName = {
-    "fename", 
-    "Name of the tuner this instance is using.",
-    CommandVariableFENameGet, 
-    NULL
-    };
-
-static CommandVariable_t VariableTSMode = {
-    "tsmode", 
-    "Whether this instance is running in Full TS or hardware restricted mode.",
-    CommandVariableTSModeGet, 
-    NULL
-    };
 
 static time_t StartTime;
 /*******************************************************************************
@@ -254,23 +216,12 @@ static time_t StartTime;
 void CommandInstallInfo(void)
 {
     CommandRegisterCommands(CommandDetailsInfo);
-    
-    CommandRegisterVariable(&VariableUptime);
-    CommandRegisterVariable(&VariableUpsecs);    
-    CommandRegisterVariable(&VariableFEType);
-    CommandRegisterVariable(&VariableFEName);    
-    CommandRegisterVariable(&VariableTSMode);    
     StartTime = time(NULL);
 }
 
 void CommandUnInstallInfo(void)
 {
     CommandUnRegisterCommands(CommandDetailsInfo); 
-    CommandUnRegisterVariable(&VariableUptime);
-    CommandUnRegisterVariable(&VariableUpsecs);    
-    CommandUnRegisterVariable(&VariableFEType);
-    CommandUnRegisterVariable(&VariableFEName);    
-    CommandUnRegisterVariable(&VariableTSMode);     
 }
 
 /*******************************************************************************
@@ -929,54 +880,4 @@ static char* GetPropertyTypeString(PropertyType_e type)
     return typeStr;
 }
 
-
-/*******************************************************************************
-* Variable Functions                                                           *
-*******************************************************************************/
-static void CommandVariableUptimeGet(char *name)
-{
-    if (strcmp(name, "uptime") == 0)
-    {
-        time_t now;
-        int seconds;
-        int d, h, m, s;
-        time(&now);
-        seconds = (int)difftime(now, StartTime);
-        d = seconds / (24 * 60 * 60);
-        h = (seconds - (d * 24 * 60 * 60)) / (60 * 60);
-        m = (seconds - ((d * 24 * 60 * 60) + (h * 60 * 60))) / 60;
-        s = (seconds - ((d * 24 * 60 * 60) + (h * 60 * 60) + (m * 60)));
-        CommandPrintf("%d Days %d Hours %d Minutes %d seconds\n", d, h, m, s);
-    }else if (strcmp(name, "upsecs") == 0)
-    {
-        time_t now;
-        time(&now);
-
-        CommandPrintf("%d\n", (int)difftime(now, StartTime));
-    }
-}
-
-static void CommandVariableFETypeGet(char *name)
-{
-
-    DVBAdapter_t *adapter = MainDVBAdapterGet();
-
-    CommandPrintf("%s\n", FETypesStr[adapter->info.type]);
-}
-
-static void CommandVariableFENameGet(char *name)
-{
-
-    DVBAdapter_t *adapter = MainDVBAdapterGet();
-
-    CommandPrintf("%s\n", adapter->info.name);
-}
-
-static void CommandVariableTSModeGet(char *name)
-{
-
-    DVBAdapter_t *adapter = MainDVBAdapterGet();
-
-    CommandPrintf("%s\n", adapter->hardwareRestricted ? "H/W Restricted":"Full TS");
-}
 
