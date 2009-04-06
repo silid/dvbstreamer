@@ -63,16 +63,6 @@ Command Processing and command functions.
 /* Context Prototypes. */
 static void CommandContextSet(CommandContext_t *context);
 
-/* External Command Prototypes. */
-void CommandInstallInfo(void);
-void CommandUnInstallInfo(void);
-
-void CommandInstallServiceFilter(void);
-void CommandUnInstallServiceFilter(void);
-
-extern void CommandInstallScanning(void);
-extern void CommandUnInstallScanning(void);
-
 /* File Prototypes */
 static char **AttemptComplete (const char *text, int start, int end);
 static char *CompleteCommand(const char *text, int state);
@@ -83,14 +73,7 @@ static void ParseLine(char *line, char **command, char **argument);
 
 
 static void CommandQuit(int argc, char **argv);
-
 static void CommandHelp(int argc, char **argv);
-static void CommandGet(int argc, char **argv);
-static void CommandSet(int argc, char **argv);
-static void CommandVars(int argc, char **argv);
-
-static int CommandConsolePrintf(CommandContext_t *context,const char *fmt, va_list args);
-static char *CommandConsoleGets(CommandContext_t *context, char *buffer, int len);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -100,8 +83,8 @@ static CommandContext_t ConsoleCommandContext =
 {
     "console",
     FALSE,
-    CommandConsolePrintf,
-    CommandConsoleGets,
+    NULL,
+    NULL,
     NULL,
     NULL,
     TRUE,
@@ -127,35 +110,11 @@ static Command_t coreCommands[] =
         "List all available commands or displays specific help for the command specifed.",
         CommandHelp
     },
-    {
-        "get",
-        TRUE, 1, 1,
-        "Get the state of a setting.",
-        "get <variable>\n"
-        "Retrieve the state of a setting.",
-        CommandGet
-    },
-    {
-        "set",
-        TRUE, 1, 10,
-        "Set the state of a setting.",
-        "Set <variable> <args>...\n"
-        "Set the state of a setting.",
-        CommandSet
-    },
-    {
-        "vars",
-        FALSE, 0, 0,
-        "List available settings/variables",
-        "List all available variables and whether they are read only.",
-        CommandVars
-    },
     {NULL, FALSE, 0, 0, NULL,NULL}
 };
 
 static bool quit = FALSE;
 static List_t *CommandsList;
-static List_t *VariableHandlers;
 static pthread_mutex_t CommandMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_key_t commandContextKey;
 
@@ -176,32 +135,19 @@ int CommandInit(void)
         return -1;
     }
 
-    VariableHandlers = ListCreate();
-    if (!VariableHandlers)
-    {
-        LogModule(LOG_ERROR, COMMAND, "Failed to allocate VariableHandlers!\n");
-        return -1;
-    }
-
     ListAdd( CommandsList, coreCommands);
 
     pthread_key_create(&commandContextKey, NULL);
 
-    CommandInstallServiceFilter();
-    CommandInstallInfo();
-    CommandInstallScanning();
+    ConsoleCommandContext.outfp = stdout;    
+    ConsoleCommandContext.infp = stdin;    
 
     return 0;
 }
 
 void CommandDeInit(void)
 {
-    CommandUnInstallServiceFilter();
-    CommandUnInstallInfo();
-    CommandUnInstallScanning();
     ListFree( CommandsList, NULL);
-    ListFree( VariableHandlers, NULL);
-
 }
 
 void CommandRegisterCommands(Command_t *commands)
@@ -217,21 +163,6 @@ void CommandUnRegisterCommands(Command_t *commands)
     ListRemove( CommandsList, commands);
     pthread_mutex_unlock(&CommandMutex);
 }
-
-void CommandRegisterVariable(CommandVariable_t *handler)
-{
-    pthread_mutex_lock(&CommandMutex);
-    ListAdd(VariableHandlers, handler);
-    pthread_mutex_unlock(&CommandMutex);
-}
-
-void CommandUnRegisterVariable(CommandVariable_t *handler)
-{
-    pthread_mutex_lock(&CommandMutex);
-    ListRemove(VariableHandlers, handler);
-    pthread_mutex_unlock(&CommandMutex);
-}
-
 static void CommandContextSet(CommandContext_t *context)
 {
     pthread_setspecific(commandContextKey, context);
@@ -249,7 +180,7 @@ int CommandPrintf(const char* fmt, ...)
 
     CommandContext_t *context = CommandContextGet();
     va_start(args, fmt);
-    result = context->printf(context, fmt, args);
+    result = vfprintf(context->outfp, fmt, args);
     va_end(args);
     return result;
 }
@@ -257,7 +188,7 @@ int CommandPrintf(const char* fmt, ...)
 char *CommandGets(char *buffer, int len)
 {
     CommandContext_t *context = CommandContextGet();
-    return context->gets(context, buffer, len);
+    return fgets(buffer, len, context->infp);
 }
 
 
@@ -335,6 +266,7 @@ int CommandProcessFile(char *file)
 bool CommandExecuteConsole(char *line)
 {
     bool found = FALSE;
+    
     if (CommandExecute(&ConsoleCommandContext, line))
     {
         add_history(line);
@@ -718,96 +650,3 @@ static void CommandHelp(int argc, char **argv)
     }
 }
 
-static void CommandGet(int argc, char **argv)
-{
-    ListIterator_t iterator;
-    bool found = FALSE;
-    for (ListIterator_Init(iterator, VariableHandlers);
-         ListIterator_MoreEntries(iterator);
-         ListIterator_Next(iterator))
-    {
-        CommandVariable_t *handler = (CommandVariable_t*)ListIterator_Current(iterator);
-        if (strcmp(handler->name, argv[0]) == 0)
-        {
-            if (handler->get)
-            {
-                handler->get(handler->name);
-            }
-            else
-            {
-                CommandError(COMMAND_ERROR_GENERIC, "Variable \"%s\" is write-only!\n", handler->name);
-            }
-            found = TRUE;
-        }
-    }
-
-    if (!found)
-    {
-        CommandError(COMMAND_ERROR_GENERIC, "Unknown variable \"%s\"", argv[0]);
-    }
-}
-
-static void CommandSet(int argc, char **argv)
-{
-    ListIterator_t iterator;
-    bool found = FALSE;
-    for (ListIterator_Init(iterator, VariableHandlers);
-         ListIterator_MoreEntries(iterator);
-         ListIterator_Next(iterator))
-    {
-        CommandVariable_t *handler = (CommandVariable_t*)ListIterator_Current(iterator);
-        if (strcmp(handler->name, argv[0]) == 0)
-        {
-            if (handler->set)
-            {
-                handler->set(handler->name, argc-1, argv + 1);
-            }
-            else
-            {
-                CommandError(COMMAND_ERROR_GENERIC, "Variable \"%s\" is read-only!\n", handler->name);
-            }
-            found = TRUE;
-        }
-    }
-    if (!found)
-    {
-        CommandError(COMMAND_ERROR_GENERIC, "Unknown variable \"%s\"", argv[0]);
-    }
-
-}
-
-static void CommandVars(int argc, char **argv)
-{
-    ListIterator_t iterator;
-
-    for (ListIterator_Init(iterator, VariableHandlers);
-         ListIterator_MoreEntries(iterator);
-         ListIterator_Next(iterator))
-    {
-        CommandVariable_t *handler = (CommandVariable_t*)ListIterator_Current(iterator);
-        char *mode = "--";
-        if (handler->get && handler->set)
-        {
-            mode = "RW";
-        }
-        else if (handler->get)
-        {
-            mode = "R-";
-        }
-        else if (handler->set)
-        {
-            mode = "-W";
-        }
-        CommandPrintf("%-15s  (%s) : %s\n", handler->name, mode, handler->description);
-     }
-}
-
-static int CommandConsolePrintf(CommandContext_t *context,const char *fmt, va_list args)
-{
-   return vprintf(fmt, args);
-}
-
-static char *CommandConsoleGets(CommandContext_t *context, char *buffer, int len)
-{
-    return fgets(buffer, len, stdin);
-}
