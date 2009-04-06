@@ -93,10 +93,6 @@ int EPGDBaseInit(int adapter)
 {
     int rc;
     sqlite3 *EPGDBaseConnection;
-    
-    ObjectRegisterType(EPGEvent_t);
-    ObjectRegisterTypeDestructor(EPGEventRating_t, EPGEventRatingDestructor);    
-    ObjectRegisterTypeDestructor(EPGEventDetail_t, EPGEventDetailDestructor);
 
     sprintf(EPGDBaseFile, "%s/epg%d.db", DataDirectory, adapter);
     rc = sqlite3_open(EPGDBaseFile, &EPGDBaseConnection);
@@ -551,19 +547,6 @@ static sqlite3 *EPGDBaseConnectionGet(void)
     return connection;
 }
 
-static void EPGEventRatingDestructor(void *arg)
-{
-    EPGEventRating_t *rating = arg;
-    free(rating->rating);
-    free(rating->system);
-}
-
-static void EPGEventDetailDestructor(void *arg)
-{
-    EPGEventDetail_t *detail = arg;
-    free(detail->name);
-    free(detail->value);
-}
 
 static long long int CreateEventUID(EPGServiceRef_t *serviceRef, unsigned int eventId)
 {

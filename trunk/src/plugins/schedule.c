@@ -28,7 +28,7 @@ Plugin to collect EPG schedule information.
 #include <time.h>
 
 #include "plugin.h"
-#include "epgdbase.h"
+#include "epgchannel.h"
 #include "dvbpsi/datetime.h"
 #include "dvbpsi/eit.h"
 #include "dvbpsi/dr_4d.h"
@@ -106,7 +106,7 @@ PLUGIN_FEATURES(
 
 PLUGIN_INTERFACE_F(
     PLUGIN_FOR_DVB,
-    "DVBSchedule", "0.2",
+    "DVBSchedule", "0.3",
     "Plugin to capture DVB EPG schedule information.",
     "charrea6@users.sourceforge.net"
     );
@@ -162,7 +162,6 @@ static void DeferredProcessEIT(void *arg)
     LogModule(LOG_DEBUG, DVBSCHEDULE, "Processing EIT (version %d) net id %x ts id %x service id %x\n",
     eit->i_version, eit->i_network_id, eit->i_ts_id, eit->i_service_id);
 
-    EPGDBaseTransactionStart();
     serviceRef.netId = eit->i_network_id;
     serviceRef.tsId = eit->i_ts_id;
     serviceRef.serviceId = eit->i_service_id;
@@ -171,7 +170,6 @@ static void DeferredProcessEIT(void *arg)
         ProcessEvent(&serviceRef, event);
     }
     ObjectRefDec(eit);
-    EPGDBaseTransactionCommit();
 }
 
 /*******************************************************************************
@@ -179,27 +177,33 @@ static void DeferredProcessEIT(void *arg)
 *******************************************************************************/
 static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *eitevent)
 {
-    EPGEvent_t epgevent;
+    EPGEventRef_t eventRef;
     dvbpsi_descriptor_t *descriptor;
+    struct tm startTime;
+    struct tm endTime;
     char startTimeStr[25];
     char endTimeStr[25];
-    epgevent.serviceRef = *serviceRef;
-    epgevent.eventId = eitevent->i_event_id;
-    ConvertToTM(&eitevent->t_start_time, &eitevent->t_duration, &epgevent.startTime, &epgevent.endTime);
-    epgevent.ca = eitevent->b_free_ca;
-    strftime(startTimeStr, sizeof(startTimeStr), "%Y-%m-%d %T", &epgevent.startTime);
-    strftime(endTimeStr, sizeof(startTimeStr), "%Y-%m-%d %T", &epgevent.endTime);
+    
+    eventRef.serviceRef = *serviceRef;
+    eventRef.eventId = eitevent->i_event_id;
+    
+    ConvertToTM(&eitevent->t_start_time, &eitevent->t_duration, &startTime, &endTime);
+
+    strftime(startTimeStr, sizeof(startTimeStr), "%Y-%m-%d %T", &startTime);
+    strftime(endTimeStr, sizeof(startTimeStr), "%Y-%m-%d %T", &endTime);
     LogModule(LOG_DEBUG, DVBSCHEDULE, "(%x:%x:%x) Event %x Start Time %s End Time %s\n",
-        serviceRef->netId, serviceRef->tsId, serviceRef->serviceId, epgevent.eventId,
+        eventRef.serviceRef.netId, eventRef.serviceRef.tsId, eventRef.serviceRef.serviceId, eventRef.eventId,
         startTimeStr, endTimeStr);
 
-    if (EPGDBaseEventAdd(&epgevent) != 0)
+    if (EPGChannelNewEvent(&eventRef, &startTime, &endTime, eitevent->b_free_ca) != 0)
     {
+        LogModule(LOG_DEBUG, DVBSCHEDULE, "Failed to send returning...");
         return;
     }
 
     for (descriptor = eitevent->p_first_descriptor; descriptor; descriptor = descriptor->p_next)
     {
+        LogModule(LOG_DEBUG, DVBSCHEDULE, "Tag %02x", descriptor->i_tag);
         switch(descriptor->i_tag)
         {
             case SHORT_EVENT_DR:
@@ -214,13 +218,13 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *eiteve
                     temp = DVBTextToUTF8((char *)sed->i_event_name, sed->i_event_name_length);
                     if (temp)
                     {
-                        EPGDBaseDetailAdd(serviceRef, epgevent.eventId, lang, EPG_EVENT_DETAIL_TITLE, temp);
+                        EPGChannelNewDetail(&eventRef, lang, EPG_EVENT_DETAIL_TITLE, temp);
                         free(temp);
                     }
                     temp = DVBTextToUTF8((char *)sed->i_text, sed->i_text_length);
                     if (temp)
                     {
-                        EPGDBaseDetailAdd(serviceRef, epgevent.eventId, lang, EPG_EVENT_DETAIL_DESCRIPTION, temp);
+                        EPGChannelNewDetail(&eventRef, lang, EPG_EVENT_DETAIL_DESCRIPTION, temp);
                         free(temp);
                     }
                 }
@@ -240,7 +244,7 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *eiteve
                         if (prd->p_parental_rating[i].i_rating < 0x0f)
                         {
                             char *rating =  RatingsTable[prd->p_parental_rating[i].i_rating];
-                            EPGDBaseRatingAdd(serviceRef, epgevent.eventId, cc,rating);
+                            EPGChannelNewRating(&eventRef, cc, rating);
                         }
                     }
                 }
@@ -280,7 +284,7 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *eiteve
                                     char *crid = ResolveCRID(serviceRef, (char*)cridd->p_entries[i].value.path);
                                     if (crid)
                                     {
-                                        EPGDBaseDetailAdd(serviceRef, epgevent.eventId, (char*)ISO639NoLinguisticContent,
+                                        EPGChannelNewDetail(&eventRef, (char*)ISO639NoLinguisticContent,
                                         type, crid);
                                         free(crid);
                                     }
@@ -288,7 +292,7 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *eiteve
                                 }
                                 else
                                 {
-                                    EPGDBaseDetailAdd(serviceRef, epgevent.eventId, (char*)ISO639NoLinguisticContent,
+                                    EPGChannelNewDetail(&eventRef, (char*)ISO639NoLinguisticContent,
                                         type, (char *)cridd->p_entries[i].value.path);
                                 }
                             }
@@ -304,6 +308,8 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *eiteve
         }
 
     }
+    LogModule(LOG_DEBUG, DVBSCHEDULE, "(%x:%x:%x) Event %x Finished\n",
+        eventRef.serviceRef.netId, eventRef.serviceRef.tsId, eventRef.serviceRef.serviceId, eventRef.eventId);    
 }
 
 static void ConvertToTM(dvbpsi_date_time_t *datetime, dvbpsi_eit_event_duration_t *duration,
@@ -319,7 +325,7 @@ static void ConvertToTM(dvbpsi_date_time_t *datetime, dvbpsi_eit_event_duration_
     startTime->tm_min  = datetime->i_minute;
     startTime->tm_sec  = datetime->i_second;
 
-    secs = mktime(startTime) + startTime->tm_gmtoff;
+    secs = timegm(startTime);
 
     secs += (duration->i_hours * 60 * 60) + (duration->i_minutes* 60) + duration->i_seconds;
 

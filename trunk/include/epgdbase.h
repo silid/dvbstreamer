@@ -23,8 +23,7 @@ EPG Database Functions and structures.
 
 #ifndef _EPGDBASE_H
 #define _EPGDBASE_H
-#include <time.h>
-#include "types.h"
+#include "epgtypes.h"
 
 /**
  * @defgroup EPGDB EPG Database
@@ -34,56 +33,6 @@ EPG Database Functions and structures.
  * @{
  */
 
-/**
- * Constant for an events title.
- */
-#define EPG_EVENT_DETAIL_TITLE       "title"
-
-/**
- * Constant for an events descripton.
- */
-#define EPG_EVENT_DETAIL_DESCRIPTION "description"
-
-/**
- * Structure used to identify a service in the EPG database.
- */
-typedef struct EPGServiceRef_s
-{
-    unsigned int netId;     /**< Original network id. */
-    unsigned int tsId;      /**< Transport stream id. */
-    unsigned int serviceId; /**< Service id. */
-}EPGServiceRef_t;
-
-/** 
- * Structure used to describe an EPG event.
- */
-typedef struct EPGEvent_s
-{
-    EPGServiceRef_t serviceRef; /**< Service the event is happening on. */
-    unsigned int eventId;       /**< Event id. */
-    struct tm    startTime;     /**< Start time of the event.*/
-    struct tm    endTime;       /**< Finish time of the event. */
-    bool         ca;            /**< Whether the event is encrypted. */
-}EPGEvent_t;
-
-/**
- * Structure describing a rating for an event.
- */
-typedef struct EPGEventRating_s
-{
-    char *system; /**< System the rating pertains to. */
-    char *rating; /**< Rating of the event. */
-}EPGEventRating_t;
-
-/**
- * Structure describing a detail of an event.
- */
-typedef struct EPGEventDetail_s
-{
-    char lang[4]; /**< 3 character language code + \0 */
-    char *name;   /**< Name of the information in question, ie title/description/director etc. */
-    char *value;  /**< The actual information. */
-}EPGEventDetail_t;
 
 /**
  * Handle to enumerate events.

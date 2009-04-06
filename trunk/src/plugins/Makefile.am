@@ -12,9 +12,7 @@ plugins_LTLIBRARIES = \
 	fileoutput.la \
 	outputs.la \
 	extractpes.la \
-	epgtoxmltv.la \
 	manualfilters.la \
-	queryepg.la \
 	sicapture.la \
 	traffic.la \
 	eventsdispatcher.la \

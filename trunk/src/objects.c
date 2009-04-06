@@ -205,7 +205,7 @@ void ObjectRefIncImpl(void *ptr, char *file, int line)
     {
         clazzName = object->clazz->name;
     }
-    LogModule(LOG_DEBUGV, OBJECT, "(%p:%s) Incrementing ref count, now %d (%s:%d)\n", object, clazzName, object->refCount, file, line);
+    LogModule(LOG_DIARRHEA, OBJECT, "(%p:%s) Incrementing ref count, now %d (%s:%d)\n", object, clazzName, object->refCount, file, line);
     pthread_mutex_unlock(&objectMutex);
 }
 
@@ -237,7 +237,7 @@ bool ObjectRefDecImpl(void *ptr, char *file, int line)
     if (object->refCount > 0)
     {
         object->refCount --;
-        LogModule(LOG_DEBUGV, OBJECT, "(%p:%s) Decrementing ref count, now %d (%s:%d)\n", object, clazzName, object->refCount, file, line);        
+        LogModule(LOG_DIARRHEA, OBJECT, "(%p:%s) Decrementing ref count, now %d (%s:%d)\n", object, clazzName, object->refCount, file, line);        
     }
 
     if (object->refCount == 0)

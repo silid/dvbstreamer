@@ -38,7 +38,8 @@ Entry point to the application.
 
 #include "parsezap.h"
 #include "dbase.h"
-#include "epgdbase.h"
+#include "epgtypes.h"
+#include "epgchannel.h"
 #include "multiplexes.h"
 #include "services.h"
 #include "dvbadapter.h"
@@ -104,6 +105,19 @@ Entry point to the application.
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
+/* External Command Prototypes. */
+extern void CommandInstallInfo(void);
+extern void CommandUnInstallInfo(void);
+
+extern void CommandInstallServiceFilter(void);
+extern void CommandUnInstallServiceFilter(void);
+
+extern void CommandInstallScanning(void);
+extern void CommandUnInstallScanning(void);
+
+extern void CommandInstallEPG(void);
+extern void CommandUnInstallEPG(void);
+
 static void usage(char *appname);
 static void version(void);
 static void sighandler(int signum);
@@ -254,7 +268,8 @@ int main(int argc, char *argv[])
             exit(1);
         }
     }
-
+    LogRegisterThread(pthread_self(), "Main");
+    LogModule(LOG_INFO, MAIN, "DVBStreamer starting");
     LogModule(LOG_INFOV, MAIN, "Using adapter %d\n", adapterNumber);
     if (startupFile)
     {
@@ -273,7 +288,8 @@ int main(int argc, char *argv[])
     INIT(EventsInit(), "events");
     INIT(PropertiesInit(), "properties");
     INIT(DBaseInit(adapterNumber), "database");
-    INIT(EPGDBaseInit(adapterNumber), "EPG database");
+    INIT(EPGTypesInit(), "EPG types");
+    INIT(EPGChannelInit(), "EPG channel");
     INIT(MultiplexInit(), "multiplex");
     INIT(ServiceInit(), "service");
     INIT(CacheInit(), "cache");
@@ -348,6 +364,12 @@ int main(int argc, char *argv[])
 
     INIT(CommandInit(), "commands");
 
+    /* Install commands */
+    CommandInstallServiceFilter();
+    CommandInstallInfo();
+    CommandInstallScanning();
+    CommandInstallEPG();
+
     INIT(TuningInit(), "tuning");
 
     InstallSysProperties();
@@ -420,6 +442,9 @@ int main(int argc, char *argv[])
         }
         DBaseMetadataDelete(METADATA_NAME_SCAN_ALL);
     }
+
+    LogModule(LOG_INFO, MAIN, "DVBStreamer ready.");
+    
     if (DaemonMode)
     {
         RemoteInterfaceAcceptConnections();
@@ -476,6 +501,12 @@ int main(int argc, char *argv[])
 
     DEINIT(TuningDeInit(), "tuning");
 
+    /* Uninstall commands */
+    CommandUnInstallEPG();
+    CommandUnInstallServiceFilter();
+    CommandUnInstallInfo();
+    CommandUnInstallScanning();
+    
     DEINIT(CommandDeInit(), "commands");
 
     /* Disable all the filters */
@@ -518,9 +549,10 @@ int main(int argc, char *argv[])
 
     DEINIT(CacheDeInit(), "cache");
 
-    DEINIT(ServiceDeinit(), "service");
-    DEINIT(MultiplexDeinit(), "multiplex");
-    DEINIT(EPGDBaseDeInit(), "EPG database");
+    DEINIT(ServiceDeInit(), "service");
+    DEINIT(MultiplexDeInit(), "multiplex");
+    DEINIT(EPGChannelDeInit(), "EPG channel");
+    DEINIT(EPGTypesDeInit(), "EPG types");
     DEINIT(DBaseDeInit(), "database");
     DEINIT(PropertiesDeInit(), "properties");
     DEINIT(EventsDeInit(), "events");
@@ -530,7 +562,8 @@ int main(int argc, char *argv[])
     {
         DeInitDaemon();
     }
-
+    
+    LogModule(LOG_INFO, MAIN, "DVBStreamer finished.");
     LoggingDeInit();
     return 0;
 }
