@@ -23,6 +23,7 @@ Logging levels and functions.
 #ifndef _LOGGING_H
 #define _LOGGING_H
 #include <stdarg.h>
+#include <pthread.h>
 #include "types.h"
 
 /**
@@ -110,6 +111,20 @@ void LogLevelDec(void);
  * @return TRUE if the level is enabled, FALSE otherwise.
  */
 bool LogLevelIsEnabled(int level);
+
+/**
+ * Register a name for a pthread. The name will be used instead of the numeric 
+ * id in the log output.
+ * @param thread pthread to register.
+ * @param name Name of the thread.
+ */
+void LogRegisterThread(pthread_t thread, const char *name);
+
+/**
+ * Unregister a name of a pthread.
+ * @param thread pthread to unregister.
+ */
+void LogUnregisterThread(pthread_t thread);
 
 /**
  * Write the text describe by format to the log output, if the current verbosity

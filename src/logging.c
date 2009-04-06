@@ -33,11 +33,24 @@ Logging functions.
 #include "pthread.h"
 
 /*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
+#define MAX_THREADS 100
+
+/*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
-
+static void LoggingInitCommon(int logLevel);
 static void LogImpl(int level, const char *module, const char * format, va_list valist);
-
+static char *LogGetThreadName(pthread_t thread);
+/*******************************************************************************
+* Typedefs                                                                     *
+*******************************************************************************/
+typedef struct ThreadName_s
+{
+    pthread_t thread;
+    char *name;
+}ThreadName_t;
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
@@ -49,6 +62,7 @@ static void LogImpl(int level, const char *module, const char * format, va_list 
 static int verbosity = 0;
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 static FILE *logFP = NULL;
+static ThreadName_t threadNames[MAX_THREADS];
 
 /*******************************************************************************
 * Global functions                                                             *
@@ -70,7 +84,8 @@ int LoggingInitFile(char *filepath, int logLevel)
         /* Turn off buffering */
         setbuf(logFP, NULL);
     }
-    verbosity = logLevel;
+    
+    LoggingInitCommon(logLevel);
     return 0;
 }
 
@@ -93,9 +108,10 @@ int LoggingInit(char *filename, int logLevel)
     /* Turn off buffering */
     setbuf(logFP, NULL);
 
-    verbosity = logLevel;
+    LoggingInitCommon(logLevel);    
     return 0;
 }
+
 
 void LoggingDeInit(void)
 {
@@ -127,6 +143,34 @@ bool LogLevelIsEnabled(int level)
     return (level <= verbosity);
 }
 
+void LogRegisterThread(pthread_t thread, const char *name)
+{
+    int i;
+    for (i = 0; i < MAX_THREADS; i ++)
+    {
+        if (threadNames[i].thread == 0)
+        {
+            threadNames[i].thread = thread;
+            threadNames[i].name = strdup(name);
+            break;
+        }
+    }
+}
+
+void LogUnregisterThread(pthread_t thread)
+{
+    int i;
+    for (i = 0; i < MAX_THREADS; i ++)
+    {
+        if (threadNames[i].thread == thread)
+        {
+            threadNames[i].thread = 0;
+            free(threadNames[i].name);
+            break;
+        }
+    }
+}
+
 void LogModule(int level, const char *module, char *format, ...)
 {
     va_list valist;
@@ -152,13 +196,22 @@ void LogModule(int level, const char *module, char *format, ...)
 /*******************************************************************************
 * Local Functions                                                              *
 *******************************************************************************/
+static void LoggingInitCommon(int logLevel)
+{
+    fprintf(logFP, "------------------- | --------------- | -- | --------------- | ----------------------------------------\n");
+    fprintf(logFP, "Date       Time     | Module          | Lv | Thread          | Details\n");
+    fprintf(logFP, "------------------- | --------------- | -- | --------------- | ----------------------------------------\n");
+    verbosity = logLevel;
+    memset(&threadNames, 0, sizeof(threadNames));
+}
 
 static void LogImpl(int level, const char *module, const char * format, va_list valist)
 {
     char timeBuffer[24]; /* "YYYY-MM-DD HH:MM:SS" */
     time_t curtime;
     struct tm *loctime;
-
+    char *thread;
+    
     pthread_mutex_lock(&mutex);
 
     /* Get the current time. */
@@ -166,9 +219,11 @@ static void LogImpl(int level, const char *module, const char * format, va_list 
     /* Convert it to local time representation. */
     loctime = localtime (&curtime);
     /* Print it out in a nice format. */
-    strftime (timeBuffer, sizeof(timeBuffer), "%F %T : ", loctime);
+    strftime (timeBuffer, sizeof(timeBuffer), "%F %T", loctime);
 
-    fprintf(logFP, "%s %-15s : %2d : ", timeBuffer, module ? module:"<Unknown>", level);
+    thread = LogGetThreadName(pthread_self());
+    
+    fprintf(logFP, "%-19s | %-15s | %2d | %-15s | ", timeBuffer, module ? module:"<Unknown>", level, thread);
 
     vfprintf(logFP, format, valist);
 
@@ -179,9 +234,24 @@ static void LogImpl(int level, const char *module, const char * format, va_list 
 
     if ((level == LOG_ERROR) && (errno != 0))
     {
-        fprintf(logFP, "%s %-15s : %2d : errno = %d (%s)\n", timeBuffer,
-            module ? module:"<Unknown>", level, errno, strerror(errno));
+        fprintf(logFP, "%-19s | %-15s | %2d |  %-15s | errno = %d (%s)\n", timeBuffer,
+            module ? module:"<Unknown>", level, thread, errno, strerror(errno));
     }
 
     pthread_mutex_unlock(&mutex);
+}
+
+static char *LogGetThreadName(pthread_t thread)
+{
+    static char numericName[11];
+    int i;
+    for (i = 0; i < MAX_THREADS; i ++)
+    {
+        if (thread == threadNames[i].thread)
+        {
+            return threadNames[i].name;
+        }
+    }
+    sprintf(numericName, "0x%08lx", (unsigned long)thread);
+    return numericName;
 }
