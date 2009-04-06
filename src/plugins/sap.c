@@ -112,6 +112,7 @@ void SAPServerDeinit(void)
     quit = TRUE;
     pthread_cond_signal(&messageDelayCond);
     pthread_join(serverThread, NULL);
+    LogUnregisterThread(serverThread);
     ListFree(sessionList, SAPSessionFree);
 }
 
@@ -252,6 +253,8 @@ static void *SAPServer(void *arg)
     int socket6 = UDPCreateSocket(PF_INET6);
     int ttl = 255;
 
+    LogRegisterThread(serverThread, "SAP");
+    
     setsockopt(socket4,IPPROTO_IP,IP_MULTICAST_TTL, &ttl,sizeof(ttl));
     setsockopt(socket4,IPPROTO_IPV6,IPV6_MULTICAST_HOPS, &ttl,sizeof(ttl));
     LogModule(LOG_DEBUG, SAP, "Annoucement thread starting\n");

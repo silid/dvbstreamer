@@ -95,6 +95,7 @@ void DeferredProcessingAddJob(DeferredProcessor_t processor, void *arg)
 static void *DeferredProcessingThread(void* arg)
 {
     DeferredJob_t *job;
+    LogRegisterThread(processingThread, DEFERREDPROC);    
     LogModule(LOG_DEBUG, DEFERREDPROC, "Deferred processing thread started\n");
     while(!MessageQIsQuitSet(jobQ))
     {
@@ -103,6 +104,7 @@ static void *DeferredProcessingThread(void* arg)
         {
             LogModule(LOG_DEBUGV, DEFERREDPROC, "Running job %p (processor:%p, arg:%p)\n", job, job->processor, job->arg);            
             job->processor(job->arg);
+            LogModule(LOG_DEBUGV, DEFERREDPROC, "Finished job %p (processor:%p, arg:%p)\n", job, job->processor, job->arg);            
             ObjectRefDec(job);
         }
     }

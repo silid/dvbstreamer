@@ -193,6 +193,7 @@ int CacheInit()
     cacheUpdateQ = MessageQCreate();
     ObjectRegisterType(CacheUpdateMessage_t);
     pthread_create(&cacheUpdateThread, NULL, CacheUpdateProcessor, NULL);
+    LogRegisterThread(cacheUpdateThread, CACHE);
     return 0;
 }
 
