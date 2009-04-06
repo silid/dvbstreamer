@@ -71,7 +71,7 @@ int MultiplexInit(void);
  * Release resources used by the multiplex module.
  * @return 0 on success.
  */
-int MultiplexDeinit(void);
+int MultiplexDeInit(void);
 
 /**
  * Number of multiplexes stored in the database.

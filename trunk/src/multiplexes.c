@@ -70,7 +70,7 @@ int MultiplexInit(void)
     return  ObjectRegisterType(Multiplex_t);
 }
 
-int MultiplexDeinit(void)
+int MultiplexDeInit(void)
 {
     return 0;
 }
