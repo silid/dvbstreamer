@@ -103,18 +103,15 @@ int EPGChannelUnregisterListener(MessageQ_t msgQ)
 int EPGChannelNewEvent(EPGEventRef_t *eventRef, struct tm *startTime, struct tm *endTime, bool ca)
 {
     EPGChannelMessage_t *msg;
-    EPGEvent_t *event;
 
     CHECK_LISTENERS();
     
     msg = ObjectCreateType(EPGChannelMessage_t);
     msg->type = EPGChannelMessageType_Event;
     msg->eventRef = *eventRef;
-    event = ObjectCreateType(EPGEvent_t);
-    event->startTime = *startTime;
-    event->endTime = *endTime;
-    event->ca = ca;
-    msg->data.event = event;
+    msg->data.event.startTime = *startTime;
+    msg->data.event.endTime = *endTime;
+    msg->data.event.ca = ca;
     EPGChannelSendMessage(msg);
     return 0;
 }
@@ -123,17 +120,14 @@ int EPGChannelNewEvent(EPGEventRef_t *eventRef, struct tm *startTime, struct tm 
 int EPGChannelNewRating(EPGEventRef_t *eventRef, char *system, char *rating)
 {
     EPGChannelMessage_t *msg;
-    EPGEventRating_t *eventRating;
 
     CHECK_LISTENERS();
     
     msg = ObjectCreateType(EPGChannelMessage_t);
     msg->type = EPGChannelMessageType_Rating;
     msg->eventRef = *eventRef;
-    eventRating = ObjectCreateType(EPGEventRating_t);
-    eventRating->system = strdup(system);
-    eventRating->rating = strdup(rating);
-    msg->data.rating  = eventRating;
+    msg->data.rating.system = strdup(system);
+    msg->data.rating.rating = strdup(rating);
     EPGChannelSendMessage(msg);
     return 0;
 }
@@ -148,11 +142,9 @@ int EPGChannelNewDetail(EPGEventRef_t *eventRef, char *lang, char * name, char *
     msg = ObjectCreateType(EPGChannelMessage_t);
     msg->type = EPGChannelMessageType_Detail;
     msg->eventRef = *eventRef;
-    eventDetail = ObjectCreateType(EPGEventDetail_t);
-    memcpy(eventDetail->lang, lang, sizeof(eventDetail->lang));
-    eventDetail->name = strdup(name);
-    eventDetail->value = strdup(value);
-     msg->data.detail = eventDetail;
+    memcpy(msg->data.detail.lang, lang, sizeof(eventDetail->lang));
+    msg->data.detail.name = strdup(name);
+    msg->data.detail.value = strdup(value);
     EPGChannelSendMessage(msg);
     return 0;
 }
@@ -180,13 +172,14 @@ static void EPGChannelMessageDestructor(void *ptr)
     switch(msg->type)
     {
         case EPGChannelMessageType_Event:
-            ObjectRefDec(msg->data.event);
             break;
         case EPGChannelMessageType_Detail:
-            ObjectRefDec(msg->data.detail);
+            free(msg->data.detail.name);
+            free(msg->data.detail.value);            
             break;
         case EPGChannelMessageType_Rating:
-            ObjectRefDec(msg->data.rating);
+            free(msg->data.rating.system);
+            free(msg->data.rating.rating);            
             break;
     }
 }

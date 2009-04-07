@@ -82,7 +82,6 @@ static void CommandEPGData(int argc, char **argv)
     MessageQ_t msgQ = MessageQCreate();
     char startTimeStr[25];
     char endTimeStr[25];
-    size_t a;
     
     EPGChannelRegisterListener(msgQ);
     if (CommandPrintf("<epg>\n") < 0)
@@ -94,39 +93,37 @@ static void CommandEPGData(int argc, char **argv)
         EPGChannelMessage_t *msg = MessageQReceiveTimed(msgQ, 400);
         if (msg != NULL)
         {
-            int chars = 0;
-            chars = CommandPrintf("<event net=\"0x%04x\" ts=\"0x%04x\" source=\"0x%04x\" event=\"%08x\">\n",
+            CommandContext_t *context = CommandContextGet();
+            CommandPrintf("<event net=\"0x%04x\" ts=\"0x%04x\" source=\"0x%04x\" event=\"0x%08x\">\n",
                 msg->eventRef.serviceRef.netId, msg->eventRef.serviceRef.netId, msg->eventRef.serviceRef.serviceId,
                 msg->eventRef.eventId);
-            if (chars >= 0)
+            switch(msg->type)
             {
-                switch(msg->type)
-                {
-                    case EPGChannelMessageType_Event:
-                        a = strftime(startTimeStr, sizeof(startTimeStr), "%Y-%m-%d %T", &msg->data.event->startTime);
-                        a = strftime(endTimeStr, sizeof(startTimeStr), "%Y-%m-%d %T", &msg->data.event->endTime);                        
-                        chars = CommandPrintf("<new start=\"%s\" end=\"%s\" ca=\"%s\"/>\n",
-                                   startTimeStr, endTimeStr, msg->data.event->ca ? "yes":"no");
-                        break;
-                    case EPGChannelMessageType_Detail:
-                        chars = CommandPrintf("<detail lang=\"%s\" name=\"%s\">\n",
-                                 msg->data.detail->lang,  msg->data.detail->name);
-                        PrintXmlified(msg->data.detail->value);
-                        chars = CommandPrintf("</detail>\n");
-                        break;
-                    case EPGChannelMessageType_Rating:
-                        chars = CommandPrintf("<rating system=\"%s\" value=\"%s\"/>\n", 
-                                    msg->data.rating->system, msg->data.rating->rating);
-                        break;
-                }
+                case EPGChannelMessageType_Event:
+                    strftime(startTimeStr, sizeof(startTimeStr), "%Y-%m-%d %T", &msg->data.event.startTime);
+                    strftime(endTimeStr, sizeof(startTimeStr), "%Y-%m-%d %T", &msg->data.event.endTime);                        
+                    CommandPrintf("<new start=\"%s\" end=\"%s\" ca=\"%s\"/>\n",
+                               startTimeStr, endTimeStr, msg->data.event.ca ? "yes":"no");
+                    break;
+                case EPGChannelMessageType_Detail:
+                    CommandPrintf("<detail lang=\"%s\" name=\"%s\">\n",
+                             msg->data.detail.lang,  msg->data.detail.name);
+                    PrintXmlified(msg->data.detail.value);
+                    CommandPrintf("</detail>\n");
+                    break;
+                case EPGChannelMessageType_Rating:
+                    CommandPrintf("<rating system=\"%s\" value=\"%s\"/>\n", 
+                                msg->data.rating.system, msg->data.rating.rating);
+                    break;
             }
-            if (chars >= 0)
+
+
+            CommandPrintf("</event>\n");
+            if (fflush(context->outfp) != 0)
             {
-                CommandContext_t *context = CommandContextGet();
-                chars = CommandPrintf("</event>\n");
-                fflush(context->outfp);
+                connected = FALSE;
             }
-            connected = (chars >= 0);
+            LogModule(LOG_INFO, "EPG Data", "connected = %d", connected);
             ObjectRefDec(msg);
         }
     }
