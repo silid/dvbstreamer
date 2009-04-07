@@ -224,6 +224,7 @@ int CacheLoad(Multiplex_t *multiplex)
     list = ServiceListForMultiplex(multiplex);
     
     LogModule(LOG_DEBUG, CACHE, "Loading %d services for %d\n", ListCount(list), multiplex->uid);
+    cachedServicesCount = ListCount(list);
     if (ListCount(list) > 0)
     {
         ListIterator_t iterator;
@@ -243,8 +244,6 @@ int CacheLoad(Multiplex_t *multiplex)
          */
         ListFree(list, NULL);
     }
-
-    cachedServicesCount = ListCount(list);
 
     MultiplexRefInc(multiplex);
     cachedServicesMultiplex = multiplex;
