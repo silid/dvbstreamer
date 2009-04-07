@@ -1,0 +1,423 @@
+#!/usr/bin/python
+from socket import *
+import threading  
+import time
+import traceback
+import xml.sax
+import xml.sax.handler
+import sqlite3
+import os
+import os.path
+import sys
+
+class ControlConnection:
+    """
+    Class implementing a connection to a DVBStreamer daemon.
+    """
+    def __init__(self, host, adapter):
+        """
+        Create a connection object to communicate with a DVBStreamer daemon.
+        """
+        self.host = host
+        self.adapter = adapter
+        self.opened = False
+        self.version = None
+        self.welcome_message = None
+        self.my_ip = None
+
+    def open(self):
+        """
+        Open the connection to the DVBStreamer daemon.
+        """
+        if self.opened:
+            return
+        self.socket = socket(AF_INET,SOCK_STREAM)
+        self.socket.connect((self.host, self.adapter + 54197))
+
+        self.my_ip = self.socket.getsockname()[0]
+
+        self.socket_file = self.socket.makefile('r+')
+        self.opened = True
+        (error_code, error_message, lines) = self.read_response()
+
+        if error_code != 0:
+            self.socket.close()
+            self.opened = False
+        else:
+            self.welcome_message = error_message
+
+        return self.opened
+
+    def close(self):
+        """
+        Close the connection to the DVBStreamer daemon.
+        """
+        if self.opened:
+            self.send_command('logout')
+            self.socket_file.close()
+            self.socket.close()
+            self.opened = False
+
+    def send_command(self, command):
+        """
+        Send a command to the connection DVBStreamer daemon.
+        """
+        if not self.opened:
+            raise RuntimeError, 'not connected'
+
+        self.socket_file.write(command + '\n')
+        self.socket_file.flush()
+
+
+    def read_response(self):
+        """
+        Read a response from the DVBStreamer deamon after a command has been
+        sent.
+        Returns a tuple of error code, error message and response lines.
+        """
+        more_lines = True
+        lines = []
+        error_code = -1
+        error_message = ''
+        while more_lines:
+            line = self.socket_file.readline()
+
+            if line.startswith('DVBStreamer/'):
+                more_lines = False
+                sections = line.split('/')
+                self.version = sections[1]
+                error_sections = sections[2].split(' ', 1)
+                error_code = int(error_sections[0])
+                if len(error_sections) > 1:
+                    error_message = error_sections[1].strip()
+                else:
+                    error_message = ''
+            elif line == '':
+                more_lines = False
+            else:
+                lines.append(line.strip('\n\r'))
+
+        return (error_code, error_message, lines)
+
+    def get_services(self, mux=''):
+        """
+        Get the list of services available on all or a specific multiplex.
+        """
+        self.send_command('lsservices %s' % mux)
+        (errcode, errmsg, services) = self.read_response()
+        if errcode != 0:
+            return None
+        return services
+    
+    def get_service_info(self, service):
+        """
+        Retrieve information about the specified service.
+        """
+        self.send_command('serviceinfo "%s"' % service)
+        (errcode, errmsg, lines) = self.read_response()
+        if errcode != 0:
+            return None
+        dict = {}
+        for line in lines:
+            name, value = line.split(':', 2)
+            dict[name.strip()] = value.strip()
+        return dict
+
+class EPGProcessor(xml.sax.handler.ContentHandler):
+    def __init__(self, dbase, host, adapter):
+        self.connection = ControlConnection(host, adapter)
+        self.__stop = False
+        self.dbase = dbase
+        self.thread = threading.Thread(target=self.__run)
+        self.thread.setName('EPGProcessor-%s-%d'% (host, adapter))
+        self.thread.start()
+    
+    def stop(self):
+        self.__stop = True
+        try:
+            if self.connection:
+                self.connection.close()
+        except:
+            traceback.print_exc()
+        self.thread.join()
+
+    def __run(self):
+        while not self.__stop:
+            try:
+                self.connection.open()
+                self.connection.send_command('epgdata')
+                xml.sax.parse(self.connection.socket_file, self)
+            except:
+                traceback.print_exc()
+                self.connection.close()
+            
+            if not self.__stop:
+                time.sleep(2.0)
+    
+    def startElement(self, name, attrs):
+        if name == 'event':
+            # Start transaction
+            self.event_ref = (parse_int(attrs.getValue('net')), 
+                              parse_int(attrs.getValue('ts')),
+                              parse_int(attrs.getValue('source')),
+                              parse_int(attrs.getValue('event')))
+            
+        elif name == 'new':
+            new_start = time.strptime(attrs.getValue('start'), '%Y-%m-%d %H:%M:%S')
+            new_end = time.strptime(attrs.getValue('start'), '%Y-%m-%d %H:%M:%S')
+            new_ca = attrs.getValue('ca') == 'yes'
+            
+            self.dbase.new_event(self.event_ref, new_start, new_end, new_ca)
+            
+        elif name == 'detail':
+            self.detail_name = attrs.getValue('name')
+            self.detail_lang = attrs.getValue('lang')
+            self.detail_content = ''
+            
+        elif name == 'rating':
+            rating_system = attrs.getValue('system')
+            rating_value = attrs.getValue('value')
+            self.dbase.update_rating(self.event_ref, rating_system, rating_value)
+            
+        else:
+            print 'Start: %s %r' % (name, attrs.getNames())
+        self.current_element = name
+
+    def endElement(self, name):
+        if name == 'detail':
+            self.dbase.update_detail(self.event_ref, self.detail_name, self.detail_lang, self.detail_content)
+    
+    def characters(self, content):
+        if self.current_element == 'detail':
+            self.detail_content += content
+
+def parse_int(str):
+    if str.startswith('0x'):
+        return int(str[2:], 16)
+    if str.startswith('0'):
+        return int(str[1:], 8)
+    return int(str)
+
+class EPGDatabase:
+    EVENTS_TABLE = 'Events'
+    EVENTS_COLUMN_SOURCE= 'source'
+    EVENTS_COLUMN_EVENT = 'event'
+    EVENTS_COLUMN_START = 'start'
+    EVENTS_COLUMN_END   = 'end'
+    EVENTS_COLUMN_CA    = 'ca'
+    EVENTS_COLUMNS = [EVENTS_COLUMN_SOURCE , EVENTS_COLUMN_EVENT, 
+                        EVENTS_COLUMN_START  , EVENTS_COLUMN_END  , EVENTS_COLUMN_CA]
+    
+    RATINGS_TABLE = 'Ratings'
+    RATINGS_COLUMN_SOURCE = 'source'
+    RATINGS_COLUMN_EVENT  = 'event'
+    RATINGS_COLUMN_SYSTEM = 'system'
+    RATINGS_COLUMN_VALUE  = 'value'
+    RATINGS_COLUMNS = [RATINGS_COLUMN_SOURCE, RATINGS_COLUMN_EVENT, RATINGS_COLUMN_SYSTEM, RATINGS_COLUMN_VALUE]
+    
+    DETAILS_TABLE = 'Details'
+    DETAILS_COLUMN_SOURCE = 'source'
+    DETAILS_COLUMN_EVENT  = 'event'
+    DETAILS_COLUMN_NAME   = 'name'
+    DETAILS_COLUMN_LANG   = 'lang'
+    DETAILS_COLUMN_VALUE  = 'value'
+    DETAILS_COLUMNS = [DETAILS_COLUMN_SOURCE, DETAILS_COLUMN_EVENT, DETAILS_COLUMN_NAME, 
+                        DETAILS_COLUMN_LANG, DETAILS_COLUMN_VALUE]
+    
+    def __init__(self, dbpath):
+        self.dbpath = dbpath
+        self.create_tables()
+        
+        self.connections = {}
+        
+        self.message_q = []
+        self.message_event = threading.Event()
+        self.__quit = False
+        
+        self.updater_thread = threading.Thread(target=self.updater)
+        self.updater_thread.setName('EPGDbase Updater')
+        self.updater_thread.start()
+        
+        self.reaper_thread = threading.Thread(target=self.reaper)
+        self.reaper_thread.setDaemon(True)
+        self.reaper_thread.setName('EPGDbase Reaper')
+        self.reaper_thread.start()
+        
+    def close(self):
+        self.__quit = True
+        self.post_message(('quit',))
+        self.updater_thread.join()
+        
+    def create_tables(self):
+        connection = sqlite3.Connection(self.dbpath)
+        cursor = connection.cursor()
+        
+        self.create_table(cursor, EPGDatabase.EVENTS_TABLE,  EPGDatabase.EVENTS_COLUMNS, 
+                            [EPGDatabase.EVENTS_COLUMN_SOURCE, EPGDatabase.EVENTS_COLUMN_EVENT])
+                              
+        self.create_table(cursor, EPGDatabase.RATINGS_TABLE, EPGDatabase.RATINGS_COLUMNS, 
+                            [EPGDatabase.RATINGS_COLUMN_SOURCE, EPGDatabase.RATINGS_COLUMN_EVENT,
+                                EPGDatabase.RATINGS_COLUMN_SYSTEM])
+        
+        self.create_table(cursor, EPGDatabase.DETAILS_TABLE, EPGDatabase.DETAILS_COLUMNS, 
+                            [EPGDatabase.DETAILS_COLUMN_SOURCE, EPGDatabase.DETAILS_COLUMN_EVENT,
+                                EPGDatabase.DETAILS_COLUMN_NAME, EPGDatabase. DETAILS_COLUMN_LANG])
+        connection.close()
+        
+    
+    def create_table(self, cursor, table, fields, primary_key):
+        sql = 'CREATE TABLE IF NOT EXISTS ' + table + '('
+        for field in fields:
+            sql += field + ','
+        sql += 'PRIMARY KEY('
+        for field in primary_key:
+            sql += field + ','
+        sql =sql[:-1] + '));'
+        
+        cursor.execute(sql)
+    
+    def get_connection(self):
+        thread = threading.currentThread()
+        if thread in self.connections:
+            return self.connections[thread]
+        connection = sqlite3.Connection(self.dbpath)
+        self.connections[thread] = connection
+        return connection
+        
+    def close_connection(self):
+        thread = threading.currentThread()
+        if thread in self.connections:
+            self.connections[thread].close()
+            del self.connections[thread]
+        
+    
+    def new_event(self, event_ref, start, end, ca):    
+        self.post_message(('new', event_ref, start, end, ca))
+        
+    def __new_event(self, event_ref, start, end, ca):
+        if 'TZ' in os.environ:
+            tz = os.environ['TZ']
+        else:
+            tz = None
+            
+        os.environ['TZ']='UTC0'
+        time.tzset()
+        start_secs = int(time.mktime(start))
+        end_secs = int(time.mktime(end))
+        
+        if tz is not None:
+            os.environ['TZ'] = tz
+            
+        time.tzset()
+        self.__update(EPGDatabase.EVENTS_TABLE, EPGDatabase.EVENTS_COLUMNS,
+                        ('%04x.%04x.%04x' % event_ref[:3], event_ref[3], start_secs, end_secs, ca))
+        
+    
+    def update_detail(self, event_ref, name, lang, value):
+        self.post_message(('detail', event_ref, name, lang, value))
+    
+    def __update_detail(self, event_ref, name, lang, value):
+        self.__update(EPGDatabase.DETAILS_TABLE, EPGDatabase.DETAILS_COLUMNS,
+                        ('%04x.%04x.%04x' % event_ref[:3], event_ref[3], name, lang, value))
+    
+    def update_rating(self, event_ref, system, value):
+        self.post_message(('rating', event_ref, system, value))
+        
+    def __update_rating(self, event_ref, system, value):
+        self.__update(EPGDatabase.RATINGS_TABLE, EPGDatabase.RATINGS_COLUMNS,
+                        ('%04x.%04x.%04x' % event_ref[:3], event_ref[3], system, value))
+    
+    def __update(self, table, columns, values):
+        connection = self.get_connection()
+        cursor = connection.cursor()
+        sql = 'INSERT OR REPLACE INTO %s ( %s) VALUES (%s);' % (table, 
+                                                                reduce(lambda x,y: x +','+y, columns),
+                                                                reduce(lambda x,y: x.startswith('?') and x +',?' or '?,?', values))
+        cursor.execute(sql, values)
+        
+    def post_message(self, msg):
+        self.message_q.append(msg)
+        self.message_event.set()
+        
+    def updater(self):
+        connection = self.get_connection()
+        updates = 0
+        while not self.__quit:
+            if len(self.message_q) == 0:
+                self.message_event.wait()
+                
+            if len(self.message_q) > 0:
+                msg = self.message_q.pop()
+                if msg[0] == 'commit':
+                    print 'Commiting %d updates' % updates
+                    connection.commit()
+                    updates = 0
+                    
+                elif msg[0] == 'new':
+                    updates += 1
+                    self.__new_event(*msg[1:])
+                    
+                elif msg[0] == 'detail':
+                    updates += 1
+                    self.__update_detail(*msg[1:])
+                    
+                elif msg[0] == 'rating':
+                    updates += 1
+                    self.__update_rating(*msg[1:])
+                    
+                elif msg[0] == 'reap':
+                    updates = 0
+                    self.__reap()
+                    
+                elif msg[0] == 'quit':
+                    connection.commit()
+                    
+            if len(self.message_q) == 0:
+                self.message_event.clear()
+            
+
+    def reaper(self):
+        last_reap = 0.0
+        while not self.__quit:
+            now = time.time()
+            if (now - last_reap) > 360.0:
+                # Reap old events
+                self.post_message(('reap',))
+                last_reap = now
+            else:
+                self.post_message(('commit',))
+            # Sleep for 30 seconds
+            time.sleep(30.0)
+
+    def __reap(self):
+        connection = self.get_connection()
+        cursor = connection.cursor()
+        past24 = int(time.time() - (24.0 * 360.0))
+        cursor.execute('DELETE FROM Events WHERE end<=?;',(past24,))
+        # Remove orphaned details and ratings
+        cursor.execute('DELETE FROM Details WHERE NOT EXISTS ' +
+                        '(SELECT * FROM Events WHERE source=Details.source AND event=Details.event);')
+
+        cursor.execute('DELETE FROM Ratings WHERE NOT EXISTS '+ 
+                        '(SELECT * FROM Events WHERE source=Ratings.source AND event=Ratings.event);')
+
+if __name__ == '__main__':
+    app_dir = os.path.expanduser('~/.epgdb')
+    
+    if not os.path.exists(app_dir):
+        os.mkdir(app_dir)
+        
+    dbase = EPGDatabase(os.path.join(app_dir, 'database.db'))
+    processor = EPGProcessor(dbase, sys.argv[1], int(sys.argv[2]))
+    while True:
+        try:
+            time.sleep(1.0)
+        except KeyboardInterrupt:
+            print 'Interrupted'
+            break
+        except:
+            traceback.print_exc()
+            break
+    processor.stop()
+    dbase.close()
+    sys.exit(0)
