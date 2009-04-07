@@ -41,9 +41,9 @@ typedef struct EPGChannelMessage_s{
     EPGChannelMessageType type;
     EPGEventRef_t eventRef;
     union {
-        EPGEvent_t *event;
-        EPGEventDetail_t *detail;
-        EPGEventRating_t *rating;
+        EPGEvent_t event;
+        EPGEventDetail_t detail;
+        EPGEventRating_t rating;
     }data;
 }EPGChannelMessage_t;
 
