@@ -243,7 +243,7 @@ static void LogImpl(int level, const char *module, const char * format, va_list 
 
 static char *LogGetThreadName(pthread_t thread)
 {
-    static char numericName[11];
+    static char numericName[20];
     int i;
     for (i = 0; i < MAX_THREADS; i ++)
     {
