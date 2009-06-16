@@ -254,9 +254,15 @@ static void *SAPServer(void *arg)
     int ttl = 255;
 
     LogRegisterThread(serverThread, "SAP");
-    
-    setsockopt(socket4,IPPROTO_IP,IP_MULTICAST_TTL, &ttl,sizeof(ttl));
-    setsockopt(socket4,IPPROTO_IPV6,IPV6_MULTICAST_HOPS, &ttl,sizeof(ttl));
+
+    if (socket4 != -1)
+    {
+        setsockopt(socket4,IPPROTO_IP,IP_MULTICAST_TTL, &ttl,sizeof(ttl));
+    }
+    if (socket6 != -1)
+    {
+        setsockopt(socket6,IPPROTO_IPV6,IPV6_MULTICAST_HOPS, &ttl,sizeof(ttl));
+    }
     LogModule(LOG_DEBUG, SAP, "Annoucement thread starting\n");
     while (!quit)
     {
@@ -285,11 +291,17 @@ static void *SAPServer(void *arg)
             /* Send the message */
             if (session->originatingSource.ss_family == PF_INET)
             {
-                UDPSendTo(socket4, packet, packetLen, (struct sockaddr *)&sapMulticastAddr, sizeof(struct sockaddr_in));
+                if (socket4 != -1)
+                {
+                    UDPSendTo(socket4, packet, packetLen, (struct sockaddr *)&sapMulticastAddr, sizeof(struct sockaddr_in));
+                }
             }
             else
             {
-                UDPSendTo(socket6, packet, packetLen, (struct sockaddr *)&sapMulticastAddr, sizeof(struct sockaddr_in6));
+                if (socket6 != -1)
+                {
+                    UDPSendTo(socket6, packet, packetLen, (struct sockaddr *)&sapMulticastAddr, sizeof(struct sockaddr_in6));
+                }
             }
         }
         waitFor.tv_sec += 1;
@@ -298,6 +310,13 @@ static void *SAPServer(void *arg)
 
     }
     LogModule(LOG_DEBUG, SAP, "Annoucement thread finished.\n");
-    close(socket4);
+    if (socket4 != -1)
+    {
+        close(socket4);
+    }
+    if (socket6 != -1)
+    {
+        close(socket6);
+    }
     return NULL;
 }
