@@ -31,6 +31,8 @@ PIDFilter_t *SubTableProcessorCreate(TSFilter_t *tsfilter, uint16_t pid,
 
 void SubTableProcessorDestroy(PIDFilter_t *filter);
 
+void SubTableProcessorRestart(PIDFilter_t *filter);
+    
 bool SubTableProcessorInit(PIDFilter_t *filter, uint16_t pid, 
                                    dvbpsi_demux_new_cb_t subtablehandler, void *stharg, 
                                    MultiplexChanged multiplexchanged, void *mcarg);

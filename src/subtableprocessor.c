@@ -122,6 +122,19 @@ void SubTableProcessorDeinit(PIDFilter_t *filter)
     ObjectRefDec(state);
 }
 
+void SubTableProcessorRestart(PIDFilter_t *filter)
+{
+    SubTableProcessor_t *state = (SubTableProcessor_t *)filter->ppArg;
+    assert(filter->processPacket == SubTableProcessorProcessPacket);
+    if (state->demuxhandle)
+    {
+        dvbpsi_DetachDemux(state->demuxhandle);
+        state->demuxhandle = dvbpsi_AttachDemux(state->subtablehandler, state->stharg);
+        state->payloadstartonly = TRUE;
+    }
+}
+
+    
 void *SubTableProcessorGetSubTableHandlerArg(PIDFilter_t *filter)
 {
     SubTableProcessor_t *state = (SubTableProcessor_t *)filter->ppArg;
