@@ -28,6 +28,7 @@ Simplify UDP socket creation and packet sending.
 #include <sys/socket.h>
 #include <string.h>
 #include <netdb.h>
+#include <errno.h>
 #include "main.h"
 #include "logging.h"
 #include "udp.h"
@@ -61,13 +62,14 @@ int UDPCreateSocket(sa_family_t family)
 
     if (socketfd < 0)
     {
-        LogModule(LOG_ERROR, UDP, "socket() failed\n");
+        LogModule(LOG_INFO, UDP, "socket() failed (%d: %s)\n", errno, strerror(errno));
+
         return -1;
     }
 
     if (setsockopt(socketfd, SOL_SOCKET, SO_REUSEADDR, &reuseAddr, sizeof(int)))
     {
-        LogModule(LOG_ERROR, UDP, "setsockopt(SOL_SOCKET, SO_REUSEADDR) failed\n");
+        LogModule(LOG_INFO, UDP, "setsockopt(SOL_SOCKET, SO_REUSEADDR) failed (%d: %s)\n", errno, strerror(errno));
         close(socketfd);
         return -1;
     }
@@ -79,7 +81,7 @@ int UDPCreateSocket(sa_family_t family)
     ret = getaddrinfo(NULL, TOSTRING(PORT), &hints, &addrinfo);
     if (ret != 0 || addrinfo == NULL)
     {
-        LogModule(LOG_ERROR, UDP, "getaddrinfo() failed with error %s\n", gai_strerror(ret));
+        LogModule(LOG_INFO, UDP, "getaddrinfo() failed with error %s\n", gai_strerror(ret));
         return -1;
     }
     addr = addrinfo->ai_addr;
@@ -94,7 +96,7 @@ int UDPCreateSocket(sa_family_t family)
 
     if (bind(socketfd, addr, addr_len)<0)
     {
-        LogModule(LOG_ERROR,UDP, "bind() failed\n");
+        LogModule(LOG_INFO,UDP, "bind() failed (%d: %s)\n", errno, strerror(errno));
         close(socketfd);
         socketfd = -1;
     }
