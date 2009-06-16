@@ -9,6 +9,7 @@ import sqlite3
 import os
 import os.path
 import sys
+import logging
 
 class ControlConnection:
     """
@@ -98,7 +99,11 @@ class ControlConnection:
                 lines.append(line.strip('\n\r'))
 
         return (error_code, error_message, lines)
-
+    
+    def execute_command(self, command):
+        self.send_command(command)
+        return self.read_response()
+        
     def get_services(self, mux=''):
         """
         Get the list of services available on all or a specific multiplex.
@@ -145,6 +150,7 @@ class EPGProcessor(xml.sax.handler.ContentHandler):
         while not self.__stop:
             try:
                 self.connection.open()
+                self.connection.execute_command('epgcaprestart')
                 self.connection.send_command('epgdata')
                 xml.sax.parse(self.connection.socket_file, self)
             except:
@@ -179,8 +185,6 @@ class EPGProcessor(xml.sax.handler.ContentHandler):
             rating_value = attrs.getValue('value')
             self.dbase.update_rating(self.event_ref, rating_system, rating_value)
             
-        else:
-            print 'Start: %s %r' % (name, attrs.getNames())
         self.current_element = name
 
     def endElement(self, name):
@@ -349,7 +353,6 @@ class EPGDatabase:
             if len(self.message_q) > 0:
                 msg = self.message_q.pop()
                 if msg[0] == 'commit':
-                    print 'Commiting %d updates' % updates
                     connection.commit()
                     updates = 0
                     
@@ -401,23 +404,68 @@ class EPGDatabase:
         cursor.execute('DELETE FROM Ratings WHERE NOT EXISTS '+ 
                         '(SELECT * FROM Events WHERE source=Ratings.source AND event=Ratings.event);')
 
-if __name__ == '__main__':
+def usage():
+    print '%s [<host>[:<adapter>] ...]'
+    print 'Connects to one or more DVBStreamer daemons to process and store EPG data.'
+
+
+def process_host(host):
+    if host[0] == '[':
+        # IPv6
+        i = host.find(']')
+        hostname = host[:i + 1]
+        if len(host) > i + 1:
+            adapter = int(host[i + 2])
+        else:
+            adapter = 0
+    else:
+        tmp = host.split(':')
+        
+        hostname = tmp[0]
+            
+        if len(tmp) >= 2:
+            adapter = int(tmp[1])
+        else:
+            adapter = 0
+    return (hostname, adapter)
+
+    
+def main():
     app_dir = os.path.expanduser('~/.epgdb')
     
     if not os.path.exists(app_dir):
         os.mkdir(app_dir)
-        
+    
+    
+    hosts = None
+    for arg in sys.argv[1:]:
+        host = arg.split(':')
+        hosts.append(process_host(host))
+
     dbase = EPGDatabase(os.path.join(app_dir, 'database.db'))
-    processor = EPGProcessor(dbase, sys.argv[1], int(sys.argv[2]))
+    if hosts is None:
+        hosts = [('localhost', 0)]
+    
+    processors = []
+    for host in hosts:
+        processors.append(EPGProcessor(dbase, host[0], host[1]))
+    
     while True:
         try:
             time.sleep(1.0)
         except KeyboardInterrupt:
-            print 'Interrupted'
             break
         except:
             traceback.print_exc()
             break
-    processor.stop()
+    
+    for processor in processors:
+        processor.stop()
     dbase.close()
+
+if __name__ == '__main__':
+    try:
+        main()
+    except:
+        traceback.print_exc()
     sys.exit(0)

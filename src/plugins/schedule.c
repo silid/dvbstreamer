@@ -64,6 +64,10 @@ static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t table
 static void ProcessEIT(void *arg, dvbpsi_eit_t *newEIT);
 static void DeferredProcessEIT(void *arg);
 
+static void CommandEPGCapRestart(int argc, char **argv);
+static void CommandEPGCapStart(int argc, char **argv);
+static void CommandEPGCapStop(int argc, char **argv);
+
 static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *event);
 
 static void ConvertToTM(dvbpsi_date_time_t *datetime, dvbpsi_eit_event_duration_t *duration,
@@ -104,7 +108,30 @@ PLUGIN_FEATURES(
     PLUGIN_FEATURE_FILTER(filter)
     );
 
-PLUGIN_INTERFACE_F(
+PLUGIN_COMMANDS({
+        "epgcaprestart",
+        FALSE, 0, 0,
+        "Starts or restarts the capturing of EPG content.",
+        "Starts or restarts the capturing of EPG content, for use by EPG capture applications.",
+        CommandEPGCapRestart
+    },
+    {
+        "epgcapstart",
+        FALSE, 0, 0,
+        "Starts the capturing of EPG content.",
+        "Starts the capturing of EPG content, for use by EPG capture applications.",
+        CommandEPGCapStart
+    },
+    {
+        "epgcapstop",
+        FALSE, 0, 0,
+        "Stops the capturing of EPG content.",
+        "Stops the capturing of EPG content, for use by EPG capture applications.",
+        CommandEPGCapStop
+    }
+);
+    
+PLUGIN_INTERFACE_CF(
     PLUGIN_FOR_DVB,
     "DVBSchedule", "0.3",
     "Plugin to capture DVB EPG schedule information.",
@@ -116,7 +143,7 @@ PLUGIN_INTERFACE_F(
 static void Init0x12Filter(PIDFilter_t *filter)
 {
     filter->name = "DVB Schedule";
-    filter->enabled = TRUE;
+    filter->enabled = FALSE;
 
     SubTableProcessorInit(filter, 0x12, SubTableHandler, NULL, NULL, NULL);
     if (filter->tsFilter->adapter->hardwareRestricted)
@@ -172,6 +199,25 @@ static void DeferredProcessEIT(void *arg)
     ObjectRefDec(eit);
 }
 
+/*******************************************************************************
+* Command Functions                                                            *
+*******************************************************************************/
+static void CommandEPGCapRestart(int argc, char **argv)
+{
+    filter.filter->enabled = FALSE;
+    SubTableProcessorRestart(filter.filter);
+    filter.filter->enabled = TRUE;
+}
+
+static void CommandEPGCapStart(int argc, char **argv)
+{
+    filter.filter->enabled = TRUE;
+}
+
+static void CommandEPGCapStop(int argc, char **argv)
+{
+    filter.filter->enabled = FALSE;
+}
 /*******************************************************************************
 * Helper Functions                                                             *
 *******************************************************************************/
