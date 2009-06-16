@@ -54,7 +54,7 @@ Command_t CommandEPGInfo[] =
         TRUE, 0, 0,
         "Register to receive EPG data in XML format.",
         "EPG data is output to the command context in XML format until DVBStreamer"
-        "terminates or the command content is closed (ie the socket is disconnected).",
+        "terminates or the command context is closed (ie the socket is disconnected).",
         CommandEPGData
     },
     {NULL, FALSE, 0, 0, NULL,NULL}

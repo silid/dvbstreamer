@@ -91,6 +91,9 @@ static void DumpDescriptor(char *prefix, dvbpsi_descriptor_t *descriptor);
 static void ConvertToTM(uint32_t startSeconds, uint32_t duration,
     struct tm *startTime, struct tm *endTime);
 
+static void CommandEPGCapRestart(int argc, char **argv);
+static void CommandEPGCapStart(int argc, char **argv);
+static void CommandEPGCapStop(int argc, char **argv);
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
@@ -114,7 +117,30 @@ PLUGIN_FEATURES(
     PLUGIN_FEATURE_STTPROCESSOR(NewSTT)
     );
 
-PLUGIN_INTERFACE_F(
+PLUGIN_COMMANDS({
+        "epgcaprestart",
+        FALSE, 0, 0,
+        "Starts or restarts the capturing of EPG content.",
+        "Starts or restarts the capturing of EPG content, for use by EPG capture applications.",
+        CommandEPGCapRestart
+    },
+    {
+        "epgcapstart",
+        FALSE, 0, 0,
+        "Starts the capturing of EPG content.",
+        "Starts the capturing of EPG content, for use by EPG capture applications.",
+        CommandEPGCapStart
+    },
+    {
+        "epgcapstop",
+        FALSE, 0, 0,
+        "Stops the capturing of EPG content.",
+        "Stops the capturing of EPG content, for use by EPG capture applications.",
+        CommandEPGCapStop
+    }
+);
+
+PLUGIN_INTERFACE_CF(
     PLUGIN_FOR_ATSC,
     "ATSCtoEPG", "0.3",
     "Plugin to capture ATSC EPG schedule information.",
@@ -126,7 +152,7 @@ PLUGIN_INTERFACE_F(
 static void InitEITFilter(PIDFilter_t *filter)
 {
     filter->name = "ATSC to EPG";
-    filter->enabled = TRUE;
+    filter->enabled = FALSE;
     PIDFilterFilterPacketSet(filter, ATSCtoEPGFilterPacket, NULL);
     PIDFilterMultiplexChangeSet(filter, ATSCtoEPGMultiplexChanged, NULL);
     PIDFilterProcessPacketSet(filter, ATSCtoEPGProcessPacket, NULL);
@@ -318,6 +344,26 @@ static void DeferredProcessETT(void *arg)
 
     ObjectRefDec(ett);
     ObjectRefDec(info);
+}
+
+/*******************************************************************************
+* Command Functions                                                            *
+*******************************************************************************/
+static void CommandEPGCapRestart(int argc, char **argv)
+{
+    filter.filter->enabled = FALSE;
+    SubTableProcessorRestart(filter.filter);
+    filter.filter->enabled = TRUE;
+}
+
+static void CommandEPGCapStart(int argc, char **argv)
+{
+    filter.filter->enabled = TRUE;
+}
+
+static void CommandEPGCapStop(int argc, char **argv)
+{
+    filter.filter->enabled = FALSE;
 }
 
 /*******************************************************************************
