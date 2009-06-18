@@ -51,6 +51,19 @@ DeliveryMethodHandler_t NullOutputHandler = {
     NullOutputCreate
 };
 
+static DeliveryMethodInstanceOps_t nullInstanceOps = {
+    NullOutputSendPacket,
+    NullOutputSendBlock,
+    NullOutputDestroy,
+    NULL,
+    NULL
+};
+
+static DeliveryMethodInstance_t singleInstance ={
+       "null://",
+        &nullInstanceOps,
+        NULL
+        };
 /*******************************************************************************
 * Plugin Setup                                                                 *
 *******************************************************************************/
@@ -61,10 +74,11 @@ PLUGIN_FEATURES(
 PLUGIN_INTERFACE_F(
     PLUGIN_FOR_ALL,
     "NullOutput", 
-    "0.1", 
+    "0.2", 
     "Null Delivery method, all packets are dropped.", 
     "charrea6@users.sourceforge.net"
 );
+
 
 
 /*******************************************************************************
@@ -77,15 +91,7 @@ bool NullOutputCanHandle(char *mrl)
 
 DeliveryMethodInstance_t *NullOutputCreate(char *arg)
 {
-    DeliveryMethodInstance_t *instance = calloc(1, sizeof(DeliveryMethodInstance_t));
-
-    if (instance)
-    {
-        instance->SendPacket = NullOutputSendPacket;
-        instance->SendBlock = NullOutputSendBlock;
-        instance->DestroyInstance = NullOutputDestroy;
-    }
-    return instance;
+    return &singleInstance;
 }
 
 void NullOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet)
@@ -103,6 +109,7 @@ void NullOutputSendBlock(DeliveryMethodInstance_t *this, void *block, unsigned l
 
 void NullOutputDestroy(DeliveryMethodInstance_t *this)
 {
-    free(this);
+    /* Does nothing */
+    return;
 }
 

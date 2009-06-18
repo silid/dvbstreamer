@@ -390,10 +390,11 @@ static void CommandTraffic(int argc, char **argv)
                 char * name = "";
                 char * info = "";
                 Service_t *service;
+                void **ptr = (void*)&service;
                 List_t *list = ServiceListForPID(data[i].PID, multiplex);
                 if (list && (ListCount(list) > 0))
                 {
-                    ListGet(list, 0, (void**)&service);
+                    ListGet(list, 0, ptr);
                     if (printServiceName)
                     {
                         name = service->name;

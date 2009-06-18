@@ -245,14 +245,14 @@ void ServiceFilterDeliveryMethodSet(PIDFilter_t *filter, DeliveryMethodInstance_
     ServiceFilter_t *state = (ServiceFilter_t *)filter->fpArg;
     DeliveryMethodInstance_t *prevInstance = filter->opArg;
     
-    if (instance->ReserveHeaderSpace)
+    if (instance->ops->ReserveHeaderSpace)
     {
-        instance->ReserveHeaderSpace(instance, HEADER_PACKETS); 
+        instance->ops->ReserveHeaderSpace(instance, HEADER_PACKETS); 
     }
 
     PIDFilterOutputPacketSet(filter, DeliveryMethodOutputPacket, instance);
 
-    if (instance->ReserveHeaderSpace)
+    if (instance->ops->ReserveHeaderSpace)
     {
         state->setHeader = TRUE;
     }
@@ -428,9 +428,9 @@ static TSPacket_t *ServiceFilterProcessPacket(PIDFilter_t *pidfilter, void *arg,
     if (state->setHeader && state->headerGotPAT && state->headerGotPMT)
     {
         DeliveryMethodInstance_t *dmInstance = ServiceFilterDeliveryMethodGet(pidfilter);
-        if (dmInstance->SetHeader)
+        if (dmInstance->ops->SetHeader)
         {
-            dmInstance->SetHeader(dmInstance, state->packets, state->headerCount);
+            dmInstance->ops->SetHeader(dmInstance, state->packets, state->headerCount);
         }
         state->setHeader = FALSE;
         
