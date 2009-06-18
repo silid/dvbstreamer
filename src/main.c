@@ -737,11 +737,46 @@ static void InitDaemon(int adapter)
     pid = fork();
     if (pid < 0)
     {
+        LogModule(LOG_ERROR, MAIN, "First fork failed while going into daemon mode");
         exit(1);
     }
 
     /* If we got a good PID, then
        we can exit the parent process. */
+    if (pid > 0)
+    {
+        exit(0);
+    }
+
+    /* Create a new SID for the child process */
+    sid = setsid();
+    if (sid < 0)
+    {
+        LogModule(LOG_ERROR, MAIN, "setsid failed while going into daemon mode");
+        /* Log the failure */
+        exit(1);
+    }
+
+    /* Change the current working directory */
+    if ((chdir("/")) < 0)
+    {
+        LogModule(LOG_ERROR, MAIN, "chdir failed while going into daemon mode");
+        /* Log the failure */
+        exit(1);
+    }
+
+    /* Close out the standard file descriptors */
+    fclose(stdin);
+    fclose(stdout);
+    fclose(stderr);
+
+    pid = fork();
+    if (pid < 0)
+    {
+        LogModule(LOG_ERROR, MAIN, "Second fork failed while going into daemon mode");
+        exit(1);
+    }
+
     if (pid > 0)
     {
         FILE *fp;
@@ -760,28 +795,7 @@ static void InitDaemon(int adapter)
         }
         exit(0);
     }
-
-    /* Create a new SID for the child process */
-    sid = setsid();
-    if (sid < 0)
-    {
-        perror("setsid failed while going into daemon mode");
-        /* Log the failure */
-        exit(1);
-    }
-
-    /* Change the current working directory */
-    if ((chdir("/")) < 0)
-    {
-        perror("chdir failed while going into daemon mode");
-        /* Log the failure */
-        exit(1);
-    }
-
-    /* Close out the standard file descriptors */
-    fclose(stdin);
-    fclose(stdout);
-    fclose(stderr);
+    
     DaemonMode = TRUE;
 }
 
