@@ -27,7 +27,6 @@ Delivery Method management functions.
  * @defgroup DeliveryMethod Delivery Method Management
  * @{
  */
-
 /**
  * Structure to represent an instance of a delivery method.
  * Implementors should consider the following structure as the 'base class' and
@@ -53,6 +52,25 @@ typedef struct DeliveryMethodInstance_t
      * The media resource locator used to create the instance.
      */
     char *mrl;
+
+
+    /**
+     * Pointer to the table of functions used to manipulate this instance.
+     */
+    struct DeliveryMethodInstanceOps_t const *ops;
+    
+    /**
+     * Field used to hold private information for the type of instance.
+     */
+    void *private;
+}
+DeliveryMethodInstance_t;
+
+/**
+ * Structure used to define the functions used to manipulate a DeliveryMethodInstance.
+ */
+typedef struct DeliveryMethodInstanceOps_t
+{
     /**
      * Send a packet.
      * @param this The instance of the DeliveryMethodInstance_t to send the packet using.
@@ -93,9 +111,10 @@ typedef struct DeliveryMethodInstance_t
      */
      void (*SetHeader)(struct DeliveryMethodInstance_t *this, 
                         TSPacket_t *packets, int count);
-    
-}
-DeliveryMethodInstance_t;
+}DeliveryMethodInstanceOps_t;
+
+
+
 
 /**
  * Structure used to describe a Delivery Method Handler.

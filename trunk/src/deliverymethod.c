@@ -125,7 +125,7 @@ DeliveryMethodInstance_t *DeliveryMethodCreate(char *mrl)
             {
                 if (instance->mrl == NULL)
                 {
-                    instance->mrl = strdup(mrl);
+                    LogModule(LOG_DEBUG, DELIVERYMETHOD, "MRL field not set when creating instance for %s", mrl);
                 }
                 ListAdd(InstancesList, instance);
                 LogModule(LOG_DEBUG, DELIVERYMETHOD, "Created DeliveryMethodInstance(%p) for %s\n",instance, instance->mrl);
@@ -138,11 +138,9 @@ DeliveryMethodInstance_t *DeliveryMethodCreate(char *mrl)
 
 void DeliveryMethodDestroy(DeliveryMethodInstance_t *instance)
 {
-    char *mrl = instance->mrl;
-    instance->DestroyInstance(instance);
+    LogModule(LOG_DEBUG, DELIVERYMETHOD, "Released DeliveryMethodInstance(%p) for %s\n" ,instance, instance->mrl);
+    instance->ops->DestroyInstance(instance);
     ListRemove(InstancesList, instance);
-    LogModule(LOG_DEBUG, DELIVERYMETHOD, "Released DeliveryMethodInstance(%p) for %s\n" ,instance, mrl);
-    free(mrl);
 }
 
 void DeliveryMethodDestroyAll()
@@ -168,6 +166,6 @@ void DeliveryMethodOutputPacket(PIDFilter_t *pidfilter, void *userarg, TSPacket_
     DeliveryMethodInstance_t *instance = userarg;
     if (instance)
     {
-        instance->SendPacket(instance, packet);
+        instance->ops->SendPacket(instance, packet);
     }
 }

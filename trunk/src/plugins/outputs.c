@@ -50,6 +50,7 @@ typedef struct Output_s
     char *name;
     unsigned int refCount;
     DeliveryMethodInstance_t *dmInstance;
+    char *mrl;
 }Output_t;
 
 typedef struct OutputsState_s
@@ -92,6 +93,14 @@ DeliveryMethodHandler_t OutputsHandler = {
             OutputsCanHandle,
             OutputsCreate
         };
+
+DeliveryMethodInstanceOps_t OutputInstanceOps = {
+    OutputsSendPacket,
+    OutputsSendBlock,
+    OutputsDestroy,
+    NULL,
+    NULL
+};
 
 const char OUTPUTS[] = "Outputs";
 
@@ -195,10 +204,8 @@ static DeliveryMethodInstance_t *OutputsCreate(char *arg)
         LogModule(LOG_DEBUG, OUTPUTS, "Failed to allocate Outputs state\n");
         return NULL;
     }
-    state->instance.SendPacket = OutputsSendPacket;
-    state->instance.SendBlock = OutputsSendBlock;
-    state->instance.DestroyInstance = OutputsDestroy;
-
+    state->instance.ops = &OutputInstanceOps;
+    state->instance.mrl = output->mrl;
     return &state->instance;
 }
 
@@ -215,7 +222,7 @@ static void OutputsSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet
 {
     OutputsState_t *state = (OutputsState_t *)this;
     pthread_mutex_lock(&outputsMutex);
-    state->output->dmInstance->SendPacket(state->output->dmInstance, packet);
+    state->output->dmInstance->ops->SendPacket(state->output->dmInstance, packet);
     pthread_mutex_unlock(&outputsMutex);
 }
 
@@ -223,7 +230,7 @@ static void OutputsSendBlock(DeliveryMethodInstance_t *this, void *block, unsign
 {
     OutputsState_t *state = (OutputsState_t *)this;
     pthread_mutex_lock(&outputsMutex);
-    state->output->dmInstance->SendBlock(state->output->dmInstance, block, blockLen);
+    state->output->dmInstance->ops->SendBlock(state->output->dmInstance, block, blockLen);
     pthread_mutex_unlock(&outputsMutex);
 }
 
@@ -255,6 +262,7 @@ static void CommandAddOutput(int argc, char **argv)
             output->name = strdup(argv[0]);
             if (output->name)
             {
+                asprintf(&output->mrl, "%s%s", OutputPrefix, argv[0]);
                 output->dmInstance = DeliveryMethodCreate(mrl);
                 if (output->dmInstance)
                 {
@@ -323,6 +331,11 @@ static void OutputDestructor(void *arg)
     if (output->name != NULL)
     {
         free(output->name);
+    }
+
+    if (output->mrl != NULL)
+    {
+        free(output->mrl);
     }
 
     if (output->dmInstance)

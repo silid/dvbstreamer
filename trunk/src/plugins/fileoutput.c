@@ -70,6 +70,15 @@ DeliveryMethodHandler_t FileOutputHandler = {
             FileOutputCanHandle,
             FileOutputCreate
         };
+
+DeliveryMethodInstanceOps_t FileInstanceOps ={
+    FileOutputSendPacket,
+    FileOutputSendBlock,
+    FileOutputDestroy,
+    FileReserveHeaderSpace,
+    FileSetHeader,
+};
+
 static const char FILEOUTPUT[] = "FileOutput";
 
 /*******************************************************************************
@@ -107,11 +116,8 @@ DeliveryMethodInstance_t *FileOutputCreate(char *arg)
     {
         return NULL;
     }
-    instance->instance.SendPacket = FileOutputSendPacket;
-    instance->instance.SendBlock = FileOutputSendBlock;
-    instance->instance.DestroyInstance = FileOutputDestroy;
-    instance->instance.ReserveHeaderSpace = FileReserveHeaderSpace;
-    instance->instance.SetHeader = FileSetHeader;
+
+    instance->instance.ops = &FileInstanceOps;
 
     instance->fp = fopen((char*)(arg + PREFIX_LEN), "wb");
 
@@ -121,6 +127,7 @@ DeliveryMethodInstance_t *FileOutputCreate(char *arg)
         return NULL;
     }
 
+    instance->instance.mrl = strdup(arg);
     return &instance->instance;
 }
 
@@ -142,6 +149,7 @@ void FileOutputDestroy(DeliveryMethodInstance_t *this)
 {
     struct FileOutputInstance_t *instance = (struct FileOutputInstance_t*)this;
     fclose(instance->fp);
+    free(this->mrl);
     free(this);
 }
 
@@ -158,7 +166,7 @@ void FileReserveHeaderSpace(DeliveryMethodInstance_t *this, int packets)
 
     for (i=0; i< packets; i ++)
     {
-        if (fwrite(&nullPacket, TSPACKET_SIZE, 1, instance->fp) != TSPACKET_SIZE)
+        if (fwrite(&nullPacket, TSPACKET_SIZE, 1, instance->fp) != 1)
         {
             LogModule(LOG_INFO, FILEOUTPUT, "Failed to write all of null packet to start of file.\n");
         }

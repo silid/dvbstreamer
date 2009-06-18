@@ -148,7 +148,7 @@ static void ProcessPESPacket(void *userarg, uint8_t *packet, uint16_t length)
     }
 
     dmInstance = pesOutput.opArg;
-    dmInstance->SendBlock(dmInstance, packet, length);
+    dmInstance->ops->SendBlock(dmInstance, packet, length);
     pesOutput.packetsOutput ++;
 }
 

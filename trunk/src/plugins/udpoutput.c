@@ -103,6 +103,22 @@ DeliveryMethodHandler_t UDPOutputHandler = {
             UDPOutputCreate
         };
 
+DeliveryMethodInstanceOps_t UDPInstanceOps = {
+    UDPOutputSendPacket,
+    UDPOutputSendBlock,
+    UDPOutputDestroy,
+    NULL,
+    NULL
+};
+
+DeliveryMethodInstanceOps_t RTPInstanceOps = {
+    RTPOutputSendPacket,
+    NULL,
+    UDPOutputDestroy,
+    NULL,
+    NULL
+};
+
 const char UDPOUTPUT[] = "UDPOutput";
 
 /*******************************************************************************
@@ -155,7 +171,7 @@ static DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
     char portbuffer[6]; /* 65536\0 */
     char *sessionName= "DVBStreamer";
     bool rtp;
-
+    char *mrl = arg;
     hostbuffer[0] = 0;
     portbuffer[0] = 0;
 
@@ -164,69 +180,69 @@ static DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
      */
 
     /* Is this a RTP MRL? */
-    rtp = (strncmp(RTPPrefix, arg, PREFIX_LEN) == 0);
+    rtp = (strncmp(RTPPrefix, mrl, PREFIX_LEN) == 0);
 
     /* Ignore the prefix */
-    arg += PREFIX_LEN;
+    mrl += PREFIX_LEN;
 
-    if (arg[0] == '[')
+    if (mrl[0] == '[')
     {
-        arg ++;
-        LogModule(LOG_DEBUG, UDPOUTPUT, "IPv6 Address! %s\n", arg);
-        for (i = 0;arg[i] && (arg[i] != ']'); i ++)
+        mrl ++;
+        LogModule(LOG_DEBUG, UDPOUTPUT, "IPv6 Address! %s\n", mrl);
+        for (i = 0;mrl[i] && (mrl[i] != ']'); i ++)
         {
-            hostbuffer[i] = arg[i];
+            hostbuffer[i] = mrl[i];
         }
         hostbuffer[i] = 0;
-        arg += i;
-        if (*arg == ']')
+        mrl += i;
+        if (*mrl == ']')
         {
-            arg ++;
+            mrl ++;
         }
     }
     else
     {
-        LogModule(LOG_DEBUG, UDPOUTPUT, "IPv4 Address! %s\n", arg);
-        for (i = 0;arg[i] && (arg[i] != ':'); i ++)
+        LogModule(LOG_DEBUG, UDPOUTPUT, "IPv4 Address! %s\n", mrl);
+        for (i = 0;mrl[i] && (mrl[i] != ':'); i ++)
         {
-            hostbuffer[i] = arg[i];
+            hostbuffer[i] = mrl[i];
         }
         hostbuffer[i] = 0;
-        arg += i;
+        mrl += i;
     }
     /* Port */
-    if (*arg == ':')
+    if (*mrl == ':')
     {
-        arg ++;
-        LogModule(LOG_DEBUG, UDPOUTPUT, "Port parameter detected! %s\n", arg);
+        mrl ++;
+        LogModule(LOG_DEBUG, UDPOUTPUT, "Port parameter detected! %s\n", mrl);
         /* Process port */
-        for (i = 0;arg[i] && (arg[i] != ':'); i ++)
+        for (i = 0;mrl[i] && (mrl[i] != ':'); i ++)
         {
-            portbuffer[i] = arg[i];
+            portbuffer[i] = mrl[i];
         }
         portbuffer[i] = 0;
-        arg += i;
+        mrl += i;
     }
     /* TTL */
-    if (*arg == ':')
+    if (*mrl == ':')
     {
         char ttlbuffer[4];
-        arg ++;
-        LogModule(LOG_DEBUG, UDPOUTPUT, "TTL parameter detected! %s\n", arg);
+        mrl ++;
+        LogModule(LOG_DEBUG, UDPOUTPUT, "TTL parameter detected! %s\n", mrl);
 
-        for (i = 0;arg[i] && (arg[i] != ':') && (i < 3); i ++)
+        for (i = 0;mrl[i] && (mrl[i] != ':') && (i < 3); i ++)
         {
-            ttlbuffer[i] = arg[i];
+            ttlbuffer[i] = mrl[i];
         }
         /* process ttl */
         ttl = (unsigned char)atoi(ttlbuffer) & 255;
-        arg += i;
+        mrl += i;
     }
     /* Anything else is the session name for SAP/SDP */
-    if (*arg == ':')
+    if (*mrl == ':')
     {
-        arg ++;
-        sessionName = arg;
+        mrl ++;
+        sessionName = mrl;
     }
 
     /*
@@ -250,15 +266,12 @@ static DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
 
     if (rtp)
     {
-        state->instance.SendPacket = RTPOutputSendPacket;
-        state->instance.SendBlock = NULL;
+        state->instance.ops = &RTPInstanceOps;
     }
     else
     {
-        state->instance.SendPacket = UDPOutputSendPacket;
-        state->instance.SendBlock = UDPOutputSendBlock;
+        state->instance.ops = &UDPInstanceOps;    
     }
-    state->instance.DestroyInstance = UDPOutputDestroy;
 
     LogModule(LOG_DEBUG, UDPOUTPUT, "UDP Host \"%s\" Port \"%s\" TTL %d\n", hostbuffer, portbuffer, ttl);
 #ifdef USE_GETADDRINFO
@@ -322,6 +335,7 @@ static DeliveryMethodInstance_t *UDPOutputCreate(char *arg)
     }
 
     state->datagramFullCount = MAX_TS_PACKETS_PER_DATAGRAM;
+    state->instance.mrl = strdup(arg);
     return &state->instance;
 }
 
@@ -333,6 +347,7 @@ static void UDPOutputDestroy(DeliveryMethodInstance_t *this)
     {
         SAPServerDeleteSession(state->sapHandle);
     }
+    free(this->mrl);
     free(state);
 }
 
