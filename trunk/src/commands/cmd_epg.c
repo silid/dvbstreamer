@@ -95,7 +95,7 @@ static void CommandEPGData(int argc, char **argv)
         {
             CommandContext_t *context = CommandContextGet();
             CommandPrintf("<event net=\"0x%04x\" ts=\"0x%04x\" source=\"0x%04x\" event=\"0x%08x\">\n",
-                msg->eventRef.serviceRef.netId, msg->eventRef.serviceRef.netId, msg->eventRef.serviceRef.serviceId,
+                msg->eventRef.serviceRef.netId, msg->eventRef.serviceRef.tsId, msg->eventRef.serviceRef.serviceId,
                 msg->eventRef.eventId);
             switch(msg->type)
             {
