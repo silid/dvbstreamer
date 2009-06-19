@@ -5,6 +5,7 @@ import time
 import traceback
 import xml.sax
 import xml.sax.handler
+from xml.sax.saxutils import XMLGenerator
 import sqlite3
 import os
 import os.path
@@ -15,7 +16,7 @@ class ControlConnection:
     """
     Class implementing a connection to a DVBStreamer daemon.
     """
-    def __init__(self, host, adapter):
+    def __init__(self, host, adapter, username='dvbstreamer', password='control'):
         """
         Create a connection object to communicate with a DVBStreamer daemon.
         """
@@ -25,6 +26,9 @@ class ControlConnection:
         self.version = None
         self.welcome_message = None
         self.my_ip = None
+        
+        self.username = username
+        self.password = password
 
     def open(self):
         """
@@ -103,15 +107,23 @@ class ControlConnection:
     def execute_command(self, command):
         self.send_command(command)
         return self.read_response()
+    
+    def authenticate(self):
+        ec, em, lines = self.execute_command('auth %s %s' % (self.username, self.password))
+        if ec != 0:
+            raise RuntimeError('Failed to authenticate')
         
     def get_services(self, mux=''):
         """
         Get the list of services available on all or a specific multiplex.
         """
-        self.send_command('lsservices %s' % mux)
-        (errcode, errmsg, services) = self.read_response()
+        self.send_command('lsservices -id %s' % mux)
+        (errcode, errmsg, lines) = self.read_response()
         if errcode != 0:
             return None
+        services = []
+        for line in lines:
+            services.append(line.split(' : '))
         return services
     
     def get_service_info(self, service):
@@ -127,10 +139,15 @@ class ControlConnection:
             name, value = line.split(':', 2)
             dict[name.strip()] = value.strip()
         return dict
+    
+    def capture_epg_data(self):
+        self.authenticate()
+        self.execute_command('epgcaprestart')
+        self.send_command('epgdata')
 
 class EPGProcessor(xml.sax.handler.ContentHandler):
-    def __init__(self, dbase, host, adapter):
-        self.connection = ControlConnection(host, adapter)
+    def __init__(self, dbase, host, adapter, username, password):
+        self.connection = ControlConnection(host, adapter, username, password)
         self.__stop = False
         self.dbase = dbase
         self.thread = threading.Thread(target=self.__run)
@@ -150,8 +167,7 @@ class EPGProcessor(xml.sax.handler.ContentHandler):
         while not self.__stop:
             try:
                 self.connection.open()
-                self.connection.execute_command('epgcaprestart')
-                self.connection.send_command('epgdata')
+                self.connection.capture_epg_data()
                 xml.sax.parse(self.connection.socket_file, self)
             except:
                 traceback.print_exc()
@@ -228,7 +244,7 @@ class EPGDatabase:
     DETAILS_COLUMNS = [DETAILS_COLUMN_SOURCE, DETAILS_COLUMN_EVENT, DETAILS_COLUMN_NAME, 
                         DETAILS_COLUMN_LANG, DETAILS_COLUMN_VALUE]
     
-    def __init__(self, dbpath):
+    def __init__(self, dbpath, updater=False, reaper=False):
         self.dbpath = dbpath
         self.create_tables()
         
@@ -237,20 +253,24 @@ class EPGDatabase:
         self.message_q = []
         self.message_event = threading.Event()
         self.__quit = False
-        
-        self.updater_thread = threading.Thread(target=self.updater)
-        self.updater_thread.setName('EPGDbase Updater')
-        self.updater_thread.start()
-        
-        self.reaper_thread = threading.Thread(target=self.reaper)
-        self.reaper_thread.setDaemon(True)
-        self.reaper_thread.setName('EPGDbase Reaper')
-        self.reaper_thread.start()
+        if updater:
+            self.updater_thread = threading.Thread(target=self.updater)
+            self.updater_thread.setName('EPGDbase Updater')
+            self.updater_thread.start()
+        else:
+            self.updater_thread = None
+
+        if reaper:
+            self.reaper_thread = threading.Thread(target=self.reaper)
+            self.reaper_thread.setDaemon(True)
+            self.reaper_thread.setName('EPGDbase Reaper')
+            self.reaper_thread.start()
         
     def close(self):
-        self.__quit = True
-        self.post_message(('quit',))
-        self.updater_thread.join()
+        if self.updater_thread:
+            self.__quit = True
+            self.post_message(('quit',))
+            self.updater_thread.join()
         
     def create_tables(self):
         connection = sqlite3.Connection(self.dbpath)
@@ -294,6 +314,16 @@ class EPGDatabase:
             self.connections[thread].close()
             del self.connections[thread]
         
+    def get_events(self, source):
+        connection = self.get_connection()
+        cursor = connection.cursor()
+        print 'SELECT %s FROM %s WHERE %s="%s"' % (reduce(lambda x,y: x +','+y,EPGDatabase.EVENTS_COLUMNS), 
+                                                         EPGDatabase.EVENTS_TABLE, 
+                                                         EPGDatabase.EVENTS_COLUMN_SOURCE, source)
+        cursor.execute('SELECT %s FROM %s WHERE %s=?;' % (reduce(lambda x,y: x +','+y,EPGDatabase.EVENTS_COLUMNS), 
+                                                         EPGDatabase.EVENTS_TABLE, 
+                                                         EPGDatabase.EVENTS_COLUMN_SOURCE), (source,))
+        return cursor.fetchall()
     
     def new_event(self, event_ref, start, end, ca):    
         self.post_message(('new', event_ref, start, end, ca))
@@ -353,6 +383,7 @@ class EPGDatabase:
             if len(self.message_q) > 0:
                 msg = self.message_q.pop()
                 if msg[0] == 'commit':
+                    print 'Committing %d updates' % updates
                     connection.commit()
                     updates = 0
                     
@@ -370,7 +401,7 @@ class EPGDatabase:
                     
                 elif msg[0] == 'reap':
                     updates = 0
-                    self.__reap()
+                    #self.__reap()
                     
                 elif msg[0] == 'quit':
                     connection.commit()
@@ -405,50 +436,65 @@ class EPGDatabase:
                         '(SELECT * FROM Events WHERE source=Ratings.source AND event=Ratings.event);')
 
 def usage():
-    print '%s [<host>[:<adapter>] ...]'
-    print 'Connects to one or more DVBStreamer daemons to process and store EPG data.'
+    print '%s -c' % sys.argv[0]
+    print 'Connects to one or more DVBStreamer daemons, specified in .epgdb/adapters, to process and store EPG data.'
+    
+    print 
+    
+    print '%s -x <outputfile>' % sys.argv[0]
+    print 'Exports the database as an XMLTV file (<outputfile>) by connecting to the DVBStreamer daemons used to capture the data to find available services/channels'
+    print 
+    print 'Format of .epgdb/adapters file'
+    print '------------------------------'
+    print 'One DVBStreamer host/adapter specified per line in the following format:'
+    print '<host>[:adapter[:<username>[:<password>]]]'
+    print
+    print 'host     - Either an IP address of hostname'
+    print 'adapter  - The adapter number used by the DVBStreamer daemon (Default:0)'
+    print 'username - Username used to authenitcate with the DVBStreamer daemon (Default:dvbstreamer)'
+    print 'password - Password used to authenitcate with the DVBStreamer daemon (Default:control)'
+    sys.exit(1)
 
-
+    
 def process_host(host):
     if host[0] == '[':
         # IPv6
         i = host.find(']')
         hostname = host[:i + 1]
         if len(host) > i + 1:
-            adapter = int(host[i + 2])
+            rest = host[i + 2:]
         else:
-            adapter = 0
+            rest = ''
     else:
-        tmp = host.split(':')
-        
-        hostname = tmp[0]
-            
-        if len(tmp) >= 2:
-            adapter = int(tmp[1])
+        tmp = host.find(':')
+        if tmp == -1:
+            rest = ''
+            hostname = host
         else:
-            adapter = 0
-    return (hostname, adapter)
+            rest =  host[tmp + 1:]
+            hostname = host[:tmp]
+    
+    username = 'dvbstreamer'
+    password = 'control'
+    
+    if rest:
+        parts = rest.split(':')
+        adapter = int(parts[0])
+        if len(parts) > 1:
+            username = parts[1]
+        if len(parts) > 2:
+            password = parts[2]
+    else:
+        adapter = 0
+    return (hostname, adapter, username, password)
 
-    
-def main():
-    app_dir = os.path.expanduser('~/.epgdb')
-    
-    if not os.path.exists(app_dir):
-        os.mkdir(app_dir)
-    
-    
-    hosts = None
-    for arg in sys.argv[1:]:
-        host = arg.split(':')
-        hosts.append(process_host(host))
+def capture_start(args):
+    dbase = EPGDatabase(os.path.join(app_dir, 'database.db'), True, True)
 
-    dbase = EPGDatabase(os.path.join(app_dir, 'database.db'))
-    if hosts is None:
-        hosts = [('localhost', 0)]
-    
     processors = []
-    for host in hosts:
-        processors.append(EPGProcessor(dbase, host[0], host[1]))
+    
+    for adapter in get_adapters():
+        processors.append(EPGProcessor(dbase, adapter[0], adapter[1], adapter[2], adapter[3]))
     
     while True:
         try:
@@ -463,9 +509,97 @@ def main():
         processor.stop()
     dbase.close()
 
+
+def get_services_info(services, adapter):
+    connection = ControlConnection(*adapter)
+    try:
+        connection.open()
+        
+        for id,name in connection.get_services():
+            info = connection.get_service_info(id)
+            net,ts,service = id.split('.')
+            source = eval(info['Source'])
+            services[id] = (name, '%s.%s.%04x' % (net, ts, source))
+        
+        connection.close()
+    except:
+        traceback.print_exc()
+
+def export_xmltv(args):
+    if len(args) < 1:
+        usage()
+    
+    dbase = EPGDatabase(os.path.join(app_dir, 'database.db'))
+    outfilename = args[0]
+    services = {}
+    for adapter in get_adapters():
+        get_services_info(services, adapter)
+    
+    outfile = open(outfilename, 'w')
+    generator = XMLGenerator(outfile)
+    generator.startDocument()
+    generator.startElement('tv', {})
+    
+    # Channels
+    for id,(name, source) in services.items():
+        generator.startElement('channel', {'id':id})
+        generator.startElement('display-name', {})
+        generator.characters(name)
+        generator.endElement('display-name')
+        generator.endElement('channel')
+    
+    # Programmes
+    for id,(name, source) in services.items():
+        print '%s => %s' % (source, name)
+        print dbase.get_events(source)
+        print
+        
+    generator.endElement('tv')
+    generator.endDocument()
+    outfile.close()
+    
+    
+def get_adapters():
+    adapters = []
+    try:
+        adaptersfile = open(os.path.join(app_dir, 'adapters'), 'r')
+        for line in adaptersfile:
+            adapters.append(process_host(line.strip()))
+        adaptersfile.close()
+    except:
+        traceback.print_exc()
+        print 'WARNING: Failed to open adapters file, defaulting to localhost:0:dvbstreamer:control'
+    if len(adapters) == 0:
+        adapters = [('localhost', 0, 'dvbstreamer', 'control')]
+    return adapters
+    
+# Location of the user data for epgdb    
+app_dir = ''
+
+def main():
+    global app_dir
+    app_dir = os.path.expanduser('~/.epgdb')
+    
+    if not os.path.exists(app_dir):
+        os.mkdir(app_dir)
+        
+    if len(sys.argv) < 2:
+        usage()
+    elif sys.argv[1] == '-c':
+        capture_start(sys.argv[2:])
+    
+    elif sys.argv[1] == '-x':
+        export_xmltv(sys.argv[2:])
+    
+    else:
+        usage()
+    
+
 if __name__ == '__main__':
     try:
         main()
+    except SystemExit:
+        raise
     except:
         traceback.print_exc()
     sys.exit(0)
