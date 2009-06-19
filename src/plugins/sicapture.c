@@ -79,7 +79,7 @@ PLUGIN_FEATURES(
 PLUGIN_COMMANDS(
     {
         "enablesicap",
-        TRUE, 1, 1,
+        1, 1,
         "Enable the capture of PSI/SI data.",
         "enablesicap <mrl>\n"
         "Enables and sets the MRL to send captured PSI/SI packets to.",
@@ -87,7 +87,7 @@ PLUGIN_COMMANDS(
     },
     {
         "disablesicap",
-        TRUE, 0, 0,
+        0, 0,
         "Disable the capture of PSI/SI data.",
         "enablesicap <mrl>\n"
         "Disables the capture of PSI/SI packets.",

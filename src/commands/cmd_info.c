@@ -86,7 +86,7 @@ Command_t CommandDetailsInfo[] =
 {
     {
         "lsservices",
-        TRUE, 0, 6,
+        0, 6,
         "List all services or for a specific multiplex.",
         "lsservices [-id] [filters] [-q query|[multiplex]]\n"
         "Lists selected services, by default all services on all multiplex are displayed.\n"
@@ -107,7 +107,7 @@ Command_t CommandDetailsInfo[] =
     },
     {
         "lsmuxes",
-        TRUE, 0, 1,
+        0, 1,
         "List multiplexes.",
         "lsmuxes [-id]\n"
         "List all available multiplex UIDs.\n"
@@ -118,7 +118,7 @@ Command_t CommandDetailsInfo[] =
     },
     {
         "lspids",
-        TRUE, 1, 2,
+        1, 2,
         "List the PIDs for a specified service.",
         "lspids <service name or service id>\n"
         "List all the PIDs specified in <service name> PMT.",
@@ -126,14 +126,14 @@ Command_t CommandDetailsInfo[] =
     },    
     {
         "current",
-        FALSE, 0, 0,
+        0, 0,
         "Print out the service currently being streamed.",
         "Shows the service that is currently being streamed to the default output.",
         CommandCurrent
     },
     {
         "serviceinfo",
-        FALSE, 1, 1,
+        1, 1,
         "Display information about a service.",
         "serviceinfo <service name or service id>\n"
         "Displays information about the specified service.",
@@ -141,7 +141,7 @@ Command_t CommandDetailsInfo[] =
     },
     {
         "muxinfo",
-        TRUE, 1, 2,
+        1, 2,
         "Display information about a mux.",
         "muxinfo <uid> or\n"
         "muxinfo <netid>.<tsid>\n"
@@ -151,7 +151,7 @@ Command_t CommandDetailsInfo[] =
     },
     {
         "stats",
-        FALSE, 0, 0,
+        0, 0,
         "Display the stats for the PAT,PMT and service PID filters.",
         "Display the number of packets processed for the PSI/SI filters and the number of"
         " packets filtered for each service filter and manual output.",
@@ -159,7 +159,7 @@ Command_t CommandDetailsInfo[] =
     },
     {
         "festatus",
-        FALSE, 0, 0,
+        0, 0,
         "Displays the status of the tuner.",
         "Displays whether the front end is locked, the bit error rate and signal to noise"
         "ratio and the signal strength",
@@ -167,7 +167,7 @@ Command_t CommandDetailsInfo[] =
     },
     {
         "lsprops",
-        TRUE, 0, 2,
+        0, 2,
         "List available properties.",
         "lsprops [-l] [<property path>]\n"
         "List all available properties at the specified path or the root if not supplied."
@@ -176,7 +176,7 @@ Command_t CommandDetailsInfo[] =
     },
     {
         "getprop",
-        TRUE, 1, 1,
+        1, 1,
         "Get the value of a property.",
         "getprop <property path>\n"
         "Get the value of the specified property.",
@@ -184,7 +184,7 @@ Command_t CommandDetailsInfo[] =
     },
     {
         "setprop",
-         TRUE, 2, 2,
+        2, 2,
         "Set the value of a property.",
         "setprop <property path> <new value>\n"
         "Set the value of the specified property to that of <new value>.",
@@ -192,13 +192,13 @@ Command_t CommandDetailsInfo[] =
     },
     {
         "propinfo",
-        TRUE, 1, 1,
+        1, 1,
         "Display information about a property.",
         "propinfo <property path>\n"
         "Display information about the specified property.",
         CommandPropertyInfo
     },
-    {NULL, FALSE, 0, 0, NULL,NULL}
+    COMMANDS_SENTINEL
 };
 
 static char *FETypesStr[] = {

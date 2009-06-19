@@ -82,20 +82,20 @@ static List_t *PluginsList;
 static Command_t PluginManagerCommands[] = {
         {
             "lsplugins",
-            FALSE, 0, 0,
+            0, 0,
             "List loaded plugins.",
             "List all plugins that where loaded at startup.",
             PluginManagerLsPlugins
         },
         {
             "plugininfo",
-            TRUE, 1, 1,
+            1, 1,
             "Display the information about a plugin.",
             "plugininfo <pluginname>\n"
             "Displays the version, author and descriptor for a specific plugin.",
             PluginManagerPluginInfo
         },
-        {NULL, FALSE, 0, 0, NULL, NULL}
+        COMMANDS_SENTINEL
     };
 
 struct PluginFeatureInfo_t pluginFeatures[] = {

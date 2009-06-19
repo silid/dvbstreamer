@@ -52,7 +52,7 @@ static bool started = FALSE;
 PLUGIN_COMMANDS(
     {
         "startxpes",
-        TRUE, 2, 2,
+        2, 2,
         "Start extracting a PES from a specified PID to an MRL.",
         "Start extracting a Packetised Elementary Stream on the specified PID"
         "and send it to the specified MRL.",
@@ -60,14 +60,14 @@ PLUGIN_COMMANDS(
     },
     {
         "stopxpes",
-        FALSE, 0, 0,
+        0, 0,
         "Stop extracting a PES.",
         "Stop a previously started extraction of a PES from a PID.",
         CommandStopExtractingPes
     },
     {
         "currentxpes",
-        FALSE, 0, 0,
+        0, 0,
         "Display the current PID being extracted.",
         "Displays the current PID from which a PES is being extracted.",
         CommandCurrentExtractingPes

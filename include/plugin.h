@@ -212,7 +212,7 @@ typedef struct Plugin_t
 #define PLUGIN_COMMANDS(_commands...) \
     static Command_t PluginCommands[] = {\
         _commands,\
-        {NULL, FALSE, 0, 0, NULL, NULL, NULL}\
+        COMMANDS_SENTINEL\
     }
 
 /**

@@ -82,7 +82,7 @@ static pthread_mutex_t manualFiltersMutex = PTHREAD_MUTEX_INITIALIZER;
 PLUGIN_COMMANDS(
     {
         "addmf",
-        TRUE, 2, 2,
+        2, 2,
         "Add a new destination for manually filtered PIDs.",
         "addmf <filter name> <mrl>\n"
         "Adds a new destination for sending packets to. This is only used for "
@@ -93,7 +93,7 @@ PLUGIN_COMMANDS(
     },
     {
         "rmmf",
-        TRUE, 1, 1,
+        1, 1,
         "Remove a destination for manually filtered PIDs.",
         "rmoutput <filter name>\n"
         "Removes the destination and stops all filters associated with this output.",
@@ -101,14 +101,14 @@ PLUGIN_COMMANDS(
     },
     {
         "lsmfs",
-        FALSE, 0, 0,
+        0, 0,
         "List current filters.",
         "List all active additonal output names and destinations.",
         CommandListMF
     },
     {
         "setmfmrl",
-        TRUE, 2, 2,
+        2, 2,
         "Set the filter's MRL.",
         "setmfmrl <filter name> <mrl>\n"
         "Change the destination for packets sent to this output. If the MRL cannot be"
@@ -117,7 +117,7 @@ PLUGIN_COMMANDS(
     },
     {
         "addmfpid",
-        TRUE, 2, 2,
+        2, 2,
         "Adds a PID to a filter.",
         "addmfpid <filter name> <pid>\n"
         "Adds a PID to the filter to be sent to the specified output. The PID can be "
@@ -126,7 +126,7 @@ PLUGIN_COMMANDS(
     },
     {
         "rmmfpid",
-        TRUE, 2, 2,
+        2, 2,
         "Removes a PID from a filter.",
         "rmmfpid <filter name> <pid>\n"
         "Removes the PID from the filter that is sending packets to the specified output."
@@ -135,7 +135,7 @@ PLUGIN_COMMANDS(
     },
     {
         "lsmfpids",
-        TRUE, 1, 1,
+        1, 1,
         "List PIDs for filter.",
         "lsmfpids <filter name>\n"
         "List the PIDs being filtered for a specific output.",

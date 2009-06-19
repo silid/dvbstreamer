@@ -49,13 +49,17 @@ Command Processing and command functions.
 typedef struct Command_t
 {
     char *command;  /**< Command name */
-    bool  tokenise; /**< Should the argument string be split on spaces? */
     int   minArgs;  /**< Minimum number of args this command accepts. */
     int   maxArgs;  /**< Maximum number of args this command accepts. */
     char *shortHelp;/**< Short description of the command, displayed by help */
     char *longHelp; /**< Long description of the command, displayed by help \<command\> */
     void (*commandfunc)(int argc, char **argv); /**< Function to call to execute command */
 }Command_t;
+
+/**
+ * Sentinel used to terminate an array of commands.
+ */
+#define COMMANDS_SENTINEL {NULL, 0, 0, NULL, NULL, NULL}
 
 /**
  * Function pointer to call when retrieve a variable.

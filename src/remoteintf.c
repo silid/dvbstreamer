@@ -84,20 +84,20 @@ static void PrintResponse(FILE *fp, uint16_t errno, char * msg);
 * Global variables                                                             *
 *******************************************************************************/
 static Command_t RemoteInterfaceCommands[] = {
-        {
-            "who",
-            FALSE, 0, 0,
-            "Display current control connections.",
-            "List all the control connections and if they are authenticated.",
-            RemoteInterfaceWho
-        },
-        {NULL, FALSE, 0, 0, NULL, NULL}
-    };
+    {
+        "who",
+        0, 0,
+        "Display current control connections.",
+        "List all the control connections and if they are authenticated.",
+        RemoteInterfaceWho
+    },
+    COMMANDS_SENTINEL
+};
 
 static Command_t ConnectionCommands[] = {
     {
         "auth",
-        TRUE, 2, 2,
+        2, 2,
         "Login to control dvbstreamer.",
         "auth <username> <password>\n"
                 "Authenticate as the user that is able to select channels etc.",
@@ -105,12 +105,12 @@ static Command_t ConnectionCommands[] = {
     },
     {
         "logout",
-        FALSE, 0, 0,
+        0, 0,
         "Close the current control connection.",
         "Close the current control connection (only works for remote connections).",
         RemoteInterfaceLogout
     },
-    {NULL, FALSE, 0, 0, NULL, NULL}
+    COMMANDS_SENTINEL
 };
 
 static bool remoteIntfExit = FALSE;

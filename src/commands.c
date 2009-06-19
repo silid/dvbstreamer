@@ -96,7 +96,7 @@ static Command_t coreCommands[] =
 {
     {
         "quit",
-        FALSE, 0, 0,
+        0, 0,
         "Exit the program.",
         "Exit the program, can be used in the startup file to stop further processing.",
         CommandQuit
@@ -104,13 +104,13 @@ static Command_t coreCommands[] =
 
     {
         "help",
-        TRUE, 0, 1,
+        0, 1,
         "Display the list of commands or help on a specific command.",
         "help [<command>]\n"
         "List all available commands or displays specific help for the command specifed.",
         CommandHelp
     },
-    {NULL, FALSE, 0, 0, NULL,NULL}
+    COMMANDS_SENTINEL
 };
 
 static bool quit = FALSE;
@@ -393,16 +393,7 @@ static bool ProcessCommand(CommandContext_t *context, char *command, char *argum
     {
         if (argument)
         {
-            if (commandInfo->tokenise)
-            {
-                argv = Tokenise(argument, &argc);
-            }
-            else
-            {
-                argc = 1;
-                argv = calloc(sizeof(char*), 1);
-                argv[0] = argument;
-            }
+            argv = Tokenise(argument, &argc);
         }
         else
         {
@@ -420,16 +411,11 @@ static bool ProcessCommand(CommandContext_t *context, char *command, char *argum
             CommandError(COMMAND_ERROR_WRONG_ARGS, "Incorrect number of arguments!");
         }
 
-        if (commandInfo->tokenise)
+        for (; argc > 0; argc --)
         {
-            int a;
-
-            for (a = 0; a < argc; a ++)
-            {
-                free(argv[a]);
-            }
-            free(argv);
+            free(argv[argc - 1]);
         }
+        free(argv);
 
         commandFound = TRUE;
     }
@@ -524,23 +510,36 @@ static char **Tokenise(char *arguments, int *argc)
 
     while (*start)
     {
-        bool quotesOpen = FALSE;
+        bool doubleQuotesOpen = FALSE;
+        bool singleQuotesOpen = FALSE;
 
         /* Trim spaces from the start */
         for (; *start && isspace(*start); start ++);
 
         if (start[0] == '"')
         {
-            quotesOpen = TRUE;
+            doubleQuotesOpen = TRUE;
             start ++;
         }
-
+        
+        if (start[0] == '\'')
+        {
+            singleQuotesOpen = TRUE;
+            start ++;
+        }
         /* Work out the end of the argument */
         for (end = start; *end; end ++)
         {
-            if (quotesOpen)
+            if (doubleQuotesOpen)
             {
                 if (*end== '"')
+                {
+                    break;
+                }
+            }
+            else if (singleQuotesOpen)
+            {
+                if (*end== '\'')
                 {
                     break;
                 }
@@ -556,7 +555,7 @@ static char **Tokenise(char *arguments, int *argc)
         args[currentarg] = strdup(start);
         end[0] = t;
         start = end;
-        if (quotesOpen)
+        if (doubleQuotesOpen || singleQuotesOpen)
         {
             start ++;
         }
