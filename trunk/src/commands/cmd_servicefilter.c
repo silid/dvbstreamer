@@ -89,7 +89,7 @@ Command_t CommandDetailsServiceFilter[] =
 {
     {
         "select",
-        FALSE, 1, 1,
+        1, 1,
         "Select a new service to stream.",
         "select <service name>\n"
         "Sets <service name> as the current service, this may mean tuning to a different "
@@ -98,7 +98,7 @@ Command_t CommandDetailsServiceFilter[] =
     },
     {
         "setmrl",
-        TRUE, 1,1,
+        1,1,
         "Set the MRL of the primary service filter.",
         "setmrl <MRL>\n"
         "Set the MRL of the primary service filter.\n"
@@ -107,7 +107,7 @@ Command_t CommandDetailsServiceFilter[] =
     },
     {
         "getmrl",
-        TRUE, 0,0,
+        0,0,
         "Get the primary service filter MRL.",
         "getmrl\n"
         "Get the MRL of the primary service filter.\n"
@@ -116,7 +116,7 @@ Command_t CommandDetailsServiceFilter[] =
     },    
     {
         "addsf",
-        TRUE, 2, 2,
+        2, 2,
         "Add a service filter.",
         "addsf <service filter name> <mrl>\n"
         "Adds a new destination for sending a secondary service to.",
@@ -124,7 +124,7 @@ Command_t CommandDetailsServiceFilter[] =
     },
     {
         "rmsf",
-        TRUE, 1, 1,
+        1, 1,
         "Remove a service filter.",
         "rmsf <service filter name>\n"
         "Remove a destination for sending secondary services to.",
@@ -132,14 +132,14 @@ Command_t CommandDetailsServiceFilter[] =
     },
     {
         "lssfs",
-        FALSE,0,0,
+        0, 0,
         "List all service filters.",
         "List all service filters their names, destinations and currently selected service.",
         CommandListSF
     },
     {
         "setsf",
-        FALSE, 1, 1,
+        1, 1,
         "Set the service to be filtered by a service filter.",
         "setsf <service filter name> <service name>\n"
         "Selects the service to be filtered by the service filter.\n"
@@ -148,7 +148,7 @@ Command_t CommandDetailsServiceFilter[] =
     },
 {
         "getsf",
-        FALSE, 1, 1,
+        1, 1,
         "Get the service to stream to a secondary service output.",
         "setsf <service filter name> <service name>\n"
         "Stream the specified service to the secondary service output.",
@@ -156,7 +156,7 @@ Command_t CommandDetailsServiceFilter[] =
     },    
     {
         "setsfmrl",
-        TRUE, 2, 2,
+        2, 2,
         "Set the service filter's MRL.",
         "setsfmrl <service filter name> <mrl>\n"
         "Change the destination for packets sent to this service filters output."
@@ -165,7 +165,7 @@ Command_t CommandDetailsServiceFilter[] =
     },
     {
         "getsfmrl",
-        TRUE, 1, 1,
+        1, 1,
         "Get the service filter's MRL.",
         "getsfmrl <service filter name>\n"
         "Retrieve the current MRL for the specified service filter.",
@@ -173,7 +173,7 @@ Command_t CommandDetailsServiceFilter[] =
     },    
     {
         "setsfavsonly",
-        TRUE, 2, 2,
+        2, 2,
         "Enable/disable streaming of Audio/Video/Subtitles only.",
         "setsfavsonly <service filter name> on|off\n"
         "Enabling AVS Only cause the PMT to be rewritten to only include the first "
@@ -183,14 +183,13 @@ Command_t CommandDetailsServiceFilter[] =
     },
     {
         "getsfavsonly",
-        TRUE, 1, 1,
+        1, 1,
         "Get whether Audio/Video/Subtitles only streaming is enabled.",
         "getsfavsonly <service filter name>\n"
         "Retrieves whether Audio/Video/Subtitles only streaming is enabled.",
         CommandGetSFAVSOnly
     },
-    
-    {NULL, FALSE, 0, 0, NULL,NULL}
+    COMMANDS_SENTINEL
 };
 /*******************************************************************************
 * Global functions                                                             *

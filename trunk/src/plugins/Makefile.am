@@ -16,6 +16,7 @@ plugins_LTLIBRARIES = \
 	sicapture.la \
 	traffic.la \
 	eventsdispatcher.la \
+	sectionfilters.la \
 	$(atsc_plugins) \
 	$(dvb_plugins)
 
@@ -83,11 +84,6 @@ schedule_la_SOURCES = \
 
 schedule_la_LDFLAGS = -module -no-undefined -avoid-version
 
-epgtoxmltv_la_SOURCES = \
-    epgtoxmltv.c
-
-epgtoxmltv_la_LDFLAGS = -module -no-undefined -avoid-version
-
 atsctoepg_la_SOURCES = \
     atsctoepg.c
 
@@ -97,11 +93,6 @@ manualfilters_la_SOURCES = \
     manualfilters.c
 
 manualfilters_la_LDFLAGS = -module -no-undefined -avoid-version
-
-queryepg_la_SOURCES = \
-    queryepg.c
-
-queryepg_la_LDFLAGS = -module -no-undefined -avoid-version
 
 sicapture_la_SOURCES = \
     sicapture.c
@@ -118,3 +109,7 @@ eventsdispatcher_la_SOURCES = \
 
 eventsdispatcher_la_LDFLAGS = -module -no-undefined -avoid-version
 
+sectionfilters_la_SOURCES = \
+    sectionfilters.c
+
+sectionfilters_la_LDFLAGS = -module -no-undefined -avoid-version

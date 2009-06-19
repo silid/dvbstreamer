@@ -119,7 +119,7 @@ PLUGIN_FEATURES(
 PLUGIN_COMMANDS(
     {
         "addoutput",
-        TRUE, 1, 2,
+        1, 2,
         "Add a new output.",
         "addoutput <output> [<mrl>]\n"
         "Add a new output that can be used by multiple filters. \n"
@@ -129,7 +129,7 @@ PLUGIN_COMMANDS(
     },
     {
         "rmoutput",
-        TRUE, 1, 1,
+        1, 1,
         "Remove an output.",
         "rmoutput <output>\n"
         "Remove an output, note that the output must not currently be in use to be able to remove it.",

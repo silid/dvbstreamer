@@ -82,7 +82,7 @@ PLUGIN_FEATURES(
 PLUGIN_COMMANDS(
     {
         "traffic",
-        TRUE, 0, 2,
+        0, 2,
         "Display the packet rate for each PID in the TS",
         "traffic [-s] [-i]\n"
         "Display the packet rate for each PID in the TS.\n"

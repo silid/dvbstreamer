@@ -111,7 +111,7 @@ Command_t CommandDetailsScanning[] =
 {
     {
         "scan",
-        TRUE, 1,2,
+        1,2,
         "Scan the specified multiplex(es) for services.",
         "scan <multiplex>\n"
         "Tunes to the specified multiplex and waits for up to 5 seconds to acquire service information.\n"
@@ -128,13 +128,13 @@ Command_t CommandDetailsScanning[] =
     },
     {
         "cancelscan",
-        FALSE, 0, 0,
+        0, 0,
         "Cancel the any scan that is in progress.",
         "cancelscan\n"
         "Cancels any scans that are currently in progress.",
         CommandScanCancel
     },
-    {NULL, FALSE, 0, 0, NULL, NULL, NULL}
+    COMMANDS_SENTINEL
 };
 
 

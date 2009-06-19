@@ -99,7 +99,7 @@ static char NOWNEXT[]="NowNext";
 PLUGIN_COMMANDS(
     {
         "now",
-        FALSE, 1, 1,
+        1, 1,
         "Display the current program.",
         "Display the current program on all channels (assuming the data is "
         "present on the current TS). Dates are in YYYY/MM/DD format and times"
@@ -108,7 +108,7 @@ PLUGIN_COMMANDS(
     },
     {
         "next",
-        FALSE, 1, 1,
+        1, 1,
         "Display the next program.",
         "Display the next program on all channels (assuming the data is "
         "present on the current TS). Dates are in YYYY/MM/DD format and times"

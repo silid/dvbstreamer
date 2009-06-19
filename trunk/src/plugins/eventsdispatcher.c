@@ -113,7 +113,7 @@ static PropertyTableDescription_t tableDescription = {
 PLUGIN_COMMANDS(
     {
         "listen",
-        TRUE, 0, 0,
+        0, 0,
         "Listen for events.",
         "listen\n"
         "Listen for internal events, to add events to listen to, type\n"
@@ -129,7 +129,7 @@ PLUGIN_COMMANDS(
     },
     {
         "addlistener",
-        TRUE, 2, 2,
+        2, 2,
         "Add a destination to send event notification to.",
         "addlistener <name> <MRL>\n"
         "Add an MRL destination to send event notifications to.\n"
@@ -139,7 +139,7 @@ PLUGIN_COMMANDS(
     },
     {
         "rmlistener",
-        TRUE, 1, 1,
+        1, 1,
         "Remove a destination to send event notification to.",
         "rmlistener <name>\n"
         "Remove a destination to send event notifications over udp to.",
@@ -147,14 +147,14 @@ PLUGIN_COMMANDS(
     },
     {
         "lslisteners",
-        TRUE, 0, 0,
+        0, 0,
         "List all registered event listener",
         "List all registered UDP event listener",
         CommandListListeners
     },
     {
         "addlistenevent",
-        TRUE, 2, 2,
+        2, 2,
         "Add an internal event to monitor.",
         "addlistenevent <name> <event>\n"
         "Add an internal event (<event>) to monitor to the listener specified by <name>.\n"
@@ -163,7 +163,7 @@ PLUGIN_COMMANDS(
     },
     {
         "rmlistenevent",
-        TRUE, 2, 2,
+        2, 2,
         "Remove an internal event to monitor",
         "rmlistenevent <name> <event>\n"
         "Remove an internal event previously monitored by a call to addevent.",
@@ -171,7 +171,7 @@ PLUGIN_COMMANDS(
     },
     {
         "lslistenevents",
-        TRUE, 1, 1,
+        1, 1,
         "List all registered event listener",
         "List all registered UDP event listener",
         CommandListListenEvents

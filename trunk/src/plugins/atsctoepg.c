@@ -119,21 +119,21 @@ PLUGIN_FEATURES(
 
 PLUGIN_COMMANDS({
         "epgcaprestart",
-        FALSE, 0, 0,
+        0, 0,
         "Starts or restarts the capturing of EPG content.",
         "Starts or restarts the capturing of EPG content, for use by EPG capture applications.",
         CommandEPGCapRestart
     },
     {
         "epgcapstart",
-        FALSE, 0, 0,
+        0, 0,
         "Starts the capturing of EPG content.",
         "Starts the capturing of EPG content, for use by EPG capture applications.",
         CommandEPGCapStart
     },
     {
         "epgcapstop",
-        FALSE, 0, 0,
+        0, 0,
         "Stops the capturing of EPG content.",
         "Stops the capturing of EPG content, for use by EPG capture applications.",
         CommandEPGCapStop

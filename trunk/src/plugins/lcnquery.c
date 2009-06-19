@@ -97,21 +97,21 @@ PLUGIN_FEATURES(
 PLUGIN_COMMANDS(
     {
         "lslcn",
-        FALSE, 0, 0,
+        0, 0,
         "List the logical channel numbers to services.",
         "List all the logical channel numbers and the services they refer to.",
         CommandListLCN
     },
     {
         "findlcn",
-        TRUE, 1, 1,
+        1, 1,
         "Find the service for a logical channel number.",
         "Given a logical channel number return the service name it refers to.",
         CommandFindLCN
     },
     {
         "selectlcn",
-        TRUE, 1, 1,
+        1, 1,
         "Select the service from a logical channel number.",
         "Select service refered to by the logical channel number as the primary service.",
         CommandSelectLCN

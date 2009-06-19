@@ -52,7 +52,7 @@ PLUGIN_FEATURES(
 PLUGIN_COMMANDS(
     {
         "date",
-        FALSE, 0, 0,
+        0, 0,
         "Display the last date/time received.",
         "Display the last date/time received.",
         CommandDateTime
