@@ -640,7 +640,9 @@ def get_adapters():
     try:
         adaptersfile = open(os.path.join(app_dir, 'adapters'), 'r')
         for line in adaptersfile:
-            adapters.append(process_host(line.strip()))
+            line = line.strip()
+            if line:
+                adapters.append(process_host(line))
         adaptersfile.close()
     except:
         traceback.print_exc()
