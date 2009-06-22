@@ -105,10 +105,19 @@ class ControlConnection:
         return (error_code, error_message, lines)
     
     def execute_command(self, command):
+        """
+        Send command and wait for response
+        Returns a tuple of error code, error message and response lines.
+        """
+        
         self.send_command(command)
         return self.read_response()
     
     def authenticate(self):
+        """
+        Send the authenticate command using the username and password specified 
+        when the connection was created.
+        """
         ec, em, lines = self.execute_command('auth %s %s' % (self.username, self.password))
         if ec != 0:
             raise RuntimeError('Failed to authenticate')
@@ -141,6 +150,9 @@ class ControlConnection:
         return dict
     
     def capture_epg_data(self):
+        """
+        Start capturing EPG data and send it to this connection.
+        """
         self.authenticate()
         self.execute_command('epgcaprestart')
         self.send_command('epgdata')
@@ -317,14 +329,40 @@ class EPGDatabase:
     def get_events(self, source):
         connection = self.get_connection()
         cursor = connection.cursor()
-        print 'SELECT %s FROM %s WHERE %s="%s"' % (reduce(lambda x,y: x +','+y,EPGDatabase.EVENTS_COLUMNS), 
-                                                         EPGDatabase.EVENTS_TABLE, 
-                                                         EPGDatabase.EVENTS_COLUMN_SOURCE, source)
         cursor.execute('SELECT %s FROM %s WHERE %s=?;' % (reduce(lambda x,y: x +','+y,EPGDatabase.EVENTS_COLUMNS), 
                                                          EPGDatabase.EVENTS_TABLE, 
                                                          EPGDatabase.EVENTS_COLUMN_SOURCE), (source,))
         return cursor.fetchall()
     
+    def get_details(self, source, event):
+        connection = self.get_connection()
+        cursor = connection.cursor()
+        cursor.execute('SELECT %s,%s,%s FROM %s WHERE %s=? AND %s=?;' % (EPGDatabase.DETAILS_COLUMN_NAME, 
+                                                         EPGDatabase.DETAILS_COLUMN_LANG,
+                                                         EPGDatabase.DETAILS_COLUMN_VALUE, 
+                                                         EPGDatabase.DETAILS_TABLE, 
+                                                         EPGDatabase.DETAILS_COLUMN_SOURCE,
+                                                         EPGDatabase.DETAILS_COLUMN_EVENT), (source, event))
+        details = {}
+        for name,lang,value in cursor:
+            if name in details:
+                details[name].append((lang, value))
+            else:
+                details[name] = [(lang, value)]
+        
+        return details
+    
+    def get_ratings(self, source, event):
+        connection = self.get_connection()
+        cursor = connection.cursor()
+        cursor.execute('SELECT %s,%s FROM %s WHERE %s=? AND %s=?;' % (EPGDatabase.RATINGS_COLUMN_SYSTEM,
+                                                         EPGDatabase.RATINGS_COLUMN_VALUE,
+                                                         EPGDatabase.RATINGS_TABLE, 
+                                                         EPGDatabase.RATINGS_COLUMN_SOURCE,
+                                                         EPGDatabase.RATINGS_COLUMN_EVENT), (source, event))
+        return cursor.fetchall()
+        
+        
     def new_event(self, event_ref, start, end, ca):    
         self.post_message(('new', event_ref, start, end, ca))
         
@@ -524,6 +562,9 @@ def get_services_info(services, adapter):
         connection.close()
     except:
         traceback.print_exc()
+        
+def format_time(secs):
+    return time.strftime('%Y%m%d%H%M%s', time.gmtime(secs))
 
 def export_xmltv(args):
     if len(args) < 1:
@@ -536,7 +577,7 @@ def export_xmltv(args):
         get_services_info(services, adapter)
     
     outfile = open(outfilename, 'w')
-    generator = XMLGenerator(outfile)
+    generator = XMLGenerator(outfile, 'UTF-8')
     generator.startDocument()
     generator.startElement('tv', {})
     
@@ -550,9 +591,45 @@ def export_xmltv(args):
     
     # Programmes
     for id,(name, source) in services.items():
-        print '%s => %s' % (source, name)
-        print dbase.get_events(source)
-        print
+        for event in dbase.get_events(source):
+            start = format_time(event[2])
+            stop  = format_time(event[3])
+            
+            generator.startElement('programme', {'start':start, 'stop':stop, 'channel':id})
+            
+            details = dbase.get_details(source, event[1])
+            if 'title' in details:
+                for lang,value in details['title']:
+                    generator.startElement('title', {'lang':lang})
+                    generator.characters(value)
+                    generator.endElement('title')
+            
+            if 'description' in details:
+                for lang,value in details['description']:
+                    generator.startElement('desc', {'lang':lang})
+                    generator.characters(value)
+                    generator.endElement('desc')
+            
+            if 'content' in details:
+                content = details['content'][0][1]
+                generator.startElement('content', {})
+                generator.characters(content)
+                generator.endElement('content')
+            
+            if 'series' in details:
+                series = details['series'][0][1]
+                generator.startElement('series', {})
+                generator.characters(series)
+                generator.endElement('series')
+            
+            ratings = dbase.get_ratings(source, event[1])
+            for system,value in ratings:
+                generator.startElement('rating', {'system':system})
+                generator.startElement('value', {})
+                generator.characters(value)
+                generator.endElement('value')
+                generator.endElement('rating')
+            generator.endElement('programme')
         
     generator.endElement('tv')
     generator.endDocument()
