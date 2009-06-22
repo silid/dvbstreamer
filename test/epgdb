@@ -421,7 +421,6 @@ class EPGDatabase:
             if len(self.message_q) > 0:
                 msg = self.message_q.pop()
                 if msg[0] == 'commit':
-                    print 'Committing %d updates' % updates
                     connection.commit()
                     updates = 0
                     
@@ -439,7 +438,7 @@ class EPGDatabase:
                     
                 elif msg[0] == 'reap':
                     updates = 0
-                    #self.__reap()
+                    self.__reap()
                     
                 elif msg[0] == 'quit':
                     connection.commit()
