@@ -262,7 +262,10 @@ static void CommandAddOutput(int argc, char **argv)
             output->name = strdup(argv[0]);
             if (output->name)
             {
-                (void)asprintf(&output->mrl, "%s%s", OutputPrefix, argv[0]);
+                if (asprintf(&output->mrl, "%s%s", OutputPrefix, argv[0]) == -1)
+                {
+                    LogModule(LOG_INFO, OUTPUTS, "Failed to allocate memory for mrl!");
+                }
                 output->dmInstance = DeliveryMethodCreate(mrl);
                 if (output->dmInstance)
                 {
