@@ -262,7 +262,7 @@ static void CommandAddOutput(int argc, char **argv)
             output->name = strdup(argv[0]);
             if (output->name)
             {
-                asprintf(&output->mrl, "%s%s", OutputPrefix, argv[0]);
+                (void)asprintf(&output->mrl, "%s%s", OutputPrefix, argv[0]);
                 output->dmInstance = DeliveryMethodCreate(mrl);
                 if (output->dmInstance)
                 {
