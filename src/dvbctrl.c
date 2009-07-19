@@ -52,7 +52,7 @@ Application to control dvbstreamer in daemon mode.
 
 static void usage(char *appname);
 static void version(void);
-static bool Authenticate();
+static bool Authenticate(FILE *socketfp);
 static void StripNewLineFromEnd(char *str);
 static void ProcessResponseLine(char *line, char **ver, int *errno, char **errmsg);
 
