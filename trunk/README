@@ -295,6 +295,7 @@ Ramsey Ammar     - DVBStreamer first donor :-) many thanks.
 Paul Kelly       - Patch to make festatus command work on DVB-S
 Louis Croisez    - Help finding critical MRL bug and other testing.
 Chris Allison    - Patch to add Series/Content ids to xmltv output.
+Marcel Ritter    - Bug fix
 
 VideoLan libdvbpsi Team for the excellent libdvbpsi. (http://www.videolan.org/developers/libdvbpsi.html)
 
