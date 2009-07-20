@@ -139,7 +139,7 @@ Command_t CommandDetailsServiceFilter[] =
     },
     {
         "setsf",
-        1, 1,
+        2, 2,
         "Set the service to be filtered by a service filter.",
         "setsf <service filter name> <service name>\n"
         "Selects the service to be filtered by the service filter.\n"
@@ -325,21 +325,10 @@ static void CommandSetSFService(int argc, char **argv)
 {
     PIDFilter_t *filter;
     char *outputName = argv[0];
-    char *serviceName;
+    char *serviceName = argv[1];
     Service_t *service;
 
     CommandCheckAuthenticated();
-
-    serviceName = strchr(outputName, ' ');
-    if (!serviceName)
-    {
-        CommandError(COMMAND_ERROR_GENERIC,"No service specified!");
-        return;
-    }
-
-    serviceName[0] = 0;
-
-    for (serviceName ++;*serviceName && isspace(*serviceName); serviceName ++);
 
     if (strcmp(outputName, PrimaryService) == 0)
     {
