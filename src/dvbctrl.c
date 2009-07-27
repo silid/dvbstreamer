@@ -278,11 +278,35 @@ int main(int argc, char *argv[])
         line[0] = 0;
         for (i = optind; i < argc; i ++)
         {
+            bool useDoubleQuotes = FALSE;
+            bool useSingleQuotes = FALSE;
+            
             if (i - optind)
             {
                 strcat(line, " ");
             }
+            if (strchr(argv[i], ' ') != NULL)
+            {
+                if (strchr(argv[i], '\"') == NULL)
+                {
+                    useDoubleQuotes = TRUE;
+                    strcat(line, "\"");
+                }
+                else
+                {
+                    useSingleQuotes = TRUE;
+                    strcat(line, "\'");   
+                }
+            }
             strcat(line, argv[i]);
+            if (useDoubleQuotes)
+            {
+                strcat(line, "\"");
+            }
+            if (useSingleQuotes)
+            {
+                strcat(line, "\'"); 
+            }
         }
 
         SendCommand(socketfp, line, &ver, &errno, &errmsg);
