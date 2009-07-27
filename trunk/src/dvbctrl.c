@@ -52,7 +52,7 @@ Application to control dvbstreamer in daemon mode.
 
 static void usage(char *appname);
 static void version(void);
-static bool Authenticate(FILE *socketfp);
+static bool Authenticate(FILE *socketfp, char *username, char *password);
 static void StripNewLineFromEnd(char *str);
 static void ProcessResponseLine(char *line, char **ver, int *errno, char **errmsg);
 
@@ -66,9 +66,9 @@ static const char responselineStart[] = "DVBStreamer/";
 static const char DVBCTRL[] = "DVBCtrl";
 static char *host = "localhost";
 static int adapterNumber = 0;
-static char *username = NULL;
-static char *password = NULL;
 static char line[MAX_LINE_LENGTH];
+static char defaultUsername[] = "dvbstreamer";
+static char defaultPassword[] = "control";
 
 char DataDirectory[PATH_MAX];
 /*******************************************************************************
@@ -96,6 +96,9 @@ int main(int argc, char *argv[])
     int logLevel = 0;
     char logFilename[PATH_MAX] = {0};
 
+    char *username = defaultUsername;
+    char *password = defaultPassword;
+ 
     /* Create the data directory */
     sprintf(DataDirectory, "%s/.dvbstreamer", getenv("HOME"));
     mkdir(DataDirectory, S_IRWXU);
@@ -239,7 +242,7 @@ int main(int argc, char *argv[])
 
     if (username && password)
     {
-        if (!Authenticate(socketfp))
+        if (!Authenticate(socketfp,username,password))
         {
             LogModule(LOG_ERROR, DVBCTRL, "Failed to authenticate!");
             fclose(socketfp);
@@ -331,7 +334,7 @@ static void version(void)
 /******************************************************************************/
 /* Command functions                                                          */
 /******************************************************************************/
-static bool Authenticate(FILE *socketfp)
+static bool Authenticate(FILE *socketfp, char *username, char *password)
 {
     char * ver;
     int errno;
