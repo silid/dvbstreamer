@@ -27,6 +27,7 @@ Logging functions.
 #include <errno.h>
 #include <limits.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "main.h"
 #include "logging.h"
@@ -91,7 +92,7 @@ int LoggingInitFile(char *filepath, int logLevel)
 
 int LoggingInit(char *filename, int logLevel)
 {
-    char logFile[PATH_MAX];
+  char *logFile=calloc(PATH_MAX,1);
 
     /* Try /var/log first then users home directory */
     sprintf(logFile, "/var/log/%s", filename);
@@ -112,6 +113,11 @@ int LoggingInit(char *filename, int logLevel)
     return 0;
 }
 
+void LoggingRedirectStdErrStdOut(void)
+{
+    dup2(fileno(logFP), 1);
+    dup2(fileno(logFP), 2);
+}
 
 void LoggingDeInit(void)
 {
