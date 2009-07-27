@@ -35,6 +35,8 @@ Application to control dvbstreamer in daemon mode.
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <linux/dvb/frontend.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 
 #include "types.h"
 #include "logging.h"
@@ -55,7 +57,7 @@ static void version(void);
 static bool Authenticate(FILE *socketfp, char *username, char *password);
 static void StripNewLineFromEnd(char *str);
 static void ProcessResponseLine(char *line, char **ver, int *errno, char **errmsg);
-
+static void interactivePrompt(FILE *socketfp);
 static bool SendCommand(FILE *socketfp, char *line, char **version, int *errno, char **errmsg);
 
 /*******************************************************************************
@@ -95,7 +97,7 @@ int main(int argc, char *argv[])
     char *errmsg;
     int logLevel = 0;
     char logFilename[PATH_MAX] = {0};
-
+    bool interactive = FALSE;
     char *username = defaultUsername;
     char *password = defaultPassword;
  
@@ -106,7 +108,7 @@ int main(int argc, char *argv[])
     while (TRUE)
     {
         int c;
-        c = getopt(argc, argv, "vVh:a:u:p:f:L:");
+        c = getopt(argc, argv, "vVh:a:u:p:f:L:i");
         if (c == -1)
         {
             break;
@@ -127,6 +129,9 @@ int main(int argc, char *argv[])
                 break;
             case 'a':
                 adapterNumber = atoi(optarg);
+                break;
+            case 'i':
+                interactive = TRUE;
                 break;
             case 'u':
                 username = optarg;
@@ -169,7 +174,7 @@ int main(int argc, char *argv[])
 
     LogModule(LOG_INFOV, DVBCTRL, "Will connect to host %s adapter %d\n", host, adapterNumber);
     /* Commands follow options */
-    if (optind >= argc)
+    if ((optind >= argc) && (filename == NULL) && (!interactive))
     {
         LogModule(LOG_ERROR, DVBCTRL, "No commands specified!\n");
         exit(1);
@@ -251,19 +256,77 @@ int main(int argc, char *argv[])
     }
 
     /* Process commands */
-
-    if (filename)
+    if (interactive)
     {
-        FILE *fp = fopen(filename, "r");
-        if (!fp)
+        interactivePrompt(socketfp);
+    }
+    else
+    {
+        if (filename)
         {
-            LogModule(LOG_ERROR, DVBCTRL, "Failed to open %s\n", filename);
-            fclose(socketfp);
-            return 1;
+            FILE *fp = NULL;
+
+            if (strcmp(filename, "-") == 0)
+            {
+                fp = stdin;
+            }
+            else
+            {
+                fp = fopen(filename, "r");
+            }
+            if (!fp)
+            {
+                LogModule(LOG_ERROR, DVBCTRL, "Failed to open %s\n", filename);
+                fclose(socketfp);
+                return 1;
+            }
+            while(fgets(line, MAX_LINE_LENGTH, fp))
+            {
+                StripNewLineFromEnd(line);
+                SendCommand(socketfp, line, &ver, &errno, &errmsg);
+                if (errno != 0)
+                {
+                    LogModule(LOG_ERROR, DVBCTRL, "%s\n", errmsg);
+                    break;
+                }
+            }
         }
-        while(fgets(line, MAX_LINE_LENGTH, fp))
+        else
         {
-            StripNewLineFromEnd(line);
+            line[0] = 0;
+            for (i = optind; i < argc; i ++)
+            {
+                bool useDoubleQuotes = FALSE;
+                bool useSingleQuotes = FALSE;
+                
+                if (i - optind)
+                {
+                    strcat(line, " ");
+                }
+                if (strchr(argv[i], ' ') != NULL)
+                {
+                    if (strchr(argv[i], '\"') == NULL)
+                    {
+                        useDoubleQuotes = TRUE;
+                        strcat(line, "\"");
+                    }
+                    else
+                    {
+                        useSingleQuotes = TRUE;
+                        strcat(line, "\'");   
+                    }
+                }
+                strcat(line, argv[i]);
+                if (useDoubleQuotes)
+                {
+                    strcat(line, "\"");
+                }
+                if (useSingleQuotes)
+                {
+                    strcat(line, "\'"); 
+                }
+            }
+
             SendCommand(socketfp, line, &ver, &errno, &errmsg);
             if (errno != 0)
             {
@@ -273,50 +336,6 @@ int main(int argc, char *argv[])
             }
         }
     }
-    else
-    {
-        line[0] = 0;
-        for (i = optind; i < argc; i ++)
-        {
-            bool useDoubleQuotes = FALSE;
-            bool useSingleQuotes = FALSE;
-            
-            if (i - optind)
-            {
-                strcat(line, " ");
-            }
-            if (strchr(argv[i], ' ') != NULL)
-            {
-                if (strchr(argv[i], '\"') == NULL)
-                {
-                    useDoubleQuotes = TRUE;
-                    strcat(line, "\"");
-                }
-                else
-                {
-                    useSingleQuotes = TRUE;
-                    strcat(line, "\'");   
-                }
-            }
-            strcat(line, argv[i]);
-            if (useDoubleQuotes)
-            {
-                strcat(line, "\"");
-            }
-            if (useSingleQuotes)
-            {
-                strcat(line, "\'"); 
-            }
-        }
-
-        SendCommand(socketfp, line, &ver, &errno, &errmsg);
-        if (errno != 0)
-        {
-            LogModule(LOG_ERROR, DVBCTRL, "%s\n", errmsg);
-            fclose(socketfp);
-            return errno;
-        }
-    }
     /* Disconnect from host */
     fclose(socketfp);
     LogModule(LOG_DEBUG, DVBCTRL, "Socket closed\n");
@@ -324,6 +343,35 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+static void interactivePrompt(FILE *socketfp)
+{
+    char *ver;
+    int errno;
+    char *errmsg;
+    rl_readline_name = "DVBCtrl";
+    while (TRUE)
+    {
+        char *line = readline("DVBCtrl>");
+        if (line)
+        {
+            SendCommand(socketfp, line, &ver, &errno, &errmsg);
+            if (errno == 0)
+            {
+                add_history(line);
+            }
+            else
+            {
+                LogModule(LOG_ERROR, DVBCTRL, "%s\n", errmsg);
+            }
+            
+            free(line);
+        }
+        else
+        {
+            break;
+        }
+    }
+}
 
 /*
  * Output command line usage and help.

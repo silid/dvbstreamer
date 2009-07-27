@@ -130,7 +130,7 @@ dvbctrl_SOURCES = \
 
 dvbctrl_LDFLAGS =
 
-dvbctrl_LDADD =
+dvbctrl_LDADD = -lreadline @READLINE_TERMCAP@ 
 
 
 #
