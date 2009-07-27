@@ -76,7 +76,14 @@ int LoggingInit(char *filename, int logLevel);
  * @return 0 on success.
  */
 int LoggingInitFile(char *filename, int logLevel); 
- 
+
+/**
+ * @internal
+ * Redirects STDOUT and STDERR file descriptors to use the file descriptor opened
+ * for log output.
+ */
+void LoggingRedirectStdErrStdOut(void);
+
 /**
  * @internal
  * Deinitialise logging.

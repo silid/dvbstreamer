@@ -235,24 +235,15 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    if (DaemonMode)
-    {
-        if (startupFile && (startupFile[0] != '/'))
-        {
-            char *cwd = getcwd(NULL, 0);
-            if (asprintf(&startupFile, "%s/%s", cwd, startupFile) == -1)
-            {
-                LogModule(LOG_ERROR, MAIN, "Failed to allocate memory for startup file path!\n");
-            }
-            free(cwd);
-        }
-        InitDaemon( adapterNumber);
-    }
-
-    StartTime = time(NULL);
 
     if (logFilename[0])
     {
+        if (DaemonMode && (strcmp(logFilename, "-") == 0))
+        {
+            fprintf(stderr, "Cannot use STDERR for logging when running as a daemon!");
+            exit(1);
+        }
+        
         if (LoggingInitFile(logFilename, logLevel))
         {
             perror("Could not open user specified log file:");
@@ -268,6 +259,25 @@ int main(int argc, char *argv[])
             exit(1);
         }
     }
+
+
+    if (DaemonMode)
+    {
+        if (startupFile && (startupFile[0] != '/'))
+        {
+            char *cwd = getcwd(NULL, 0);
+            if (asprintf(&startupFile, "%s/%s", cwd, startupFile) == -1)
+            {
+                LogModule(LOG_ERROR, MAIN, "Failed to allocate memory for startup file path!\n");
+            }
+            free(cwd);
+        }
+        InitDaemon(adapterNumber);
+    }
+
+    StartTime = time(NULL);
+
+
     LogRegisterThread(pthread_self(), "Main");
     LogModule(LOG_INFO, MAIN, "DVBStreamer starting");
     LogModule(LOG_INFOV, MAIN, "Using adapter %d\n", adapterNumber);
@@ -765,11 +775,11 @@ static void InitDaemon(int adapter)
         exit(1);
     }
 
-    /* Close out the standard file descriptors */
-    fclose(stdin);
-    fclose(stdout);
-    fclose(stderr);
+    /* Redirect standard files to logging file */
+    freopen( "/dev/null", "r", stdin);
 
+    LoggingRedirectStdErrStdOut();
+    
     pid = fork();
     if (pid < 0)
     {
@@ -801,6 +811,7 @@ static void InitDaemon(int adapter)
 
 static void DeInitDaemon(void)
 {
+
     /* Remove pid file */
     unlink(PidFile);
     exit(0);
