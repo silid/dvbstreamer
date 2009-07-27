@@ -1,5 +1,7 @@
 2.0
 ---
+* All commands now must have channels names enclosed in quotes if the name 
+  includes spaces.
 * New scanning feature
    - Can now perform a full spectrum scan (ATSC, DVB-C/T)
    - Can now perform a network scan using information from dvb-utils (All)
