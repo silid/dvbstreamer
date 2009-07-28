@@ -420,8 +420,11 @@ static TSPacket_t *ServiceFilterProcessPacket(PIDFilter_t *pidfilter, void *arg,
                 }
                 state->pmtPacketCount = 0;
             }
-            memcpy(&state->pmtPackets[state->pmtPacketCount], packet, TSPACKET_SIZE);
-            state->pmtPacketCount ++;
+            if (state->pmtPacketCount < PMT_PACKETS)
+            {
+                memcpy(&state->pmtPackets[state->pmtPacketCount], packet, TSPACKET_SIZE);
+                state->pmtPacketCount ++;
+            }
         }
     }
 
