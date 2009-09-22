@@ -776,7 +776,10 @@ static void InitDaemon(int adapter)
     }
 
     /* Redirect standard files to logging file */
-    freopen( "/dev/null", "r", stdin);
+    if (freopen( "/dev/null", "r", stdin) == NULL)
+    {
+        LogModule(LOG_ERROR, MAIN, "Failed to redirect stdin to /dev/null!");
+    }
 
     LoggingRedirectStdErrStdOut();
     
