@@ -163,7 +163,7 @@ static int FilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacke
         }
         ServiceRefDec(service);
         adapter = MainDVBAdapterGet();
-        if (adapter->frontEndLocked)
+        if (!adapter->frontEndLocked)
         {
             return 0;
         }
