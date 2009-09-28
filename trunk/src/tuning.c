@@ -103,7 +103,7 @@ Service_t *TuningCurrentServiceGet(void)
 void TuningCurrentServiceSet(Service_t *service)
 {
     Multiplex_t *multiplex;
-    TSReader_t *tsFilter = MainTSReaderGet();
+    TSReader_t *reader = MainTSReaderGet();
     ServiceFilter_t primaryServiceFilter;
 
     if (!service)
@@ -114,18 +114,15 @@ void TuningCurrentServiceSet(Service_t *service)
     if ((CurrentService == NULL) || (!ServiceAreEqual(service,CurrentService)))
     {
         LogModule(LOG_DEBUGV, TUNING, "Disabling filters\n");
-        TSReaderEnable(tsFilter, FALSE);
+        TSReaderEnable(reader, FALSE);
 
         multiplex = MultiplexFindUID(service->multiplexUID);
-        primaryServiceFilter = TSReaderFindPIDFilter(tsFilter, PrimaryService, ServicePIDFilterType);
+        primaryServiceFilter = ServiceFilterFindFilter(PrimaryService);
 
         if ((CurrentMultiplex!= NULL) && MultiplexAreEqual(multiplex, CurrentMultiplex))
         {
             LogModule(LOG_DEBUGV, TUNING, "Same multiplex\n");
-            /* Reset primary service filter stats */
-            primaryServiceFilter->packetsFiltered  = 0;
-            primaryServiceFilter->packetsProcessed = 0;
-            primaryServiceFilter->packetsOutput    = 0;
+            /* TODO Reset primary service filter stats */
         }
         else
         {
@@ -134,7 +131,7 @@ void TuningCurrentServiceSet(Service_t *service)
 
             TuneMultiplex(multiplex);
             /* Reset all stats as this is a new TS */
-            TSReaderZeroStats(tsFilter);
+            TSReaderZeroStats(reader);
         }
 
         MultiplexRefDec(multiplex);
@@ -155,7 +152,7 @@ void TuningCurrentServiceSet(Service_t *service)
         ChannelChangedDoCallbacks((Multiplex_t *)CurrentMultiplex, (Service_t *)CurrentService);
         EventsFireEventListeners(serviceChangedEvent, CurrentService);
         LogModule(LOG_DEBUGV, TUNING, "Enabling filters\n");
-        TSReaderEnable(tsFilter, TRUE);
+        TSReaderEnable(reader, TRUE);
     }
 }
 
@@ -167,23 +164,23 @@ Multiplex_t *TuningCurrentMultiplexGet(void)
 
 void TuningCurrentMultiplexSet(Multiplex_t *multiplex)
 {
-    TSReader_t *tsFilter = MainTSReaderGet();
-    PIDFilter_t *primaryServiceFilter;
+    TSReader_t *reader = MainTSReaderGet();
+    ServiceFilter_t primaryServiceFilter;
 
-    TSReaderLock(tsFilter);
+    TSReaderLock(reader);
     LogModule(LOG_DEBUG, TUNING, "Writing changes back to database.\n");
     CacheWriteback();
-    TSReaderUnLock(tsFilter);
+    TSReaderUnLock(reader);
 
     LogModule(LOG_DEBUGV, TUNING, "Disabling filters\n");
-    TSReaderEnable(tsFilter, FALSE);
+    TSReaderEnable(reader, FALSE);
 
-    primaryServiceFilter = TSReaderFindPIDFilter(tsFilter, PrimaryService, ServicePIDFilterType);
+    primaryServiceFilter = ServiceFilterFindFilter(PrimaryService);
     ServiceFilterServiceSet(primaryServiceFilter, NULL);
 
     TuneMultiplex(multiplex);
 
-    TSReaderZeroStats(tsFilter);
+    TSReaderZeroStats(reader);
 
     /*
      * Inform any interested parties that we have now changed the current
@@ -193,7 +190,7 @@ void TuningCurrentMultiplexSet(Multiplex_t *multiplex)
     EventsFireEventListeners(serviceChangedEvent, NULL);
 
     LogModule(LOG_DEBUGV, TUNING, "Enabling filters\n");
-    TSReaderEnable(tsFilter, TRUE);
+    TSReaderEnable(reader, TRUE);
 }
 
 /*******************************************************************************
@@ -216,7 +213,7 @@ static void TuneMultiplex(Multiplex_t *multiplex)
     struct dvb_frontend_parameters feparams;
     DVBDiSEqCSettings_t diseqc;
     DVBAdapter_t *dvbAdapter = MainDVBAdapterGet();
-    TSReader_t *tsFilter = MainTSReaderGet();
+    TSReader_t *reader = MainTSReaderGet();
 
     MultiplexRefDec(CurrentMultiplex);
 
@@ -236,7 +233,7 @@ static void TuneMultiplex(Multiplex_t *multiplex)
     }
 
     LogModule(LOG_DEBUGV,TUNING, "Informing TSReader multiplex has changed!\n");
-    TSReaderMultiplexChanged(tsFilter, CurrentMultiplex);
+    TSReaderMultiplexChanged(reader, CurrentMultiplex);
 
     EventsFireEventListeners(mulitplexChangedEvent, multiplex);
 }

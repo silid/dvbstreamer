@@ -243,7 +243,7 @@ TSFilterGroup_t* TSReaderFindFilterGroup(TSReader_t *reader, char *name, char *t
 
 void TSFilterGroupDestroy(TSFilterGroup_t* group)
 {
-    TSFlterGroupRemoveAllFilters(group);
+    TSFilterGroupRemoveAllFilters(group);
     ListRemove(group->tsReader->groups, group);
     ObjectRefDec(group);
 }

@@ -71,4 +71,5 @@ int MPEG2StandardDeinit(TSReader_t *reader)
     reader = reader;
     PATProcessorDestroy(patProcessor);
     PMTProcessorDestroy(pmtProcessor);
+    return 0;
 }

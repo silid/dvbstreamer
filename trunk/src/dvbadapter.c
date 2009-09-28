@@ -124,29 +124,29 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
         sprintf(result->frontEndPath, "/dev/dvb/adapter%d/frontend0", adapter);
         sprintf(result->demuxPath, "/dev/dvb/adapter%d/demux0", adapter);
         sprintf(result->dvrPath, "/dev/dvb/adapter%d/dvr0", adapter);
-        result->maxFilters = -1
+        result->maxFilters = -1;
         /* Determine max number of filters */
         for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
         {
             if (result->maxFilters == -1)
             {
-                result->filters[i].demuxFd = open(result->demuxPath);
-                if (result->filters[i] == -1)
+                result->filters[i].demuxFd = open(result->demuxPath, O_RDWR);
+                if (result->filters[i].demuxFd == -1)
                 {
                     result->maxFilters = i;
                 }
             }
             else
             {
-                result->filters[i] = -1;
+                result->filters[i].demuxFd = -1;
             }
             
         }
 
         for (i = 0; i < result->maxFilters; i ++)
         {
-            close(result->filters[i]);
-            result->filters[i] = -1;
+            close(result->filters[i].demuxFd);
+            result->filters[i].demuxFd = -1;
         }
 
         result->frontEndFd = open(result->frontEndPath, O_RDWR);
