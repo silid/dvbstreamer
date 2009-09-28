@@ -103,8 +103,8 @@ Service_t *TuningCurrentServiceGet(void)
 void TuningCurrentServiceSet(Service_t *service)
 {
     Multiplex_t *multiplex;
-    TSFilter_t *tsFilter = MainTSFilterGet();
-    PIDFilter_t *primaryServiceFilter;
+    TSReader_t *tsFilter = MainTSReaderGet();
+    ServiceFilter_t primaryServiceFilter;
 
     if (!service)
     {
@@ -114,10 +114,10 @@ void TuningCurrentServiceSet(Service_t *service)
     if ((CurrentService == NULL) || (!ServiceAreEqual(service,CurrentService)))
     {
         LogModule(LOG_DEBUGV, TUNING, "Disabling filters\n");
-        TSFilterEnable(tsFilter, FALSE);
+        TSReaderEnable(tsFilter, FALSE);
 
         multiplex = MultiplexFindUID(service->multiplexUID);
-        primaryServiceFilter = TSFilterFindPIDFilter(tsFilter, PrimaryService, ServicePIDFilterType);
+        primaryServiceFilter = TSReaderFindPIDFilter(tsFilter, PrimaryService, ServicePIDFilterType);
 
         if ((CurrentMultiplex!= NULL) && MultiplexAreEqual(multiplex, CurrentMultiplex))
         {
@@ -134,7 +134,7 @@ void TuningCurrentServiceSet(Service_t *service)
 
             TuneMultiplex(multiplex);
             /* Reset all stats as this is a new TS */
-            TSFilterZeroStats(tsFilter);
+            TSReaderZeroStats(tsFilter);
         }
 
         MultiplexRefDec(multiplex);
@@ -155,7 +155,7 @@ void TuningCurrentServiceSet(Service_t *service)
         ChannelChangedDoCallbacks((Multiplex_t *)CurrentMultiplex, (Service_t *)CurrentService);
         EventsFireEventListeners(serviceChangedEvent, CurrentService);
         LogModule(LOG_DEBUGV, TUNING, "Enabling filters\n");
-        TSFilterEnable(tsFilter, TRUE);
+        TSReaderEnable(tsFilter, TRUE);
     }
 }
 
@@ -167,23 +167,23 @@ Multiplex_t *TuningCurrentMultiplexGet(void)
 
 void TuningCurrentMultiplexSet(Multiplex_t *multiplex)
 {
-    TSFilter_t *tsFilter = MainTSFilterGet();
+    TSReader_t *tsFilter = MainTSReaderGet();
     PIDFilter_t *primaryServiceFilter;
 
-    TSFilterLock(tsFilter);
+    TSReaderLock(tsFilter);
     LogModule(LOG_DEBUG, TUNING, "Writing changes back to database.\n");
     CacheWriteback();
-    TSFilterUnLock(tsFilter);
+    TSReaderUnLock(tsFilter);
 
     LogModule(LOG_DEBUGV, TUNING, "Disabling filters\n");
-    TSFilterEnable(tsFilter, FALSE);
+    TSReaderEnable(tsFilter, FALSE);
 
-    primaryServiceFilter = TSFilterFindPIDFilter(tsFilter, PrimaryService, ServicePIDFilterType);
+    primaryServiceFilter = TSReaderFindPIDFilter(tsFilter, PrimaryService, ServicePIDFilterType);
     ServiceFilterServiceSet(primaryServiceFilter, NULL);
 
     TuneMultiplex(multiplex);
 
-    TSFilterZeroStats(tsFilter);
+    TSReaderZeroStats(tsFilter);
 
     /*
      * Inform any interested parties that we have now changed the current
@@ -193,7 +193,7 @@ void TuningCurrentMultiplexSet(Multiplex_t *multiplex)
     EventsFireEventListeners(serviceChangedEvent, NULL);
 
     LogModule(LOG_DEBUGV, TUNING, "Enabling filters\n");
-    TSFilterEnable(tsFilter, TRUE);
+    TSReaderEnable(tsFilter, TRUE);
 }
 
 /*******************************************************************************
@@ -216,7 +216,7 @@ static void TuneMultiplex(Multiplex_t *multiplex)
     struct dvb_frontend_parameters feparams;
     DVBDiSEqCSettings_t diseqc;
     DVBAdapter_t *dvbAdapter = MainDVBAdapterGet();
-    TSFilter_t *tsFilter = MainTSFilterGet();
+    TSReader_t *tsFilter = MainTSReaderGet();
 
     MultiplexRefDec(CurrentMultiplex);
 
@@ -235,8 +235,8 @@ static void TuneMultiplex(Multiplex_t *multiplex)
         LogModule(LOG_ERROR, TUNING, "Tuning failed!\n");
     }
 
-    LogModule(LOG_DEBUGV,TUNING, "Informing TSFilter multiplex has changed!\n");
-    TSFilterMultiplexChanged(tsFilter, CurrentMultiplex);
+    LogModule(LOG_DEBUGV,TUNING, "Informing TSReader multiplex has changed!\n");
+    TSReaderMultiplexChanged(tsFilter, CurrentMultiplex);
 
     EventsFireEventListeners(mulitplexChangedEvent, multiplex);
 }

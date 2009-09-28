@@ -1021,7 +1021,7 @@ static int TuneFrequency(fe_type_t type, struct dvb_frontend_parameters *feparam
     int result;
     int muxUID;
     bool lockFailed = TRUE;
-    TSFilter_t *tsFilter = MainTSFilterGet();
+    TSReader_t *tsFilter = MainTSReaderGet();
 
 
     if (mux != NULL)
@@ -1030,7 +1030,7 @@ static int TuneFrequency(fe_type_t type, struct dvb_frontend_parameters *feparam
     }
 
     /* Disable TS Packet processing while we tune */
-    TSFilterEnable(tsFilter, FALSE);
+    TSReaderEnable(tsFilter, FALSE);
     FELocked = FALSE;
     waitingForFELocked = TRUE;
     LogModule(LOG_DEBUG, SCANNING, "Trying frequency %d\n", feparams->frequency);
@@ -1054,7 +1054,7 @@ static int TuneFrequency(fe_type_t type, struct dvb_frontend_parameters *feparam
             lockFailed = FALSE;
             if (mux == NULL)
             {
-                /* Add multiplex to DBase, set the new multiplex as current and reenabled TSFilter */
+                /* Add multiplex to DBase, set the new multiplex as current and reenabled TSReader */
                 result = MultiplexAdd(type, feparams, diseqc, &muxUID);
                 if (result == 0)
                 {
@@ -1183,7 +1183,7 @@ static void PATCallback(dvbpsi_pat_t* newpat)
     {
         int i;
         dvbpsi_pat_program_t *patentry = newpat->p_first_program;
-        TSFilter_t *tsFilter = MainTSFilterGet();
+        TSReader_t *tsFilter = MainTSReaderGet();
         PMTCount = 0;
         while(patentry)
         {

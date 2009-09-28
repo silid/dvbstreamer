@@ -101,6 +101,14 @@ typedef void (*ListDataDestructor_t)(void *);
 #define ListIterator_MoreEntries(_iterator) ((_iterator).current)
 
 /**
+ * Convenience macro for defining a for loop to iterate over all items in a list.
+ * @param _iterator The iterator to initialise (not a pointer),
+ * @param _list The list to initialise the iterator to use.
+ */
+#define ListIterator_ForEach(_iterator, _list) \
+        for (ListIterator_Init(_iterator, _list); ListIterator_MoreEntries(_iterator); ListIterator_Next(_iterator))
+            
+/**
  * Creates a new double linked list.
  * @return A new List_t instance or NULL if there is not enough memory.
  */

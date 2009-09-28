@@ -63,7 +63,7 @@ typedef struct CallbackDetails_t
 * Prototypes                                                                   *
 *******************************************************************************/
 static PIDFilter_t *PESProcessorFind(uint16_t pid);
-static PIDFilter_t *PESProcessorCreate(TSFilter_t *tsfilter, uint16_t pid);
+static PIDFilter_t *PESProcessorCreate(TSReader_t *tsfilter, uint16_t pid);
 static void PESProcessorDestroy(PIDFilter_t *filter);
 static void PESProcessorRegisterCallback(PIDFilter_t *filter,PluginPESProcessor_t callback, void *userarg);
 static void PESProcessorUnRegisterCallback(PIDFilter_t *filter,PluginPESProcessor_t callback, void *userarg);
@@ -90,7 +90,7 @@ void PESProcessorStartPID(uint16_t pid, PluginPESProcessor_t callback, void *use
 
     if (processor == NULL)
     {
-        processor = PESProcessorCreate(MainTSFilterGet(), pid);
+        processor = PESProcessorCreate(MainTSReaderGet(), pid);
     }
     if (processor)
     {
@@ -150,7 +150,7 @@ static PIDFilter_t *PESProcessorFind(uint16_t pid)
     return NULL;
 }
 
-static PIDFilter_t *PESProcessorCreate(TSFilter_t *tsfilter, uint16_t pid)
+static PIDFilter_t *PESProcessorCreate(TSReader_t *tsfilter, uint16_t pid)
 {
     PIDFilter_t *result = NULL;
     PESProcessor_t *state;

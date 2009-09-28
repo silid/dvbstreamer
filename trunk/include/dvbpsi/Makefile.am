@@ -4,6 +4,7 @@ dvbpsiatscdir = $(pkgincludedir)/dvbpsi/atsc
 
 dvbpsi_DATA = \
 	demux.h \
+	sections.h \
 	descriptor.h \
 	datetime.h \
 	dr_02.h \

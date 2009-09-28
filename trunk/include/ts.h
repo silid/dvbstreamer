@@ -26,6 +26,7 @@ Transport stream processing and filter management.
 #include <stdint.h>
 #include <pthread.h>
 
+#include "dvbpsi/dvbpsi.h"
 #include "types.h"
 #include "dvbadapter.h"
 #include "services.h"
@@ -37,6 +38,11 @@ Transport stream processing and filter management.
  * @defgroup TSPacket Transport Stream Packet Access
  * @{
  */
+
+/**
+ * Maximum number of pids in a transport stream.
+ */
+#define TS_MAX_PIDS 8192
 
 /**
  * Constant for the size of a transport packet with out hamming code.
@@ -146,149 +152,91 @@ TSPacket_t;
 
 /**@}*/
 
+
+/*---- Transport Stream Reader structure ----*/
 /**
- * @defgroup TSPIDFilter PID Filtering
+ * @defgroup TSReader Transport Stream Reader
  * @{
  */
 
-struct PIDFilter_s;
-
-/*---- Filter function pointer type----*/
-/**
- * Callback used to signal that the transport stream has changed to a new multiplex.
- *
- * @param pidfilter The PID Filter this callback belongs to.
- * @param userarg   A user defined argument.
- */
-typedef void (*MultiplexChanged)(struct PIDFilter_s *pidfilter, void *userarg, Multiplex_t *multiplex);
-
-/**
- * Callback used to signal that a change has occured to the underlying structure
- * of the transport stream.
- * @param pidfilter The PID Filter this callback belongs to.
- * @param userarg   A user defined argument.
- */
-typedef void (*TSStructureChanged)(struct PIDFilter_s *pidfilter, void *userarg);
-
-/**
- * Callback used to determine if a packet should be passed to the packet processor
- * or output callbacks.
- * @param pidFilter The PID Filter this callback belongs to.
- * @param userarg   A user defined argument.
- * @param pid       PID of the packet in question.
- * @param packet    The packet in question.
- * @return 0 if the packet should not be processed/output, any other value if the
- * packet should be passed on to the Packet processor callback if one exists, or
- * to the output callback.
- */
-typedef int (*PacketFilter)(struct PIDFilter_s *pidfilter, void *userarg, uint16_t pid, TSPacket_t* packet);
-
-/**
- * Callback used to process a packet, this is intended to be a function which
- * needs more time to process a packet than just a simple filter.
- * @param pidFilter The PID Filter this callback belongs to.
- * @param userarg   A user defined argument.
- * @param packet    The packet in question.
- * @return The packet to pass to the output callback, this can be null if no
- * packet should be output. Returning the packet allows the processor to either
- * return the original pointer or to insert a packet of its own creation.
- */
-typedef TSPacket_t* (*PacketProcessor)(struct PIDFilter_s *pidfilter, void *userarg, TSPacket_t* packet);
-
-/**
- * Callback used to send a packet to an output destination.
- * @param pidFilter The PID Filter this callback belongs to.
- * @param userarg   A user defined argument.
- * @param packet    The packet to output.
- */
-typedef void (*PacketOutput)(struct PIDFilter_s *pidfilter, void *userarg, TSPacket_t* packet);
-
-/*---- PID Filter Structures ----*/
-/**
- * Structure representing a PID Filter that belongs to a TS Filter.
- */
-typedef struct PIDFilter_s
+typedef enum TSFilterEventType_e
 {
-    char *name;                            /**< Name of this instance */
-    char *type;                            /**< Type of this instance */
-    struct TSFilter_t *tsFilter;           /**< TS Filter instance this filter belongs to. */
-    volatile bool enabled;                 /**< Boolean indicating whether this filter is enabled and should process packets */
+    TSFilterEventType_MuxChanged,
+    TSFilterEventType_StructureChanged
+}TSFilterEventType_e;
 
-    MultiplexChanged multiplexChanged;     /**< Callback to call when the Multiplex is changed. */
-    void *mcArg;                           /**< User defined argument to pass to the multiplexChanged callback */
+struct TSFilterGroup_t;
 
-    TSStructureChanged tsStructureChanged; /**< Callback to call when the underlying TS structure changes */
-    void *tscArg;                          /**< User defined argument to pass to the tsStructureChanged callback */
+typedef void (*TSFilterGroupEventCallback_t)(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details);
 
-    PacketFilter filterPacket;             /**< Callback to call when a new packet arrives */
-    void *fpArg;                           /**<User defined argument to pass to the filterPacket callback */
-
-    PacketProcessor processPacket;         /**< Callback to call if filterPacket returns non-zero */
-    void *ppArg;                           /**<User defined argument to pass to the processPacket callback */
-
-    PacketOutput outputPacket;             /**< Callback to call when a packet has passed filterPacket and processPacket callbacks tests */
-    void *opArg;                           /**<User defined argument to pass to the outputPacket callback */
-
-    /* Variables for statistics */
-    volatile unsigned long long packetsFiltered;          /**< Number of packets that filterPacket has returned non-zero for. */
-    volatile unsigned long long packetsProcessed;         /**< Number of packets that processPacket has returned non-NULL for. */
-    volatile unsigned long long packetsOutput;            /**< Number of packets sent to the output callback */
-}PIDFilter_t;
-
-/**
- * PIDFilter type that processes PSI/SI data.
- */
-extern char PSISIPIDFilterType[];
-
-/**@}*/
-
-/**
- * @defgroup SimplePIDFilter Simple PID Filter
- * @{
- */
-
-/*---- Simple PID Filter structures ---*/
-/**
- * Maximum number of PIDs that can be added to a Simple PID Filter
- */
-#define MAX_PIDS 20
-
-/**
- * Structure describing a simple PID filter that just checks the PID of the
- * packet matches one contained in the pids array.
- */
-typedef struct PIDFilterSimpleFilter_t
+typedef void (*TSPacketFilterCallback_t)(void *userArg, struct TSFilterGroup_t *group, TSPacket_t *packet);
+typedef struct TSPacketFilter_t
 {
-    int pidcount;            /**< Number of PIDs in the pids array. */
-    uint16_t pids[MAX_PIDS]; /**< Array of PIDs to accept */
-}
-PIDFilterSimpleFilter_t;
+    uint16_t pid;
 
-/**@}*/
+    TSPacketFilterCallback_t callback;
+    void *userArg;
+    struct TSFilterGroup_t *group;
+    
+    struct TSPacketFilter_t *next;
+}TSPacketFilter_t;
 
-/*---- Transport Stream Filter structure ----*/
-/**
- * @defgroup TSFilter Transport Stream Filter
- * @{
- */
-/**
- * Maximum number of filters supported by a TSFilter_t instance.
- */
-#define MAX_FILTERS 20
+typedef struct TSPacketFilterList_t
+{
+    uint16_t pid;
+    List_t *filters;
+}TSPacketFilterList_t;
 
-/**
- * Maximum number of packets to read from the DVB adapter in one go,
- */
-#define MAX_PACKETS 20
+typedef struct TSSectionFilter_t
+{
+    uint16_t pid;
+    int priority;
+    dvbpsi_handle sectionHandle;
+    struct TSSectionFilter_t *next;
+}TSSectionFilter_t;
+
+#define TSSectFilterListFlags_PAYLOAD_START     1
+#define TSSectFilterListFlags_PRIORITY_OVERRIDE 2
+
+typedef struct TSSectionFilterList_t
+{
+    uint16_t pid;
+    uint32_t flags;
+    int priority;
+    List_t *filters;
+    dvbpsi_handle sectionHandle;
+    TSPacketFilter_t *packetFilter;
+    struct TSReader_t *tsReader;
+}TSSectionFilterList_t;
+
+typedef struct TSFilterGroup_t
+{
+    char *name;
+    char *type;
+    struct TSReader_t *tsReader;           /**< TS Reader instance this filter group belongs to. */
+
+    TSFilterGroupEventCallback_t eventCallback;
+    void *userArg;
+
+    TSSectionFilter_t *sectionFilters;
+    TSPacketFilter_t *packetFilters;
+
+    volatile unsigned long long packetsProcessed;
+    volatile unsigned long long sectionsProcessed;
+
+}TSFilterGroup_t;
+
+#define TSREADER_PIDFILTER_BUCKETS 8
 
 /**
  * Structure describing a Transport Stream Filter instance.
  */
-typedef struct TSFilter_t
+typedef struct TSReader_t
 {
     bool quit;                          /**< Whether the filters thread should finish. */
-    TSPacket_t readBuffer[MAX_PACKETS]; /**< Buffer used to read packets into from the DVB Adapter */
     DVBAdapter_t *adapter;              /**< DVBAdapter packets should be read from */
+    int notificationFds[2];             /**< File descriptors for waking up the reader thread. */
+    bool notificationSent;
     pthread_t thread;                   /**< Thread used to read and process TS packets */
     bool enabled;                       /**< Whether packets should be read/processed */
     pthread_mutex_t mutex;              /**< Mutex used to protect access to this structure */
@@ -299,150 +247,68 @@ typedef struct TSFilter_t
     volatile unsigned long long totalPackets; /**< Total number of packets processed by this instance. */
     volatile unsigned long bitrate;     /**< Approximate bit rate of the transport stream being processed. */
 
-    List_t *pidFilters;                 /**< List of PIDFilter_t objects associated with this TS Filter. */
+    List_t *groups;                     /**< List of TS Filter groups. */
+    List_t *pidFilterBuckets[TSREADER_PIDFILTER_BUCKETS]; /**< List of active PID filters */
+    List_t *sectionFilters;             /**< List of section filters that are awaiting scheduling */
+    List_t *activeSectionFilters;       /**< List of active section filters. */
 }
-TSFilter_t;
+TSReader_t;
 
 /**
- * Create a new TSFilter_t instance that is processing packets from the specified
+ * Create a new TSReader_t instance that is processing packets from the specified
  * DVBAdapter instance.
  * @param adapter The DVBAdapter to read packets from.
- * @return A new TSFilter_t instance or NULL if one could not be created.
+ * @return A new TSReader_t instance or NULL if one could not be created.
  */
-TSFilter_t* TSFilterCreate(DVBAdapter_t *adapter);
+TSReader_t* TSReaderCreate(DVBAdapter_t *adapter);
 
 /**
- * Stop and Destroy the specified TSFilter_t instance.
- * @param tsfilter The TSFilter_t instance to destroy.
+ * Stop and Destroy the specified TSReader_t instance.
+ * @param reader The TSReader_t instance to destroy.
  */
-void TSFilterDestroy(TSFilter_t * tsfilter);
+void TSReaderDestroy(TSReader_t * reader);
 
 /**
- * Enable/Disable processing of packets by the specified TSFilter_t instance.
- * @param tsfilter The instance to enable or disable packet processing on.
+ * Enable/Disable processing of packets by the specified TSReader_t instance.
+ * @param reader The instance to enable or disable packet processing on.
  * @param enable   TRUE to enable processing packets, FALSE to disable processing.
  */
-void TSFilterEnable(TSFilter_t * tsfilter, bool enable);
+void TSReaderEnable(TSReader_t * reader, bool enable);
 
 /**
  * Zero total packets and bit rate fields as well as all packet statistics fields
  * in all PIDFilters.
- * @param tsfilter TSFilter_t instance to zero the stats of.
+ * @param reader TSReader_t instance to zero the stats of.
  */
-void TSFilterZeroStats(TSFilter_t *tsfilter);
+void TSReaderZeroStats(TSReader_t *reader);
 
 /**
  * Informs all PID filters that the multiplex has changed to newmultiplex.
- * @param tsfilter TSFilter_t instance to inform.
+ * @param reader TSReader_t instance to inform.
  * @param newmultiplex The new multiplex that the DVB adapter is now tuned to.
  */
-void TSFilterMultiplexChanged(TSFilter_t *tsfilter, Multiplex_t *newmultiplex);
+void TSReaderMultiplexChanged(TSReader_t *reader, Multiplex_t *newmultiplex);
 
 /**
- * Lock access to the TSFilter_t structure to this thread.
- * @param tsfilter The instance to lock access to.
+ * Lock access to the TSReader_t structure to this thread.
+ * @param reader The instance to lock access to.
  */
-#define TSFilterLock(tsfilter)   pthread_mutex_lock(&(tsfilter)->mutex)
+#define TSReaderLock(reader)   pthread_mutex_lock(&(reader)->mutex)
 
 /**
- * Unlock access to the TSFilter_t structure.
- * @param tsfilter The instance to unlock access to.
+ * Unlock access to the TSReader_t structure.
+ * @param reader The instance to unlock access to.
  */
-#define TSFilterUnLock(tsfilter) pthread_mutex_unlock(&(tsfilter)->mutex)
+#define TSReaderUnLock(reader) pthread_mutex_unlock(&(reader)->mutex)
 
-/**
- * Find a PIDFilter_t of the given name and type associated with this TSFilter.
- * @param tsfilter TSFilter to search.
- * @param name Name of the PIDFilter to find.
- * @param type Type of the PIDFilter to find.
- * @return a PIDFilter_t instance or NULL if not found.
- */
-PIDFilter_t* TSFilterFindPIDFilter(TSFilter_t *tsfilter, const char *name, const char *type);
+TSFilterGroup_t* TSReaderCreateFilterGroup(TSReader_t *reader, char *name, char *type, TSFilterGroupEventCallback_t callback, void *userArg );
+TSFilterGroup_t* TSReaderFindFilterGroup(TSReader_t *reader, char *name, char *type);
+void TSFilterGroupDestroy(TSFilterGroup_t* group);
+void TSFilterGroupRemoveAllFilters(TSFilterGroup_t* group);
+void TSFilterGroupAddSectionFilter(TSFilterGroup_t *group, uint16_t pid, int priority, dvbpsi_handle handle);
+void TSFilterGroupRemoveSectionFilter(TSFilterGroup_t *group, uint16_t pid);
+bool TSFilterGroupAddPacketFilter(TSFilterGroup_t *group, uint16_t pid, TSPacketFilterCallback_t callback, void *userArg);
+void TSFilterGroupRemovePacketFilter(TSFilterGroup_t *group, uint16_t pid);
 
 /**@}*/
-
-/**
- * @addtogroup TSPIDFilter
- * @{
- */
-/**
- * Allocate a PID filter for the specified TSFilter_t instance.
- * @param tsfilter The TSFilter_t instance to allocate the PID filter for.
- * @return A PIDFilter pointer or NULL if one could not be allocated.
- */
-PIDFilter_t* PIDFilterAllocate(TSFilter_t* tsfilter);
-/**
- * Free a PIDFilter_t instance.
- * @param pidfilter The instance to release.
- */
-void PIDFilterFree(PIDFilter_t * pidfilter);
-
-/**
- * Creates and initialise a new PIDFIlter_t instance.
- * @param tsfilter      The TSFilter_t instance to allocate the PID filter for.
- * @param filterpacket  The callback to use to filter packets.
- * @param fparg         The user argument to pass to the filter packet callback.
- * @param processpacket The callback to use to proces packets.
- * @param pparg         The user argument ot pass to the process packet callback.
- * @param outputpacket  The callback to use to output packets.
- * @param oparg         The user argument to pass to the output packet callback.
- * @return A PIDFilter pointer or NULL if one could not be allocated.
- */
-PIDFilter_t *PIDFilterSetup(TSFilter_t *tsfilter,
-                            PacketFilter filterpacket,     void *fparg,
-                            PacketProcessor processpacket, void *pparg,
-                            PacketOutput outputpacket,     void *oparg);
-
-/**
- * Sets the filterpacket callback and user argument.
- * @param _pidfilter The PIDFilter_t instance to set.
- * @param _callback  The function to set as the filterpacket callback.
- * @param _arg       The user argument to pass to the callback.
- */
-#define PIDFilterFilterPacketSet(_pidfilter, _callback, _arg) \
-    do{ (_pidfilter)->fpArg = _arg; (_pidfilter)->filterPacket = _callback; } while(0)
-/**
- * Sets the processpacket callback and user argument.
- * @param _pidfilter The PIDFilter_t instance to set.
- * @param _callback  The function to set as the processpacket callback.
- * @param _arg       The user argument to pass to the callback.
- */
-#define PIDFilterProcessPacketSet(_pidfilter, _callback, _arg) \
-    do{ (_pidfilter)->ppArg = _arg; (_pidfilter)->processPacket = _callback; } while(0)
-/**
- * Sets the outputpacket callback and user argument.
- * @param _pidfilter The PIDFilter_t instance to set.
- * @param _callback  The function to set as the outputpacket callback.
- * @param _arg       The user argument to pass to the callback.
- */
-#define PIDFilterOutputPacketSet(_pidfilter, _callback, _arg) \
-    do{ (_pidfilter)->opArg = _arg; (_pidfilter)->outputPacket = _callback; } while(0)
-/**
- * Sets the tsstructurechanged callback and user argument.
- * @param _pidfilter The PIDFilter_t instance to set.
- * @param _callback  The function to set as the tsstructurechanged callback.
- * @param _arg       The user argument to pass to the callback.
- */
-#define PIDFilterTSStructureChangeSet(_pidfilter, _callback, _arg) \
-    do{ (_pidfilter)->tscArg = _arg; (_pidfilter)->tsStructureChanged = _callback; } while(0)
-/**
- * Sets the multiplexchanged callback and user argument.
- * @param _pidfilter The PIDFilter_t instance to set.
- * @param _callback  The function to set as the multiplexchanged callback.
- * @param _arg       The user argument to pass to the callback.
- */
-#define PIDFilterMultiplexChangeSet(_pidfilter, _callback, _arg) \
-    do{ (_pidfilter)->mcArg = _arg; (_pidfilter)->multiplexChanged = _callback; } while(0)
-/**@}*/
-
-
-/**
- * @ingroup SimplePIDFilter
- * Function to set as the filterpacket callback when using a SimplePIDFilter_t.
- * This is the function to use along with a SimplePIDFilter_t instance as the
- * user arg, when you want to use a simple filter callback that just checks the
- * PID of the packet is one of the specified PIDs.
- */
-int PIDFilterSimpleFilter(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet);
-
 #endif

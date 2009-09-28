@@ -117,11 +117,6 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
     if (result)
     {
         int i;
-        /* Set all filters to be unallocated */
-        for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
-        {
-            result->filters[i].demuxFd = -1;
-        }
 
         result->frontEndFd = -1;
         result->dvrFd = -1;
@@ -129,6 +124,31 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
         sprintf(result->frontEndPath, "/dev/dvb/adapter%d/frontend0", adapter);
         sprintf(result->demuxPath, "/dev/dvb/adapter%d/demux0", adapter);
         sprintf(result->dvrPath, "/dev/dvb/adapter%d/dvr0", adapter);
+        result->maxFilters = -1
+        /* Determine max number of filters */
+        for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
+        {
+            if (result->maxFilters == -1)
+            {
+                result->filters[i].demuxFd = open(result->demuxPath);
+                if (result->filters[i] == -1)
+                {
+                    result->maxFilters = i;
+                }
+            }
+            else
+            {
+                result->filters[i] = -1;
+            }
+            
+        }
+
+        for (i = 0; i < result->maxFilters; i ++)
+        {
+            close(result->filters[i]);
+            result->filters[i] = -1;
+        }
+
         result->frontEndFd = open(result->frontEndPath, O_RDWR);
         if (result->frontEndFd == -1)
         {
@@ -192,10 +212,6 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
         {
             LogModule(LOG_INFO, DVBADAPTER, "Running in hardware restricted mode!\n");
         }
-        else
-        {
-            DVBDemuxAllocateFilter(result, 8192, TRUE);
-        }
 
         /* Start monitoring thread */
         pthread_create(&result->monitorThread, NULL, DVBFrontEndMonitor, result);
@@ -208,6 +224,8 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
             PropertyType_String, result, DVBPropertyNameGet, NULL);
         PropertiesAddProperty(propertyParent, "hwrestricted", "Whether the hardware is not capable of supplying the entire TS.",
             PropertyType_Boolean, &result->hardwareRestricted, PropertiesSimplePropertyGet, NULL);
+        PropertiesAddProperty(propertyParent, "maxfilters", "The maximum number of PID filters available.",
+            PropertyType_Boolean, &result->maxFilters, PropertiesSimplePropertyGet, NULL);
         PropertiesAddProperty(propertyParent, "type", "The type of broadcast the frontend is capable of receiving",
             PropertyType_String, &FETypesStr[result->info.type], PropertiesSimplePropertyGet, NULL);
         PropertiesAddProperty(propertyParent, "system", "The broadcast system the frontend is capable of receiving",
@@ -227,8 +245,7 @@ void DVBDispose(DVBAdapter_t *adapter)
     }
 
     LogModule(LOG_DEBUGV, DVBADAPTER, "Closing Demux file descriptors\n");
-    DVBDemuxReleaseAllFilters(adapter, FALSE);
-    DVBDemuxReleaseAllFilters(adapter, TRUE);
+    DVBDemuxReleaseAllFilters(adapter);
     adapter->monitorExit = TRUE;
 
     if (adapter->frontEndFd > -1)
@@ -512,68 +529,64 @@ int DVBDemuxSetBufferSize(DVBAdapter_t *adapter, unsigned long size)
     return 0;
 }
 
-int DVBDemuxAllocateFilter(DVBAdapter_t *adapter, uint16_t pid, bool system)
+int DVBDemuxAllocateFilter(DVBAdapter_t *adapter, uint16_t pid)
 {
     int result = -1;
-    if (adapter->hardwareRestricted || (pid == 8192))
-    {
-        int i;
-        int idxToUse = -1;
+    int i;
+    int idxToUse = -1;
 
-        for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
+    for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
+    {
+        if (adapter->filters[i].demuxFd == -1)
         {
-            if (adapter->filters[i].demuxFd == -1)
+            idxToUse = i;
+        }
+        else
+        {
+            if (adapter->filters[i].pid == pid)
             {
-                idxToUse = i;
-            }
-            else
-            {
-                if (adapter->filters[i].pid == pid)
-                {
-                    /* Already streaming this PID */
-                    idxToUse = -1;
-                    result = 0;
-                    break;
-                }
+                /* Already streaming this PID */
+                idxToUse = -1;
+                result = 0;
+                break;
             }
         }
-        if (idxToUse != -1)
+    }
+    if (idxToUse != -1)
+    {
+        LogModule(LOG_DEBUG, DVBADAPTER, "Allocation filter for pid 0x%x\n", pid);
+        adapter->filters[idxToUse].demuxFd = open(adapter->demuxPath, O_RDWR);
+        if (adapter->filters[idxToUse].demuxFd == -1)
         {
-            LogModule(LOG_DEBUG, DVBADAPTER, "Allocation filter for pid 0x%x type %s\n", pid, system ? "System":"Service");
-            adapter->filters[idxToUse].demuxFd = open(adapter->demuxPath, O_RDWR);
-            if (adapter->filters[idxToUse].demuxFd == -1)
+            LogModule(LOG_ERROR, DVBADAPTER, "Failed to open %s : %s when attempting to allocate filter for PID 0x%x\n", adapter->demuxPath, strerror(errno), pid);
+        }
+        else
+        {
+            struct dmx_pes_filter_params pesFilterParam;
+
+            adapter->filters[idxToUse].pid = pid;
+
+            pesFilterParam.pid = pid;
+            pesFilterParam.input = DMX_IN_FRONTEND;
+            pesFilterParam.output = DMX_OUT_TS_TAP;
+            pesFilterParam.pes_type = DMX_PES_OTHER;
+            if (adapter->frontEndLocked)
             {
-                LogModule(LOG_ERROR, DVBADAPTER, "Failed to open %s : %s when attempting to allocate filter for PID 0x%x\n", adapter->demuxPath, strerror(errno), pid);
+                LogModule(LOG_DEBUG, DVBADAPTER, "Starting pid filter immediately!\n");
+                pesFilterParam.flags = DMX_IMMEDIATE_START;
             }
             else
             {
-                struct dmx_pes_filter_params pesFilterParam;
+                pesFilterParam.flags = 0;
+            }
 
-                adapter->filters[idxToUse].pid = pid;
-                adapter->filters[idxToUse].system = system;
-
-                pesFilterParam.pid = pid;
-                pesFilterParam.input = DMX_IN_FRONTEND;
-                pesFilterParam.output = DMX_OUT_TS_TAP;
-                pesFilterParam.pes_type = DMX_PES_OTHER;
-                if (adapter->frontEndLocked)
-                {
-                    LogModule(LOG_DEBUG, DVBADAPTER, "Starting pid filter immediately!\n");
-                    pesFilterParam.flags = DMX_IMMEDIATE_START;
-                }
-                else
-                {
-                    pesFilterParam.flags = 0;
-                }
-
-                if (ioctl(adapter->filters[idxToUse].demuxFd , DMX_SET_PES_FILTER, &pesFilterParam) < 0)
-                {
-                    LogModule(LOG_ERROR, DVBADAPTER,"set_pid: %s\n", strerror(errno));
-                }
-                else
-                {
-                    result = 0;
-                }
+            if (ioctl(adapter->filters[idxToUse].demuxFd , DMX_SET_PES_FILTER, &pesFilterParam) < 0)
+            {
+                LogModule(LOG_ERROR, DVBADAPTER,"set_pid: %s\n", strerror(errno));
+            }
+            else
+            {
+                result = 0;
             }
         }
     }
@@ -590,8 +603,7 @@ int DVBDemuxReleaseFilter(DVBAdapter_t *adapter, uint16_t pid)
         {
             if ((adapter->filters[i].demuxFd != -1) && (adapter->filters[i].pid == pid))
             {
-                LogModule(LOG_DEBUG, DVBADAPTER, "Releasing filter for pid 0x%x type %s\n",
-                    pid, adapter->filters[i].system ? "System":"Service");
+                LogModule(LOG_DEBUG, DVBADAPTER, "Releasing filter for pid 0x%x\n",pid);
                 close(adapter->filters[i].demuxFd);
                 adapter->filters[i].demuxFd = -1;
                 result = 0;
@@ -602,15 +614,14 @@ int DVBDemuxReleaseFilter(DVBAdapter_t *adapter, uint16_t pid)
     return result;
 }
 
-int DVBDemuxReleaseAllFilters(DVBAdapter_t *adapter, bool system)
+int DVBDemuxReleaseAllFilters(DVBAdapter_t *adapter)
 {
     int result = -1;
     int i;
-    LogModule(LOG_DEBUG, DVBADAPTER, "Releasing all filters for type %s\n",
-        system ? "System":"Service");
+    LogModule(LOG_DEBUG, DVBADAPTER, "Releasing all filters");
     for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
     {
-        if ((adapter->filters[i].demuxFd != -1) && (adapter->filters[i].system == system))
+        if (adapter->filters[i].demuxFd != -1)
         {
             close(adapter->filters[i].demuxFd);
             adapter->filters[i].demuxFd = -1;

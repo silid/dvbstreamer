@@ -20,8 +20,9 @@ dvbstreamer_SOURCES = \
     services.c\
     pids.c\
     ts.c\
-    patprocessor.c\
-    pmtprocessor.c\
+    standard/mpeg2/mpeg2.c\
+    standard/mpeg2/patprocessor.c\
+    standard/mpeg2/pmtprocessor.c\
     servicefilter.c\
     dbase.c\
     cache.c\
@@ -35,9 +36,7 @@ dvbstreamer_SOURCES = \
     list.c\
     deliverymethod.c\
     pluginmgr.c \
-    sectionprocessor.c \
     pesprocessor.c \
-    subtableprocessor.c \
     epgtypes.c \
     epgchannel.c \
     utf8.c \
@@ -50,18 +49,20 @@ dvbstreamer_SOURCES = \
 
 if ENABLE_ATSC
 atsc_src =\
-    atsctext.c \
-    psipprocessor.c
+    standard/atsc/atsc.c \
+    standard/atsc/atsctext.c \
+    standard/atsc/psipprocessor.c
 else
 atsc_src =
 endif
 
 if ENABLE_DVB
 dvb_src =\
-    sdtprocessor.c\
-    nitprocessor.c \
-    tdtprocessor.c \
-    dvbtext.c
+    standard/dvb/dvb.c\
+    standard/dvb/sdtprocessor.c\
+    standard/dvb/nitprocessor.c \
+    standard/dvb/tdtprocessor.c \
+    standard/dvb/dvbtext.c
 else
 dvb_src =
 endif
@@ -85,8 +86,9 @@ fdvbstreamer_SOURCES = \
     services.c\
     pids.c\
     ts.c\
-    patprocessor.c\
-    pmtprocessor.c\
+    standard/mpeg2/mpeg2.c\
+    standard/mpeg2/patprocessor.c\
+    standard/mpeg2/pmtprocessor.c\
     servicefilter.c\
     dbase.c\
     cache.c\

@@ -57,12 +57,12 @@ void UpdateDatabase();
 
 /**
  * Retrieve the main Transport Stream Filter object.
- * @return The main TSFilter_t object.
+ * @return The main TSReader_t object.
  */
-TSFilter_t *MainTSFilterGet(void);
+TSReader_t *MainTSFilterGet(void);
 
 /**
- * Retrieve the DVBAdapter_t object being used by the main TSFilter_t object.
+ * Retrieve the DVBAdapter_t object being used by the main TSReader_t object.
  * @return The main DVBAdapter_t object.
  */
 DVBAdapter_t *MainDVBAdapterGet(void);

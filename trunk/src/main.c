@@ -45,12 +45,6 @@ Entry point to the application.
 #include "dvbadapter.h"
 #include "ts.h"
 #include "main.h"
-#include "patprocessor.h"
-#include "pmtprocessor.h"
-#include "sdtprocessor.h"
-#include "nitprocessor.h"
-#include "tdtprocessor.h"
-#include "psipprocessor.h"
 #include "sectionprocessor.h"
 #include "pesprocessor.h"
 #include "servicefilter.h"
@@ -139,7 +133,7 @@ const char PrimaryService[] = "<Primary>";
 char DataDirectory[PATH_MAX];
 
 static char PidFile[PATH_MAX];
-static TSFilter_t *TSFilter;
+static TSReader_t *TSReader;
 static DVBAdapter_t *DVBAdapter;
 static const char MAIN[] = "Main";
 static time_t StartTime;
@@ -164,9 +158,7 @@ int main(int argc, char *argv[])
     bool remoteInterface = FALSE;
     bool disableConsoleInput = FALSE;
     bool hwRestricted = FALSE;
-    PIDFilter_t *primaryServiceFilter = NULL;
     DeliveryMethodInstance_t *dmInstance;
-    PIDFilter_t *PIDFilters[MAX_PIDFILTERS];
     char logFilename[PATH_MAX] = {0};
 
     /* Create the data directory */
@@ -331,46 +323,22 @@ int main(int argc, char *argv[])
 #endif
 
     /* Create Transport stream filter thread */
-    INIT(!(TSFilter = TSFilterCreate(DVBAdapter)), "TS filter");
+    INIT(!(TSReader = TSReaderCreate(DVBAdapter)), "TS reader");
 
-    /* Create PAT/PMT filters */
-    memset(&PIDFilters, 0, sizeof(PIDFilters));
-
-    PIDFilters[PIDFILTER_INDEX_PAT] = PATProcessorCreate(TSFilter);
-    PIDFilters[PIDFILTER_INDEX_PMT] = PMTProcessorCreate(TSFilter);
     if (MainIsDVB())
     {
 #if defined(ENABLE_DVB)
         LogModule(LOG_INFO, MAIN, "Starting DVB filters\n");
-        INIT(SDTProcessorInit(), "SDT Processor");
-        INIT(TDTProcessorInit(), "TDT Processor");
-        INIT(NITProcessorInit(), "NIT Processor");
-
-        PIDFilters[PIDFILTER_INDEX_SDT] = SDTProcessorCreate(TSFilter);
-        PIDFilters[PIDFILTER_INDEX_NIT] = NITProcessorCreate(TSFilter);
-        PIDFilters[PIDFILTER_INDEX_TDT] = TDTProcessorCreate(TSFilter);
+        INIT(DVBStandardInit(TSReader), "DVB Filters");
 #endif
     }
     else
     {
 #if defined(ENABLE_ATSC)
         LogModule(LOG_INFO, MAIN, "Starting ATSC filters\n");
-        INIT(ATSCMultipleStringsInit(), "ATSC Strings");
-        INIT(PSIPProcessorInit(), "PSIP Processor");
-
-        PIDFilters[PIDFILTER_INDEX_PSIP] = PSIPProcessorCreate(TSFilter);
+        INIT(ATSCStandardInit(TSReader), "DVB Filters");
 #endif
     }
-
-    /* Enable all the filters */
-    for (i = 0; i < MAX_PIDFILTERS; i ++)
-    {
-        if (PIDFilters[i])
-        {
-            PIDFilters[i]->enabled = TRUE;
-        }
-    }
-    LogModule(LOG_DEBUGV, MAIN, "PID filters started\n");
 
     INIT(CommandInit(), "commands");
 
@@ -392,7 +360,7 @@ int main(int argc, char *argv[])
     INIT(PluginManagerInit(), "plugin manager");
 
     /* Create Service filter */
-    primaryServiceFilter = ServiceFilterCreate(TSFilter, (char *)PrimaryService);
+    primaryServiceFilter = ServiceFilterCreate(TSReader, (char *)PrimaryService);
     if (!primaryServiceFilter)
     {
         LogModule(LOG_ERROR, MAIN, "Failed to create primary service filter\n");
@@ -417,7 +385,6 @@ int main(int argc, char *argv[])
     }
 
     ServiceFilterDeliveryMethodSet(primaryServiceFilter, dmInstance);
-    primaryServiceFilter->enabled = TRUE;
 
     if (DaemonMode || remoteInterface)
     {
@@ -487,9 +454,9 @@ int main(int argc, char *argv[])
         }
     }
 
-    TSFilterEnable(TSFilter, FALSE);
+    TSReaderEnable(TSReader, FALSE);
 
-    ServiceFilterDestroyAll(TSFilter);
+    ServiceFilterDestroyAll(TSReader);
     SectionProcessorDestroyAllProcessors();
     PESProcessorDestroyAllProcessors();
 
@@ -518,43 +485,21 @@ int main(int argc, char *argv[])
     CommandUnInstallScanning();
     
     DEINIT(CommandDeInit(), "commands");
-
-    /* Disable all the filters */
-    for (i = 0; i < MAX_PIDFILTERS; i ++)
-    {
-        if (PIDFilters[i])
-        {
-            PIDFilters[i]->enabled = FALSE;
-        }
-    }
-    LogModule(LOG_DEBUGV, MAIN, "PID filters stopped\n");
-
-    PATProcessorDestroy( PIDFilters[PIDFILTER_INDEX_PAT]);
-    PMTProcessorDestroy( PIDFilters[PIDFILTER_INDEX_PMT]);
     if (MainIsDVB())
     {
 #if defined(ENABLE_DVB)
-        SDTProcessorDestroy( PIDFilters[PIDFILTER_INDEX_SDT]);
-        NITProcessorDestroy( PIDFilters[PIDFILTER_INDEX_NIT]);
-        TDTProcessorDestroy( PIDFilters[PIDFILTER_INDEX_TDT]);
-        DEINIT(SDTProcessorDeInit(), "SDT Processor");
-        DEINIT(TDTProcessorDeInit(), "TDT Processor");
-        DEINIT(NITProcessorDeInit(), "NIT Processor");
+        DVBStandardDeinit(TSReader);
 #endif
     }
     else
     {
 #if defined(ENABLE_ATSC)
-        PSIPProcessorDestroy( PIDFilters[PIDFILTER_INDEX_PSIP]);
-        DEINIT(PSIPProcessorDeInit(), "PSIP Processor");
-        DEINIT(ATSCMultipleStringsDeInit(), "ATSC Strings");
+        ATSCStandardDeinit(TSReader);
 #endif
     }
-
-
     LogModule(LOG_DEBUGV, MAIN, "Processors destroyed\n");
     /* Close the adapter and shutdown the filter etc*/
-    DEINIT(TSFilterDestroy(TSFilter), "TS filter");
+    DEINIT(TSReaderDestroy(TSReader), "TS filter");
     DEINIT(DVBDispose(DVBAdapter), "DVB adapter");
 
     DEINIT(CacheDeInit(), "cache");
@@ -580,9 +525,9 @@ int main(int argc, char *argv[])
 
 void UpdateDatabase()
 {
-    TSFilterLock(TSFilter);
+    TSReaderLock(TSReader);
     CacheWriteback();
-    TSFilterUnLock(TSFilter);
+    TSReaderUnLock(TSReader);
 }
 
 static void InstallSysProperties(void)
@@ -628,9 +573,9 @@ static int SysPropertyGetUptimeSecs(void *userArg, PropertyValue_t *value)
 }
 
 
-TSFilter_t *MainTSFilterGet(void)
+TSReader_t *MainTSReaderGet(void)
 {
-    return TSFilter;
+    return TSReader;
 }
 
 DVBAdapter_t *MainDVBAdapterGet(void)

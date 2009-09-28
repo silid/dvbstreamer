@@ -45,7 +45,7 @@ Plugin to allow manual filtering of sections.
         char filterName[20]; /* Section(PID 0x%04x) */ \
         pid = ParsePID(_name); \
         sprintf(filterName, SectionFilterNameFormat, pid); \
-        filter = TSFilterFindPIDFilter(MainTSFilterGet(), (filterName), SectionPIDFilterType);\
+        filter = TSReaderFindPIDFilter(MainTSReaderGet(), (filterName), SectionPIDFilterType);\
         if (!filter)\
         {\
             CommandError(COMMAND_ERROR_GENERIC, "Section filter not found!");\
@@ -138,7 +138,7 @@ PLUGIN_INTERFACE_C(
 static void CommandAddSecF(int argc, char **argv)
 {
     DVBAdapter_t *adapter = MainDVBAdapterGet();
-    TSFilter_t *tsFilter = MainTSFilterGet();
+    TSReader_t *tsFilter = MainTSReaderGet();
     PIDFilter_t *filter;
     PIDFilterSimpleFilter_t *simplePIDFilter;
     DeliveryMethodInstance_t *dmInstance;
@@ -157,7 +157,7 @@ static void CommandAddSecF(int argc, char **argv)
     pid = ParsePID(argv[0]);
     sprintf(filterName, SectionFilterNameFormat, pid);
         
-    filter = TSFilterFindPIDFilter(tsFilter, filterName, SectionPIDFilterType);
+    filter = TSReaderFindPIDFilter(tsFilter, filterName, SectionPIDFilterType);
     if (filter)
     {
         CommandError(COMMAND_ERROR_GENERIC, "Already section filtering this PID!");
@@ -238,10 +238,10 @@ static void CommandRemoveSecF(int argc, char **argv)
 
 static void CommandListSecF(int argc, char **argv)
 {
-    TSFilter_t *tsFilter = MainTSFilterGet();
+    TSReader_t *tsFilter = MainTSReaderGet();
     ListIterator_t iterator;
 
-    TSFilterLock(tsFilter);
+    TSReaderLock(tsFilter);
     for ( ListIterator_Init(iterator, tsFilter->pidFilters);
           ListIterator_MoreEntries(iterator);
           ListIterator_Next(iterator))
@@ -252,7 +252,7 @@ static void CommandListSecF(int argc, char **argv)
             CommandPrintf("%10s : %s\n", filter->name,  ((SectionFilter_t*)filter->ppArg)->dmInstance->mrl);
         }
     }
-    TSFilterUnLock(tsFilter);
+    TSReaderUnLock(tsFilter);
 }
 
 static void CommandSetOutputMRL(int argc, char **argv)

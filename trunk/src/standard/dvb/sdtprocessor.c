@@ -34,6 +34,7 @@ Process Service Description Tables and update the services information.
 #include <dvbpsi/demux.h>
 #include <dvbpsi/sdt.h>
 
+#include "events.h"
 #include "multiplexes.h"
 #include "services.h"
 #include "dvbadapter.h"
@@ -48,7 +49,7 @@ Process Service Description Tables and update the services information.
 /*******************************************************************************
 * Defines                                                                      *
 *******************************************************************************/
-#define SDT_PID 0x11
+#define PID_SDT 0x11
 
 #define TABLE_ID_SDT_ACTUAL 0x42
 #define TABLE_ID_SDT_OTHER  0x46
@@ -60,11 +61,11 @@ Process Service Description Tables and update the services information.
 * Typedefs                                                                     *
 *******************************************************************************/
 
-typedef struct SDTProcessorState_s
+typedef struct SDTProcessor_s
 {
-    TSFilter_t *tsfilter;    
-    Multiplex_t *multiplex;
-}SDTProcessorState_t;
+    TSFilterGroup_t *tsgroup;    
+    dvbpsi_handle demux;
+};
 
 /*******************************************************************************
 * Prototypes                                                                   *
@@ -79,91 +80,53 @@ static ServiceType ConvertDVBServiceType(int type);
 * Global variables                                                             *
 *******************************************************************************/
 static char SDTPROCESSOR[] = "SDTProcessor";
-static List_t *NewSDTCallbacksList = NULL;
+static Event_t sdtEvent = NULL;
 
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
-int SDTProcessorInit(void)
+SDTProcessor_t SDTProcessorCreate(TSReader_t *tsfilter)
 {
-    NewSDTCallbacksList = ListCreate();
-    return NewSDTCallbacksList ? 0: -1;
-}
-
-void SDTProcessorDeInit(void)
-{
-    ListFree(NewSDTCallbacksList, NULL);
-}
-
-PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter)
-{
-    SDTProcessorState_t *state = NULL;
-    PIDFilter_t *result = NULL;
-    ObjectRegisterType(SDTProcessorState_t);
-    state = ObjectCreateType(SDTProcessorState_t);
+    SDTProcessor_t *state = NULL;
+    if (sdtEvent == NULL)
+    {
+        sdtEvent = EventsRegisterEvent(DVBEventSource, "sdt", NULL);
+    }
+    ObjectRegisterClass("SDTProcessor_t", sizeof(struct SDTProcessor_s), NULL);
+    state = ObjectCreateType(SDTProcessor_t);
     if (state)
     {
-        state->tsfilter = tsfilter;
-        result = SubTableProcessorCreate(tsfilter, SDT_PID, SubTableHandler, state, SDTMultiplexChanged, state);
-
-        if (result)
-        {
-            result->name = "SDT";
-            result->type = PSISIPIDFilterType;
-            /* If the PAT changes we want to pick up the SDT again as otherwise we 
-               may have services with no names.
-               Seen this with the UK multiplexes where there have been PAT changes 
-               in quick succesion but there has been no change to the SDT. This 
-               resulted in the services being available but losing there names
-               as the first changed to the PAT removed all services and then the 
-               next one added them all back (?!)
-            */
-            PIDFilterTSStructureChangeSet(result, SDTTSStructureChanged, state);
-            if (tsfilter->adapter->hardwareRestricted)
-            {
-                DVBDemuxAllocateFilter(tsfilter->adapter, SDT_PID, TRUE);
-            }
-        }
-        else
-        {
-            ObjectRefDec(state);
-        }
+        state->tsgroup = TSReaderCreateFilterGroup(TSReader_t * reader,char * name,char * type,TSFilterGroupEventCallback_t callback,void * userArg)
     }
     return result;
 }
 
-void SDTProcessorDestroy(PIDFilter_t *filter)
+void SDTProcessorDestroy(SDTProcessor_t processor)
 {
-    SDTProcessorState_t *state = filter->tscArg;
-    if (filter->tsFilter->adapter->hardwareRestricted)
+    TSFilterGroupDestroy(processor->tsgroup);
+    if (processor->demux)
     {
-        DVBDemuxReleaseFilter(filter->tsFilter->adapter, SDT_PID);
+        dvbpsi_DetachDemux(processor->demux);
     }
-    
-    SubTableProcessorDestroy(filter);
-    MultiplexRefDec(state->multiplex);
-    ObjectRefDec(state);
-}
-
-void SDTProcessorRegisterSDTCallback(PluginSDTProcessor_t callback)
-{
-    if (NewSDTCallbacksList)
-    {
-        ListAdd(NewSDTCallbacksList, callback);
-    }
-}
-
-void SDTProcessorUnRegisterSDTCallback(PluginSDTProcessor_t callback)
-{
-    if (NewSDTCallbacksList)
-    {
-        ListRemove(NewSDTCallbacksList, callback);
-    }
+    ObjectRefDec(processor);
 }
 
 /*******************************************************************************
 * Local Functions                                                              *
 *******************************************************************************/
+static void SDTProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details)
+{
+    SDTProcessor_t state = (SDTProcessor_t)userArg;
+    if (state->demux)
+    {
+        TSFilterGroupRemoveSectionFilter(state->tsgroup, PID_SDT);
+        dvbpsi_DetachDemux(state->demux);
+    }
+
+    state->demux = dvbpsi_AttachDemux(SubTableHandler, state);
+    TSFilterGroupAddSectionFilter(state->tsgroup, PID_SDT, 1, state->demux);
+}
+
 static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension)
 {
     if(tableId == TABLE_ID_SDT_ACTUAL)
@@ -174,8 +137,7 @@ static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t table
 
 static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
 {
-    SDTProcessorState_t *state = arg;
-    ListIterator_t iterator;
+    SDTProcessor_t state = arg;
     dvbpsi_sdt_service_t* sdtservice = newSDT->p_first_service;
     int count,i;
     Service_t **services;
@@ -296,27 +258,8 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
         CacheUpdateNetworkId(state->multiplex, newSDT->i_network_id);
     }
 
-    for (ListIterator_Init(iterator, NewSDTCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
-    {
-        PluginSDTProcessor_t callback = ListIterator_Current(iterator);
-        callback(newSDT);
-    }
-
+    EventsFireEventListeners(sdtEvent, newSDT);
     ObjectRefDec(newSDT);
-}
-
-static void SDTMultiplexChanged(PIDFilter_t *filter, void *arg, Multiplex_t *multiplex)
-{
-    SDTProcessorState_t *state = arg;
-    MultiplexRefDec(state->multiplex);
-    state->multiplex = multiplex;
-    MultiplexRefInc(state->multiplex);
-}
-
-static void SDTTSStructureChanged(PIDFilter_t *filter, void *arg)
-{
-    SDTProcessorState_t *state = arg;
-    filter->multiplexChanged(filter, filter->mcArg, state->multiplex);
 }
 
 static ServiceType ConvertDVBServiceType(int type)

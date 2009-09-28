@@ -34,6 +34,7 @@ Caches service and PID information from the database for the current multiplex.
 #include "dbase.h"
 #include "main.h"
 #include "messageq.h"
+#include "events.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -172,6 +173,8 @@ static void CacheProcessUpdateMessage(CacheUpdateMessage_t *msg);
 * Global variables                                                             *
 *******************************************************************************/
 static char CACHE[] = "Cache";
+static EventSource_t eventSource;
+static Event_t pidsUpdatedEvent;
 static Multiplex_t *cachedServicesMultiplex = NULL;
 static int cachedServicesCount = 0;
 
@@ -190,6 +193,10 @@ static pthread_t  cacheUpdateThread;
 int CacheInit()
 {
     pthread_mutex_init(&cacheUpdateMutex, NULL);
+
+    eventSource = EventsRegisterSource("cache");
+    pidsUpdatedEvent = EventsRegisterEvent(eventSource, "pidsupdated", NULL);
+    
     cacheUpdateQ = MessageQCreate();
     ObjectRegisterType(CacheUpdateMessage_t);
     pthread_create(&cacheUpdateThread, NULL, CacheUpdateProcessor, NULL);
@@ -677,6 +684,7 @@ void CacheUpdatePIDs(Service_t *service, int pcrpid, PIDList_t *pids, int pmtver
                 MessageQSend(cacheUpdateQ, msg);
                 ObjectRefDec(msg);
             }
+            EventsFireEventListeners(pidsUpdatedEvent, cachedServices[i]);
             break;
         }
     }

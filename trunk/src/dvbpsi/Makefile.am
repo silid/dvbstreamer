@@ -10,6 +10,7 @@ libdvbpsi_a_SOURCES= \
 	descriptor.c \
 	dvbpsi.c \
 	psi.c \
+	sections.c \
 	$(mpeg2_descriptors_src) \
 	$(mpeg2_tables_src) \
 	$(dvb_src) \

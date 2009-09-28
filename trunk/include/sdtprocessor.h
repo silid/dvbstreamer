@@ -22,16 +22,9 @@ Process Service Description Tables and update the services information.
 */
 #ifndef _SDTPROCESSOR_H
 #define _SDTPROCESSOR_H
-#include "plugin.h"
 #include "ts.h"
+typedef struct SDTProcessor_s *SDTProcessor_t;
 
-int SDTProcessorInit(void);
-void SDTProcessorDeInit(void);
-
-PIDFilter_t *SDTProcessorCreate(TSFilter_t *tsfilter);
-void SDTProcessorDestroy(PIDFilter_t *filter);
-
-void SDTProcessorRegisterSDTCallback(PluginSDTProcessor_t callback);
-void SDTProcessorUnRegisterSDTCallback(PluginSDTProcessor_t callback);
-
+SDTProcessor_t SDTProcessorCreate(TSReader_t *reader);
+void SDTProcessorDestroy(SDTProcessor_t processor);
 #endif

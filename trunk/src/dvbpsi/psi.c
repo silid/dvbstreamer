@@ -29,6 +29,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #if defined(HAVE_INTTYPES_H)
 #include <inttypes.h>
@@ -189,7 +190,37 @@ void dvbpsi_ReleasePSISections(dvbpsi_handle h_dvbpsi, dvbpsi_psi_section_t * p_
     h_dvbpsi->p_free_sections = p_section;
 }
 
+/*****************************************************************************
+ * dvbpsi_ClonePSISection
+ *****************************************************************************
+ * Clone a section
+ *****************************************************************************/
+dvbpsi_psi_section_t * dvbpsi_ClonePSISection(dvbpsi_handle h_dvbpsi, dvbpsi_psi_section_t * p_section)
+{
+    dvbpsi_psi_section_t *p_cloned = NULL;
+    p_cloned = dvbpsi_ClaimPSISection(h_dvbpsi, p_section->i_max_size);
+    if (p_cloned == NULL)
+    {
+        return NULL;
+    }
+    p_cloned->i_table_id = p_section->i_table_id;
+    p_cloned->b_syntax_indicator = p_section->b_syntax_indicator;
+    p_cloned->b_private_indicator = p_section->b_private_indicator;
+    p_cloned->i_length = p_section->i_length;
 
+    p_cloned->i_extension = p_section->i_extension;
+    p_cloned->i_version = p_section->i_version;
+    p_cloned->b_current_next = p_section->b_current_next;
+    p_cloned->i_number = p_section->i_number;
+    p_cloned->i_last_number = p_section->i_last_number;
+    p_cloned->i_crc = p_section->i_crc;
+    memcpy(p_cloned->p_data, p_section->p_data, p_section->i_max_size);
+    p_cloned->p_payload_start = p_cloned->p_data + (p_section->p_payload_start - p_section->p_data);
+    p_cloned->p_payload_end = p_cloned->p_data + (p_section->p_payload_end - p_section->p_data);
+
+    return p_cloned;
+}
+    
 /*****************************************************************************
  * dvbpsi_NewPSISection
  *****************************************************************************

@@ -263,7 +263,7 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
                 case PLUGIN_FEATURE_TYPE_FILTER:
                     {
                         PluginFilter_t *pluginFilter = pluginInterface->features[i].details;
-                        pluginFilter->filter = PIDFilterAllocate(MainTSFilterGet());
+                        pluginFilter->filter = PIDFilterAllocate(MainTSReaderGet());
                         if (pluginFilter->filter)
                         {
                             pluginFilter->filter->type = "Plugin";

@@ -36,26 +36,27 @@ the output to only include this service.
  */
 extern char ServicePIDFilterType[];
 
+typedef struct ServiceFilter_s *ServiceFilter_t;
+
 /**
- * Creates a new Service Filter linked to the supplied TS Filter and return the
- * PIDFilter_t instance used to filter the TS.
- * @param tsfilter The TS Filter to link the ServiceFilter to.
+ * Creates a new Service Filter linked to the supplied TS Reader.
+ * @param reader The TS Reader to link the ServiceFilter to.
  * @param name The name of this filter.
- * @return The PIDFilter_t instance that will be used to filter PIDs.
+ * @return A new ServiceFilter_t instance that will be used to filter PIDs.
  */
-PIDFilter_t *ServiceFilterCreate(TSFilter_t *tsfilter, char *name);
+ServiceFilter_t ServiceFilterCreate(TSReader_t *reader, char *name);
 
 /**
  * Destroy a service filter created by ServiceFilterCreate().
  * @param filter The service filter to destroy.
  */
-void ServiceFilterDestroy(PIDFilter_t *filter);
+void ServiceFilterDestroy(ServiceFilter_t filter);
 
 /**
  * Destroy all service filters linked to the specified TS Filter.
- * @param tsFilter The TS Filter to remove all ServiceFilters from.
+ * @param reader The TS Reader to remove all ServiceFilters from.
  */
-void ServiceFilterDestroyAll(TSFilter_t *tsFilter);
+void ServiceFilterDestroyAll(TSReader_t *reader);
 
 /**
  * Set the service filtered by the specified service filter.
@@ -63,13 +64,13 @@ void ServiceFilterDestroyAll(TSFilter_t *tsFilter);
  *               NULL to stop filtering.
  * @param service The new service to filter.
  */
-void ServiceFilterServiceSet(PIDFilter_t *filter, Service_t *service);
+void ServiceFilterServiceSet(ServiceFilter_t filter, Service_t *service);
 /**
  * Get the service being filtered by the specified service filter.
  * @param filter The service filter to retrieve the service from.
  * @return A Service_t instance or NULL if no service is being filtered.
  */
-Service_t *ServiceFilterServiceGet(PIDFilter_t *filter);
+Service_t *ServiceFilterServiceGet(ServiceFilter_t filter);
 
 /**
  * Set whether to filter out any PIDs that are not being used by Audio/Video or 
@@ -79,7 +80,7 @@ Service_t *ServiceFilterServiceGet(PIDFilter_t *filter);
  * @param enable TRUE to enable AVS only, FALSE to disable and filter all PIDS 
  *               related to the service.
  */
-void ServiceFilterAVSOnlySet(PIDFilter_t *filter, bool enable);
+void ServiceFilterAVSOnlySet(ServiceFilter_t filter, bool enable);
 
 /**
  * Get whether the specified service filter is only filtering Audio/Video or 
@@ -87,20 +88,21 @@ void ServiceFilterAVSOnlySet(PIDFilter_t *filter, bool enable);
  * @param filter The service filter to check.
  * @return TRUE if only AVS PIDs are being filtered, FALSE otherwise.
  */
-bool ServiceFilterAVSOnlyGet(PIDFilter_t *filter);
+bool ServiceFilterAVSOnlyGet(ServiceFilter_t filter);
 
 /**
  * Set the delivery method associated with the specified service filter.
  * @param filter The service filter to change the delivery method of.
  * @param instance The new delivery method to set.
  */
-void ServiceFilterDeliveryMethodSet(PIDFilter_t *filter, DeliveryMethodInstance_t *instance);
+void ServiceFilterDeliveryMethodSet(ServiceFilter_t filter, DeliveryMethodInstance_t *instance);
+
 /**
  * Get the delivery method associated with the specified service filter.
  * @param filter The service filter to interrogate.
  * @return A DeliveryMethodInstance_t or NULL if not delivery method has been set.
  */
-DeliveryMethodInstance_t * ServiceFilterDeliveryMethodGet(PIDFilter_t *filter);
+DeliveryMethodInstance_t * ServiceFilterDeliveryMethodGet(ServiceFilter_t filter);
 
 /**@}*/
 #endif

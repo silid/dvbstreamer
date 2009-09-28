@@ -54,7 +54,7 @@ Command functions for service filter related tasks
 *******************************************************************************/
 
 #define FIND_SERVICE_FILTER(_name) \
-    filter = TSFilterFindPIDFilter(MainTSFilterGet(), (_name), ServicePIDFilterType); \
+    filter = TSReaderFindPIDFilter(MainTSReaderGet(), (_name), ServicePIDFilterType); \
     if (filter == NULL) \
     {\
         CommandError(COMMAND_ERROR_GENERIC, "Service filter not found!"); \
@@ -253,7 +253,7 @@ static void CommandGetMRL(int argc, char **argv)
 static void CommandAddSF(int argc, char **argv)
 {
     DVBAdapter_t *adapter = MainDVBAdapterGet();
-    TSFilter_t *tsFilter = MainTSFilterGet();
+    TSReader_t *tsFilter = MainTSReaderGet();
     PIDFilter_t *filter;
 
     if (adapter->hardwareRestricted)
@@ -263,7 +263,7 @@ static void CommandAddSF(int argc, char **argv)
     }
     
     CommandCheckAuthenticated();
-    filter = TSFilterFindPIDFilter(tsFilter, argv[0], ServicePIDFilterType);
+    filter = TSReaderFindPIDFilter(tsFilter, argv[0], ServicePIDFilterType);
     if (filter)
     {
         CommandError(COMMAND_ERROR_GENERIC, "Service Filter of that name already exists!");
@@ -305,7 +305,7 @@ static void CommandRemoveSF(int argc, char **argv)
 
 static void CommandListSF(int argc, char **argv)
 {
-    TSFilter_t *tsFilter = MainTSFilterGet();
+    TSReader_t *tsFilter = MainTSReaderGet();
     ListIterator_t iterator;
     
     for ( ListIterator_Init(iterator, tsFilter->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))

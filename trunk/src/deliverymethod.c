@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2006  Adam Charrett
+Copyright (C) 2009  Adam Charrett
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -74,42 +74,6 @@ void DeliveryMethodManagerUnRegister(DeliveryMethodHandler_t *handler)
     ListRemove(DeliveryMethodsList, handler);
 }
 
-bool DeliveryMethodManagerFind(char *mrl, PIDFilter_t *filter)
-{
-    DeliveryMethodInstance_t *instance = DeliveryMethodCreate(mrl);
-
-    if (instance)
-    {
-        if (filter->enabled)
-        {
-            TSFilterLock(filter->tsFilter);
-        }
-        if (filter->outputPacket)
-        {
-            DeliveryMethodManagerFree(filter);
-        }
-        filter->outputPacket = DeliveryMethodOutputPacket;
-        filter->opArg = instance;
-        LogModule(LOG_DEBUG, DELIVERYMETHOD, "Created DeliveryMethodInstance(%p) for %s\n",instance, instance->mrl);
-        if (filter->enabled)
-        {
-            TSFilterUnLock(filter->tsFilter);
-        }
-    }
-
-    return instance != NULL;
-}
-
-void DeliveryMethodManagerFree(PIDFilter_t *filter)
-{
-    DeliveryMethodInstance_t *instance = filter->opArg;
-    if (instance)
-    {
-        DeliveryMethodDestroy(instance);
-        filter->opArg = NULL;
-    }
-}
-
 DeliveryMethodInstance_t *DeliveryMethodCreate(char *mrl)
 {
     ListIterator_t iterator;
@@ -155,17 +119,40 @@ void DeliveryMethodDestroyAll()
      }
 }
 
-char* DeliveryMethodGetMRL(PIDFilter_t *filter)
+char* DeliveryMethodGetMRL(DeliveryMethodInstance_t *instance)
 {
-    DeliveryMethodInstance_t *instance = filter->opArg;
     return instance->mrl;
 }
 
-void DeliveryMethodOutputPacket(PIDFilter_t *pidfilter, void *userarg, TSPacket_t* packet)
+void DeliveryMethodReserveHeaderSpace(DeliveryMethodInstance_t *instance, int nrofPackets)
 {
-    DeliveryMethodInstance_t *instance = userarg;
-    if (instance)
+    if (instance->ops->ReserveHeaderSpace)
     {
-        instance->ops->SendPacket(instance, packet);
+        instance->ops->ReserveHeaderSpace(instance, nrofPackets);
     }
 }
+
+void DeliveryMethodSetHeader(DeliveryMethodInstance_t *instance, TSPacket_t *packets, int nrofPackets)
+{
+    if (instance->ops->SetHeader)
+    {
+        instance->ops->SetHeader(instance, packets, nrofPackets);
+    }
+}
+
+void DeliveryMethodOutputPacket(DeliveryMethodInstance_t *instance, TSPacket_t* packet)
+{
+    if (instance->ops->OutputPacket)
+    {
+        instance->ops->OutputPacket(instance, packet);
+    }
+}
+
+void DeliveryMethodOutputBlock(DeliveryMethodInstance_t *instance, void *block, unsigned long blockLen)
+{
+    if (instance->ops->OutputBlock)
+    {
+        instance->ops->OutputBlock(instance, block, blockLen);
+    }
+}
+

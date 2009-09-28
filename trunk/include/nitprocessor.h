@@ -25,11 +25,10 @@ Process Network Information Tables.
 #include "plugin.h"
 #include "ts.h"
 
-int NITProcessorInit(void);
-void NITProcessorDeInit(void);
+typedef struct NITProcessor_s *NITProcessor_t;
 
-PIDFilter_t *NITProcessorCreate(TSFilter_t *tsfilter);
-void NITProcessorDestroy(PIDFilter_t *filter);
+NITProcessor_t NITProcessorCreate(TSReader_t *reader);
+void NITProcessorDestroy(NITProcessor_t processor);
 
 void NITProcessorRegisterNITCallback(PluginNITProcessor_t callback);
 void NITProcessorUnRegisterNITCallback(PluginNITProcessor_t callback);

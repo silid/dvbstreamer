@@ -40,7 +40,7 @@ Plugin to allow manual filtering of PIDs.
 * Defines                                                                      *
 *******************************************************************************/
 #define FIND_MANUAL_FILTER(_name) \
-    filter = TSFilterFindPIDFilter(MainTSFilterGet(), (_name), ManualPIDFilterType);\
+    filter = TSReaderFindPIDFilter(MainTSReaderGet(), (_name), ManualPIDFilterType);\
     if (!filter)\
     {\
         CommandError(COMMAND_ERROR_GENERIC, "Manual filter not found!");\
@@ -156,7 +156,7 @@ PLUGIN_INTERFACE_C(
 static void CommandAddMF(int argc, char **argv)
 {
     DVBAdapter_t *adapter = MainDVBAdapterGet();
-    TSFilter_t *tsFilter = MainTSFilterGet();
+    TSReader_t *tsFilter = MainTSReaderGet();
     PIDFilter_t *filter;
     PIDFilterSimpleFilter_t *simplePIDFilter;
     DeliveryMethodInstance_t *dmInstance;
@@ -168,7 +168,7 @@ static void CommandAddMF(int argc, char **argv)
     }
     CommandCheckAuthenticated();
 
-    filter = TSFilterFindPIDFilter(tsFilter, argv[0], ManualPIDFilterType);
+    filter = TSReaderFindPIDFilter(tsFilter, argv[0], ManualPIDFilterType);
     if (filter)
     {
         CommandError(COMMAND_ERROR_GENERIC, "A manual filter with this name exists!");
@@ -225,10 +225,10 @@ static void CommandRemoveMF(int argc, char **argv)
 
 static void CommandListMF(int argc, char **argv)
 {
-    TSFilter_t *tsFilter = MainTSFilterGet();
+    TSReader_t *tsFilter = MainTSReaderGet();
     ListIterator_t iterator;
 
-    TSFilterLock(tsFilter);
+    TSReaderLock(tsFilter);
     for ( ListIterator_Init(iterator, tsFilter->pidFilters);
           ListIterator_MoreEntries(iterator);
           ListIterator_Next(iterator))
@@ -239,7 +239,7 @@ static void CommandListMF(int argc, char **argv)
             CommandPrintf("%10s : %s\n", filter->name,  DeliveryMethodGetMRL(filter));
         }
     }
-    TSFilterUnLock(tsFilter);
+    TSReaderUnLock(tsFilter);
 }
 
 static void CommandSetOutputMRL(int argc, char **argv)
