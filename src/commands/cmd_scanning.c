@@ -86,22 +86,22 @@ static void ScanFullDVBT(void);
 static void ScanFullDVBC(void);
 static void TryTuneDVBC(int channelCount, struct dvb_frontend_parameters *feparams,
    __u32 *symbolRates, int nrofSymbolRates, fe_modulation_t *modulations, int nrofModulations);
-static void SDTCallback(dvbpsi_sdt_t* newsdt);
-static void NITCallback(dvbpsi_nit_t* newnit);
+static void SDTEventListener(void *arg, Event_t event, void *payload);
+static void NITEventListener(void *arg, Event_t event, void *payload);
 static bool FindTransponder(int freq);
 static double BCDFixedPoint3_7ToDouble(uint32_t bcd);
 #endif
 
 #if defined(ENABLE_ATSC)
 static void ScanFullATSC(void);
-static void VCTCallback(dvbpsi_atsc_vct_t* newvct);
+static void VCTEventListener(void *arg, Event_t event, void *payload);
 #endif
 
 static void ScanNetwork(char *initialdata);
 static void ScanMultiplex(Multiplex_t *multiplex, bool needNIT);
 static int TuneFrequency(fe_type_t type, struct dvb_frontend_parameters *feparams, DVBDiSEqCSettings_t * diseqc, Multiplex_t *mux, bool needNIT);
-static void PATCallback(dvbpsi_pat_t* newpat);
-static void PMTCallback(dvbpsi_pmt_t* newpmt);
+static void PATEventListener(void *arg, Event_t event, void *payload);
+static void PMTEventListener(void *arg, Event_t event, void *payload);
 
 static void FELockedEventListener(void *arg, Event_t event, void *payload);
 /*******************************************************************************
@@ -154,7 +154,6 @@ static List_t *transponderList = NULL;
 static bool waitingForFELocked= FALSE;
 static bool FELocked = FALSE;
 static int PMTCount = 0;
-static int PMTNextIndex = 0;
 static struct PMTReceived_t *PMTsReceived = NULL;
 static pthread_mutex_t scanningmutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t scanningcond = PTHREAD_COND_INITIALIZER;
@@ -187,18 +186,19 @@ void CommandInstallScanning(void)
     if (MainIsDVB())
     {
 #if defined(ENABLE_DVB)
-        SDTProcessorRegisterSDTCallback(SDTCallback);
-        NITProcessorRegisterNITCallback(NITCallback);
+        EventsRegisterEventListener(EventsFindEvent("dvb.sdt"),SDTEventListener,NULL);
+        EventsRegisterEventListener(EventsFindEvent("dvb.nit"),NITEventListener, NULL);
 #endif
     }
     else
     {
 #if defined(ENABLE_ATSC)
-        PSIPProcessorRegisterVCTCallback(VCTCallback);
+        EventsRegisterEventListener(EventsFindEvent("atsc.vct"),VCTEventListener, NULL);        
 #endif
     }
-    PATProcessorRegisterPATCallback(PATCallback);
-    PMTProcessorRegisterPMTCallback(PMTCallback);
+    EventsRegisterEventListener(EventsFindEvent("mpeg2.pat"),PATEventListener, NULL);
+    EventsRegisterEventListener(EventsFindEvent("mpeg2.pmt"),PMTEventListener, NULL);
+
     LogModule(LOG_DEBUG,SCANNING,"Finding fe locked event.\n");
     feLockedEvent = EventsFindEvent("DVBAdapter.Locked");
     EventsRegisterEventListener(feLockedEvent, FELockedEventListener, NULL);
@@ -235,19 +235,19 @@ void CommandUnInstallScanning(void)
     CommandUnRegisterCommands(CommandDetailsScanning);
     PropertiesRemoveAllProperties(propertyParent);
     scanning = FALSE;
-    PATProcessorUnRegisterPATCallback(PATCallback);
-    PMTProcessorUnRegisterPMTCallback(PMTCallback);
+    EventsUnregisterEventListener(EventsFindEvent("mpeg2.pat"),PATEventListener, NULL);
+    EventsUnregisterEventListener(EventsFindEvent("mpeg2.pmt"),PMTEventListener, NULL);
     if (MainIsDVB())
     {
 #if defined(ENABLE_DVB)
-        SDTProcessorUnRegisterSDTCallback(SDTCallback);
-        NITProcessorUnRegisterNITCallback(NITCallback);
+        EventsUnregisterEventListener(EventsFindEvent("dvb.sdt"),SDTEventListener, NULL);
+        EventsUnregisterEventListener(EventsFindEvent("dvb.nit"),NITEventListener, NULL);
 #endif
     }
     else
     {
 #if defined(ENABLE_ATSC)
-        PSIPProcessorUnRegisterVCTCallback(VCTCallback);
+        EventsUnregisterEventListener(EventsFindEvent("atsc.vct"),VCTEventListener, NULL);
 #endif
     }
 }
@@ -1177,8 +1177,9 @@ static void ScanMultiplex(Multiplex_t *multiplex, bool needNIT)
 
 
 }
-static void PATCallback(dvbpsi_pat_t* newpat)
+static void PATEventListener(void *arg, Event_t event, void *payload)
 {
+    dvbpsi_pat_t* newpat = payload;
     if (scanning && !PATReceived)
     {
         int i;
@@ -1208,44 +1209,24 @@ static void PATCallback(dvbpsi_pat_t* newpat)
         }
         PATReceived = TRUE;
         tsFilter->tsStructureChanged = TRUE; /* Force all PMTs to be received again incase we are scanning a mux we have pids for */
-        if (tsFilter->adapter->hardwareRestricted)
-        {
-            for (PMTNextIndex = 0;PMTNextIndex < PMTCount; PMTNextIndex ++)
-            {
-                if (DVBDemuxAllocateFilter(tsFilter->adapter, PMTsReceived[PMTNextIndex].pid,FALSE) != 0)
-                {
-                    break;
-                }
-            }
-        }
         pthread_mutex_lock(&scanningmutex);
         pthread_cond_signal(&scanningcond);
         pthread_mutex_unlock(&scanningmutex);
     }
 }
 
-static void PMTCallback(dvbpsi_pmt_t* newpmt)
+static void PMTEventListener(void *arg, Event_t event, void *payload)
 {
+    dvbpsi_pmt_t *newpmt = payload;
     if (scanning && !AllPMTReceived)
     {
         bool all = TRUE;
         int i;
-        DVBAdapter_t *adapter = MainDVBAdapterGet();
         for (i = 0; i < PMTCount; i ++)
         {
             if (PMTsReceived[i].id == newpmt->i_program_number)
             {
                 PMTsReceived[i].received = TRUE;
-                if (adapter->hardwareRestricted)
-                {
-                    DVBDemuxReleaseFilter(adapter,PMTsReceived[i].pid);
-
-                    if (PMTNextIndex < PMTCount)
-                    {
-                        DVBDemuxAllocateFilter(adapter, PMTsReceived[PMTNextIndex].pid, FALSE);
-                        PMTNextIndex ++;
-                    }
-                }
             }
         }
 
@@ -1267,7 +1248,7 @@ static void PMTCallback(dvbpsi_pmt_t* newpmt)
     }
 }
 #if defined(ENABLE_DVB)
-static void SDTCallback(dvbpsi_sdt_t* newsdt)
+static void SDTEventListener(void *arg, Event_t event, void *payload)
 {
     if (scanning && !SDTReceived)
     {
@@ -1297,8 +1278,9 @@ static fe_code_rate_t fecInnerTable[] = {FEC_NONE, FEC_1_2, FEC_2_3, FEC_3_4,
 
 static enum Polarisation_e polarisationTable[] = {POL_HORIZONTAL, POL_VERTICAL, POL_HORIZONTAL, POL_VERTICAL};
 
-static void NITCallback(dvbpsi_nit_t* newnit)
+static void NITEventListener(void *arg, Event_t event, void *payload)
 {
+    dvbpsi_nit_t* newnit = payload;
     DVBAdapter_t *adapter = MainDVBAdapterGet();
 
     TransponderEntry_t *tpEntry;
@@ -1444,7 +1426,7 @@ static double BCDFixedPoint3_7ToDouble(uint32_t bcd)
 #endif
 
 #if defined(ENABLE_ATSC)
-static void VCTCallback(dvbpsi_atsc_vct_t* newvct)
+static void VCTEventListener(void *arg, Event_t event, void *payload)
 {
     if (scanning && !SDTReceived)
     {

@@ -30,6 +30,7 @@ Initialise/Deinitialise the ATSC Standard.
 #include "standard/mpeg2.h"
 #include "standard/atsc.h"
 #include "psipprocessor.h"
+#include "atsctext.h"
 
 /*******************************************************************************
 * Global variables                                                             *

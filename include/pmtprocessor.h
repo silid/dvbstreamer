@@ -29,7 +29,4 @@ typedef struct PMTProcessor_s *PMTProcessor_t;
 
 PMTProcessor_t PMTProcessorCreate(TSReader_t *reader);
 void PMTProcessorDestroy(PMTProcessor_t processor);
-
-void PMTProcessorRegisterPMTCallback(PluginPMTProcessor_t callback);
-void PMTProcessorUnRegisterPMTCallback(PluginPMTProcessor_t callback);
 #endif

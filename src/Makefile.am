@@ -36,7 +36,6 @@ dvbstreamer_SOURCES = \
     list.c\
     deliverymethod.c\
     pluginmgr.c \
-    pesprocessor.c \
     epgtypes.c \
     epgchannel.c \
     utf8.c \
@@ -103,8 +102,6 @@ fdvbstreamer_SOURCES = \
     deliverymethod.c\
     pluginmgr.c \
     sectionprocessor.c \
-    pesprocessor.c \
-    subtableprocessor.c \
     epgtypes.c \
     epgchannel.c \
     utf8.c \

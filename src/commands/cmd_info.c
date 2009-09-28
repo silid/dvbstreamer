@@ -542,57 +542,11 @@ static void CommandMuxInfo(int argc, char **argv)
 
 static void CommandStats(int argc, char **argv)
 {
-    ListIterator_t iterator;
-    TSReader_t *tsFilter = MainTSFilterGet();
-
-    CommandPrintf("PSI/SI Processor Statistics\n"
-                  "---------------------------\n");
-
-    for ( ListIterator_Init(iterator, tsFilter->pidFilters); 
-          ListIterator_MoreEntries(iterator); 
-          ListIterator_Next(iterator))
-    {
-        PIDFilter_t *filter = (PIDFilter_t *)ListIterator_Current(iterator);
-        if (strcmp(filter->type, PSISIPIDFilterType) == 0)
-        {
-            CommandPrintf("\t%-15s : %lld\n", filter->name, filter->packetsProcessed);
-        }
-    }
-    CommandPrintf("\n");
-
-    CommandPrintf("Service Filter Statistics\n"
-                  "-------------------------\n");
-    for ( ListIterator_Init(iterator, tsFilter->pidFilters); 
-          ListIterator_MoreEntries(iterator); 
-          ListIterator_Next(iterator))
-    {
-        PIDFilter_t *filter = (PIDFilter_t *)ListIterator_Current(iterator);
-        if (strcmp(filter->type, ServicePIDFilterType) == 0)
-        {
-            CommandPrintf("\t%-15s : %lld\n", filter->name, filter->packetsProcessed);
-        }
-    }
-    CommandPrintf("\n");
-
-    CommandPrintf("Other Filter Statistics\n"
-                  "------------------------\n");
-     for ( ListIterator_Init(iterator, tsFilter->pidFilters); 
-           ListIterator_MoreEntries(iterator); 
-           ListIterator_Next(iterator))
-    {
-        PIDFilter_t *filter = (PIDFilter_t *)ListIterator_Current(iterator);
-        if ((strcmp(filter->type, PSISIPIDFilterType) != 0) &&
-            (strcmp(filter->type, ServicePIDFilterType) != 0))
-        {
-            CommandPrintf("\t%-15s : %lld (%s)\n", filter->name, filter->packetsFiltered, filter->type);
-        }
-    }
-    CommandPrintf("\n");
+    TSReader_t *tsReader = MainTSReaderGet();
 
 
-
-    CommandPrintf("Total packets processed: %lld\n", tsFilter->totalPackets);
-    CommandPrintf("Approximate TS bitrate : %gMbs\n", ((double)tsFilter->bitrate / (1024.0 * 1024.0)));
+    CommandPrintf("Total packets processed: %lld\n", tsReader->totalPackets);
+    CommandPrintf("Approximate TS bitrate : %gMbs\n", ((double)tsReader->bitrate / (1024.0 * 1024.0)));
 }
 
 

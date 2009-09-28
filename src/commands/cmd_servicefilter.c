@@ -54,7 +54,7 @@ Command functions for service filter related tasks
 *******************************************************************************/
 
 #define FIND_SERVICE_FILTER(_name) \
-    filter = TSReaderFindPIDFilter(MainTSReaderGet(), (_name), ServicePIDFilterType); \
+    filter = ServiceFilterFindFilter(_name); \
     if (filter == NULL) \
     {\
         CommandError(COMMAND_ERROR_GENERIC, "Service filter not found!"); \
@@ -252,18 +252,11 @@ static void CommandGetMRL(int argc, char **argv)
 
 static void CommandAddSF(int argc, char **argv)
 {
-    DVBAdapter_t *adapter = MainDVBAdapterGet();
-    TSReader_t *tsFilter = MainTSReaderGet();
-    PIDFilter_t *filter;
-
-    if (adapter->hardwareRestricted)
-    {
-        CommandError(COMMAND_ERROR_GENERIC, "Not supported in hardware restricted mode!");
-        return;
-    }
+    TSReader_t *tsReader = MainTSReaderGet();
+    ServiceFilter_t filter;
     
     CommandCheckAuthenticated();
-    filter = TSReaderFindPIDFilter(tsFilter, argv[0], ServicePIDFilterType);
+    filter = ServiceFilterFindFilter(argv[0]);
     if (filter)
     {
         CommandError(COMMAND_ERROR_GENERIC, "Service Filter of that name already exists!");
@@ -271,21 +264,19 @@ static void CommandAddSF(int argc, char **argv)
     else
     {
         DeliveryMethodInstance_t *instance;
-        filter = ServiceFilterCreate(tsFilter, strdup(argv[0]));
+        filter = ServiceFilterCreate(tsReader, strdup(argv[0]));
         instance = DeliveryMethodCreate(argv[1]);
         if (!instance)
         {
             instance = DeliveryMethodCreate("null://");
         }
         ServiceFilterDeliveryMethodSet(filter, instance);
-        filter->enabled = TRUE;
     }
 }
 
 static void CommandRemoveSF(int argc, char **argv)
 {
-    PIDFilter_t *filter;
-    char *name;
+    ServiceFilter_t filter;
 
     CommandCheckAuthenticated();
 
@@ -297,33 +288,28 @@ static void CommandRemoveSF(int argc, char **argv)
 
     FIND_SERVICE_FILTER(argv[0]);
     
-    name = filter->name;
     ServiceFilterDestroy(filter);
-    free(name);
-
 }
 
 static void CommandListSF(int argc, char **argv)
 {
-    TSReader_t *tsFilter = MainTSReaderGet();
-    ListIterator_t iterator;
+    ListIterator_t *iterator;
     
-    for ( ListIterator_Init(iterator, tsFilter->pidFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    for (iterator = ServiceFilterGetListIterator(); ListIterator_MoreEntries(*iterator); ListIterator_Next(*iterator))
     {
-        PIDFilter_t *filter = (PIDFilter_t *)ListIterator_Current(iterator);
-        if (strcmp(filter->type, ServicePIDFilterType) == 0)
-        {
-            Service_t *service = ServiceFilterServiceGet(filter);
-            CommandPrintf("%10s : %s (%s)\n",filter->name,
-                    DeliveryMethodGetMRL(filter),
-                    service ? service->name:"<NONE>");
-        }
+        ServiceFilter_t filter = ListIterator_Current(*iterator);
+        Service_t *service = ServiceFilterServiceGet(filter);
+        char *name = ServiceFilterNameGet(filter);
+        DeliveryMethodInstance_t *dmInstance = ServiceFilterDeliveryMethodGet(filter);
+        CommandPrintf("%10s : %s (%s)\n", name,
+                DeliveryMethodGetMRL(dmInstance),
+                service ? service->name:"<NONE>");
     }
 }
 
 static void CommandSetSFService(int argc, char **argv)
 {
-    PIDFilter_t *filter;
+    ServiceFilter_t filter;
     char *outputName = argv[0];
     char *serviceName = argv[1];
     Service_t *service;
@@ -358,7 +344,7 @@ static void CommandSetSFService(int argc, char **argv)
 
 static void CommandGetSFService(int argc, char **argv)
 {
-    PIDFilter_t *filter;
+    ServiceFilter_t filter;
     Service_t *service;
     Multiplex_t *multiplex;
  
@@ -375,7 +361,7 @@ static void CommandGetSFService(int argc, char **argv)
 
 static void CommandSetSFMRL(int argc, char **argv)
 {
-    PIDFilter_t *filter;
+    ServiceFilter_t filter;
     DeliveryMethodInstance_t *instance;
     CommandCheckAuthenticated();
 
@@ -385,7 +371,7 @@ static void CommandSetSFMRL(int argc, char **argv)
     if (instance)
     {
         ServiceFilterDeliveryMethodSet(filter, instance);
-        CommandPrintf("MRL set to \"%s\" for %s\n", DeliveryMethodGetMRL(filter), argv[0]);
+        CommandPrintf("MRL set to \"%s\" for %s\n", DeliveryMethodGetMRL(ServiceFilterDeliveryMethodGet(filter)), argv[0]);
     }
     else
     {
@@ -395,17 +381,17 @@ static void CommandSetSFMRL(int argc, char **argv)
 
 static void CommandGetSFMRL(int argc, char **argv)
 {
-    PIDFilter_t *filter;
+    ServiceFilter_t filter;
     CommandCheckAuthenticated();
 
     FIND_SERVICE_FILTER(argv[0]);
 
-    CommandPrintf("%s\n", DeliveryMethodGetMRL(filter));
+    CommandPrintf("%s\n", DeliveryMethodGetMRL(ServiceFilterDeliveryMethodGet(filter)));
 }
 
 static void CommandSetSFAVSOnly(int argc, char **argv)
 {
-    PIDFilter_t *filter;
+    ServiceFilter_t filter;
     CommandCheckAuthenticated();
 
     FIND_SERVICE_FILTER(argv[0]);
@@ -426,7 +412,7 @@ static void CommandSetSFAVSOnly(int argc, char **argv)
 
 static void CommandGetSFAVSOnly(int argc, char **argv)
 {
-    PIDFilter_t *filter;
+    ServiceFilter_t filter;
     bool avsOnly;
     CommandCheckAuthenticated();
 

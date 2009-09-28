@@ -42,6 +42,8 @@ Process Time/Date and Time Offset Tables.
 #include "list.h"
 #include "tdtprocessor.h"
 #include "dvbpsi/tdttot.h"
+#include "events.h"
+#include "standard/dvb.h"
 
 /*******************************************************************************
 * Typedefs                                                                     *
@@ -70,8 +72,7 @@ static char TDTPROCESSOR[] = "TDTProcessor";
 *******************************************************************************/
 TDTProcessor_t TDTProcessorCreate(TSReader_t *reader)
 {
-    PIDFilter_t *result = NULL;
-    TDTProcessor_t *state;
+    TDTProcessor_t state;
     ObjectRegisterClass("TDTProcessor_t", sizeof(struct TDTProcessor_s), NULL);
     state = ObjectCreateType(TDTProcessor_t);
     if (state)
@@ -79,13 +80,13 @@ TDTProcessor_t TDTProcessorCreate(TSReader_t *reader)
         state->tsgroup = TSReaderCreateFilterGroup(reader, TDTPROCESSOR, "dvb", TDTProcessorFilterEventCallback, state);
     }
 
-    return result;
+    return state;
 }
 
 void TDTProcessorDestroy(TDTProcessor_t processor)
 {
     TSFilterGroupDestroy(processor->tsgroup);
-    if (processor->hande)
+    if (processor->handle)
     {
         dvbpsi_DetachTDTTOT(processor->handle);
     }
@@ -119,8 +120,6 @@ static void TDTProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_
 
 static void TDTHandler(void* arg, dvbpsi_tdt_tot_t* newTDT)
 {
-    ListIterator_t iterator;
-
     EventsFireEventListeners(tdtEvent, newTDT);
     ObjectRefDec(newTDT);
 }

@@ -42,9 +42,10 @@ Process Service Description Tables and update the services information.
 #include "main.h"
 #include "cache.h"
 #include "logging.h"
+#include "tuning.h"
 #include "sdtprocessor.h"
-#include "subtableprocessor.h"
 #include "dvbtext.h"
+#include "standard/dvb.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -61,7 +62,7 @@ Process Service Description Tables and update the services information.
 * Typedefs                                                                     *
 *******************************************************************************/
 
-typedef struct SDTProcessor_s
+struct SDTProcessor_s
 {
     TSFilterGroup_t *tsgroup;    
     dvbpsi_handle demux;
@@ -70,10 +71,9 @@ typedef struct SDTProcessor_s
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
+static void SDTProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details);
 static void SubTableHandler(void * state, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension);
 static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT);
-static void SDTMultiplexChanged(PIDFilter_t *filter, void *arg, Multiplex_t *multiplex);
-static void SDTTSStructureChanged(PIDFilter_t *filter, void *arg);
 static ServiceType ConvertDVBServiceType(int type);
 
 /*******************************************************************************
@@ -85,9 +85,9 @@ static Event_t sdtEvent = NULL;
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
-SDTProcessor_t SDTProcessorCreate(TSReader_t *tsfilter)
+SDTProcessor_t SDTProcessorCreate(TSReader_t *reader)
 {
-    SDTProcessor_t *state = NULL;
+    SDTProcessor_t state = NULL;
     if (sdtEvent == NULL)
     {
         sdtEvent = EventsRegisterEvent(DVBEventSource, "sdt", NULL);
@@ -96,9 +96,9 @@ SDTProcessor_t SDTProcessorCreate(TSReader_t *tsfilter)
     state = ObjectCreateType(SDTProcessor_t);
     if (state)
     {
-        state->tsgroup = TSReaderCreateFilterGroup(TSReader_t * reader,char * name,char * type,TSFilterGroupEventCallback_t callback,void * userArg)
+        state->tsgroup = TSReaderCreateFilterGroup(reader, SDTPROCESSOR, "dvb", SDTProcessorFilterEventCallback, state);
     }
-    return result;
+    return state;
 }
 
 void SDTProcessorDestroy(SDTProcessor_t processor)
@@ -141,6 +141,7 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
     dvbpsi_sdt_service_t* sdtservice = newSDT->p_first_service;
     int count,i;
     Service_t **services;
+    Multiplex_t *mux;
     
     LogModule(LOG_DEBUG, SDTPROCESSOR, "SDT recieved, version %d\n", newSDT->i_version);
     while(sdtservice)
@@ -246,18 +247,19 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
                 services = CacheServicesGet(&count);
                 i --;
                 /* Cause a TS Structure change call back*/
-                state->tsfilter->tsStructureChanged = TRUE;
+                state->tsgroup->tsReader->tsStructureChanged = TRUE;
             }
         }
     }
     CacheServicesRelease();
-    
+    mux = TuningCurrentMultiplexGet();
     /* Set the Original Network id, this is a hack should really get and decode the NIT */
-    if (state->multiplex->networkId != newSDT->i_network_id)
+    if (mux->networkId != newSDT->i_network_id)
     {
-        CacheUpdateNetworkId(state->multiplex, newSDT->i_network_id);
+        CacheUpdateNetworkId(mux, newSDT->i_network_id);
     }
-
+    MultiplexRefDec(mux);
+    
     EventsFireEventListeners(sdtEvent, newSDT);
     ObjectRefDec(newSDT);
 }
