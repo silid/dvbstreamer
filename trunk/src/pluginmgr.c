@@ -32,7 +32,6 @@ Plugin Manager functions.
 #include "sdtprocessor.h"
 #include "nitprocessor.h"
 #include "tdtprocessor.h"
-#include "sectionprocessor.h"
 #include "psipprocessor.h"
 #include "pesprocessor.h"
 #include "pluginmgr.h"
@@ -260,25 +259,13 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
         {
             switch(pluginInterface->features[i].type)
             {
-                case PLUGIN_FEATURE_TYPE_FILTER:
-                    {
-                        PluginFilter_t *pluginFilter = pluginInterface->features[i].details;
-                        pluginFilter->filter = PIDFilterAllocate(MainTSReaderGet());
-                        if (pluginFilter->filter)
-                        {
-                            pluginFilter->filter->type = "Plugin";
-                            LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed filter.\n", pluginInterface->name);
-                            pluginFilter->InitFilter(pluginFilter->filter);
-                        }
-                    }
-                    break;
                 case PLUGIN_FEATURE_TYPE_PATPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed PAT processor.\n", pluginInterface->name);
-                    PATProcessorRegisterPATCallback(pluginInterface->features[i].details);
+//                    PATProcessorRegisterPATCallback(pluginInterface->features[i].details);
                     break;
                 case PLUGIN_FEATURE_TYPE_PMTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed PMT processor.\n", pluginInterface->name);
-                    PMTProcessorRegisterPMTCallback(pluginInterface->features[i].details);
+//                    PMTProcessorRegisterPMTCallback(pluginInterface->features[i].details);
                     break;
                 case PLUGIN_FEATURE_TYPE_DELIVERYMETHOD:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed Delivery method.\n", pluginInterface->name);
@@ -291,43 +278,43 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
 #if defined(ENABLE_DVB)
                 case PLUGIN_FEATURE_TYPE_SDTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed SDT processor.\n", pluginInterface->name);
-                    SDTProcessorRegisterSDTCallback(pluginInterface->features[i].details);
+//                    SDTProcessorRegisterSDTCallback(pluginInterface->features[i].details);
                     break;
                 case PLUGIN_FEATURE_TYPE_NITPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed NIT processor.\n", pluginInterface->name);
-                    NITProcessorRegisterNITCallback(pluginInterface->features[i].details);
+//                    NITProcessorRegisterNITCallback(pluginInterface->features[i].details);
                     break;
                 case PLUGIN_FEATURE_TYPE_TDTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed TDT processor.\n", pluginInterface->name);
-                    TDTProcessorRegisterTDTCallback(pluginInterface->features[i].details);
+//                    TDTProcessorRegisterTDTCallback(pluginInterface->features[i].details);
                     break;
 #endif
                 case PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR:
                     {
-                        PluginSectionProcessorDetails_t *details = pluginInterface->features[i].details;
+//                        PluginSectionProcessorDetails_t *details = pluginInterface->features[i].details;
                         LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed section processor.\n", pluginInterface->name);
-                        SectionProcessorStartPID(details->pid, details->processor, details->userarg);
+//                        SectionProcessorStartPID(details->pid, details->processor, details->userarg);
                     }
                     break;
                 case PLUGIN_FEATURE_TYPE_PESPROCESSOR:
                     {
-                        PluginPESProcessorDetails_t *details = pluginInterface->features[i].details;
+//                        PluginPESProcessorDetails_t *details = pluginInterface->features[i].details;
                         LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed PES processor.\n", pluginInterface->name);
-                        PESProcessorStartPID(details->pid, details->processor, details->userarg);
+//                        PESProcessorStartPID(details->pid, details->processor, details->userarg);
                     }
                     break;
 #if defined(ENABLE_ATSC)
                 case PLUGIN_FEATURE_TYPE_MGTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed MGT processor.\n", pluginInterface->name);
-                    PSIPProcessorRegisterMGTCallback(pluginInterface->features[i].details);
+//                    PSIPProcessorRegisterMGTCallback(pluginInterface->features[i].details);
                     break;
                 case PLUGIN_FEATURE_TYPE_STTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed STT processor.\n", pluginInterface->name);
-                    PSIPProcessorRegisterSTTCallback(pluginInterface->features[i].details);
+//                    PSIPProcessorRegisterSTTCallback(pluginInterface->features[i].details);
                     break;
                 case PLUGIN_FEATURE_TYPE_VCTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed VCT processor.\n", pluginInterface->name);
-                    PSIPProcessorRegisterVCTCallback(pluginInterface->features[i].details);
+//                    PSIPProcessorRegisterVCTCallback(pluginInterface->features[i].details);
                     break;
 #endif
                 case PLUGIN_FEATURE_TYPE_INSTALL:
@@ -355,24 +342,13 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface)
         {
             switch(pluginInterface->features[i].type)
             {
-                case PLUGIN_FEATURE_TYPE_FILTER:
-                    {
-                        PluginFilter_t *pluginFilter = pluginInterface->features[i].details;
-                        if (pluginFilter->filter)
-                        {
-                            LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled filter.\n", pluginInterface->name);
-                            pluginFilter->DeinitFilter(pluginFilter->filter);
-                            PIDFilterFree(pluginFilter->filter);
-                        }
-                    }
-                    break;
                 case PLUGIN_FEATURE_TYPE_PATPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled PAT processor.\n", pluginInterface->name);
-                    PATProcessorUnRegisterPATCallback(pluginInterface->features[i].details);
+//                    PATProcessorUnRegisterPATCallback(pluginInterface->features[i].details);
                     break;
                 case PLUGIN_FEATURE_TYPE_PMTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled PMT processor.\n", pluginInterface->name);
-                    PMTProcessorUnRegisterPMTCallback(pluginInterface->features[i].details);
+//                    PMTProcessorUnRegisterPMTCallback(pluginInterface->features[i].details);
                     break;
                 case PLUGIN_FEATURE_TYPE_DELIVERYMETHOD:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled Delivery method.\n", pluginInterface->name);
@@ -385,43 +361,43 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface)
 #if defined(ENABLE_DVB)
                 case PLUGIN_FEATURE_TYPE_SDTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled SDT processor.\n", pluginInterface->name);
-                    SDTProcessorUnRegisterSDTCallback(pluginInterface->features[i].details);
+//                    SDTProcessorUnRegisterSDTCallback(pluginInterface->features[i].details);
                     break;
                 case PLUGIN_FEATURE_TYPE_NITPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled NIT processor.\n", pluginInterface->name);
-                    NITProcessorUnRegisterNITCallback(pluginInterface->features[i].details);
+//                    NITProcessorUnRegisterNITCallback(pluginInterface->features[i].details);
                     break;
                 case PLUGIN_FEATURE_TYPE_TDTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled TDT processor.\n", pluginInterface->name);
-                    TDTProcessorUnRegisterTDTCallback(pluginInterface->features[i].details);
+//                    TDTProcessorUnRegisterTDTCallback(pluginInterface->features[i].details);
                     break;
 #endif
                 case PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR:
                     {
-                        PluginSectionProcessorDetails_t *details = pluginInterface->features[i].details;
+//                        PluginSectionProcessorDetails_t *details = pluginInterface->features[i].details;
                         LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled section processor.\n", pluginInterface->name);
-                        SectionProcessorStopPID(details->pid, details->processor, details->userarg);
+//                        SectionProcessorStopPID(details->pid, details->processor, details->userarg);
                     }
                     break;
                 case PLUGIN_FEATURE_TYPE_PESPROCESSOR:
                     {
-                        PluginPESProcessorDetails_t *details = pluginInterface->features[i].details;
+//                        PluginPESProcessorDetails_t *details = pluginInterface->features[i].details;
                         LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled PES processor.\n", pluginInterface->name);
-                        PESProcessorStopPID(details->pid, details->processor, details->userarg);
+//                        PESProcessorStopPID(details->pid, details->processor, details->userarg);
                     }
                     break;
 #if defined(ENABLE_ATSC)
                 case PLUGIN_FEATURE_TYPE_MGTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled MGT processor.\n", pluginInterface->name);
-                    PSIPProcessorUnRegisterMGTCallback(pluginInterface->features[i].details);
+//                    PSIPProcessorUnRegisterMGTCallback(pluginInterface->features[i].details);
                     break;
                 case PLUGIN_FEATURE_TYPE_STTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled STT processor.\n", pluginInterface->name);
-                    PSIPProcessorUnRegisterSTTCallback(pluginInterface->features[i].details);
+//                    PSIPProcessorUnRegisterSTTCallback(pluginInterface->features[i].details);
                     break;
                 case PLUGIN_FEATURE_TYPE_VCTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled VCT processor.\n", pluginInterface->name);
-                    PSIPProcessorUnRegisterVCTCallback(pluginInterface->features[i].details);
+//                    PSIPProcessorUnRegisterVCTCallback(pluginInterface->features[i].details);
                     break;
 #endif
                 case PLUGIN_FEATURE_TYPE_INSTALL:

@@ -35,6 +35,8 @@ Process Network Information Tables.
 #include "logging.h"
 #include "nitprocessor.h"
 #include "dvbpsi/nit.h"
+#include "events.h"
+#include "standard/dvb.h"
 
 /*******************************************************************************
 * Defines                                                                      *

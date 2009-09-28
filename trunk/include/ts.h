@@ -301,8 +301,8 @@ void TSReaderMultiplexChanged(TSReader_t *reader, Multiplex_t *newmultiplex);
  */
 #define TSReaderUnLock(reader) pthread_mutex_unlock(&(reader)->mutex)
 
-TSFilterGroup_t* TSReaderCreateFilterGroup(TSReader_t *reader, char *name, char *type, TSFilterGroupEventCallback_t callback, void *userArg );
-TSFilterGroup_t* TSReaderFindFilterGroup(TSReader_t *reader, char *name, char *type);
+TSFilterGroup_t* TSReaderCreateFilterGroup(TSReader_t *reader, const char *name, const char *type, TSFilterGroupEventCallback_t callback, void *userArg );
+TSFilterGroup_t* TSReaderFindFilterGroup(TSReader_t *reader, const char *name, const char *type);
 void TSFilterGroupDestroy(TSFilterGroup_t* group);
 void TSFilterGroupRemoveAllFilters(TSFilterGroup_t* group);
 void TSFilterGroupAddSectionFilter(TSFilterGroup_t *group, uint16_t pid, int priority, dvbpsi_handle handle);

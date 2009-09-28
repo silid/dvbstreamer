@@ -126,7 +126,7 @@ ServiceFilter_t ServiceFilterCreate(TSReader_t *reader, char* name)
     result = ObjectCreateType(ServiceFilter_t);
     if (result)
     {
-        result->name = name;
+        result->name = strdup(name);
         result->tsgroup = TSReaderCreateFilterGroup(reader, name, SERVICEFILTER, ServiceFilterFilterEventCallback, result);
 
         sprintf(result->propertyPath, "filters.service.%s", name);
@@ -159,6 +159,7 @@ void ServiceFilterDestroy(ServiceFilter_t filter)
     }
     ServiceRefDec(filter->service);
     ListRemove(ServiceFilterList, filter);
+    free(filter->name);
     ObjectRefDec(filter);
 
     if (ListCount(ServiceFilterList) == 0)
@@ -173,15 +174,12 @@ void ServiceFilterDestroyAll(TSReader_t *reader)
     ListIterator_t iterator;
 
     TSReaderLock(reader);
-    for ( ListIterator_Init(iterator, reader->groups); 
+    for ( ListIterator_Init(iterator, ServiceFilterList); 
           ListIterator_MoreEntries(iterator); )
     {
-        TSFilterGroup_t *group = (TSFilterGroup_t*)ListIterator_Current(iterator);
+        ServiceFilter_t filter = (ServiceFilter_t)ListIterator_Current(iterator);
         ListIterator_Next(iterator);
-        if (strcmp(group->type, ServicePIDFilterType) == 0)
-        {
-            ServiceFilterDestroy(group->userArg);
-        }
+        ServiceFilterDestroy(filter);
     }    
     TSReaderUnLock(reader);
 }
@@ -231,6 +229,11 @@ void ServiceFilterServiceSet(ServiceFilter_t filter, Service_t *service)
     {
         filter->multiplex = NULL;
     }
+}
+
+char *ServiceFilterNameGet(ServiceFilter_t filter)
+{
+    return filter->name;
 }
 
 Service_t *ServiceFilterServiceGet(ServiceFilter_t filter)

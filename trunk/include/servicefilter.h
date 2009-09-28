@@ -58,6 +58,8 @@ void ServiceFilterDestroy(ServiceFilter_t filter);
  */
 void ServiceFilterDestroyAll(TSReader_t *reader);
 
+char *ServiceFilterNameGet(ServiceFilter_t filter);
+
 /**
  * Set the service filtered by the specified service filter.
  * @param filter The service filter to set the service being filtered on or 

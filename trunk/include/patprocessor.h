@@ -28,7 +28,4 @@ typedef struct PATProcessor_s *PATProcessor_t;
 
 PATProcessor_t PATProcessorCreate(TSReader_t *reader);
 void PATProcessorDestroy(PATProcessor_t processor);
-
-void PATProcessorRegisterPATCallback(PluginPATProcessor_t callback);
-void PATProcessorUnRegisterPATCallback(PluginPATProcessor_t callback);
 #endif

@@ -46,9 +46,10 @@ Process ATSC PSIP tables
 #include "logging.h"
 #include "list.h"
 #include "tuning.h"
-#include "subtableprocessor.h"
 #include "psipprocessor.h"
 #include "atsctext.h"
+#include "events.h"
+#include "standard/atsc.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -61,7 +62,7 @@ Process ATSC PSIP tables
 
 struct PSIPProcessor_s
 {
-    TSFilterGroup_t tsgroup;
+    TSFilterGroup_t *tsgroup;
     dvbpsi_handle demux;
 };
 
@@ -122,9 +123,15 @@ PSIPProcessor_t PSIPProcessorCreate(TSReader_t *reader)
     return result;
 }
 
-void PSIPProcessorDestroy(PIDFilter_t *filter)
+void PSIPProcessorDestroy(PSIPProcessor_t filter)
 {
-    SubTableProcessorDestroy(filter);
+
+    TSFilterGroupDestroy(filter->tsgroup);
+    if (filter->demux)
+    {
+        dvbpsi_DetachDemux(filter->demux);
+    }
+    ObjectRefDec(filter);
     initCount --;
     if (initCount == 0)
     {
@@ -136,7 +143,7 @@ void PSIPProcessorDestroy(PIDFilter_t *filter)
 *******************************************************************************/
 static void PSIPProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details)
 {
-    SDTProcessor_t state = (SDTProcessor_t)userArg;
+    PSIPProcessor_t state = (PSIPProcessor_t)userArg;
     if (state->demux)
     {
         TSFilterGroupRemoveSectionFilter(state->tsgroup, PID_PSIP);

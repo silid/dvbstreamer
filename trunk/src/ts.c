@@ -212,13 +212,13 @@ void TSReaderSectionFilterResetPriority(TSReader_t *reader, uint16_t pid)
     }
 }
 
-TSFilterGroup_t* TSReaderCreateFilterGroup(TSReader_t *reader, char *name, char *type, TSFilterGroupEventCallback_t callback, void *userArg )
+TSFilterGroup_t* TSReaderCreateFilterGroup(TSReader_t *reader, const char *name, const char *type, TSFilterGroupEventCallback_t callback, void *userArg )
 {
     TSFilterGroup_t *group = ObjectCreateType(TSFilterGroup_t);
     if (group)
     {
-        group->name = name;
-        group->type = type;
+        group->name = (char *)name;
+        group->type = (char *)type;
         group->eventCallback = callback;
         group->userArg = userArg;
         ObjectRefInc(group);
@@ -226,7 +226,7 @@ TSFilterGroup_t* TSReaderCreateFilterGroup(TSReader_t *reader, char *name, char 
     return group;
 }
 
-TSFilterGroup_t* TSReaderFindFilterGroup(TSReader_t *reader, char *name, char *type)
+TSFilterGroup_t* TSReaderFindFilterGroup(TSReader_t *reader, const char *name, const char *type)
 {    
     ListIterator_t iterator;
     for (ListIterator_Init(iterator, reader->groups); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
