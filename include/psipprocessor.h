@@ -22,20 +22,11 @@ Process ATSC PSIP Tables.
 */
 #ifndef _PSIPPROCESSOR_H
 #define _PSIPPROCESSOR_H
-#include "plugin.h"
 #include "ts.h"
 
-int PSIPProcessorInit(void);
-void PSIPProcessorDeInit(void);
+typedef struct PSIPProcessor_s *PSIPProcessor_t;
 
-PIDFilter_t *PSIPProcessorCreate(TSFilter_t *tsfilter);
-void PSIPProcessorDestroy(PIDFilter_t *filter);
-
-void PSIPProcessorRegisterMGTCallback(PluginMGTProcessor_t callback);
-void PSIPProcessorUnRegisterMGTCallback(PluginMGTProcessor_t callback);
-void PSIPProcessorRegisterSTTCallback(PluginSTTProcessor_t callback);
-void PSIPProcessorUnRegisterSTTCallback(PluginSTTProcessor_t callback);
-void PSIPProcessorRegisterVCTCallback(PluginVCTProcessor_t callback);
-void PSIPProcessorUnRegisterVCTCallback(PluginVCTProcessor_t callback);
+PSIPProcessor_t PSIPProcessorCreate(TSReader_t *tsfilter);
+void PSIPProcessorDestroy(PSIPProcessor_t processor);
 #endif
 

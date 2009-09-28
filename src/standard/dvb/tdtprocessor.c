@@ -15,9 +15,9 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 
-nitprocessor.c
+tdtprocessor.c
 
-Process Network Information Tables.
+Process Time/Date and Time Offset Tables.
 
 */
 #include <stdlib.h>
@@ -40,104 +40,89 @@ Process Network Information Tables.
 #include "cache.h"
 #include "logging.h"
 #include "list.h"
-#include "nitprocessor.h"
-#include "subtableprocessor.h"
-#include "dvbpsi/nit.h"
+#include "tdtprocessor.h"
+#include "dvbpsi/tdttot.h"
 
 /*******************************************************************************
-* Defines                                                                      *
+* Typedefs                                                                     *
 *******************************************************************************/
 
+struct TDTProcessor_s
+{
+    TSFilterGroup_t *tsgroup;
+    dvbpsi_handle handle;
+};
 
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
 
-static void SubTableHandler(void * state, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension);
-static void NITHandler(void* arg, dvbpsi_nit_t* newNIT);
+static void TDTProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details);
+static void TDTHandler(void* arg, dvbpsi_tdt_tot_t* newTDT);
 
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
-
-static List_t *NewNITCallbacksList = NULL;
-
+static Event_t tdtEvent = NULL;
+static char TDTPROCESSOR[] = "TDTProcessor";
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
-int NITProcessorInit(void)
+TDTProcessor_t TDTProcessorCreate(TSReader_t *reader)
 {
-    NewNITCallbacksList = ListCreate();
-    return NewNITCallbacksList ? 0: -1;
-}
-
-void NITProcessorDeInit(void)
-{
-    ListFree(NewNITCallbacksList, NULL);
-}
-
-PIDFilter_t *NITProcessorCreate(TSFilter_t *tsfilter)
-{
-    PIDFilter_t *result = SubTableProcessorCreate(tsfilter, PID_NIT, SubTableHandler, NULL, NULL, NULL);
-    if (result)
+    PIDFilter_t *result = NULL;
+    TDTProcessor_t *state;
+    ObjectRegisterClass("TDTProcessor_t", sizeof(struct TDTProcessor_s), NULL);
+    state = ObjectCreateType(TDTProcessor_t);
+    if (state)
     {
-        result->name = "NIT";
-        result->type = PSISIPIDFilterType;
-        if (tsfilter->adapter->hardwareRestricted)
-        {
-            DVBDemuxAllocateFilter(tsfilter->adapter, PID_NIT, TRUE);
-        }        
+        state->tsgroup = TSReaderCreateFilterGroup(reader, TDTPROCESSOR, "dvb", TDTProcessorFilterEventCallback, state);
     }
 
     return result;
 }
 
-void NITProcessorDestroy(PIDFilter_t *filter)
+void TDTProcessorDestroy(TDTProcessor_t processor)
 {
-    if (filter->tsFilter->adapter->hardwareRestricted)
+    TSFilterGroupDestroy(processor->tsgroup);
+    if (processor->hande)
     {
-        DVBDemuxReleaseFilter(filter->tsFilter->adapter, PID_NIT);
-    }    
-    SubTableProcessorDestroy(filter);
-}
-
-void NITProcessorRegisterNITCallback(PluginNITProcessor_t callback)
-{
-    if (NewNITCallbacksList)
-    {
-        ListAdd(NewNITCallbacksList, callback);
+        dvbpsi_DetachTDTTOT(processor->handle);
     }
-}
-
-void NITProcessorUnRegisterNITCallback(PluginNITProcessor_t callback)
-{
-    if (NewNITCallbacksList)
-    {
-        ListRemove(NewNITCallbacksList, callback);
-    }
+    ObjectRefDec(processor);
 }
 
 /*******************************************************************************
 * Local Functions                                                              *
 *******************************************************************************/
-
-static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension)
+static void TDTProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details)
 {
-    if((tableId == TABLE_ID_NIT_ACTUAL) || (tableId == TABLE_ID_NIT_OTHER))
+    TDTProcessor_t state = (TDTProcessor_t)userArg;
+    if (event == TSFilterEventType_MuxChanged)
     {
-        dvbpsi_AttachNIT(demuxHandle, tableId, extension, NITHandler, arg);
+        if (state->handle)
+        {
+            TSFilterGroupRemoveSectionFilter(state->tsgroup, PID_TDT);
+            dvbpsi_DetachTDTTOT(state->handle);
+        }
+        if (details)
+        {
+            state->handle = dvbpsi_AttachTDTTOT(TDTHandler, state);
+            TSFilterGroupAddSectionFilter(state->tsgroup, PID_TDT, 2, state->handle);
+        }
+        else
+        {
+            state->handle = NULL;
+        }
     }
 }
 
-static void NITHandler(void* arg, dvbpsi_nit_t* newNIT)
+static void TDTHandler(void* arg, dvbpsi_tdt_tot_t* newTDT)
 {
     ListIterator_t iterator;
 
-    for (ListIterator_Init(iterator, NewNITCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
-    {
-        PluginNITProcessor_t callback = ListIterator_Current(iterator);
-        callback(newNIT);
-    }
-    ObjectRefDec(newNIT);
+    EventsFireEventListeners(tdtEvent, newTDT);
+    ObjectRefDec(newTDT);
 }
+
 

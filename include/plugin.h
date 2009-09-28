@@ -312,19 +312,6 @@ typedef struct Plugin_t
  */
 #define PLUGIN_FEATURE_INSTALL(_callback) {PLUGIN_FEATURE_TYPE_INSTALL, (void*)_callback}
 
-/**
- * Structure used to describe a Filter Feature.
- * Multiple filter features per plugin is allowed, but developers should try and
- * keep the number to a minimum to keep the overheads of maintaining and calling
- * lots of filters down.
- */
-typedef struct PluginFilter_t
-{
-    PIDFilter_t *filter; /**< Filter assigned to this filter feature */
-	void (*InitFilter)(PIDFilter_t* filter); /**< Function pointer used to initialise the filter. */
-	void (*DeinitFilter)(PIDFilter_t* filter); /**< Function pointer used to deinitialise the filter. */
-}PluginFilter_t;
-
 
 /**
  * Function pointer to function to call when a new PAT arrives.

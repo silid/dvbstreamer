@@ -352,7 +352,7 @@ int DVBDemuxSetBufferSize(DVBAdapter_t *adapter, unsigned long size)
     return 0;
 }
 
-int DVBDemuxAllocateFilter(DVBAdapter_t *adapter, uint16_t pid, bool system)
+int DVBDemuxAllocateFilter(DVBAdapter_t *adapter, uint16_t pid)
 {
     int result = -1;
     if (adapter->hardwareRestricted || (pid == 8192))
@@ -407,7 +407,7 @@ int DVBDemuxReleaseFilter(DVBAdapter_t *adapter, uint16_t pid)
     return result;
 }
 
-int DVBDemuxReleaseAllFilters(DVBAdapter_t *adapter, bool system)
+int DVBDemuxReleaseAllFilters(DVBAdapter_t *adapter)
 {
     int result = -1;
     int i;

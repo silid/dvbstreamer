@@ -68,7 +68,7 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 /**
  * Maximum number of PID filters when running in hardware restricted mode.
  */
-#define DVB_MAX_PID_FILTERS 64
+#define DVB_MAX_PID_FILTERS 256
 
 /**
  * Structure used to keep track of hardware pid filters.
@@ -77,7 +77,6 @@ typedef struct DVBAdapterPIDFilter_s
 {
     int demuxFd;  /**< File descriptor for the demux device. */
     uint16_t pid; /**< PID that is being filtered. */
-    bool system;  /**< Whether this filter is for a 'system' PID */
 }DVBAdapterPIDFilter_t;
 
 /**
@@ -118,6 +117,7 @@ typedef struct DVBAdapter_t
     DVBDiSEqCSettings_t diseqcSettings; /**< Current DiSEqC settings for DVB-S */
 
     char demuxPath[30];               /**< Path to the demux device */
+    int maxFilters;                   /**< Maximum number of available filters. */
     DVBAdapterPIDFilter_t filters[DVB_MAX_PID_FILTERS];/**< File descriptor for the demux device.*/
 
     char dvrPath[30];                 /**< Path to the dvr device */
@@ -199,10 +199,9 @@ int DVBDemuxSetBufferSize(DVBAdapter_t *adapter, unsigned long size);
  * Allocate a new PID Filter, indicating whether it is a system PID or not.
  * @param adapter The adapter to allocate the filter on,
  * @param pid The PID to filter.
- * @param system Whether this filter is a 'system' filter or not.
  * @return 0 on success, non-zero otherwise.
  */
-int DVBDemuxAllocateFilter(DVBAdapter_t *adapter, uint16_t pid, bool system);
+int DVBDemuxAllocateFilter(DVBAdapter_t *adapter, uint16_t pid);
 
 /**
  * Release a specific PID filter.
@@ -215,10 +214,9 @@ int DVBDemuxReleaseFilter(DVBAdapter_t *adapter, uint16_t pid);
 /**
  * Release all application or system PID filters.
  * @param adapter The adapter to release the filters on.
- * @param system Whether to release system or application filters.
  * @return 0 on success, non-zero otherwise.
  */ 
-int DVBDemuxReleaseAllFilters(DVBAdapter_t *adapter, bool system);
+int DVBDemuxReleaseAllFilters(DVBAdapter_t *adapter);
 
 /**
  * Read upto max bytes from the dvr device belonging to the specified adapter.
@@ -230,6 +228,11 @@ int DVBDemuxReleaseAllFilters(DVBAdapter_t *adapter, bool system);
  */
 int DVBDVRRead(DVBAdapter_t *adapter, char *data, int max, int timeout);
 
+/**
+ * Get the file descriptor for the DVR device to use in poll() etc.
+ * @param adapter The adapter to get the DVR fd from. 
+ */
+#define DVBDVRGetFD(adapter) (adapter)->dvrFd
 
 /** @} */
 #endif

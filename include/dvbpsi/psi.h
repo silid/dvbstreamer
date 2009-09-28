@@ -125,6 +125,18 @@ dvbpsi_psi_section_t * dvbpsi_ClaimPSISection(dvbpsi_handle h_dvbpsi, int i_max_
 void dvbpsi_ReleasePSISections(dvbpsi_handle h_dvbpsi, dvbpsi_psi_section_t * p_section);
 
 /*****************************************************************************
+ * dvbpsi_ClonePSISection
+ *****************************************************************************/
+ /*!
+ * \fn void dvbpsi_ClonePSISection(dvbpsi_handle h_dvbpsi, dvbpsi_psi_section_t * p_section)
+ * \brief Release a section so it can be reused.
+ * \param h_dvbpsi Handle to retrieve the currently unused section from.
+ * \param p_section pointer to the PSI section structure to clone.
+ * \return a pointer to the new PSI section structure.
+ */
+dvbpsi_psi_section_t * dvbpsi_ClonePSISection(dvbpsi_handle h_dvbpsi, dvbpsi_psi_section_t * p_section);
+
+/*****************************************************************************
  * dvbpsi_NewPSISection
  *****************************************************************************/
 /*!

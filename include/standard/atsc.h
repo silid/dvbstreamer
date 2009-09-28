@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2006  Adam Charrett
+Copyright (C) 2009  Adam Charrett
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -15,20 +15,17 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 
-patprocessor.h
+atsc.h
 
-Process Program Association Tables and update the services information.
+ATSC Broadcast standard.
+
 */
-#ifndef _PATPROCESSOR_H
-#define _PATPROCESSOR_H
-#include "plugin.h"
+#ifndef _STANDARD_ATSC_H
+#define _STANDARD_ATSC_H
 #include "ts.h"
 
-typedef struct PATProcessor_s *PATProcessor_t;
+extern EventSource_t ATSCEventSource;
 
-PATProcessor_t PATProcessorCreate(TSReader_t *reader);
-void PATProcessorDestroy(PATProcessor_t processor);
-
-void PATProcessorRegisterPATCallback(PluginPATProcessor_t callback);
-void PATProcessorUnRegisterPATCallback(PluginPATProcessor_t callback);
+int ATSCStandardInit(TSReader_t *reader);
+int ATSCStandardDeinit(TSReader_t *reader);
 #endif

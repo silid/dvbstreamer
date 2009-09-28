@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2006  Adam Charrett
+Copyright (C) 2009  Adam Charrett
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -35,6 +35,7 @@ Process Program Map Tables and update the services information and PIDs.
 #include "cache.h"
 #include "logging.h"
 #include "list.h"
+#include "standard/mpeg2.h"
 #include "pmtprocessor.h"
 
 #include <dvbpsi/dr_0a.h>
@@ -49,19 +50,19 @@ Process Program Map Tables and update the services information and PIDs.
 * Typedefs                                                                     *
 *******************************************************************************/
 
-typedef struct PMTProcessor_t
+struct PMTProcessor_s
 {
+    TSFilterGroup_t *tsgroup;
     Multiplex_t   *multiplex;
     Service_t     *services[MAX_HANDLES];
     unsigned short pmtpids[MAX_HANDLES];
     dvbpsi_handle  pmthandles[MAX_HANDLES];
-    bool           payloadstartonly[MAX_HANDLES];
-}
-PMTProcessor_t;
+};
 
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
+static PMTProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details);
 
 static int PMTProcessorFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet);
 static void PMTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex);
@@ -74,128 +75,70 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt);
 *******************************************************************************/
 
 static char PMTPROCESSOR[] = "PMTProcessor";
-static List_t *NewPMTCallbacksList = NULL;
+static Event_t pmtEvent = NULL;
 
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
 
-PIDFilter_t *PMTProcessorCreate(TSFilter_t *tsfilter)
+PMTProcessor_t PMTProcessorCreate(TSReader_t *reader)
 {
-    PIDFilter_t *result = NULL;
     PMTProcessor_t *state;
-    ObjectRegisterType(PMTProcessor_t);
+    if (pmtEvent == NULL)
+    {
+        pmtEvent = EventsRegisterEvent(MPEG2EventSource, "pmt", NULL);
+    }
+    ObjectRegisterClass("PMTProcessor_t", sizeof(struct PMTProcessor_s), NULL);
     state = ObjectCreateType(PMTProcessor_t);
     if (state)
     {
-        result =  PIDFilterSetup(tsfilter,
-                    PMTProcessorFilterPacket, state,
-                    PMTProcessorProcessPacket, state,
-                    NULL,NULL);
-        if (!result)
-        {
-            ObjectRefDec(state);
-        }
-        result->name = "PMT";
-        result->type = PSISIPIDFilterType;
-        PIDFilterTSStructureChangeSet(result, PMTProcessorTSStructureChanged, state);
-        PIDFilterMultiplexChangeSet(result, PMTProcessorMultiplexChanged, state);
+        state->tsgroup = TSReaderCreateFilterGroup(reader, PMTPROCESSOR, "MPEG2", PMTProcessorFilterEventCallback, state);
     }
-    if (!NewPMTCallbacksList)
-    {
-        NewPMTCallbacksList = ListCreate();
-    }
-    return result;
+    return state;
 }
 
-void PMTProcessorDestroy(PIDFilter_t *filter)
+void PMTProcessorDestroy(PMTProcessor_t processor)
 {
-    PMTProcessor_t *state = (PMTProcessor_t *)filter->fpArg;
     int i;
-    assert(filter->filterPacket == PMTProcessorFilterPacket);
-    PIDFilterFree(filter);
-
+    TSFilterGroupDestroy(processor->tsgroup);
     for (i = 0; i < MAX_HANDLES; i ++)
     {
-        if (state->pmthandles[i])
+        if (processor->pmthandles[i])
         {
-            dvbpsi_DetachPMT(state->pmthandles[i]);
-            state->pmtpids[i]    = 0;
-            state->pmthandles[i] = NULL;
-            ServiceRefDec(state->services[i]);
-            state->services[i]   = NULL;
+            dvbpsi_DetachPMT(processor->pmthandles[i]);
+            processor->pmthandles[i] = NULL;
+            ServiceRefDec(processor->services[i]);
+            processor->services[i]   = NULL;
         }
     }
-    MultiplexRefDec(state->multiplex);
-    ObjectRefDec(state);
-    if (NewPMTCallbacksList)
-    {
-        ListFree(NewPMTCallbacksList, NULL);
-    }
-}
-
-void PMTProcessorRegisterPMTCallback(PluginPMTProcessor_t callback)
-{
-    if (NewPMTCallbacksList)
-    {
-        ListAdd(NewPMTCallbacksList, callback);
-    }
-}
-
-void PMTProcessorUnRegisterPMTCallback(PluginPMTProcessor_t callback)
-{
-    if (NewPMTCallbacksList)
-    {
-        ListRemove(NewPMTCallbacksList, callback);
-    }
+    MultiplexRefDec(processor->multiplex);
+    ObjectRefDec(processors);
 }
 
 /*******************************************************************************
 * Local Functions                                                              *
 *******************************************************************************/
-
-static int PMTProcessorFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet)
+static PMTProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details)
 {
-    PMTProcessor_t *state = (PMTProcessor_t *)arg;
-    int result = 0;
-    if (state->multiplex)
-    {
-        int i;
-        int count;
-        Service_t **services;
-
-        services = CacheServicesGet(&count);
-        for (i = 0; i < count; i ++)
-        {
-            if (pid == services[i]->pmtPid)
-            {
-                result =  1;
-                break;
-            }
-        }
-        CacheServicesRelease();
-    }
-    return result;
-}
-
-static void PMTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex)
-{
-    PMTProcessor_t *state = (PMTProcessor_t *)arg;
+    PMTProcessor_t state = (PMTProcessor_t)userArg;
     int count;
     int i;
     Service_t **services;
+
+    TSFlterGroupRemoveAllFilters(state->tsgroup);
 
     for (i = 0; i < MAX_HANDLES; i ++)
     {
         if (state->pmthandles[i])
         {
             dvbpsi_DetachPMT(state->pmthandles[i]);
-            state->pmtpids[i]    = 0;
             state->pmthandles[i] = NULL;
             ServiceRefDec(state->services[i]);
             state->services[i]   = NULL;
         }
     }
+
+    
     services = CacheServicesGet(&count);
     if (count > MAX_HANDLES)
     {
@@ -204,63 +147,19 @@ static void PMTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Mult
     }
     for (i = 0; i < count; i ++)
     {
-        state->pmtpids[i] = services[i]->pmtPid;
         ServiceRefInc(services[i]);
         state->services[i] = services[i];
         state->pmthandles[i] = dvbpsi_AttachPMT(services[i]->id, PMTHandler, (void*)services[i]);
-        state->payloadstartonly[i] = TRUE;
+        TSFilterGroupAddSectionFilter(state->tsgroup, services[i]->pmtPid, 0, state->pmthandles[i]);
     }
     CacheServicesRelease();
+    if (event == TSFilterEventType_MuxChanged)
+    {
+        MultiplexRefDec(state->multiplex);
+        state->multiplex = (Multiplex_t*)details;
+        MultiplexRefInc(state->multiplex);
+    }
     
-    MultiplexRefDec(state->multiplex);
-    state->multiplex = (Multiplex_t*)newmultiplex;
-    MultiplexRefInc(state->multiplex);
-
-}
-
-static TSPacket_t * PMTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet)
-{
-    TSPacket_t *result = NULL;
-    PMTProcessor_t *state = (PMTProcessor_t *)arg;
-    unsigned short pid = TSPACKET_GETPID(*packet);
-    int i;
-
-    if (state->multiplex == NULL)
-    {
-        return 0;
-    }
-
-    for (i = 0; i < MAX_HANDLES; i ++)
-    {
-        if (state->pmthandles[i] && state->pmtpids[i] == pid)
-        {
-            /* Different program PMTs may be on the same so pass the packet to
-               all handlers that match the pid
-            */
-            if (state->payloadstartonly[i])
-            {
-                if (TSPACKET_ISPAYLOADUNITSTART(*packet))
-                {
-                    state->pmthandles[i]->i_continuity_counter = (TSPACKET_GETCOUNT(*packet) - 1) & 0xf;
-                    dvbpsi_PushPacket(state->pmthandles[i], (uint8_t*)packet);
-                    state->payloadstartonly[i] = FALSE;
-                }
-            }
-            else
-            {
-                dvbpsi_PushPacket(state->pmthandles[i], (uint8_t*)packet);
-            }
-        }
-    }
-
-    return result;
-}
-
-static void PMTProcessorTSStructureChanged(PIDFilter_t *pidfilter, void *arg)
-{
-    PMTProcessor_t *state = (PMTProcessor_t *)arg;
-    LogModule(LOG_DEBUG, PMTPROCESSOR, "PMTProcessor: TS Structure changed!\n");
-    PMTProcessorMultiplexChanged(pidfilter, state, state->multiplex);
 }
 
 static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
@@ -320,11 +219,7 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
         CacheUpdatePIDs(service, newpmt->i_pcr_pid, pids, newpmt->i_version);
     }
 
-    for (ListIterator_Init(iterator, NewPMTCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
-    {
-        PluginPMTProcessor_t callback = ListIterator_Current(iterator);
-        callback(newpmt);
-    }
+    EventsFireEventListeners(pmtEvent, newpmt);
 
     /* Take over the descriptors */
     esentry = newpmt->p_first_es;
@@ -335,3 +230,4 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
     }
     ObjectRefDec(newpmt);
 }
+

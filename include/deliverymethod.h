@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2006  Adam Charrett
+Copyright (C) 2009  Adam Charrett
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -72,18 +72,18 @@ DeliveryMethodInstance_t;
 typedef struct DeliveryMethodInstanceOps_t
 {
     /**
-     * Send a packet.
+     * Output a packet.
      * @param this The instance of the DeliveryMethodInstance_t to send the packet using.
      * @param packet The packet to send.
      */
-    void(*SendPacket)(struct DeliveryMethodInstance_t *this, TSPacket_t *packet);
+    void(*OutputPacket)(struct DeliveryMethodInstance_t *this, TSPacket_t *packet);
     /**
-     * Send an opaque block of data.
+     * Output an opaque block of data.
      * @param this The instance of the DeliveryMethodInstance_t to send the packet using.
      * @param block Pointer to the data to send.
      * @param block_len The length of the data in bytes to send.
      */
-    void(*SendBlock)(struct DeliveryMethodInstance_t *this, void *block, unsigned long blockLen);
+    void(*OutputBlock)(struct DeliveryMethodInstance_t *this, void *block, unsigned long blockLen);
     /**
      * Destroy an instace of DeliveryMethodInstance_t.
      * @param this The instance of the DeliveryMethodInstance_t to free.
@@ -157,32 +157,18 @@ void DeliveryMethodManagerRegister(DeliveryMethodHandler_t *handler);
 void DeliveryMethodManagerUnRegister(DeliveryMethodHandler_t *handler);
 
 /**
- * Find a Delivery method handler for the specified mrl and set the outputpacket
- * callback on the specified PID filter to use this handler.
- * @param mrl The mrl to send the packets to.
- * @param filter The PID filter to set the handler on.
+ * Create a new DeliveryMethodInstance_t that can handle the supplied MRL.
+ * @param mrl The MRL the delivery method should handle.
+ * @return A DeliveryMethodInstance_t if the supplied MRL can be handled or NULL.
  */
-bool DeliveryMethodManagerFind(char *mrl, PIDFilter_t *filter);
-
-/**
- * Release a Delivery method handler previously set on the specified PID filter.
- * @param filter The PID filter to release the handler from.
- */
-void DeliveryMethodManagerFree(PIDFilter_t *filter);
+DeliveryMethodInstance_t *DeliveryMethodCreate(char *mrl);
 
 /**
  * Retrieve the mrl used to setup the output on the specified filter.
  * @param filter The PIDFilter to retrieve the MRL from.
  * @return The MRL string.
  */
-char* DeliveryMethodGetMRL(PIDFilter_t *filter);
-
-/**
- * Create a new DeliveryMethodInstance_t that can handle the supplied MRL.
- * @param mrl The MRL the delivery method should handle.
- * @return A DeliveryMethodInstance_t if the supplied MRL can be handled or NULL.
- */
-DeliveryMethodInstance_t *DeliveryMethodCreate(char *mrl);
+char* DeliveryMethodGetMRL(DeliveryMethodInstance_t *instance);
 
 /**
  * Destory a DeliveryMethodInstance_t previously created by
@@ -202,13 +188,33 @@ void DeliveryMethodDestroy(DeliveryMethodInstance_t *instance);
 void DeliveryMethodDestroyAll();
 
 /**
- * Function to use with a PIDFilter as the PacketOutput function. 
- * The oparg variable of the PIDFilter structure should be set to a valid 
- * DeliveryMethodInstance_t.
- * @param pidfilter The pid filter that is output a packet.
- * @param userarg Must be a valid DeliveryMethodInstance_t.
+ * Reserve the specified number of packets at the start of the stream to allow for a header.
+ * @param instance The delievery method instance to use.
+ * @param nrofPackets The number of packets to reserve.
+ */
+void DeliveryMethodReserveHeaderSpace(DeliveryMethodInstance_t *instance, int nrofPackets);
+
+/**
+ * Set the header packets, previously reserved, to those specified.
+ * @param instance The delievery method instance to use.
+ * @param packets Pointer to an array of packets.
+ * @param nrofPackets The number of packets to set as the header.
+ */ 
+void DeliveryMethodSetHeader(DeliveryMethodInstance_t *instance, TSPacket_t *packets, int nrofPackets);
+
+/**
+ * Output a packet using the specified delivery method.
+ * @param instance The delievery method instance to use.
  * @param packet The packet to output.
  */
-void DeliveryMethodOutputPacket(PIDFilter_t *pidfilter, void *userarg, TSPacket_t* packet);
+void DeliveryMethodOutputPacket(DeliveryMethodInstance_t *instance, TSPacket_t* packet);
+
+/**
+ * Output a block of data using the specified delivery method.
+ * @param instance The delievery method instance to use.
+ * @param block Start address of the block of data to output.
+ * @param blockLen Length in bytes of the data to output.
+ */
+void DeliveryMethodOutputBlock(DeliveryMethodInstance_t *instance,  void *block, unsigned long blockLen);
 /** @} */
 #endif

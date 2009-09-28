@@ -42,6 +42,7 @@ the output to only include this service.
 #include "deliverymethod.h"
 #include "tuning.h"
 #include "properties.h"
+#include "servicefilter.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -57,50 +58,45 @@ the output to only include this service.
 /*******************************************************************************
 * Typedefs                                                                     *
 *******************************************************************************/
-typedef struct ServiceFilter_t
+struct ServiceFilter_s
 {
-    Multiplex_t  *currentMultiplex;
-    Service_t    *service;
-    Service_t    *nextService;
-    bool          serviceChanged;
-    pthread_mutex_t serviceChangeMutex;
+    TSFilterGroup_t tsgroup;
+    char            propertyPath[PROPERTIES_PATH_MAX];
+    DeliveryMethodInstance_t *dmInstance;
+    Service_t      *service;
+    Multiplex_t    *multiplex;
 
     /* PAT */
-    bool          rewritePAT;
-    uint16_t      patVersion;
-    uint8_t       patPacketCounter;
+    uint16_t        patVersion;
+    uint8_t         patPacketCounter;
 
     /* PMT */
-    bool          avsOnly;
-    bool          rewritePMT;
-    uint16_t      serviceVersion;
-    uint16_t      pmtVersion;
-    uint8_t       pmtPacketCounter;
-    uint16_t      videoPID;
-    uint16_t      audioPID;
-    uint16_t      subPID;
-    int           pmtPacketCount;
-    TSPacket_t    pmtPackets[PMT_PACKETS];
-
-    /* H/W Filters */
-    bool          allocateFilters;
+    bool            avsOnly;
+    uint16_t        serviceVersion;
+    uint16_t        pmtVersion;
+    uint8_t         pmtPacketCounter;
+    uint16_t        videoPID;
+    uint16_t        audioPID;
+    uint16_t        subPID;
+    int             pmtPacketCount;
+    TSPacket_t      pmtPackets[PMT_PACKETS];
 
     /* Header */
-    bool          setHeader;
-    int           headerCount;
-    bool          headerGotPAT;
-    bool          headerGotPMT;
-    TSPacket_t    packets[HEADER_PACKETS];
-}ServiceFilter_t;
+    bool            setHeader;
+    int             headerCount;
+    bool            headerGotPAT;
+    bool            headerGotPMT;
+    TSPacket_t      packets[HEADER_PACKETS];
+};
 
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
-static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet);
-static TSPacket_t *ServiceFilterProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
-static void ServiceFilterMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex);
-static void ServiceFilterPATRewrite(ServiceFilter_t *state);
-static void ServiceFilterPMTRewrite(ServiceFilter_t *state);
+static void ServiceFilterFilterEventCallback(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details);
+static void ServiceFilterPIDSUpdatedListener(void *userArg, Event_t event, void *details);
+static void ServiceFilterProcessPacket(void *arg, TSFilterGroup_t *group, TSPacket_t *packet);
+static void ServiceFilterPATRewrite(ServiceFilter_t filter);
+static void ServiceFilterPMTRewrite(ServiceFilter_t filter);
 static void ServiceFilterInitPacket(TSPacket_t *packet, dvbpsi_psi_section_t* section, char *sectionname);
 static void ServiceFilterAllocateFilters(ServiceFilter_t *state, DVBAdapter_t *adapter);
 
@@ -117,145 +113,113 @@ static char SERVICEFILTER[] = "ServiceFilter";
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
-PIDFilter_t *ServiceFilterCreate(TSFilter_t *tsfilter, char* name)
+ServiceFilter_t ServiceFilterCreate(TSReader_t *reader, char* name)
 {
     char propertyPath[PROPERTIES_PATH_MAX];
-    PIDFilter_t *result = NULL;
-    ServiceFilter_t *state;
-    ObjectRegisterType(ServiceFilter_t);
-    state = ObjectCreateType(ServiceFilter_t);
-    if (state)
+    ServiceFilter_t result;
+    Event_t cachePIDSUpdatedEvent;
+    ObjectRegisterClass("ServiceFilter_t", sizeof(struct ServiceFilter_s), NULL);
+    result = ObjectCreateType(ServiceFilter_t);
+    if (result)
     {
-        result = PIDFilterSetup(tsfilter,
-                    ServiceFilterFilterPacket, state,
-                    ServiceFilterProcessPacket, state,
-                    NULL, NULL);
-        if (result == NULL)
-        {
-            ObjectRefDec(state);
-        }
-        PIDFilterMultiplexChangeSet(result, ServiceFilterMultiplexChanged, state);
-        result->type = ServicePIDFilterType;
-        result->name = name;
+        result->tsgroup = TSReaderCreateFilterGroup(reader, name, ServicePIDFilterType, TSFilterGroupEventCallback_t callback, result);
 
-        sprintf(propertyPath, "filters.service.%s", name);
-        PropertiesAddProperty(propertyPath, "service", "The service that is currently being filtered", 
-            PropertyType_String, state, ServiceFilterPropertyServiceGet, NULL);
+        sprintf(result->propertyPath, "filters.service.%s", name);
+        PropertiesAddProperty(result->propertyPath, "service", "The service that is currently being filtered", 
+            PropertyType_String, result, ServiceFilterPropertyServiceGet, NULL);
 
-        PropertiesAddProperty(propertyPath, "avsonly", "Whether only the first Audio/Video/Subtitle streams should be filtered.", 
-            PropertyType_Boolean, state, ServiceFilterPropertyAVSOnlyGet, ServiceFilterPropertyAVSOnlySet);        
-        
-        state->currentMultiplex = TuningCurrentMultiplexGet();
-        pthread_mutex_init(&state->serviceChangeMutex, NULL);
+        PropertiesAddProperty(result->propertyPath, "avsonly", "Whether only the first Audio/Video/Subtitle streams should be filtered.", 
+            PropertyType_Boolean, result, ServiceFilterPropertyAVSOnlyGet, ServiceFilterPropertyAVSOnlySet);
+
+        cachePIDSUpdatedEvent = EventsFindEvent("cache.pidsupdated");
+        EventsRegisterEventListener(cachePIDSUpdatedEvent, ServiceFilterPIDSUpdatedListener, result);
     }
     return result;
 }
 
-void ServiceFilterDestroy(PIDFilter_t *filter)
+void ServiceFilterDestroy(ServiceFilter_t filter)
 {
-    char propertyPath[PROPERTIES_PATH_MAX];
-    ServiceFilter_t *state = (ServiceFilter_t *)filter->ppArg;
-    assert(filter->filterPacket == ServiceFilterFilterPacket);
-
-    sprintf(propertyPath, "filters.service.%s", filter->name);
-    PropertiesRemoveAllProperties(propertyPath);
+    Event_t cachePIDSUpdatedEvent;
+    cachePIDSUpdatedEvent = EventsFindEvent("cache.pidsupdated");
     
-    if (filter->tsFilter->adapter->hardwareRestricted)
+    EventsUnregisterEventListener(cachePIDSUpdatedEvent, ServiceFilterPIDSUpdatedListener, result);
+    
+    PropertiesRemoveAllProperties(filter->propertyPath);
+    TSFilterGroupDestroy(filter->tsgroup);
+    DeliveryMethodDestroy(filter->dmInstance);
+
+    if (filter->serviceChanged)
     {
-        DVBDemuxReleaseAllFilters(filter->tsFilter->adapter, FALSE);    
+        ServiceRefDec(filter->nextService);
     }
-    if (filter->opArg)
-    {
-        DeliveryMethodDestroy(filter->opArg);
-        filter->opArg = NULL;
-    }
-    PIDFilterFree(filter);
-    if (state->serviceChanged)
-    {
-        ServiceRefDec(state->nextService);
-    }
-    MultiplexRefDec(state->currentMultiplex);
-    ServiceRefDec(state->service);
-    pthread_mutex_destroy(&state->serviceChangeMutex);
-    ObjectRefDec(state);
+    MultiplexRefDec(filter->currentMultiplex);
+    ServiceRefDec(filter->service);
+    pthread_mutex_destroy(&filter->serviceChangeMutex);
+
+    ObjectRefDec(filter);
 }
 
-void ServiceFilterDestroyAll(TSFilter_t *tsFilter)
+void ServiceFilterDestroyAll(TSReader_t *reader)
 {
     ListIterator_t iterator;
 
-    TSFilterLock(tsFilter);
-    for ( ListIterator_Init(iterator, tsFilter->pidFilters); 
+    TSReaderLock(reader);
+    for ( ListIterator_Init(iterator, reader->groups); 
           ListIterator_MoreEntries(iterator); )
     {
-        PIDFilter_t *filter = (PIDFilter_t *)ListIterator_Current(iterator);
+        TSFilterGroup_t *group = (TSFilterGroup_t*)ListIterator_Current(iterator);
         ListIterator_Next(iterator);
-        if (strcmp(filter->type, ServicePIDFilterType) == 0)
+        if (strcmp(group->type, ServicePIDFilterType) == 0)
         {
-            ServiceFilterDestroy(filter);
+            ServiceFilterDestroy(group->userArg);
         }
     }    
-    TSFilterUnLock(tsFilter);
+    TSReaderUnLock(reader);
 }
 
-void ServiceFilterServiceSet(PIDFilter_t *filter, Service_t *service)
+void ServiceFilterServiceSet(ServiceFilter_t filter, Service_t *service)
 {
-    ServiceFilter_t *state = (ServiceFilter_t *)filter->fpArg;
-    assert(filter->filterPacket == ServiceFilterFilterPacket);
-    
+    if (filter->service)
+    {
+        ServiceRefDec(filter->service);
+        MultiplexRefDec(filter->multiplex);
+    }
+    TSFilterGroupRemoveAllFilters(filter->tsgroup);
+    filter->service = service;
+    filter->multiplex = MultiplexFindUID(service->multiplexUID);
     ServiceRefInc(service);
+    ServiceFilterPATRewrite(filter);
+    ServiceFilterPMTRewrite(filter);
+    ServiceFilterAllocateFilters(filter);
+}
 
-    pthread_mutex_lock(&state->serviceChangeMutex);
+Service_t *ServiceFilterServiceGet(ServiceFilter_t filter)
+{
+    return filter->service;
+}
 
-    /* Service already waiting so unref it */
-    if (state->serviceChanged)
+void ServiceFilterAVSOnlySet(ServiceFilter_t filter, bool enable)
+{
+    if (enable != filter->avsOnly)
     {
-        ServiceRefDec(state->nextService);
+        TSFilterGroupRemoveAllFilters(filter->tsgroup);
+        filter->avsOnly = enable;
+        ServiceFilterPMTRewrite(filter);
+        ServiceFilterAllocateFilters(filter);
     }
-    state->nextService = service;
-    state->serviceChanged = TRUE;
-
-    pthread_mutex_unlock(&state->serviceChangeMutex);
 }
 
-Service_t *ServiceFilterServiceGet(PIDFilter_t *filter)
+bool ServiceFilterAVSOnlyGet(ServiceFilter_t filter)
 {
-    ServiceFilter_t *state = (ServiceFilter_t *)filter->fpArg;
-    assert(filter->filterPacket == ServiceFilterFilterPacket);
-    return state->service;
+    return filter->avsOnly;
 }
 
-void ServiceFilterAVSOnlySet(PIDFilter_t *filter, bool enable)
+void ServiceFilterDeliveryMethodSet(ServiceFilter_t filter, DeliveryMethodInstance_t *instance)
 {
-    ServiceFilter_t *state = (ServiceFilter_t *)filter->fpArg;
-    assert(filter->filterPacket == ServiceFilterFilterPacket);
-    state->rewritePMT = enable;
-    state->avsOnly = enable;
-}
-
-bool ServiceFilterAVSOnlyGet(PIDFilter_t *filter)
-{
-    ServiceFilter_t *state = (ServiceFilter_t *)filter->fpArg;
-    assert(filter->filterPacket == ServiceFilterFilterPacket);
-    return state->avsOnly;
-}
-
-void ServiceFilterDeliveryMethodSet(PIDFilter_t *filter, DeliveryMethodInstance_t *instance)
-{
-    ServiceFilter_t *state = (ServiceFilter_t *)filter->fpArg;
-    DeliveryMethodInstance_t *prevInstance = filter->opArg;
-    
-    if (instance->ops->ReserveHeaderSpace)
-    {
-        instance->ops->ReserveHeaderSpace(instance, HEADER_PACKETS); 
-    }
-
-    PIDFilterOutputPacketSet(filter, DeliveryMethodOutputPacket, instance);
-
-    if (instance->ops->ReserveHeaderSpace)
-    {
-        state->setHeader = TRUE;
-    }
+    DeliveryMethodInstance_t *prevInstance = filter->dmInstance;
+    DeliveryMethodReserveHeaderSpace(filter->dmInstance, HEADER_PACKETS);
+    filter->dmInstance = instance;
+    filter->setHeader = TRUE;
 
     if (prevInstance)
     {
@@ -264,211 +228,104 @@ void ServiceFilterDeliveryMethodSet(PIDFilter_t *filter, DeliveryMethodInstance_
 
 }
 
-DeliveryMethodInstance_t * ServiceFilterDeliveryMethodGet(PIDFilter_t *filter)
+DeliveryMethodInstance_t * ServiceFilterDeliveryMethodGet(ServiceFilter_t filter)
 {
-    return filter->opArg;
+    return filter->dmInstance;
 }
 
 /*******************************************************************************
 * Local Functions                                                              *
 *******************************************************************************/
-static int ServiceFilterFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet)
+static void ServiceFilterFilterEventCallback(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details)
 {
-    int result = 0;
-    int i;
-    ServiceFilter_t *state = (ServiceFilter_t *)arg;
-
-    if (state->serviceChanged)
+    ServiceFilter_t filter = (ServiceFilter_t)userArg;
+    TSFilterGroupRemoveAllFilters(filter->tsgroup);
+    if (event == TSFilterEventType_StructureChanged)
     {
-        pthread_mutex_lock(&state->serviceChangeMutex);
-        ServiceRefDec(state->service);
-        
-        state->service = state->nextService;
-
-        state->serviceChanged = FALSE;
-        state->rewritePAT = TRUE;
-        state->rewritePMT = TRUE;
-
-        state->headerGotPAT = FALSE;
-        state->headerGotPMT = FALSE;
-        state->headerCount  = 0;
-        state->pmtPacketCount = 0;
-
-        if (state->avsOnly)
-        {
-            state->audioPID = INVALID_PID;
-            state->videoPID = INVALID_PID;
-            state->subPID   = INVALID_PID;
-        }
-
-        pthread_mutex_unlock(&state->serviceChangeMutex);
-        if (pidfilter->tsFilter->adapter->hardwareRestricted)
-        {
-            state->allocateFilters = TRUE && !state->avsOnly;
-        }
+        ServiceFilterPATRewrite(filter);
+        ServiceFilterPMTRewrite(filter);
     }
-    
-    if (state->service)
-    {
-        PIDList_t *pids;
-
-        if (pidfilter->tsFilter->adapter->hardwareRestricted && 
-            (state->allocateFilters || (state->serviceVersion != state->service->pmtVersion)))
-        {
-            ServiceFilterAllocateFilters(state, pidfilter->tsFilter->adapter);
-            state->allocateFilters = FALSE;
-            state->serviceVersion = state->service->pmtVersion;
-        }
-        
-        /* Is this service on the current multiplex ? */
-        if ((!state->currentMultiplex) || (state->service->multiplexUID != state->currentMultiplex->uid))
-        {
-            return 0;
-        }
-        
-        /* Handle PAT and PMT pids */
-        if ((pid == 0) || (pid == state->service->pmtPid) || (pid == state->service->pcrPid))
-        {
-            return 1;
-        }
-        
-        /* Handle CAT if service uses encrypted/CA streams */
-        if ((state->service->conditionalAccess) && (pid == 1))
-        {
-            return 1;
-        }
-        
-        if (state->avsOnly)
-        {
-            if ((state->videoPID == pid) || (state->audioPID == pid) || (state->subPID == pid))
-            {
-                return 1;
-            }
-        }
-        else
-        {
-            pids = CachePIDsGet(state->service);
-            if (pids)
-            {
-                for (i = 0; i < pids->count; i ++)
-                {
-                    if (pid == pids->pids[i].pid)
-                    {
-                        result = 1;
-                        break;
-                    }
-                }
-            }
-            CachePIDsRelease();
-        }
-    }
-    return result;
+    ServiceFilterAllocateFilters(filter);
 }
 
-static TSPacket_t *ServiceFilterProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet)
+static void ServiceFilterPIDSUpdatedListener(void *userArg, Event_t event, void *details)
 {
-    ServiceFilter_t *state = (ServiceFilter_t *)arg;
+    Service_t *updatedService = details;
+    if (ServiceAreEqual(filter->service, updatedService))
+    {
+        TSFilterGroupRemoveAllFilters(filter->tsgroup);    
+        ServiceFilterPMTRewrite(filter);
+        ServiceFilterAllocateFilters(filter);
+    }
+}
+
+static void ServiceFilterProcessPacket(void *arg, TSFilterGroup_t *group, TSPacket_t *packet)
+{
+    ServiceFilter_t filter = (ServiceFilter_t)arg;
     unsigned short pid = TSPACKET_GETPID(*packet);
+
     /* If this is the PAT PID we need to rewrite it! */
     if (pid == 0)
     {
-        if (state->rewritePAT)
-        {
-            state->patVersion ++;
-            ServiceFilterPATRewrite(state);
-            state->rewritePAT = FALSE;
-            state->headerGotPAT = TRUE;
-            state->headerCount = 1;
-        }
-
-        TSPACKET_SETCOUNT(state->packets[PACKETS_INDEX_PAT], state->patPacketCounter ++);
-        packet = &state->packets[PACKETS_INDEX_PAT];
+        TSPACKET_SETCOUNT(filter->packets[PACKETS_INDEX_PAT], filter->patPacketCounter ++);
+        packet = &filter->packets[PACKETS_INDEX_PAT];
     }
-
-    if (pid == state->service->pmtPid)
+    
+    if (pid == filter->service->pmtPid)
     {
-        if (state->avsOnly)
+        if (filter->avsOnly)
         {
-            if (state->rewritePMT || (state->serviceVersion != state->service->pmtVersion))
-            {
-                state->pmtVersion ++;
-                ServiceFilterPMTRewrite(state);
-                state->rewritePMT = FALSE;
-                state->serviceVersion = state->service->pmtVersion;
-
-                state->headerGotPMT = TRUE;
-                state->headerCount = 2;
-                
-                if (pidfilter->tsFilter->adapter->hardwareRestricted)
-                {
-                    state->allocateFilters = TRUE;
-                }
-            }
-
-            TSPACKET_SETCOUNT(state->packets[PACKETS_INDEX_PMT], state->pmtPacketCounter ++);
-            packet = &state->packets[PACKETS_INDEX_PMT];
+            TSPACKET_SETCOUNT(filter->packets[PACKETS_INDEX_PMT], filter->pmtPacketCounter ++);
+            packet = &filter->packets[PACKETS_INDEX_PMT];
         }
         else
         {
             if (TSPACKET_ISPAYLOADUNITSTART(*packet))
             {
-                if (state->pmtPacketCount > 0)
+                if (filter->pmtPacketCount > 0)
                 {
-                    state->headerGotPMT = TRUE;
-                    state->headerCount = 1 + state->pmtPacketCount;
-                    memcpy(&state->packets[PACKETS_INDEX_PMT], &state->pmtPackets, TSPACKET_SIZE * state->pmtPacketCount);
+                    filter->headerGotPMT = TRUE;
+                    filter->headerCount = 1 + filter->pmtPacketCount;
+                    memcpy(&filter->packets[PACKETS_INDEX_PMT], &filter->pmtPackets, TSPACKET_SIZE * filter->pmtPacketCount);
                 }
-                state->pmtPacketCount = 0;
+                filter->pmtPacketCount = 0;
             }
-            if (state->pmtPacketCount < PMT_PACKETS)
+            if (filter->pmtPacketCount < PMT_PACKETS)
             {
-                memcpy(&state->pmtPackets[state->pmtPacketCount], packet, TSPACKET_SIZE);
-                state->pmtPacketCount ++;
+                memcpy(&filter->pmtPackets[filter->pmtPacketCount], packet, TSPACKET_SIZE);
+                filter->pmtPacketCount ++;
             }
         }
     }
 
-    if (state->setHeader && state->headerGotPAT && state->headerGotPMT)
+    if (filter->setHeader && filter->headerGotPMT)
     {
-        DeliveryMethodInstance_t *dmInstance = ServiceFilterDeliveryMethodGet(pidfilter);
-        if (dmInstance->ops->SetHeader)
-        {
-            dmInstance->ops->SetHeader(dmInstance, state->packets, state->headerCount);
-        }
-        state->setHeader = FALSE;
-        
+        DeliveryMethodSetHeader(filter->dmInstance, filter->packets, filter->headerCount);
+        filter->setHeader = FALSE;
     }
-    return packet;
+
+    DeliveryMethodOutputPacket(filter->dmInstance, packet);
 }
 
-static void ServiceFilterMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex)
-{
-    ServiceFilter_t *state = (ServiceFilter_t *)arg;
-
-    MultiplexRefDec(state->currentMultiplex);
-    state->currentMultiplex = newmultiplex;
-    MultiplexRefInc(state->currentMultiplex);
-}
-
-static void ServiceFilterPATRewrite(ServiceFilter_t *state)
+static void ServiceFilterPATRewrite(ServiceFilter_t filter)
 {
     dvbpsi_pat_t pat;
     dvbpsi_psi_section_t* section;
-
-    MultiplexRefInc(state->currentMultiplex);
-    dvbpsi_InitPAT(&pat, state->currentMultiplex->tsId, state->patVersion, 1);
-    MultiplexRefDec(state->currentMultiplex);
     
-    dvbpsi_PATAddProgram(&pat, state->service->id, state->service->pmtPid);
+    filter->patVersion ++;
+
+    dvbpsi_InitPAT(&pat, filter->multiplex->tsId, filter->patVersion, 1);
+    
+    dvbpsi_PATAddProgram(&pat, filter->service->id, filter->service->pmtPid);
 
     section = dvbpsi_GenPATSections(&pat, 1);
-    ServiceFilterInitPacket(&state->packets[PACKETS_INDEX_PAT], section, "PAT");
+    ServiceFilterInitPacket(&filter->packets[PACKETS_INDEX_PAT], section, "PAT");
 
     dvbpsi_DeletePSISections(section);
     dvbpsi_EmptyPAT(&pat);
 }
 
-static void ServiceFilterPMTRewrite(ServiceFilter_t *state)
+static void ServiceFilterPMTRewrite(ServiceFilter_t state)
 {
     int i;
     PIDList_t *pids;
@@ -479,6 +336,8 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t *state)
     dvbpsi_pmt_es_t *es;
     dvbpsi_psi_section_t* section;
 
+    state->pmtVersion ++;
+    
     dvbpsi_InitPMT(&pmt, state->service->id, state->pmtVersion, 1, state->service->pcrPid);
 
     state->videoPID = INVALID_PID;
@@ -553,6 +412,9 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t *state)
     LogModule(LOG_DEBUG, SERVICEFILTER, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     dvbpsi_DeletePSISections(section);
     dvbpsi_EmptyPMT(&pmt);
+
+    state->headerGotPMT = TRUE;
+    state->headerCount = 2;   
 }
 
 static void ServiceFilterInitPacket(TSPacket_t *packet, dvbpsi_psi_section_t* section, char *sectionname)
@@ -584,44 +446,52 @@ static void ServiceFilterInitPacket(TSPacket_t *packet, dvbpsi_psi_section_t* se
     }
 }
 
-static void ServiceFilterAllocateFilters(ServiceFilter_t *state, DVBAdapter_t *adapter)
+static void ServiceFilterAllocateFilters(ServiceFilter_t *filter)
 {
-    DVBDemuxReleaseAllFilters(adapter, FALSE);
-    DVBDemuxAllocateFilter(adapter, state->service->pmtPid, FALSE);
-    /* Make sure we also stream the PCR PID just in case its not the audio/video */
-    DVBDemuxAllocateFilter(adapter, state->service->pcrPid, FALSE);
-    
-    if (state->avsOnly)
+    Multiplex_t *mux = TuningCurrentMultiplexGet();
+    int muxUID = mux->uid;
+    MultiplexRefDec(mux);    
+
+    /* Service is not part of the current mux */
+    if (filter->service->multiplexUID != muxUID)
     {
-        if (state->audioPID != INVALID_PID)
+        return;
+    }
+    
+    TSReaderLock(filter->tsgroup->reader);
+    TSFilterGroupAddPacketFilter(filter->tsgroup, filter->service->pmtPid, ServiceFilterProcessPacket, filter);
+    /* Make sure we also stream the PCR PID just in case its not the audio/video */
+    TSFilterGroupAddPacketFilter(filter->tsgroup, filter->service->pcrPid, ServiceFilterProcessPacket, filter);
+
+    if (filter->avsOnly)
+    {
+        if (filter->audioPID != INVALID_PID)
         {
-             DVBDemuxAllocateFilter(adapter, state->audioPID, FALSE);
+            TSFilterGroupAddPacketFilter(filter->tsgroup, filter->audioPID, ServiceFilterProcessPacket, filter);
         }
-        if (state->videoPID != INVALID_PID)
+        if (filter->videoPID != INVALID_PID)
         {
-             DVBDemuxAllocateFilter(adapter, state->videoPID, FALSE);
+            TSFilterGroupAddPacketFilter(filter->tsgroup, filter->videoPID, ServiceFilterProcessPacket, filter);
         }
-        if (state->subPID != INVALID_PID)
+        if (filter->subPID != INVALID_PID)
         {
-             DVBDemuxAllocateFilter(adapter, state->subPID, FALSE);
+            TSFilterGroupAddPacketFilter(filter->tsgroup, filter->subPID, ServiceFilterProcessPacket, filter);
         }
     }
     else
     {
-        PIDList_t *pids = CachePIDsGet(state->service);
+        PIDList_t *pids = CachePIDsGet(filter->service);
         if (pids)
         {
             int i;
             for (i = 0; i < pids->count; i ++)
             {
-                if (state->serviceVersion != state->service->pmtVersion)
-                {
-                     DVBDemuxAllocateFilter(adapter, pids->pids[i].pid, FALSE);
-                }
+                TSFilterGroupAddPacketFilter(filter->tsgroup, pids->pids[i], ServiceFilterProcessPacket, filter);
             }
         }
         CachePIDsRelease();
     }
+    TSReaderUnLock(filter->tsgroup->reader);
 }
 
 static int ServiceFilterPropertyServiceGet(void *userArg, PropertyValue_t *value)
@@ -649,8 +519,8 @@ static int ServiceFilterPropertyAVSOnlyGet(void *userArg, PropertyValue_t *value
 
 static int ServiceFilterPropertyAVSOnlySet(void *userArg, PropertyValue_t *value)
 {
-    ServiceFilter_t *state = userArg;
-    state->avsOnly = value->u.boolean;
+    ServiceFilter_t filter = userArg;
+    ServiceFilterAVSOnlySet(filter, value->u.boolean);
     return 0;
 }
 

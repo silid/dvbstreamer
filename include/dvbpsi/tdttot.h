@@ -23,6 +23,10 @@ Time Date Table and Time Offset Table.
 #ifndef _TDTTOT_H
 #define _TDTTOT_H
 
+#define PID_TDT 0x14
+#define TABLE_ID_TDT 0x40
+#define TABLE_ID_TOT 0x41
+
 /*****************************************************************************
  * dvbpsi_tdt_t
  *****************************************************************************/

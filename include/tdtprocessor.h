@@ -24,14 +24,9 @@ Process Time/Date and Time offset Tables.
 #define _TDTPROCESSOR_H
 #include "plugin.h"
 #include "ts.h"
+typedef struct TDTProcessor_s *TDTProcessor_t;
 
-int TDTProcessorInit(void);
-void TDTProcessorDeInit(void);
-
-PIDFilter_t *TDTProcessorCreate(TSFilter_t *tsfilter);
-void TDTProcessorDestroy(PIDFilter_t *filter);
-
-void TDTProcessorRegisterTDTCallback(PluginTDTProcessor_t callback);
-void TDTProcessorUnRegisterTDTCallback(PluginTDTProcessor_t callback);
+TDTProcessor_t TDTProcessorCreate(TSReader_t *reader);
+void TDTProcessorDestroy(TDTProcessor_t processor);
 
 #endif

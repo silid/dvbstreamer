@@ -543,7 +543,7 @@ static void CommandMuxInfo(int argc, char **argv)
 static void CommandStats(int argc, char **argv)
 {
     ListIterator_t iterator;
-    TSFilter_t *tsFilter = MainTSFilterGet();
+    TSReader_t *tsFilter = MainTSFilterGet();
 
     CommandPrintf("PSI/SI Processor Statistics\n"
                   "---------------------------\n");

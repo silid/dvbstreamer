@@ -25,8 +25,10 @@ Process Program Map Tables and update the services information and PIDs.
 #include "plugin.h"
 #include "ts.h"
 
-PIDFilter_t *PMTProcessorCreate(TSFilter_t *tsfilter);
-void PMTProcessorDestroy(PIDFilter_t *filter);
+typedef struct PMTProcessor_s *PMTProcessor_t;
+
+PMTProcessor_t PMTProcessorCreate(TSReader_t *reader);
+void PMTProcessorDestroy(PMTProcessor_t processor);
 
 void PMTProcessorRegisterPMTCallback(PluginPMTProcessor_t callback);
 void PMTProcessorUnRegisterPMTCallback(PluginPMTProcessor_t callback);

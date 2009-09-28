@@ -51,8 +51,24 @@ Process ATSC PSIP tables
 #include "atsctext.h"
 
 /*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
+#define PID_PSIP 0x1ffb
+
+/*******************************************************************************
+* Typedefs                                                                     *
+*******************************************************************************/
+
+struct PSIPProcessor_s
+{
+    TSFilterGroup_t tsgroup;
+    dvbpsi_handle demux;
+};
+
+/*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
+static void PSIPProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details);
 static void SubTableHandler(void * state, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension);
 static void ProcessMGT(void *arg, dvbpsi_atsc_mgt_t *newMGT);
 static void ProcessSTT(void *arg, dvbpsi_atsc_stt_t *newSTT);
@@ -65,47 +81,42 @@ static void DumpDescriptor(char *prefix, dvbpsi_descriptor_t *descriptor);
 *******************************************************************************/
 static const char PSIPPROCESSOR[] = "PSIPProcessor";
 
-static List_t *NewMGTCallbacksList = NULL;
-static List_t *NewSTTCallbacksList = NULL;
-static List_t *NewVCTCallbacksList = NULL;
+static int initCount = 0;
 static iconv_t utf16ToUtf8CD;
 static time_t UnixEpochOffset = 315964800;
+
+static Event_t mgtEvent = NULL;
+static Event_t sttEvent = NULL;
+static Event_t vctEvent = NULL;
 
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
-int PSIPProcessorInit(void)
+PSIPProcessor_t PSIPProcessorCreate(TSReader_t *reader)
 {
-    utf16ToUtf8CD = iconv_open("UTF-8", "UTF-16BE");
-    if ((long)utf16ToUtf8CD == -1)
+    PSIPProcessor_t result;
+    if (initCount == 0)
     {
-        LogModule(LOG_ERROR, PSIPPROCESSOR, "Failed to open iconv to convert UTF16 to UTF8\n");
-        return -1;
+        utf16ToUtf8CD = iconv_open("UTF-8", "UTF-16BE");
+        if ((long)utf16ToUtf8CD == -1)
+        {
+            LogModule(LOG_ERROR, PSIPPROCESSOR, "Failed to open iconv to convert UTF16 to UTF8\n");
+            return NULL;
+        }
     }
+    initCount ++;
+    if (mgtEvent == NULL)
+    {
+        mgtEvent = EventsRegisterEvent(ATSCEventSource, "mgt", NULL);
+        sttEvent = EventsRegisterEvent(ATSCEventSource, "stt", NULL);
+        vctEvent = EventsRegisterEvent(ATSCEventSource, "vct", NULL);
+    }
+    ObjectRegisterClass("PSIPProcessor_t", sizeof(struct PSIPProcessor_s), NULL);
 
-    NewMGTCallbacksList = ListCreate();
-    NewSTTCallbacksList = ListCreate();
-    NewVCTCallbacksList = ListCreate();
-
-
-    return (NewMGTCallbacksList && NewSTTCallbacksList && NewVCTCallbacksList) ? 0 : -1;
-}
-
-void PSIPProcessorDeInit(void)
-{
-    ListFree(NewMGTCallbacksList, NULL);
-    ListFree(NewSTTCallbacksList, NULL);
-    ListFree(NewVCTCallbacksList, NULL);    
-    iconv_close(utf16ToUtf8CD);
-}
-
-PIDFilter_t *PSIPProcessorCreate(TSFilter_t *tsfilter)
-{
-    PIDFilter_t *result = SubTableProcessorCreate(tsfilter, 0x1ffb, SubTableHandler, tsfilter, NULL, NULL);
+    result = ObjectCreateType(PSIPProcessor_t);
     if (result)
     {
-        result->name = "PSIP";
-        result->type = PSISIPIDFilterType;
+        result->tsgroup = TSReaderCreateFilterGroup(reader, PSIPPROCESSOR, "atsc", PSIPProcessorFilterEventCallback, result);
     }
     
     return result;
@@ -114,61 +125,27 @@ PIDFilter_t *PSIPProcessorCreate(TSFilter_t *tsfilter)
 void PSIPProcessorDestroy(PIDFilter_t *filter)
 {
     SubTableProcessorDestroy(filter);
-}
-
-void PSIPProcessorRegisterMGTCallback(PluginMGTProcessor_t callback)
-{
-    if (NewMGTCallbacksList)
+    initCount --;
+    if (initCount == 0)
     {
-        ListAdd(NewMGTCallbacksList, callback);
+        iconv_close(utf16ToUtf8CD);
     }
 }
-
-void PSIPProcessorUnRegisterMGTCallback(PluginMGTProcessor_t callback)
-{
-    if (NewMGTCallbacksList)
-    {
-        ListRemove(NewMGTCallbacksList, callback);
-    }
-}
-
-void PSIPProcessorRegisterSTTCallback(PluginSTTProcessor_t callback)
-{
-    if (NewSTTCallbacksList)
-    {
-        ListAdd(NewSTTCallbacksList, callback);
-    }
-}
-
-void PSIPProcessorUnRegisterSTTCallback(PluginSTTProcessor_t callback)
-{
-    if (NewSTTCallbacksList)
-    {
-        ListRemove(NewSTTCallbacksList, callback);
-    }
-}
-
-void PSIPProcessorRegisterVCTCallback(PluginVCTProcessor_t callback)
-{
-    if (NewVCTCallbacksList)
-    {
-        LogModule(LOG_DEBUG, PSIPPROCESSOR, "Registered %p\n", callback);
-        ListAdd(NewVCTCallbacksList, callback);
-    }
-}
-
-void PSIPProcessorUnRegisterVCTCallback(PluginVCTProcessor_t callback)
-{
-    if (NewVCTCallbacksList)
-    {
-        ListRemove(NewVCTCallbacksList, callback);
-    }
-}
-
 /*******************************************************************************
 * Local Functions                                                              *
 *******************************************************************************/
+static void PSIPProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details)
+{
+    SDTProcessor_t state = (SDTProcessor_t)userArg;
+    if (state->demux)
+    {
+        TSFilterGroupRemoveSectionFilter(state->tsgroup, PID_PSIP);
+        dvbpsi_DetachDemux(state->demux);
+    }
 
+    state->demux = dvbpsi_AttachDemux(SubTableHandler, state);
+    TSFilterGroupAddSectionFilter(state->tsgroup, PID_PSIP, 1, state->demux);
+}
 static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension)
 {
     switch (tableId)
@@ -204,7 +181,6 @@ static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t table
 static void ProcessMGT(void *arg, dvbpsi_atsc_mgt_t *newMGT)
 {
     dvbpsi_atsc_mgt_table_t *table;
-    ListIterator_t iterator;
     dvbpsi_descriptor_t *descriptor;    
     Multiplex_t *current = TuningCurrentMultiplexGet();
     if (current->networkId == -1)
@@ -231,19 +207,12 @@ static void ProcessMGT(void *arg, dvbpsi_atsc_mgt_t *newMGT)
     }
     LogModule(LOG_DEBUG, PSIPPROCESSOR, "\tEnd of Descriptors\n");        
 
-
-    for (ListIterator_Init(iterator, NewMGTCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
-    {
-        PluginMGTProcessor_t callback = ListIterator_Current(iterator);
-        callback(newMGT);
-    }
-    
+    EventsFireEventListeners(mgtEvent, newMGT);
     ObjectRefDec(newMGT);
 }
 
 static void ProcessSTT(void *arg, dvbpsi_atsc_stt_t *newSTT)
 {
-    ListIterator_t iterator;
     time_t utcSeconds;
     LogModule(LOG_DEBUGV, PSIPPROCESSOR,"New STT Received! Protocol %d GPS Time =%lu GPS->UTC Offset = %u \n",
             newSTT->i_protocol, newSTT->i_system_time, newSTT->i_gps_utc_offset);
@@ -252,24 +221,17 @@ static void ProcessSTT(void *arg, dvbpsi_atsc_stt_t *newSTT)
     utcSeconds = UnixEpochOffset + newSTT->i_system_time -  newSTT->i_gps_utc_offset;
 
     LogModule(LOG_DIARRHEA, PSIPPROCESSOR, "STT UTC Time = %s\n", asctime(gmtime(&utcSeconds)));
-
-    for (ListIterator_Init(iterator, NewSTTCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
-    {
-        PluginSTTProcessor_t callback = ListIterator_Current(iterator);
-        callback(newSTT);
-    }
-    
+    EventsFireEventListeners(sttEvent, newSTT);   
     ObjectRefDec(newSTT);
 }
 
 static void ProcessVCT(void *arg, dvbpsi_atsc_vct_t *newVCT)
 {
-    ListIterator_t iterator;
     dvbpsi_descriptor_t *descriptor; 
     dvbpsi_atsc_vct_channel_t *channel;
     int count,i;
     Service_t **services;
-    TSFilter_t *tsfilter = (TSFilter_t*)arg;
+    TSReader_t *tsfilter = (TSReader_t*)arg;
     
     LogModule(LOG_DEBUG, PSIPPROCESSOR, "New VCT Recieved! Version %d Protocol %d Cable VCT? %s TS Id = 0x%04x\n", 
         newVCT->i_version, newVCT->i_protocol, newVCT->b_cable_vct ? "Yes":"No", newVCT->i_ts_id);
@@ -384,13 +346,7 @@ static void ProcessVCT(void *arg, dvbpsi_atsc_vct_t *newVCT)
         }
     }
     CacheServicesRelease();
-    
-    for (ListIterator_Init(iterator, NewVCTCallbacksList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
-    {
-        PluginVCTProcessor_t callback = ListIterator_Current(iterator);
-        callback(newVCT);
-    }
-
+    EventsFireEventListeners(vctEvent, newVCT);
     ObjectRefDec(newVCT);
         
 }
@@ -415,3 +371,4 @@ static void DumpDescriptor(char *prefix, dvbpsi_descriptor_t *descriptor)
         LogModule(LOG_DEBUG, PSIPPROCESSOR, "%s%s\n", prefix, line);
     }
 }
+
