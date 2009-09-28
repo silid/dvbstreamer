@@ -43,6 +43,7 @@ the output to only include this service.
 #include "tuning.h"
 #include "properties.h"
 #include "servicefilter.h"
+#include "events.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -60,7 +61,8 @@ the output to only include this service.
 *******************************************************************************/
 struct ServiceFilter_s
 {
-    TSFilterGroup_t tsgroup;
+    char            *name;
+    TSFilterGroup_t *tsgroup;
     char            propertyPath[PROPERTIES_PATH_MAX];
     DeliveryMethodInstance_t *dmInstance;
     Service_t      *service;
@@ -92,13 +94,13 @@ struct ServiceFilter_s
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
-static void ServiceFilterFilterEventCallback(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details);
+static void ServiceFilterFilterEventCallback(void *userArg, TSFilterGroup_t *group, TSFilterEventType_e event, void *details);
 static void ServiceFilterPIDSUpdatedListener(void *userArg, Event_t event, void *details);
 static void ServiceFilterProcessPacket(void *arg, TSFilterGroup_t *group, TSPacket_t *packet);
 static void ServiceFilterPATRewrite(ServiceFilter_t filter);
 static void ServiceFilterPMTRewrite(ServiceFilter_t filter);
 static void ServiceFilterInitPacket(TSPacket_t *packet, dvbpsi_psi_section_t* section, char *sectionname);
-static void ServiceFilterAllocateFilters(ServiceFilter_t *state, DVBAdapter_t *adapter);
+static void ServiceFilterAllocateFilters(ServiceFilter_t state);
 
 static int ServiceFilterPropertyServiceGet(void *userArg, PropertyValue_t *value);
 static int ServiceFilterPropertyAVSOnlyGet(void *userArg, PropertyValue_t *value);
@@ -106,23 +108,26 @@ static int ServiceFilterPropertyAVSOnlySet(void *userArg, PropertyValue_t *value
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
-char ServicePIDFilterType[] ="Service";
 static char SERVICEFILTER[] = "ServiceFilter";
-
+static List_t *ServiceFilterList;
 
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
 ServiceFilter_t ServiceFilterCreate(TSReader_t *reader, char* name)
 {
-    char propertyPath[PROPERTIES_PATH_MAX];
     ServiceFilter_t result;
     Event_t cachePIDSUpdatedEvent;
+    if (ServiceFilterList == NULL)
+    {
+        ServiceFilterList = ListCreate();
+    }
     ObjectRegisterClass("ServiceFilter_t", sizeof(struct ServiceFilter_s), NULL);
     result = ObjectCreateType(ServiceFilter_t);
     if (result)
     {
-        result->tsgroup = TSReaderCreateFilterGroup(reader, name, ServicePIDFilterType, TSFilterGroupEventCallback_t callback, result);
+        result->name = name;
+        result->tsgroup = TSReaderCreateFilterGroup(reader, name, SERVICEFILTER, ServiceFilterFilterEventCallback, result);
 
         sprintf(result->propertyPath, "filters.service.%s", name);
         PropertiesAddProperty(result->propertyPath, "service", "The service that is currently being filtered", 
@@ -142,21 +147,25 @@ void ServiceFilterDestroy(ServiceFilter_t filter)
     Event_t cachePIDSUpdatedEvent;
     cachePIDSUpdatedEvent = EventsFindEvent("cache.pidsupdated");
     
-    EventsUnregisterEventListener(cachePIDSUpdatedEvent, ServiceFilterPIDSUpdatedListener, result);
+    EventsUnregisterEventListener(cachePIDSUpdatedEvent, ServiceFilterPIDSUpdatedListener, filter);
     
     PropertiesRemoveAllProperties(filter->propertyPath);
     TSFilterGroupDestroy(filter->tsgroup);
     DeliveryMethodDestroy(filter->dmInstance);
 
-    if (filter->serviceChanged)
+    if (filter->multiplex)
     {
-        ServiceRefDec(filter->nextService);
+        MultiplexRefDec(filter->multiplex);
     }
-    MultiplexRefDec(filter->currentMultiplex);
     ServiceRefDec(filter->service);
-    pthread_mutex_destroy(&filter->serviceChangeMutex);
-
+    ListRemove(ServiceFilterList, filter);
     ObjectRefDec(filter);
+
+    if (ListCount(ServiceFilterList) == 0)
+    {
+        ListFree(ServiceFilterList, NULL);
+        ServiceFilterList = NULL;
+    }
 }
 
 void ServiceFilterDestroyAll(TSReader_t *reader)
@@ -177,6 +186,30 @@ void ServiceFilterDestroyAll(TSReader_t *reader)
     TSReaderUnLock(reader);
 }
 
+ListIterator_t *ServiceFilterGetListIterator(void)
+{
+    ListIterator_t *iterator = ObjectAlloc(sizeof(ListIterator_t));
+    ListIterator_Init(*iterator,ServiceFilterList);
+    return iterator;
+}
+
+
+ServiceFilter_t ServiceFilterFindFilter(const char *name)
+{
+    ListIterator_t iterator;
+    ListIterator_ForEach(iterator,ServiceFilterList)
+    {
+        ServiceFilter_t filter = ListIterator_Current(iterator);
+        if (strcmp(filter->name, name) == 0)
+        {
+            return filter;
+        }
+    }
+    return NULL;
+}
+
+
+
 void ServiceFilterServiceSet(ServiceFilter_t filter, Service_t *service)
 {
     if (filter->service)
@@ -186,11 +219,18 @@ void ServiceFilterServiceSet(ServiceFilter_t filter, Service_t *service)
     }
     TSFilterGroupRemoveAllFilters(filter->tsgroup);
     filter->service = service;
-    filter->multiplex = MultiplexFindUID(service->multiplexUID);
-    ServiceRefInc(service);
-    ServiceFilterPATRewrite(filter);
-    ServiceFilterPMTRewrite(filter);
-    ServiceFilterAllocateFilters(filter);
+    if (service)
+    {
+        filter->multiplex = MultiplexFindUID(service->multiplexUID);
+        ServiceRefInc(service);
+        ServiceFilterPATRewrite(filter);
+        ServiceFilterPMTRewrite(filter);
+        ServiceFilterAllocateFilters(filter);
+    }
+    else
+    {
+        filter->multiplex = NULL;
+    }
 }
 
 Service_t *ServiceFilterServiceGet(ServiceFilter_t filter)
@@ -236,7 +276,7 @@ DeliveryMethodInstance_t * ServiceFilterDeliveryMethodGet(ServiceFilter_t filter
 /*******************************************************************************
 * Local Functions                                                              *
 *******************************************************************************/
-static void ServiceFilterFilterEventCallback(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details)
+static void ServiceFilterFilterEventCallback(void *userArg, TSFilterGroup_t *group, TSFilterEventType_e event, void *details)
 {
     ServiceFilter_t filter = (ServiceFilter_t)userArg;
     TSFilterGroupRemoveAllFilters(filter->tsgroup);
@@ -250,6 +290,7 @@ static void ServiceFilterFilterEventCallback(void *userArg, struct TSFilterGroup
 
 static void ServiceFilterPIDSUpdatedListener(void *userArg, Event_t event, void *details)
 {
+    ServiceFilter_t filter = (ServiceFilter_t)userArg;
     Service_t *updatedService = details;
     if (ServiceAreEqual(filter->service, updatedService))
     {
@@ -446,7 +487,7 @@ static void ServiceFilterInitPacket(TSPacket_t *packet, dvbpsi_psi_section_t* se
     }
 }
 
-static void ServiceFilterAllocateFilters(ServiceFilter_t *filter)
+static void ServiceFilterAllocateFilters(ServiceFilter_t filter)
 {
     Multiplex_t *mux = TuningCurrentMultiplexGet();
     int muxUID = mux->uid;
@@ -458,7 +499,7 @@ static void ServiceFilterAllocateFilters(ServiceFilter_t *filter)
         return;
     }
     
-    TSReaderLock(filter->tsgroup->reader);
+    TSReaderLock(filter->tsgroup->tsReader);
     TSFilterGroupAddPacketFilter(filter->tsgroup, filter->service->pmtPid, ServiceFilterProcessPacket, filter);
     /* Make sure we also stream the PCR PID just in case its not the audio/video */
     TSFilterGroupAddPacketFilter(filter->tsgroup, filter->service->pcrPid, ServiceFilterProcessPacket, filter);
@@ -486,17 +527,17 @@ static void ServiceFilterAllocateFilters(ServiceFilter_t *filter)
             int i;
             for (i = 0; i < pids->count; i ++)
             {
-                TSFilterGroupAddPacketFilter(filter->tsgroup, pids->pids[i], ServiceFilterProcessPacket, filter);
+                TSFilterGroupAddPacketFilter(filter->tsgroup, pids->pids[i].pid, ServiceFilterProcessPacket, filter);
             }
         }
         CachePIDsRelease();
     }
-    TSReaderUnLock(filter->tsgroup->reader);
+    TSReaderUnLock(filter->tsgroup->tsReader);
 }
 
 static int ServiceFilterPropertyServiceGet(void *userArg, PropertyValue_t *value)
 {
-    ServiceFilter_t *state = userArg;
+    ServiceFilter_t state = userArg;
     value->type = PropertyType_String;
     if (state->service)
     {
@@ -511,7 +552,7 @@ static int ServiceFilterPropertyServiceGet(void *userArg, PropertyValue_t *value
 
 static int ServiceFilterPropertyAVSOnlyGet(void *userArg, PropertyValue_t *value)
 {
-    ServiceFilter_t *state = userArg;
+    ServiceFilter_t state = userArg;
     value->type = PropertyType_Boolean;
     value->u.boolean = state->avsOnly;
     return 0;

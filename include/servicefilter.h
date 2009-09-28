@@ -104,5 +104,11 @@ void ServiceFilterDeliveryMethodSet(ServiceFilter_t filter, DeliveryMethodInstan
  */
 DeliveryMethodInstance_t * ServiceFilterDeliveryMethodGet(ServiceFilter_t filter);
 
+
+ListIterator_t *ServiceFilterGetListIterator(void);
+
+ServiceFilter_t ServiceFilterFindFilter(const char *name);
+
+
 /**@}*/
 #endif

@@ -45,7 +45,6 @@ Entry point to the application.
 #include "dvbadapter.h"
 #include "ts.h"
 #include "main.h"
-#include "sectionprocessor.h"
 #include "pesprocessor.h"
 #include "servicefilter.h"
 #include "cache.h"
@@ -60,6 +59,10 @@ Entry point to the application.
 #include "deferredproc.h"
 #include "events.h"
 #include "properties.h"
+
+#include "standard/dvb.h"
+#include "standard/atsc.h"
+
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -84,17 +87,6 @@ Entry point to the application.
         _func;\
         LogModule(LOG_DEBUGV, MAIN, "Deinitialised %s\n", _name);\
     }while(0)
-
-#define MAX_PIDFILTERS 5 /* For DVB this is PAT,PMT,SDT,TDT,NIT for ATSC this is just PAT,PMT,PSIP */
-
-#define PIDFILTER_INDEX_PAT 0
-#define PIDFILTER_INDEX_PMT 1
-/* DVB */
-#define PIDFILTER_INDEX_SDT 2
-#define PIDFILTER_INDEX_NIT 3
-#define PIDFILTER_INDEX_TDT 4
-/* ATSC */
-#define PIDFILTER_INDEX_PSIP 2
 
 /*******************************************************************************
 * Prototypes                                                                   *
@@ -146,7 +138,6 @@ static char hexVersionStr[5]; /* XXXX\0 */
 int main(int argc, char *argv[])
 {
     char *startupFile = NULL;
-    int i;
     int adapterNumber = 0;
     int scanAll = 0;
     int logLevel = 0;
@@ -158,6 +149,7 @@ int main(int argc, char *argv[])
     bool remoteInterface = FALSE;
     bool disableConsoleInput = FALSE;
     bool hwRestricted = FALSE;
+    ServiceFilter_t primaryServiceFilter;
     DeliveryMethodInstance_t *dmInstance;
     char logFilename[PATH_MAX] = {0};
 
@@ -457,7 +449,6 @@ int main(int argc, char *argv[])
     TSReaderEnable(TSReader, FALSE);
 
     ServiceFilterDestroyAll(TSReader);
-    SectionProcessorDestroyAllProcessors();
     PESProcessorDestroyAllProcessors();
 
     /* Stop the deferred processing as when we unload the plugins we may be

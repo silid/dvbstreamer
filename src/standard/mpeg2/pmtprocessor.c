@@ -62,12 +62,7 @@ struct PMTProcessor_s
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
-static PMTProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details);
-
-static int PMTProcessorFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet);
-static void PMTProcessorMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex);
-static TSPacket_t *PMTProcessorProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
-static void PMTProcessorTSStructureChanged(PIDFilter_t *pidfilter, void *arg);
+static void PMTProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details);
 static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt);
 
 /*******************************************************************************
@@ -83,7 +78,7 @@ static Event_t pmtEvent = NULL;
 
 PMTProcessor_t PMTProcessorCreate(TSReader_t *reader)
 {
-    PMTProcessor_t *state;
+    PMTProcessor_t state;
     if (pmtEvent == NULL)
     {
         pmtEvent = EventsRegisterEvent(MPEG2EventSource, "pmt", NULL);
@@ -112,20 +107,20 @@ void PMTProcessorDestroy(PMTProcessor_t processor)
         }
     }
     MultiplexRefDec(processor->multiplex);
-    ObjectRefDec(processors);
+    ObjectRefDec(processor);
 }
 
 /*******************************************************************************
 * Local Functions                                                              *
 *******************************************************************************/
-static PMTProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details)
+static void PMTProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details)
 {
     PMTProcessor_t state = (PMTProcessor_t)userArg;
     int count;
     int i;
     Service_t **services;
 
-    TSFlterGroupRemoveAllFilters(state->tsgroup);
+    TSFilterGroupRemoveAllFilters(state->tsgroup);
 
     for (i = 0; i < MAX_HANDLES; i ++)
     {
@@ -165,7 +160,6 @@ static PMTProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_t *gr
 static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
 {
     Service_t *service = (Service_t*)arg;
-    ListIterator_t iterator;
     PIDList_t *pids;
     dvbpsi_pmt_es_t *esentry = newpmt->p_first_es;
     int count = 0;

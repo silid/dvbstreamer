@@ -53,7 +53,7 @@ struct PATProcessor_s
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
-static PATProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details);
+static void PATProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details);
 static void PATHandler(void* arg, dvbpsi_pat_t* newpat);
 
 /*******************************************************************************
@@ -65,15 +65,15 @@ static Event_t patEvent = NULL;
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
-PATProcessor_t *PATProcessorCreate(TSReader_t *reader)
+PATProcessor_t PATProcessorCreate(TSReader_t *reader)
 {
-    PATProcessor_t *state;
+    PATProcessor_t state;
     if (patEvent == NULL)
     {
         patEvent = EventsRegisterEvent(MPEG2EventSource, "pat", NULL);
     }
     
-    ObjectRegisterClass("PATProcessor_t", sizeof(struct PATProcessor_s), NULLs);
+    ObjectRegisterClass("PATProcessor_t", sizeof(struct PATProcessor_s), NULL);
     state = ObjectCreateType(PATProcessor_t);
     if (state)
     {
@@ -82,7 +82,7 @@ PATProcessor_t *PATProcessorCreate(TSReader_t *reader)
     return state;
 }
 
-void PATProcessorDestroy(PATProcessor_t *processor)
+void PATProcessorDestroy(PATProcessor_t processor)
 {
     if (processor->multiplex)
     {
@@ -96,7 +96,7 @@ void PATProcessorDestroy(PATProcessor_t *processor)
 /*******************************************************************************
 * Local Functions                                                              *
 *******************************************************************************/
-static PATProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details)
+static void PATProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details)
 {
     PATProcessor_t state= (PATProcessor_t)userArg;
 
@@ -108,13 +108,12 @@ static PATProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_t *gr
             TSFilterGroupRemoveSectionFilter(state->tsgroup, 0);
             dvbpsi_DetachPAT(state->pathandle);
         }
-        state->multiplex = newmultiplex;
-        if (newmultiplex)
+        state->multiplex = details;
+        if (details)
         {
             MultiplexRefInc(state->multiplex);
             state->pathandle = dvbpsi_AttachPAT(PATHandler, (void*)state);
             TSFilterGroupAddSectionFilter(state->tsgroup, 0, -1, state->pathandle);
-            state->payloadstartonly = TRUE;
         }
         
     }
@@ -124,7 +123,6 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
 {
     PATProcessor_t state = (PATProcessor_t)arg;
     Multiplex_t *multiplex = state->multiplex;
-    ListIterator_t iterator;
     int count,i;
     Service_t **services;
     dvbpsi_pat_program_t *patentry;
