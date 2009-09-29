@@ -65,12 +65,6 @@ void FileSetHeader(struct DeliveryMethodInstance_t *this,
 #define PREFIX_LEN (sizeof(FilePrefix) - 1)
 const char FilePrefix[] = "file://";
 
-/** Plugin Interface **/
-DeliveryMethodHandler_t FileOutputHandler = {
-            FileOutputCanHandle,
-            FileOutputCreate
-        };
-
 DeliveryMethodInstanceOps_t FileInstanceOps ={
     FileOutputSendPacket,
     FileOutputSendBlock,
@@ -85,7 +79,7 @@ static const char FILEOUTPUT[] = "FileOutput";
 * Plugin Setup                                                                 *
 *******************************************************************************/
 PLUGIN_FEATURES(
-    PLUGIN_FEATURE_DELIVERYMETHOD(FileOutputHandler)
+    PLUGIN_FEATURE_DELIVERYMETHOD(FileOutputCanHandle, FileOutputCreate)
 );
 
 PLUGIN_INTERFACE_F(

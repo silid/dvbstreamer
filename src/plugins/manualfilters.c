@@ -40,17 +40,23 @@ Plugin to allow manual filtering of PIDs.
 * Defines                                                                      *
 *******************************************************************************/
 #define FIND_MANUAL_FILTER(_name) \
-    filter = TSReaderFindPIDFilter(MainTSReaderGet(), (_name), ManualPIDFilterType);\
-    if (!filter)\
     {\
-        CommandError(COMMAND_ERROR_GENERIC, "Manual filter not found!");\
-        return;\
+        TSFilterGroup_t *group = TSReaderFindFilterGroup(MainTSReaderGet(), (_name), ManualPIDFilterType);\
+        if (!group)\
+        {\
+            CommandError(COMMAND_ERROR_GENERIC, "Manual filter not found!");\
+            return;\
+        }\
+        filter = group->userArg;\
     }
 
 /*******************************************************************************
 * Typedefs                                                                     *
 *******************************************************************************/
-
+typedef struct ManualFilter_s{
+    TSFilterGroup_t *tsgroup;
+    DeliveryMethodInstance_t *dmInstance;
+}ManualFilter_t;
 
 /*******************************************************************************
 * Prototypes                                                                   *
@@ -62,7 +68,7 @@ static void CommandSetOutputMRL(int argc, char **argv);
 static void CommandAddMFPID(int argc, char **argv);
 static void CommandRemoveMFPID(int argc, char **argv);
 static void CommandListMFPIDs(int argc, char **argv);
-
+static void OutputPacket(void *userArg, TSFilterGroup_t *group, TSPacket_t *packet);
 static int ParsePID(char *argument);
 
 
@@ -155,109 +161,98 @@ PLUGIN_INTERFACE_C(
 *******************************************************************************/
 static void CommandAddMF(int argc, char **argv)
 {
-    DVBAdapter_t *adapter = MainDVBAdapterGet();
-    TSReader_t *tsFilter = MainTSReaderGet();
-    PIDFilter_t *filter;
-    PIDFilterSimpleFilter_t *simplePIDFilter;
-    DeliveryMethodInstance_t *dmInstance;
+    TSReader_t *tsReader = MainTSReaderGet();
+    TSFilterGroup_t *group;
+    ManualFilter_t *filter;
 
-    if (adapter->hardwareRestricted)
-    {
-        CommandError(COMMAND_ERROR_GENERIC, "Not supported in hardware restricted mode!");
-        return;
-    }
     CommandCheckAuthenticated();
 
-    filter = TSReaderFindPIDFilter(tsFilter, argv[0], ManualPIDFilterType);
-    if (filter)
+    group = TSReaderFindFilterGroup(tsReader, argv[0], ManualPIDFilterType);
+    if (group)
     {
         CommandError(COMMAND_ERROR_GENERIC, "A manual filter with this name exists!");
         return;
     }
-
-    filter = PIDFilterAllocate(tsFilter);
+    ObjectRegisterType(ManualFilter_t);
+    filter = ObjectCreateType(ManualFilter_t);
     if (!filter)
     {
         CommandError(COMMAND_ERROR_GENERIC, "Failed to allocate a filter!");
         return;
     }
 
-    simplePIDFilter =(PIDFilterSimpleFilter_t*)ObjectAlloc(sizeof(PIDFilterSimpleFilter_t));
-    if (!simplePIDFilter)
+    filter->dmInstance = DeliveryMethodCreate(argv[1]);
+    if (filter->dmInstance == NULL)
     {
-        CommandError(COMMAND_ERROR_GENERIC, "Failed to allocated PIDFilterSimpleFilter_t structure!");
-        PIDFilterFree(filter);
-        return;
-    }
-    dmInstance = DeliveryMethodCreate(argv[1]);
-    if (dmInstance == NULL)
-    {
-        dmInstance = DeliveryMethodCreate("null://");
+        filter->dmInstance = DeliveryMethodCreate("null://");
     }
 
-    PIDFilterFilterPacketSet(filter, PIDFilterSimpleFilter, simplePIDFilter);
-    PIDFilterOutputPacketSet(filter, DeliveryMethodOutputPacket, dmInstance);
-
-    filter->name = strdup(argv[0]);
-    filter->type = ManualPIDFilterType;
-    filter->enabled = TRUE;
+    pthread_mutex_lock(&manualFiltersMutex);
+    filter->tsgroup = TSReaderCreateFilterGroup(tsReader, strdup(argv[0]), ManualPIDFilterType, NULL, filter);
+    if (!filter->tsgroup)
+    {
+        DeliveryMethodDestroy(filter->dmInstance);
+        ObjectRefDec(filter);
+        CommandError(COMMAND_ERROR_GENERIC, "Failed to allocate a filter!");
+    }
+    pthread_mutex_unlock(&manualFiltersMutex);
 }
 
 static void CommandRemoveMF(int argc, char **argv)
 {
-    PIDFilter_t *filter;
-    PIDFilterSimpleFilter_t *simplePIDFilter;
-    DeliveryMethodInstance_t *deliveryMethod;
+    ManualFilter_t *filter;
     char *name;
 
     CommandCheckAuthenticated();
 
     FIND_MANUAL_FILTER(argv[0]);
 
-    name = filter->name;
-    simplePIDFilter = filter->fpArg;
-    deliveryMethod = filter->opArg;
-    PIDFilterFree(filter);
-    ObjectRefDec(simplePIDFilter);
+    pthread_mutex_lock(&manualFiltersMutex);
+    name = filter->tsgroup->name;
+    TSFilterGroupDestroy(filter->tsgroup);
+    pthread_mutex_unlock(&manualFiltersMutex);
+    
     free(name);
-    DeliveryMethodDestroy(deliveryMethod);
+    DeliveryMethodDestroy(filter->dmInstance);
+    ObjectRefDec(filter);
 }
 
 static void CommandListMF(int argc, char **argv)
 {
-    TSReader_t *tsFilter = MainTSReaderGet();
+    TSReader_t *tsReader = MainTSReaderGet();
     ListIterator_t iterator;
-
-    TSReaderLock(tsFilter);
-    for ( ListIterator_Init(iterator, tsFilter->pidFilters);
+    pthread_mutex_lock(&manualFiltersMutex);
+    for ( ListIterator_Init(iterator, tsReader->groups);
           ListIterator_MoreEntries(iterator);
           ListIterator_Next(iterator))
     {
-        PIDFilter_t *filter = (PIDFilter_t *)ListIterator_Current(iterator);
-        if (strcmp(filter->type, ManualPIDFilterType) == 0)
+        TSFilterGroup_t *group = (TSFilterGroup_t *)ListIterator_Current(iterator);
+        if (strcmp(group->type, ManualPIDFilterType) == 0)
         {
-            CommandPrintf("%10s : %s\n", filter->name,  DeliveryMethodGetMRL(filter));
+            CommandPrintf("%10s : %s\n", group->name,  DeliveryMethodGetMRL(group->userArg));
         }
     }
-    TSReaderUnLock(tsFilter);
+    pthread_mutex_unlock(&manualFiltersMutex);
 }
 
 static void CommandSetOutputMRL(int argc, char **argv)
 {
-    PIDFilter_t *filter;
+    ManualFilter_t *filter;
     DeliveryMethodInstance_t *instance;
 
     CommandCheckAuthenticated();
 
     FIND_MANUAL_FILTER(argv[0]);
-
     pthread_mutex_lock(&manualFiltersMutex);
+
     instance = DeliveryMethodCreate(argv[1]);
     if (instance)
     {
-        DeliveryMethodDestroy(filter->opArg);
-        filter->opArg = instance;
-        CommandPrintf("MRL set to \"%s\" for %s\n", DeliveryMethodGetMRL(filter), argv[0]);
+        pthread_mutex_lock(&manualFiltersMutex);
+        DeliveryMethodDestroy(filter->dmInstance);
+        filter->dmInstance = instance;
+        pthread_mutex_unlock(&manualFiltersMutex);
+        CommandPrintf("MRL set to \"%s\" for %s\n", DeliveryMethodGetMRL(filter->dmInstance), argv[0]);
     }
     else
     {
@@ -267,97 +262,77 @@ static void CommandSetOutputMRL(int argc, char **argv)
 }
 static void CommandAddMFPID(int argc, char **argv)
 {
-    PIDFilter_t *filter;
-
+    ManualFilter_t *filter;
+    int pid;
     CommandCheckAuthenticated();
 
     FIND_MANUAL_FILTER(argv[0]);
 
-    if (filter)
+    pid = ParsePID(argv[1]);
+    if ((pid < 0) || (pid > 0x2000))
     {
-        int pid;
-        PIDFilterSimpleFilter_t *simplePIDFilter;
-        pid = ParsePID(argv[1]);
-        if ((pid < 0) || (pid > 0x2000))
-        {
-            CommandError(COMMAND_ERROR_GENERIC, "Invalid PID!");
-            return;
-        }
-        pthread_mutex_lock(&manualFiltersMutex);
-        simplePIDFilter = filter->fpArg;
-        if (simplePIDFilter->pidcount == MAX_PIDS)
-        {
-            CommandError(COMMAND_ERROR_GENERIC,"No more available PID entries!");
-        }
-        else
-        {
-            simplePIDFilter->pids[simplePIDFilter->pidcount] = pid;
-            simplePIDFilter->pidcount ++;
-        }
-        pthread_mutex_unlock(&manualFiltersMutex);
+        CommandError(COMMAND_ERROR_GENERIC, "Invalid PID!");
+        return;
     }
-}
-
-static void CommandRemoveMFPID(int argc, char **argv)
-{
-    PIDFilter_t *filter;
-
-    CommandCheckAuthenticated();
-
-    FIND_MANUAL_FILTER(argv[0]);
-
-    if (filter)
+    pthread_mutex_lock(&manualFiltersMutex);    
+    if (TSFilterGroupAddPacketFilter(filter->tsgroup, pid, OutputPacket, filter))
     {
-        int pid, i;
-        PIDFilterSimpleFilter_t *simplePIDFilter;
-
-        pid = ParsePID(argv[1]);
-        if ((pid < 0) || (pid > 0x2000))
-        {
-            CommandError(COMMAND_ERROR_GENERIC, "Invalid PID!");
-            return;
-        }
-
-        pthread_mutex_lock(&manualFiltersMutex);
-        simplePIDFilter = filter->fpArg;
-        for ( i = 0; i < simplePIDFilter->pidcount; i ++)
-        {
-            if (simplePIDFilter->pids[i] == pid)
-            {
-                memcpy(&simplePIDFilter->pids[i], &simplePIDFilter->pids[i + 1],
-                       (simplePIDFilter->pidcount - (i + 1)) * sizeof(uint16_t));
-                simplePIDFilter->pidcount --;
-                break;
-            }
-        }
-        pthread_mutex_unlock(&manualFiltersMutex);
-
-    }
-}
-
-static void CommandListMFPIDs(int argc, char **argv)
-{
-    int i;
-    PIDFilter_t *filter;
-    PIDFilterSimpleFilter_t *simplePIDFilter;
-
-    FIND_MANUAL_FILTER(argv[0]);
-    pthread_mutex_lock(&manualFiltersMutex);
-    simplePIDFilter = filter->fpArg;
-
-    CommandPrintf("%d PIDs for \'%s\'\n", simplePIDFilter->pidcount, argv[0]);
-
-    for (i = 0; i < simplePIDFilter->pidcount; i ++)
-    {
-        CommandPrintf("0x%x\n", simplePIDFilter->pids[i]);
+        CommandError(COMMAND_ERROR_GENERIC,"No more available PID entries!");
     }
     pthread_mutex_unlock(&manualFiltersMutex);
 
 }
 
+static void CommandRemoveMFPID(int argc, char **argv)
+{
+    ManualFilter_t *filter;
+    int pid;
+    CommandCheckAuthenticated();
+
+    FIND_MANUAL_FILTER(argv[0]);
+
+    pid = ParsePID(argv[1]);
+    if ((pid < 0) || (pid > 0x2000))
+    {
+        CommandError(COMMAND_ERROR_GENERIC, "Invalid PID!");
+        return;
+    }
+    pthread_mutex_lock(&manualFiltersMutex);
+    TSFilterGroupRemovePacketFilter(filter->tsgroup, pid);
+    pthread_mutex_unlock(&manualFiltersMutex);
+}
+
+static void CommandListMFPIDs(int argc, char **argv)
+{
+    ManualFilter_t *filter;
+    TSPacketFilter_t *packetFilter;
+    int count = 0;
+
+    FIND_MANUAL_FILTER(argv[0]);
+    pthread_mutex_lock(&manualFiltersMutex);
+    for (packetFilter=filter->tsgroup->packetFilters; packetFilter; packetFilter=packetFilter->next)
+    {
+        count ++;
+    }
+
+    CommandPrintf("%d PIDs for \'%s\'\n", count, argv[0]);
+
+    for (packetFilter=filter->tsgroup->packetFilters; packetFilter; packetFilter=packetFilter->next)
+    {
+        CommandPrintf("0x%x\n", packetFilter->pid);
+    }
+    pthread_mutex_unlock(&manualFiltersMutex);
+}
+
 /*******************************************************************************
 * Helper Functions                                                             *
 *******************************************************************************/
+static void OutputPacket(void *userArg, TSFilterGroup_t *group, TSPacket_t *packet)
+{
+    ManualFilter_t *filter = userArg;
+    DeliveryMethodOutputPacket(filter->dmInstance, packet);
+}
+
 static int ParsePID(char *argument)
 {
     char *formatstr;

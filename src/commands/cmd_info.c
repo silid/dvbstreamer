@@ -543,10 +543,21 @@ static void CommandMuxInfo(int argc, char **argv)
 static void CommandStats(int argc, char **argv)
 {
     TSReader_t *tsReader = MainTSReaderGet();
-
-
-    CommandPrintf("Total packets processed: %lld\n", tsReader->totalPackets);
-    CommandPrintf("Approximate TS bitrate : %gMbs\n", ((double)tsReader->bitrate / (1024.0 * 1024.0)));
+    TSReaderStats_t *stats = TSReaderExtractStats(tsReader);
+    TSFilterGroupTypeStats_t *typeStats;
+    for (typeStats = stats->types; typeStats; typeStats = typeStats->next)
+    {
+        TSFilterGroupStats_t *groupStats;
+        CommandPrintf("%s\n", typeStats->type);
+        for (groupStats = typeStats->groups; groupStats; groupStats = groupStats->next)
+        {
+            CommandPrintf("    %20s : %d (%d)\n", groupStats->name, groupStats->packetsProcessed, groupStats->sectionsProcessed);
+        }
+        CommandPrintf("\n");
+    }
+    CommandPrintf("Total packets processed: %lld\n", stats->totalPackets);
+    CommandPrintf("Approximate TS bitrate : %gMbs\n", ((double)stats->bitrate / (1024.0 * 1024.0)));
+    ObjectRefDec(stats);
 }
 
 

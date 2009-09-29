@@ -97,12 +97,6 @@ static void CreateSAPSession(struct UDPOutputState_t *state, bool rtp, unsigned 
 const char UDPPrefix[] = "udp://";
 const char RTPPrefix[] = "rtp://";
 
-/** Plugin Interface **/
-DeliveryMethodHandler_t UDPOutputHandler = {
-            UDPOutputCanHandle,
-            UDPOutputCreate
-        };
-
 DeliveryMethodInstanceOps_t UDPInstanceOps = {
     UDPOutputSendPacket,
     UDPOutputSendBlock,
@@ -126,7 +120,7 @@ const char UDPOUTPUT[] = "UDPOutput";
 *******************************************************************************/
 
 PLUGIN_FEATURES(
-    PLUGIN_FEATURE_DELIVERYMETHOD(UDPOutputHandler),
+    PLUGIN_FEATURE_DELIVERYMETHOD(UDPOutputCanHandle, UDPOutputCreate),
     PLUGIN_FEATURE_INSTALL(UDPOutputInstall)
 );
 

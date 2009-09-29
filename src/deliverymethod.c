@@ -26,14 +26,43 @@ Delivery Method management functions.
 #include "logging.h"
 #include "list.h"
 #include "deliverymethod.h"
+/*******************************************************************************
+* Prototypes                                                                   *
+*******************************************************************************/
 
-
+bool NullOutputCanHandle(char *mrl);
+DeliveryMethodInstance_t *NullOutputCreate(char *arg);
+void NullOutputDestroy(DeliveryMethodInstance_t *this);
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
 static char DELIVERYMETHOD[] = "DeliveryMethod";
 static List_t *DeliveryMethodsList;
 static List_t *InstancesList;
+
+/** Constants for the start of the MRL **/
+#define PREFIX_LEN (sizeof(NullPrefix) - 1)
+const char NullPrefix[] = "null://";
+
+/** Plugin Interface **/
+DeliveryMethodHandler_t NullOutputHandler = {
+    NullOutputCanHandle,
+    NullOutputCreate
+};
+
+static DeliveryMethodInstanceOps_t nullInstanceOps = {
+    NULL,
+    NULL,
+    NullOutputDestroy,
+    NULL,
+    NULL
+};
+
+static DeliveryMethodInstance_t singleInstance ={
+       "null://",
+        &nullInstanceOps,
+        NULL
+        };
 
 /*******************************************************************************
 * Global functions                                                             *
@@ -51,6 +80,7 @@ int DeliveryMethodManagerInit(void)
         ListFree(DeliveryMethodsList, NULL);
         return -1;
     }
+    DeliveryMethodManagerRegister(&NullOutputHandler);
     return 0;
 }
 
@@ -155,4 +185,24 @@ void DeliveryMethodOutputBlock(DeliveryMethodInstance_t *instance, void *block, 
         instance->ops->OutputBlock(instance, block, blockLen);
     }
 }
+
+/*******************************************************************************
+* NULL Delivery Method Functions                                                    *
+*******************************************************************************/
+bool NullOutputCanHandle(char *mrl)
+{
+    return (strncmp(NullPrefix, mrl, PREFIX_LEN) == 0);
+}
+
+DeliveryMethodInstance_t *NullOutputCreate(char *arg)
+{
+    return &singleInstance;
+}
+
+void NullOutputDestroy(DeliveryMethodInstance_t *this)
+{
+    /* Does nothing */
+    return;
+}
+
 

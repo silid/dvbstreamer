@@ -27,13 +27,6 @@ Plugin Manager functions.
 #include "ltdl.h"
 #include "list.h"
 #include "deliverymethod.h"
-#include "patprocessor.h"
-#include "pmtprocessor.h"
-#include "sdtprocessor.h"
-#include "nitprocessor.h"
-#include "tdtprocessor.h"
-#include "psipprocessor.h"
-#include "pesprocessor.h"
 #include "pluginmgr.h"
 #include "plugin.h"
 #include "logging.h"
@@ -72,6 +65,7 @@ static void PluginManagerLsPlugins(int argc, char **argv);
 static void PluginManagerPluginInfo(int argc, char **argv);
 
 static char *FindPluginFeatureName(int type);
+static void TableEventCallback(void *arg, Event_t event, void *details);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -98,16 +92,13 @@ static Command_t PluginManagerCommands[] = {
     };
 
 struct PluginFeatureInfo_t pluginFeatures[] = {
-    PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_FILTER),
+    PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_EVENT_LISTENER),
     PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_PATPROCESSOR),
     PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_PMTPROCESSOR),
     PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_DELIVERYMETHOD),
-    PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_CHANNELCHANGED),
     PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_SDTPROCESSOR),
     PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_NITPROCESSOR),
     PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_TDTPROCESSOR),
-    PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR),
-    PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_PESPROCESSOR),
     PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_INSTALL),
     PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_MGTPROCESSOR),
     PLUGIN_FEATURE_INFO(PLUGIN_FEATURE_TYPE_STTPROCESSOR),
@@ -257,71 +248,56 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
     {
         for (i = 0; pluginInterface->features[i].type != PLUGIN_FEATURE_TYPE_NONE; i++)
         {
-            switch(pluginInterface->features[i].type)
+            PluginFeature_t *feature = &pluginInterface->features[i];
+            switch(feature->type)
             {
+                case PLUGIN_FEATURE_TYPE_EVENT_LISTENER:
+                    LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed event listener (%s)\n", pluginInterface->name, 
+                        feature->details.eventDetails.name);
+                    EventsRegisterListenerByName(feature->details.eventDetails.name, feature->details.eventDetails.callback, feature->details.eventDetails.arg);
+                    break;     
                 case PLUGIN_FEATURE_TYPE_PATPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed PAT processor.\n", pluginInterface->name);
-//                    PATProcessorRegisterPATCallback(pluginInterface->features[i].details);
+                    EventsRegisterListenerByName("mpeg2.pat", TableEventCallback, (void*)feature->details.patCB);
                     break;
                 case PLUGIN_FEATURE_TYPE_PMTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed PMT processor.\n", pluginInterface->name);
-//                    PMTProcessorRegisterPMTCallback(pluginInterface->features[i].details);
+                    EventsRegisterListenerByName("mpeg2.pmt", TableEventCallback, (void*)feature->details.pmtCB);                    
                     break;
                 case PLUGIN_FEATURE_TYPE_DELIVERYMETHOD:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed Delivery method.\n", pluginInterface->name);
-                    DeliveryMethodManagerRegister(pluginInterface->features[i].details);
-                    break;
-                case PLUGIN_FEATURE_TYPE_CHANNELCHANGED:
-                    LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed channel changed callback.\n", pluginInterface->name);
-                    TuningChannelChangedRegisterCallback(pluginInterface->features[i].details);
+                    DeliveryMethodManagerRegister(&feature->details.dmHandler);
                     break;
 #if defined(ENABLE_DVB)
                 case PLUGIN_FEATURE_TYPE_SDTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed SDT processor.\n", pluginInterface->name);
-//                    SDTProcessorRegisterSDTCallback(pluginInterface->features[i].details);
+                    EventsRegisterListenerByName("dvb.sdt", TableEventCallback, (void*)feature->details.sdtCB);
                     break;
                 case PLUGIN_FEATURE_TYPE_NITPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed NIT processor.\n", pluginInterface->name);
-//                    NITProcessorRegisterNITCallback(pluginInterface->features[i].details);
+                    EventsRegisterListenerByName("dvb.nit", TableEventCallback, (void*)feature->details.nitCB);
                     break;
                 case PLUGIN_FEATURE_TYPE_TDTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed TDT processor.\n", pluginInterface->name);
-//                    TDTProcessorRegisterTDTCallback(pluginInterface->features[i].details);
+                    EventsRegisterListenerByName("dvb.tdt", TableEventCallback, (void*)feature->details.tdtCB);
                     break;
 #endif
-                case PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR:
-                    {
-//                        PluginSectionProcessorDetails_t *details = pluginInterface->features[i].details;
-                        LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed section processor.\n", pluginInterface->name);
-//                        SectionProcessorStartPID(details->pid, details->processor, details->userarg);
-                    }
-                    break;
-                case PLUGIN_FEATURE_TYPE_PESPROCESSOR:
-                    {
-//                        PluginPESProcessorDetails_t *details = pluginInterface->features[i].details;
-                        LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed PES processor.\n", pluginInterface->name);
-//                        PESProcessorStartPID(details->pid, details->processor, details->userarg);
-                    }
-                    break;
 #if defined(ENABLE_ATSC)
                 case PLUGIN_FEATURE_TYPE_MGTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed MGT processor.\n", pluginInterface->name);
-//                    PSIPProcessorRegisterMGTCallback(pluginInterface->features[i].details);
+                    EventsRegisterListenerByName("atsc.mgt", TableEventCallback, (void*)feature->details.mgtCB);
                     break;
                 case PLUGIN_FEATURE_TYPE_STTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed STT processor.\n", pluginInterface->name);
-//                    PSIPProcessorRegisterSTTCallback(pluginInterface->features[i].details);
+                    EventsRegisterListenerByName("atsc.stt", TableEventCallback, (void*)feature->details.sttCB);
                     break;
                 case PLUGIN_FEATURE_TYPE_VCTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed VCT processor.\n", pluginInterface->name);
-//                    PSIPProcessorRegisterVCTCallback(pluginInterface->features[i].details);
+                    EventsRegisterListenerByName("atsc.vct", TableEventCallback, (void*)feature->details.vctCB);
                     break;
 #endif
                 case PLUGIN_FEATURE_TYPE_INSTALL:
-                    {
-                        PluginInstallCallback_t callback = pluginInterface->features[i].details;
-                        callback(TRUE);
-                    }
+                    feature->details.installCB(TRUE);
                     break;
             }
 
@@ -340,71 +316,56 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface)
     {
         for (i = 0; pluginInterface->features[i].type != PLUGIN_FEATURE_TYPE_NONE; i++)
         {
-            switch(pluginInterface->features[i].type)
+            PluginFeature_t *feature = &pluginInterface->features[i];
+            switch(feature->type)
             {
+                case PLUGIN_FEATURE_TYPE_EVENT_LISTENER:
+                    LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled event listener (%s)\n", pluginInterface->name, 
+                        feature->details.eventDetails.name);
+                    EventsUnregisterListenerByName(feature->details.eventDetails.name, feature->details.eventDetails.callback, feature->details.eventDetails.arg);
+                    break;     
                 case PLUGIN_FEATURE_TYPE_PATPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled PAT processor.\n", pluginInterface->name);
-//                    PATProcessorUnRegisterPATCallback(pluginInterface->features[i].details);
+                    EventsUnregisterListenerByName("mpeg2.pat", TableEventCallback, (void*)feature->details.patCB);
                     break;
                 case PLUGIN_FEATURE_TYPE_PMTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled PMT processor.\n", pluginInterface->name);
-//                    PMTProcessorUnRegisterPMTCallback(pluginInterface->features[i].details);
+                    EventsUnregisterListenerByName("mpeg2.pmt", TableEventCallback,(void*)feature->details.pmtCB);                    
                     break;
                 case PLUGIN_FEATURE_TYPE_DELIVERYMETHOD:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled Delivery method.\n", pluginInterface->name);
-                    DeliveryMethodManagerUnRegister(pluginInterface->features[i].details);
-                    break;
-                case PLUGIN_FEATURE_TYPE_CHANNELCHANGED:
-                    LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled channel changed callback.\n", pluginInterface->name);
-                    TuningChannelChangedUnRegisterCallback(pluginInterface->features[i].details);
+                    DeliveryMethodManagerRegister(&feature->details.dmHandler);
                     break;
 #if defined(ENABLE_DVB)
                 case PLUGIN_FEATURE_TYPE_SDTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled SDT processor.\n", pluginInterface->name);
-//                    SDTProcessorUnRegisterSDTCallback(pluginInterface->features[i].details);
+                    EventsUnregisterListenerByName("dvb.sdt", TableEventCallback, (void*)feature->details.sdtCB);
                     break;
                 case PLUGIN_FEATURE_TYPE_NITPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled NIT processor.\n", pluginInterface->name);
-//                    NITProcessorUnRegisterNITCallback(pluginInterface->features[i].details);
+                    EventsUnregisterListenerByName("dvb.nit", TableEventCallback, (void*)feature->details.nitCB);
                     break;
                 case PLUGIN_FEATURE_TYPE_TDTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled TDT processor.\n", pluginInterface->name);
-//                    TDTProcessorUnRegisterTDTCallback(pluginInterface->features[i].details);
+                    EventsUnregisterListenerByName("dvb.tdt", TableEventCallback, (void*)feature->details.tdtCB);
                     break;
 #endif
-                case PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR:
-                    {
-//                        PluginSectionProcessorDetails_t *details = pluginInterface->features[i].details;
-                        LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled section processor.\n", pluginInterface->name);
-//                        SectionProcessorStopPID(details->pid, details->processor, details->userarg);
-                    }
-                    break;
-                case PLUGIN_FEATURE_TYPE_PESPROCESSOR:
-                    {
-//                        PluginPESProcessorDetails_t *details = pluginInterface->features[i].details;
-                        LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled PES processor.\n", pluginInterface->name);
-//                        PESProcessorStopPID(details->pid, details->processor, details->userarg);
-                    }
-                    break;
 #if defined(ENABLE_ATSC)
                 case PLUGIN_FEATURE_TYPE_MGTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled MGT processor.\n", pluginInterface->name);
-//                    PSIPProcessorUnRegisterMGTCallback(pluginInterface->features[i].details);
+                    EventsUnregisterListenerByName("atsc.mgt", TableEventCallback, (void*)feature->details.mgtCB);
                     break;
                 case PLUGIN_FEATURE_TYPE_STTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled STT processor.\n", pluginInterface->name);
-//                    PSIPProcessorUnRegisterSTTCallback(pluginInterface->features[i].details);
+                    EventsUnregisterListenerByName("atsc.stt", TableEventCallback, (void*)feature->details.sttCB);
                     break;
                 case PLUGIN_FEATURE_TYPE_VCTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled VCT processor.\n", pluginInterface->name);
-//                    PSIPProcessorUnRegisterVCTCallback(pluginInterface->features[i].details);
+                    EventsUnregisterListenerByName("atsc.vct", TableEventCallback, (void*)feature->details.vctCB);
                     break;
 #endif
                 case PLUGIN_FEATURE_TYPE_INSTALL:
-                    {
-                        PluginInstallCallback_t callback = pluginInterface->features[i].details;
-                        callback(FALSE);
-                    }
+                    feature->details.installCB(FALSE);
                     break;
             }
         }
@@ -522,3 +483,11 @@ static char *FindPluginFeatureName(int type)
     }
     return NULL;
 }
+
+static void TableEventCallback(void *arg, Event_t event, void *details)
+{
+    void (*callback)(void*);
+    callback = arg;
+    callback(details);
+}
+

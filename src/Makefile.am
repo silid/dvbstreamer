@@ -8,43 +8,37 @@ AM_CFLAGS =\
 
 bin_PROGRAMS = dvbstreamer dvbctrl setupdvbstreamer $(fstreamer_app)
 
-#
-# DVBStreamer
-#
-dvbstreamer_SOURCES = \
+common_src = \
     main.c\
     tuning.c \
-    dvbadapter.c\
-    objects.c \
+    ts.c\
     multiplexes.c\
     services.c\
     pids.c\
-    ts.c\
+    dbase.c\
     standard/mpeg2/mpeg2.c\
     standard/mpeg2/patprocessor.c\
     standard/mpeg2/pmtprocessor.c\
     servicefilter.c\
-    dbase.c\
     cache.c\
-    logging.c\
     commands.c\
     commands/cmd_servicefilter.c\
     commands/cmd_info.c\
     commands/cmd_scanning.c\
     commands/cmd_epg.c\
     remoteintf.c\
-    list.c\
     deliverymethod.c\
     pluginmgr.c \
     epgtypes.c \
     epgchannel.c \
     utf8.c \
     events.c \
+    objects.c \
+    list.c\
+    logging.c\
     properties.c \
     threading/messageq.c \
-    threading/deferredproc.c \
-    $(atsc_src) \
-    $(dvb_src)
+    threading/deferredproc.c
 
 if ENABLE_ATSC
 atsc_src =\
@@ -66,10 +60,21 @@ else
 dvb_src =
 endif
 
+#
+# DVBStreamer
+#
+dvbstreamer_SOURCES = \
+    dvbadapter.c\
+    $(common_src) \
+    $(atsc_src) \
+    $(dvb_src)
+
+
 dvbstreamer_LDFLAGS = -rdynamic -Wl,-whole-archive -Wl,dvbpsi/libdvbpsi.a -Wl,-no-whole-archive
 
 dvbstreamer_LDADD = \
 	  -lpthread -lsqlite3 -lreadline @GETTIME_LIB@ @ICONV_LIB@ @READLINE_TERMCAP@ @LIBLTDL@
+
 
 if ENABLE_FSTREAMER
 fstreamer_app = fdvbstreamer
@@ -77,38 +82,8 @@ fstreamer_app = fdvbstreamer
 # File DVBStreamer
 #
 fdvbstreamer_SOURCES = \
-    main.c\
-    tuning.c \
     fileadapter.c\
-    objects.c \
-    multiplexes.c\
-    services.c\
-    pids.c\
-    ts.c\
-    standard/mpeg2/mpeg2.c\
-    standard/mpeg2/patprocessor.c\
-    standard/mpeg2/pmtprocessor.c\
-    servicefilter.c\
-    dbase.c\
-    cache.c\
-    logging.c\
-    commands.c\
-    commands/cmd_servicefilter.c\
-    commands/cmd_info.c\
-    commands/cmd_scanning.c\
-    commands/cmd_epg.c\
-    remoteintf.c\
-    list.c\
-    deliverymethod.c\
-    pluginmgr.c \
-    sectionprocessor.c \
-    epgtypes.c \
-    epgchannel.c \
-    utf8.c \
-    events.c \
-    properties.c \
-    threading/messageq.c \
-    threading/deferredproc.c \
+    $(common_src) \
     $(atsc_src) \
     $(dvb_src)
 

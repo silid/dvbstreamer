@@ -56,6 +56,9 @@ Plugin Interface structures and macros.
 #include "types.h"
 #include "ts.h"
 #include "commands.h"
+#include "events.h"
+#include "deliverymethod.h"
+
 /**
  * @defgroup Plugin Plugin Interface
  * @{
@@ -66,9 +69,9 @@ Plugin Interface structures and macros.
  */
 #define PLUGIN_FEATURE_TYPE_NONE             0x00
 /**
- * Constant for a Filter plugin feature.
+ * Constant for Event Listener callback.
  */
-#define PLUGIN_FEATURE_TYPE_FILTER           0x01
+#define PLUGIN_FEATURE_TYPE_EVENT_LISTENER   0x01
 /**
  * Constant for a PAT processor plugin feature.
  */
@@ -82,53 +85,132 @@ Plugin Interface structures and macros.
  */
 #define PLUGIN_FEATURE_TYPE_DELIVERYMETHOD   0x04
 /**
- * Constant for a Primary Channel Changed feature.
- */
-#define PLUGIN_FEATURE_TYPE_CHANNELCHANGED   0x05
-/**
  * Constant for a SDT processor plugin feature.
  */
-#define PLUGIN_FEATURE_TYPE_SDTPROCESSOR     0x06
+#define PLUGIN_FEATURE_TYPE_SDTPROCESSOR     0x05
 /**
  * Constant for a NIT processor plugin feature.
  */
-#define PLUGIN_FEATURE_TYPE_NITPROCESSOR     0x07
+#define PLUGIN_FEATURE_TYPE_NITPROCESSOR     0x06
 /**
  * Constant for a TDT/TOT processor plugin feature.
  */
-#define PLUGIN_FEATURE_TYPE_TDTPROCESSOR     0x08
-/**
- * Constant for a generic section processor plugin feature.
- */
-#define PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR 0x09
-/**
- * Constant for a generic PES section processor plugin feature.
- */
-#define PLUGIN_FEATURE_TYPE_PESPROCESSOR     0x0A
+#define PLUGIN_FEATURE_TYPE_TDTPROCESSOR     0x07
 /**
  * Constant for a MGT processor plugin feature.
  */
-#define PLUGIN_FEATURE_TYPE_MGTPROCESSOR     0x0B
+#define PLUGIN_FEATURE_TYPE_MGTPROCESSOR     0x08
 /**
  * Constant for a STT processor plugin feature.
  */
-#define PLUGIN_FEATURE_TYPE_STTPROCESSOR     0x0C
+#define PLUGIN_FEATURE_TYPE_STTPROCESSOR     0x09
 /**
  * Constant for a VCT processor plugin feature.
  */
-#define PLUGIN_FEATURE_TYPE_VCTPROCESSOR     0x0D
+#define PLUGIN_FEATURE_TYPE_VCTPROCESSOR     0x0A
 /**
  * Constant for the plugin installed feature.
  */
 #define PLUGIN_FEATURE_TYPE_INSTALL          0xFF
+
+typedef struct PluginEventListenerDetails_s
+{
+    char *name;
+    EventListener_t callback;
+    void *arg;
+}PluginEventListenerDetails_t;
+
+/**
+ * Function pointer to function to call when a new PAT arrives.
+ * For use with the PLUGIN_FEATURE_TYPE_PATPROCESSOR feature type, only 1 per
+ * plugin is expected (allowed).
+ */
+typedef void (*PluginPATProcessor_t)(dvbpsi_pat_t* newpat);
+
+/**
+ * Function pointer to function to call when a new PMT arrives.
+ * For use with the PLUGIN_FEATURE_TYPE_PMTPROCESSOR feature type, only 1 per
+ * plugin is expected (allowed).
+ */
+typedef void (*PluginPMTProcessor_t)(dvbpsi_pmt_t* newpmt);
+
+/**
+ * Function pointer to function to call when a new SDT arrives.
+ * For use with the PLUGIN_FEATURE_TYPE_SDTPROCESSOR feature type, only 1 per
+ * plugin is expected (allowed).
+ */
+typedef void (*PluginSDTProcessor_t)(dvbpsi_sdt_t* newsdt);
+
+/**
+ * Function pointer to function to call when a new NIT arrives.
+ * For use with the PLUGIN_FEATURE_TYPE_NITPROCESSOR feature type, only 1 per
+ * plugin is expected (allowed).
+ */
+typedef void (*PluginNITProcessor_t)(dvbpsi_nit_t* newnit);
+
+/**
+ * Function pointer to function to call when a new TDT/TOT arrives.
+ * For use with the PLUGIN_FEATURE_TYPE_TDTPROCESSOR feature type, only 1 per
+ * plugin is expected (allowed).
+ */
+typedef void (*PluginTDTProcessor_t)(dvbpsi_tdt_tot_t* newtdttot);
+
+/**
+ * Function pointer to function to call when a new MGT arrives.
+ * For use with the PLUGIN_FEATURE_TYPE_MGTPROCESSOR feature type, only 1 per
+ * plugin is expected (allowed).
+ */
+typedef void (*PluginMGTProcessor_t)(dvbpsi_atsc_mgt_t* newmgt);
+
+/**
+ * Function pointer to function to call when a new STT arrives.
+ * For use with the PLUGIN_FEATURE_TYPE_STTPROCESSOR feature type, only 1 per
+ * plugin is expected (allowed).
+ */
+typedef void (*PluginSTTProcessor_t)(dvbpsi_atsc_stt_t* newstt);
+
+/**
+ * Function pointer to function to call when a new VCT arrives.
+ * For use with the PLUGIN_FEATURE_TYPE_VCTPROCESSOR feature type, only 1 per
+ * plugin is expected (allowed).
+ */
+typedef void (*PluginVCTProcessor_t)(dvbpsi_atsc_vct_t* newvct);
+
+/**
+ * Function pointer to function to call after the primary service
+ * filter is updated. The newMultiplex argument will contain the multiplex currently
+ * being used and the newService will contain the service now being filtered.
+ * For use with the PLUGIN_FEATURE_TYPE_CHANNELCHANGED feature type, only 1 per
+ * plugin is expected (allowed).
+ */
+typedef void (*PluginChannelChanged_t)(Multiplex_t *newMultiplex, Service_t *newService);
+
+/**
+ * Function pointer to a function to call when the plugin is (un)installed.
+ * installed is TRUE when the plugin is installed and FALSE when being uninstalled.
+ */
+typedef void (*PluginInstallCallback_t)(bool installed);
 
 /**
  * Structure used to describe a single 'feature' of a plugin.
  */
 typedef struct PluginFeature_t
 {
-	int type;       /**< Type of this feature. Use PLUGIN_FEATURE_TYPE_NONE to end a list.*/
-	void *details;  /**< Pointer to a structure containing specific details for the feature. */
+    int type;       /**< Type of this feature. Use PLUGIN_FEATURE_TYPE_NONE to end a list.*/
+    union{
+        PluginEventListenerDetails_t eventDetails;
+        DeliveryMethodHandler_t dmHandler;
+        PluginPMTProcessor_t    patCB;
+        PluginPMTProcessor_t    pmtCB;
+        PluginSDTProcessor_t    sdtCB;
+        PluginNITProcessor_t    nitCB;
+        PluginTDTProcessor_t    tdtCB;
+        PluginMGTProcessor_t    mgtCB;
+        PluginSTTProcessor_t    sttCB;
+        PluginVCTProcessor_t    vctCB;
+        PluginChannelChanged_t  channelChangeCB;
+        PluginInstallCallback_t installCB;
+    }details;
 }PluginFeature_t;
 
 /**
@@ -230,193 +312,88 @@ typedef struct Plugin_t
 #define PLUGIN_FEATURES(_features...) \
     static PluginFeature_t PluginFeatures[] = {\
         _features,\
-        {PLUGIN_FEATURE_TYPE_NONE, NULL}\
+        {PLUGIN_FEATURE_TYPE_NONE, .details.installCB=NULL}\
     }
 
 /**
- * Simple macro to define a Plugin Filter feature
- * @param _filter A PluginFilter_t instance (will be dereferenced).
+ * Simple macro to define an event listener feature.
+ * @param _details A PluginEventListenerDetails_t containing the event name and 
+ *                 the callback to call when the event occurs.
  */
-#define PLUGIN_FEATURE_FILTER(_filter)          {PLUGIN_FEATURE_TYPE_FILTER, (void*)&_filter}
+#define PLUGIN_FEATURE_EVENT_LISTENER(_event, _listener, _arg)\
+    {.type=PLUGIN_FEATURE_TYPE_EVENT_LISTENER, .details.eventDetails={_event, _listener, _arg}}
 /**
  * Simple macro to define a PAT Processor feature.
  * @param _processor Function to call when a new PAT arrives.
  */
-#define PLUGIN_FEATURE_PATPROCESSOR(_processor) {PLUGIN_FEATURE_TYPE_PATPROCESSOR, (void*)_processor}
+#define PLUGIN_FEATURE_PATPROCESSOR(_processor)\
+    {.type=PLUGIN_FEATURE_TYPE_PATPROCESSOR, .details.patCB=_processor}
 /**
  * Simple macro to define a PMT Processor feature.
  * @param _processor Function to call when a new PMT arrives.
  */
-#define PLUGIN_FEATURE_PMTPROCESSOR(_processor) {PLUGIN_FEATURE_TYPE_PMTPROCESSOR, (void*)_processor}
+#define PLUGIN_FEATURE_PMTPROCESSOR(_processor)\
+    {.type=PLUGIN_FEATURE_TYPE_PMTPROCESSOR, .details.pmtCB=_processor}
 /**
  * Simple macro to define a delivery method feature.
  * @param _method A DeliveryMethod_t instance (will be dereferenced).
  */
-#define PLUGIN_FEATURE_DELIVERYMETHOD(_method)  {PLUGIN_FEATURE_TYPE_DELIVERYMETHOD, (void*)&_method}
+#define PLUGIN_FEATURE_DELIVERYMETHOD(_canHandle, _newInstance)\
+    {.type=PLUGIN_FEATURE_TYPE_DELIVERYMETHOD, .details.dmHandler={_canHandle,_newInstance}}
 
 /**
  * Simple macro to define a Channel Changed feature.
  * @param _cchanged Function to call when the Primary service filter is updated.
  */
-#define PLUGIN_FEATURE_CHANNELCHANGED(_cchanged) {PLUGIN_FEATURE_TYPE_CHANNELCHANGED, (void*)_cchanged}
+#define PLUGIN_FEATURE_CHANNELCHANGED(_cchanged)\
+    {.type=PLUGIN_FEATURE_TYPE_CHANNELCHANGED, .details.channelChangeCB =_cchanged}
 
 /**
  * Simple macro to define a SDT Processor feature.
  * @param _processor Function to call when a new SDT arrives.
  */
-#define PLUGIN_FEATURE_SDTPROCESSOR(_processor) {PLUGIN_FEATURE_TYPE_SDTPROCESSOR, (void*)_processor}
+#define PLUGIN_FEATURE_SDTPROCESSOR(_processor)\
+    {.type=PLUGIN_FEATURE_TYPE_SDTPROCESSOR, .details.sdtCB=_processor}
 /**
  * Simple macro to define a NIT Processor feature.
  * @param _processor Function to call when a new NIT arrives.
  */
-#define PLUGIN_FEATURE_NITPROCESSOR(_processor) {PLUGIN_FEATURE_TYPE_NITPROCESSOR, (void*)_processor}
+#define PLUGIN_FEATURE_NITPROCESSOR(_processor)\
+    {.type=PLUGIN_FEATURE_TYPE_NITPROCESSOR, .details.nitCB=_processor}
 /**
  * Simple macro to define a TDT/TOT Processor feature.
  * @param _processor Function to call when a new TDT or TOT arrives.
  */
-#define PLUGIN_FEATURE_TDTPROCESSOR(_processor) {PLUGIN_FEATURE_TYPE_TDTPROCESSOR, (void*)_processor}
-/**
- * Simple macro to define a generic Section Processor feature.
- * @param _details A PluginSectionProcessorDetails_t containing the pid to
- *                 process and the callback to call when a new section arrives.
- */
-#define PLUGIN_FEATURE_SECTIONPROCESSOR(_details) {PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR, (void*)_details}
-
-/**
- * Simple macro to define a generic PES Processor feature.
- * @param _details A PluginPESProcessorDetails_t containing the pid to
- *                 process and the callback to call when a new PES section arrives.
- */
-#define PLUGIN_FEATURE_PESPROCESSOR(_details) {PLUGIN_FEATURE_TYPE_PESPROCESSOR, (void*)_details}
+#define PLUGIN_FEATURE_TDTPROCESSOR(_processor)\
+    {.type=PLUGIN_FEATURE_TYPE_TDTPROCESSOR, .details.tdtCB=_processor}
 /**
  * Simple macro to define a MGT Processor feature.
  * @param _processor Function to call when a new MGT arrives.
  */
-#define PLUGIN_FEATURE_MGTPROCESSOR(_processor) {PLUGIN_FEATURE_TYPE_MGTPROCESSOR, (void*)_processor}
+#define PLUGIN_FEATURE_MGTPROCESSOR(_processor)\
+    {.type=PLUGIN_FEATURE_TYPE_MGTPROCESSOR, .details.mgtCB=_processor}
 
 /**
  * Simple macro to define a STT Processor feature.
  * @param _processor Function to call when a new STT arrives.
  */
-#define PLUGIN_FEATURE_STTPROCESSOR(_processor) {PLUGIN_FEATURE_TYPE_STTPROCESSOR, (void*)_processor}
+#define PLUGIN_FEATURE_STTPROCESSOR(_processor)\
+    {.type=PLUGIN_FEATURE_TYPE_STTPROCESSOR, .details.sttCB=_processor}
 
 /**
  * Simple macro to define a VCT Processor feature.
  * @param _processor Function to call when a new VCT arrives.
  */
-#define PLUGIN_FEATURE_VCTPROCESSOR(_processor) {PLUGIN_FEATURE_TYPE_VCTPROCESSOR, (void*)_processor}
+#define PLUGIN_FEATURE_VCTPROCESSOR(_processor)\
+    {.type=PLUGIN_FEATURE_TYPE_VCTPROCESSOR, .details.vctCB=_processor}
 
 /**
  * Simple macro to define an install callback.
  * @param _callback A PluginInstallCallback_t to call when the plugin is (un)installed.
  */
-#define PLUGIN_FEATURE_INSTALL(_callback) {PLUGIN_FEATURE_TYPE_INSTALL, (void*)_callback}
+#define PLUGIN_FEATURE_INSTALL(_callback)\
+    {.type=PLUGIN_FEATURE_TYPE_INSTALL, .details.installCB=_callback}
 
-
-/**
- * Function pointer to function to call when a new PAT arrives.
- * For use with the PLUGIN_FEATURE_TYPE_PATPROCESSOR feature type, only 1 per
- * plugin is expected (allowed).
- */
-typedef void (*PluginPATProcessor_t)(dvbpsi_pat_t* newpat);
-
-/**
- * Function pointer to function to call when a new PMT arrives.
- * For use with the PLUGIN_FEATURE_TYPE_PMTPROCESSOR feature type, only 1 per
- * plugin is expected (allowed).
- */
-typedef void (*PluginPMTProcessor_t)(dvbpsi_pmt_t* newpmt);
-
-/**
- * Function pointer to function to call when a new SDT arrives.
- * For use with the PLUGIN_FEATURE_TYPE_SDTPROCESSOR feature type, only 1 per
- * plugin is expected (allowed).
- */
-typedef void (*PluginSDTProcessor_t)(dvbpsi_sdt_t* newsdt);
-
-/**
- * Function pointer to function to call when a new NIT arrives.
- * For use with the PLUGIN_FEATURE_TYPE_NITPROCESSOR feature type, only 1 per
- * plugin is expected (allowed).
- */
-typedef void (*PluginNITProcessor_t)(dvbpsi_nit_t* newnit);
-
-/**
- * Function pointer to function to call when a new TDT/TOT arrives.
- * For use with the PLUGIN_FEATURE_TYPE_TDTPROCESSOR feature type, only 1 per
- * plugin is expected (allowed).
- */
-typedef void (*PluginTDTProcessor_t)(dvbpsi_tdt_tot_t* newtdttot);
-
-/**
- * Function pointer to function to call when a new MGT arrives.
- * For use with the PLUGIN_FEATURE_TYPE_MGTPROCESSOR feature type, only 1 per
- * plugin is expected (allowed).
- */
-typedef void (*PluginMGTProcessor_t)(dvbpsi_atsc_mgt_t* newmgt);
-
-/**
- * Function pointer to function to call when a new STT arrives.
- * For use with the PLUGIN_FEATURE_TYPE_STTPROCESSOR feature type, only 1 per
- * plugin is expected (allowed).
- */
-typedef void (*PluginSTTProcessor_t)(dvbpsi_atsc_stt_t* newstt);
-
-/**
- * Function pointer to function to call when a new VCT arrives.
- * For use with the PLUGIN_FEATURE_TYPE_VCTPROCESSOR feature type, only 1 per
- * plugin is expected (allowed).
- */
-typedef void (*PluginVCTProcessor_t)(dvbpsi_atsc_vct_t* newvct);
-
-/**
- * Function pointer to function to call when a new section arrives on the specified PID.
- * For use with the PLUGIN_FEATURE_TYPE_SECTIONPROCESSOR feature type.
- */
-typedef void (*PluginSectionProcessor_t)(void *userarg, dvbpsi_psi_section_t* newsection);
-
-/**
- * Structure used to describe the pid to process and the function to call when
- * a new section arrives.
- */
-typedef struct PluginSectionProcessorDetails_t
-{
-    uint16_t pid;                       /**< PID to process. */
-    PluginSectionProcessor_t processor; /**< Function to call when a new section is received. */
-    void *userarg;                      /**< User Argument to pass to the callback function */ 
-}PluginSectionProcessorDetails_t;
-
-/**
- * Function pointer to function to call when a new section arrives on the specified PID.
- * For use with the PLUGIN_FEATURE_TYPE_PESPROCESSOR feature type.
- */
-typedef void (*PluginPESProcessor_t)(void *userarg, uint8_t *packet, uint16_t length);
-
-/**
- * Structure used to describe the pid to process and the function to call when
- * a new PES section arrives.
- */
-typedef struct PluginPESProcessorDetails_t
-{
-    uint16_t pid;                   /**< PID to process. */
-    PluginPESProcessor_t processor; /**< Function to call when a new section is received. */
-    void *userarg;                  /**< User Argument to pass to the callback function */ 
-}PluginPESProcessorDetails_t;
-
-/**
- * Function pointer to function to call after the primary service
- * filter is updated. The newMultiplex argument will contain the multiplex currently
- * being used and the newService will contain the service now being filtered.
- * For use with the PLUGIN_FEATURE_TYPE_CHANNELCHANGED feature type, only 1 per
- * plugin is expected (allowed).
- */
-typedef void (*PluginChannelChanged_t)(Multiplex_t *newMultiplex, Service_t *newService);
-
-/**
- * Function pointer to a function to call when the plugin is (un)installed.
- * installed is TRUE when the plugin is installed and FALSE when being uninstalled.
- */
-typedef void (*PluginInstallCallback_t)(bool installed);
 
 /** @} */
 #endif

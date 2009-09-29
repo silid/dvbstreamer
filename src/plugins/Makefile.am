@@ -8,10 +8,8 @@ pluginsdir = @DVBSTREAMER_PLUGINDIR@
 
 plugins_LTLIBRARIES = \
 	udpoutput.la \
-	nulloutput.la \
 	fileoutput.la \
 	outputs.la \
-	extractpes.la \
 	manualfilters.la \
 	sicapture.la \
 	traffic.la \
@@ -32,7 +30,7 @@ dvb_plugins=\
 	lcnquery.la \
 	nownext.la \
 	datetime.la \
-	schedule.la
+	dvbtoepg.la
 else
 dvb_plugins=
 endif
@@ -64,11 +62,6 @@ lcnquery_la_SOURCES = \
 
 lcnquery_la_LDFLAGS = -module -no-undefined -avoid-version
 
-extractpes_la_SOURCES = \
-    extractpes.c
-
-extractpes_la_LDFLAGS = -module -no-undefined -avoid-version
-
 nownext_la_SOURCES = \
     nownext.c
 
@@ -79,10 +72,10 @@ datetime_la_SOURCES = \
 
 datetime_la_LDFLAGS = -module -no-undefined -avoid-version
 
-schedule_la_SOURCES = \
-    schedule.c
+dvbtoepg_la_SOURCES = \
+    dvbtoepg.c
 
-schedule_la_LDFLAGS = -module -no-undefined -avoid-version
+dvbtoepg_la_LDFLAGS = -module -no-undefined -avoid-version
 
 atsctoepg_la_SOURCES = \
     atsctoepg.c
