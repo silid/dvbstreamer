@@ -109,6 +109,42 @@ int EventsDeInit(void)
     return 0;
 }
 
+void EventsRegisterListenerByName(const char *event, EventListener_t listener, void *arg)
+{
+    if (event[0] == 0)
+    {
+        EventsRegisterListener(listener, arg);
+    }
+    else if (strchr(event, '.') == NULL)
+    {
+        EventSource_t src = EventsFindSource(event);
+        EventsRegisterSourceListener(src, listener, arg);
+    }
+    else
+    {
+        Event_t evt = EventsFindEvent(event);
+        EventsRegisterEventListener(evt, listener, arg);
+    }
+}
+
+void EventsUnregisterListenerByName(const char *event, EventListener_t listener, void *arg)
+{
+    if (event[0] == 0)
+    {
+        EventsUnregisterListener(listener, arg);
+    }
+    else if (strchr(event, '.') == NULL)
+    {
+        EventSource_t src = EventsFindSource(event);
+        EventsUnregisterSourceListener(src, listener, arg);
+    }
+    else
+    {
+        Event_t evt = EventsFindEvent(event);
+        EventsUnregisterEventListener(evt, listener, arg);
+    }
+}
+
 void EventsRegisterListener(EventListener_t listener, void *arg)
 {
     pthread_mutex_lock(&eventsMutex);
@@ -149,7 +185,7 @@ void EventsUnregisterSource(EventSource_t source)
     pthread_mutex_unlock(&eventsMutex);
 }
 
-EventSource_t EventsFindSource(char *name)
+EventSource_t EventsFindSource(const char *name)
 {
     ListIterator_t iterator;
     EventSource_t result = NULL;
@@ -209,7 +245,7 @@ void EventsUnregisterEvent(Event_t event)
    pthread_mutex_unlock(&eventsMutex);
 }
 
-Event_t EventsFindEvent(char *name)
+Event_t EventsFindEvent(const char *name)
 {
     char *sourceName;
     int sourceNameLen;

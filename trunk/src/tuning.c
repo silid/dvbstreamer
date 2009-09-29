@@ -34,7 +34,6 @@ Control tuning of the dvb adapter.
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
-static void ChannelChangedDoCallbacks(Multiplex_t *multiplex, Service_t *service);
 static void TuneMultiplex(Multiplex_t *multiplex);
 static char *MultiplexChangedEventToString(Event_t event,void * payload);
 static char *ServiceChangedEventToString(Event_t event,void * payload);
@@ -43,7 +42,6 @@ static char *ServiceChangedEventToString(Event_t event,void * payload);
 *******************************************************************************/
 static Multiplex_t *CurrentMultiplex = NULL;
 static Service_t *CurrentService = NULL;
-static List_t *ChannelChangedCallbacksList = NULL;
 
 static EventSource_t tuningSource;
 static Event_t serviceChangedEvent;
@@ -57,7 +55,6 @@ static const char TUNING[] = "tuning";
 
 int TuningInit(void)
 {
-    ChannelChangedCallbacksList = ListCreate();
     tuningSource = EventsRegisterSource("Tuning");
     serviceChangedEvent = EventsRegisterEvent(tuningSource, "ServiceChanged", ServiceChangedEventToString);
     mulitplexChangedEvent = EventsRegisterEvent(tuningSource, "MultiplexChanged", MultiplexChangedEventToString);
@@ -66,7 +63,6 @@ int TuningInit(void)
 
 int TuningDeInit(void)
 {
-    ListFree(ChannelChangedCallbacksList,NULL);
     MultiplexRefDec(CurrentMultiplex);
     ServiceRefDec(CurrentService);
     EventsUnregisterSource(tuningSource);
@@ -77,23 +73,6 @@ int TuningDeInit(void)
 /*******************************************************************************
 * Channel Change functions                                                     *
 *******************************************************************************/
-void TuningChannelChangedRegisterCallback(PluginChannelChanged_t callback)
-{
-
-    if (ChannelChangedCallbacksList)
-    {
-        ListAdd(ChannelChangedCallbacksList, callback);
-    }
-}
-
-void TuningChannelChangedUnRegisterCallback(PluginChannelChanged_t callback)
-{
-    if (ChannelChangedCallbacksList)
-    {
-        ListRemove(ChannelChangedCallbacksList, callback);
-    }
-}
-
 Service_t *TuningCurrentServiceGet(void)
 {
     ServiceRefInc(CurrentService);
@@ -149,7 +128,6 @@ void TuningCurrentServiceSet(Service_t *service)
          * Inform any interested parties that we have now changed the current
          * service.
          */
-        ChannelChangedDoCallbacks((Multiplex_t *)CurrentMultiplex, (Service_t *)CurrentService);
         EventsFireEventListeners(serviceChangedEvent, CurrentService);
         LogModule(LOG_DEBUGV, TUNING, "Enabling filters\n");
         TSReaderEnable(reader, TRUE);
@@ -186,7 +164,6 @@ void TuningCurrentMultiplexSet(Multiplex_t *multiplex)
      * Inform any interested parties that we have now changed the current
      * service.
      */
-    ChannelChangedDoCallbacks((Multiplex_t *)CurrentMultiplex, NULL);
     EventsFireEventListeners(serviceChangedEvent, NULL);
 
     LogModule(LOG_DEBUGV, TUNING, "Enabling filters\n");
@@ -196,18 +173,6 @@ void TuningCurrentMultiplexSet(Multiplex_t *multiplex)
 /*******************************************************************************
 * Local Functions                                                              *
 *******************************************************************************/
-
-static void ChannelChangedDoCallbacks(Multiplex_t *multiplex, Service_t *service)
-{
-    ListIterator_t iterator;
-    for (ListIterator_Init(iterator, ChannelChangedCallbacksList);
-        ListIterator_MoreEntries(iterator);ListIterator_Next(iterator))
-    {
-        PluginChannelChanged_t callback = ListIterator_Current(iterator);
-        callback(multiplex, service);
-    }
-}
-
 static void TuneMultiplex(Multiplex_t *multiplex)
 {
     struct dvb_frontend_parameters feparams;

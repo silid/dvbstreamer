@@ -88,12 +88,6 @@ static int OutputPropertyMRLSet(void * userArg, PropertyValue_t * value);
 #define PREFIX_LEN (sizeof(OutputPrefix) - 1)
 const char OutputPrefix[] = "out://";
 
-/** Plugin Interface **/
-DeliveryMethodHandler_t OutputsHandler = {
-            OutputsCanHandle,
-            OutputsCreate
-        };
-
 DeliveryMethodInstanceOps_t OutputInstanceOps = {
     OutputsSendPacket,
     OutputsSendBlock,
@@ -113,7 +107,7 @@ static char *propertiesParent = "outputs";
 
 PLUGIN_FEATURES(
     PLUGIN_FEATURE_INSTALL(OutputsInstall),
-    PLUGIN_FEATURE_DELIVERYMETHOD(OutputsHandler)
+    PLUGIN_FEATURE_DELIVERYMETHOD(OutputsCanHandle, OutputsCreate)
 );
 
 PLUGIN_COMMANDS(
@@ -222,7 +216,7 @@ static void OutputsSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet
 {
     OutputsState_t *state = (OutputsState_t *)this;
     pthread_mutex_lock(&outputsMutex);
-    state->output->dmInstance->ops->SendPacket(state->output->dmInstance, packet);
+    DeliveryMethodOutputPacket(state->output->dmInstance, packet);
     pthread_mutex_unlock(&outputsMutex);
 }
 
@@ -230,7 +224,7 @@ static void OutputsSendBlock(DeliveryMethodInstance_t *this, void *block, unsign
 {
     OutputsState_t *state = (OutputsState_t *)this;
     pthread_mutex_lock(&outputsMutex);
-    state->output->dmInstance->ops->SendBlock(state->output->dmInstance, block, blockLen);
+    DeliveryMethodOutputBlock(state->output->dmInstance, block, blockLen);
     pthread_mutex_unlock(&outputsMutex);
 }
 

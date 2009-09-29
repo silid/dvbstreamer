@@ -93,6 +93,25 @@ int EventsInit(void);
 int EventsDeInit(void);
 
 /**
+ * Register a listener callback using the name.
+ * The name can be "" for a global listener or
+ * "<source name>" to register a source listener or
+ * "<source name>.<event name>" to register a listener for a specific event.
+ * @param name The name of the event to register with.
+ * @param listener The callback function to register.
+ * @param arg The user defined argument to pass to the callback when an event is fired.
+ */ 
+void EventsRegisterListenerByName(const char *event, EventListener_t listener, void *arg);
+
+/**
+ * Unregister a listener callback using the name.
+ * @param name The name of the event to unregister with.
+ * @param listener The callback function to unregister.
+ * @param arg The user defined argument to pass to the callback when an event is fired.
+ */
+void EventsUnregisterListenerByName(const char *event, EventListener_t listener, void *arg);
+
+/**
  * Register a listener to receive ALL events.
  * @param listener The callback function to register.
  * @param arg The user defined argument to pass to the callback when an event is fired.
@@ -125,7 +144,7 @@ void EventsUnregisterSource(EventSource_t source);
  * @param name The name of the event source to find.
  * @return An EventSource_t or NULL if no source matched the supplied name.
  */
-EventSource_t EventsFindSource(char *name);
+EventSource_t EventsFindSource(const char *name);
 
 /**
  * Register a listener for a specific source.
@@ -165,7 +184,7 @@ void EventsUnregisterEvent(Event_t event);
  * @param name The fully qualified name of the event to find.
  * @return An Event_t object or NULL if the event could not be found.
  */
-Event_t EventsFindEvent(char *name);
+Event_t EventsFindEvent(const char *name);
 
 /**
  * Calls all listeners that have register to receive events in the following order

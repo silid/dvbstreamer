@@ -45,7 +45,6 @@ Entry point to the application.
 #include "dvbadapter.h"
 #include "ts.h"
 #include "main.h"
-#include "pesprocessor.h"
 #include "servicefilter.h"
 #include "cache.h"
 #include "logging.h"
@@ -449,7 +448,6 @@ int main(int argc, char *argv[])
     TSReaderEnable(TSReader, FALSE);
 
     ServiceFilterDestroyAll(TSReader);
-//    PESProcessorDestroyAllProcessors();
 
     /* Stop the deferred processing as when we unload the plugins we may be
      * unloading code that is required by any jobs left on the queue

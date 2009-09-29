@@ -68,17 +68,6 @@ int TuningInit(void);
 int TuningDeInit(void);
 
 /**
- * Register a Channel Changed callback.
- * @param callback The callback function to register.
- */
-void TuningChannelChangedRegisterCallback(PluginChannelChanged_t callback);
-/**
- * Unregister a Channel Changed callback.
- * @param callback The callback function to unregister.
- */
-void TuningChannelChangedUnRegisterCallback(PluginChannelChanged_t callback);
-
-/**
  * Retrieve the current (primary) service.
  * @return The current service or NULL if no service is selected. Service should
  * be released with a call to ServiceRefDec when no longer needed.

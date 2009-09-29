@@ -192,6 +192,8 @@ typedef struct TSSectionFilter_t
     uint16_t pid;
     int priority;
     dvbpsi_handle sectionHandle;
+    struct TSFilterGroup_t *group;
+    
     struct TSSectionFilter_t *next;
 }TSSectionFilter_t;
 
@@ -226,6 +228,8 @@ typedef struct TSFilterGroup_t
 
 }TSFilterGroup_t;
 
+#define TSREADER_PID_ALL 8192
+
 #define TSREADER_PIDFILTER_BUCKETS 8
 
 /**
@@ -247,12 +251,36 @@ typedef struct TSReader_t
     volatile unsigned long long totalPackets; /**< Total number of packets processed by this instance. */
     volatile unsigned long bitrate;     /**< Approximate bit rate of the transport stream being processed. */
 
+    bool promiscuousMode;               /**< Whether no filtering is applied at the adapter level all packets are available to PID filters. */
     List_t *groups;                     /**< List of TS Filter groups. */
+    TSPacketFilterList_t *promiscuousPidFilters;
     List_t *pidFilterBuckets[TSREADER_PIDFILTER_BUCKETS]; /**< List of active PID filters */
     List_t *sectionFilters;             /**< List of section filters that are awaiting scheduling */
     List_t *activeSectionFilters;       /**< List of active section filters. */
 }
 TSReader_t;
+
+typedef struct TSFilterGroupStats_t
+{
+    char *name;
+    unsigned long long packetsProcessed;
+    unsigned long long sectionsProcessed;
+    struct TSFilterGroupStats_t *next;
+}TSFilterGroupStats_t;
+
+typedef struct TSFilterGroupTypeStats_t
+{
+    char *type;
+    TSFilterGroupStats_t *groups;
+    struct TSFilterGroupTypeStats_t *next;
+}TSFilterGroupTypeStats_t;
+    
+typedef struct TSReaderStats_t
+{
+    unsigned long long totalPackets; /**< Total number of packets processed by this instance. */
+    unsigned long bitrate;           /**< Approximate bit rate of the transport stream being processed. */    
+    TSFilterGroupTypeStats_t *types;
+}TSReaderStats_t;
 
 /**
  * Create a new TSReader_t instance that is processing packets from the specified
@@ -274,6 +302,14 @@ void TSReaderDestroy(TSReader_t * reader);
  * @param enable   TRUE to enable processing packets, FALSE to disable processing.
  */
 void TSReaderEnable(TSReader_t * reader, bool enable);
+
+/**
+ * Extract information about the number of packets/sections processed and the approximate
+ * TS bitrate.
+ * @param reader The instance to extract the stats from.
+ * @return A TSReaderStats_t instance containing available stats (use ObjectRefDec to free the structure).
+ */
+TSReaderStats_t *TSReaderExtractStats(TSReader_t *reader);
 
 /**
  * Zero total packets and bit rate fields as well as all packet statistics fields
