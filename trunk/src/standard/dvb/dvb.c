@@ -37,6 +37,7 @@ Initialise/Deinitialise the DVB Standard.
 * Global variables                                                             *
 *******************************************************************************/
 EventSource_t DVBEventSource;
+char DVBFilterType[] = "DVB";
 static SDTProcessor_t sdtProcessor = NULL;
 static NITProcessor_t nitProcessor = NULL;
 static TDTProcessor_t tdtProcessor = NULL;

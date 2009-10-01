@@ -26,6 +26,7 @@ MPEG2 Broadcast standard.
 #include "ts.h"
 
 extern EventSource_t MPEG2EventSource;
+extern char MPEG2FilterType[];
 
 int MPEG2StandardInit(TSReader_t *reader);
 int MPEG2StandardDeinit(TSReader_t *reader);

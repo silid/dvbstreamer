@@ -73,11 +73,15 @@ static char TDTPROCESSOR[] = "TDTProcessor";
 TDTProcessor_t TDTProcessorCreate(TSReader_t *reader)
 {
     TDTProcessor_t state;
+    if (tdtEvent == NULL)
+    {
+        tdtEvent = EventsRegisterEvent(DVBEventSource, "tdt", NULL);
+    }
     ObjectRegisterClass("TDTProcessor_t", sizeof(struct TDTProcessor_s), NULL);
     state = ObjectCreateType(TDTProcessor_t);
     if (state)
     {
-        state->tsgroup = TSReaderCreateFilterGroup(reader, TDTPROCESSOR, "dvb", TDTProcessorFilterEventCallback, state);
+        state->tsgroup = TSReaderCreateFilterGroup(reader, TDTPROCESSOR, "DVB", TDTProcessorFilterEventCallback, state);
     }
 
     return state;

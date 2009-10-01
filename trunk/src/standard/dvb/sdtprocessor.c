@@ -96,7 +96,7 @@ SDTProcessor_t SDTProcessorCreate(TSReader_t *reader)
     state = ObjectCreateType(SDTProcessor_t);
     if (state)
     {
-        state->tsgroup = TSReaderCreateFilterGroup(reader, SDTPROCESSOR, "dvb", SDTProcessorFilterEventCallback, state);
+        state->tsgroup = TSReaderCreateFilterGroup(reader, SDTPROCESSOR, "DVB", SDTProcessorFilterEventCallback, state);
     }
     return state;
 }

@@ -84,7 +84,6 @@ static const char PSIPPROCESSOR[] = "PSIPProcessor";
 
 static int initCount = 0;
 static iconv_t utf16ToUtf8CD;
-static time_t UnixEpochOffset = 315964800;
 
 static Event_t mgtEvent = NULL;
 static Event_t sttEvent = NULL;
@@ -117,7 +116,7 @@ PSIPProcessor_t PSIPProcessorCreate(TSReader_t *reader)
     result = ObjectCreateType(PSIPProcessor_t);
     if (result)
     {
-        result->tsgroup = TSReaderCreateFilterGroup(reader, PSIPPROCESSOR, "atsc", PSIPProcessorFilterEventCallback, result);
+        result->tsgroup = TSReaderCreateFilterGroup(reader, PSIPPROCESSOR, ATSCFilterType, PSIPProcessorFilterEventCallback, result);
     }
     
     return result;
@@ -220,14 +219,9 @@ static void ProcessMGT(void *arg, dvbpsi_atsc_mgt_t *newMGT)
 
 static void ProcessSTT(void *arg, dvbpsi_atsc_stt_t *newSTT)
 {
-    time_t utcSeconds;
     LogModule(LOG_DEBUGV, PSIPPROCESSOR,"New STT Received! Protocol %d GPS Time =%lu GPS->UTC Offset = %u \n",
             newSTT->i_protocol, newSTT->i_system_time, newSTT->i_gps_utc_offset);
 
-
-    utcSeconds = UnixEpochOffset + newSTT->i_system_time -  newSTT->i_gps_utc_offset;
-
-    LogModule(LOG_DIARRHEA, PSIPPROCESSOR, "STT UTC Time = %s\n", asctime(gmtime(&utcSeconds)));
     EventsFireEventListeners(sttEvent, newSTT);   
     ObjectRefDec(newSTT);
 }

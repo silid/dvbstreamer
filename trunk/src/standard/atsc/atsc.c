@@ -36,6 +36,7 @@ Initialise/Deinitialise the ATSC Standard.
 * Global variables                                                             *
 *******************************************************************************/
 EventSource_t ATSCEventSource = NULL;
+char ATSCFilterType[]="ATSC";
 static PSIPProcessor_t psipProcessor;
 
 /*******************************************************************************

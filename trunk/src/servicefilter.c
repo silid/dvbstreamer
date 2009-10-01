@@ -108,6 +108,8 @@ static int ServiceFilterPropertyAVSOnlySet(void *userArg, PropertyValue_t *value
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
+char ServiceFilterGroupType[] = "Service Filter";
+
 static char SERVICEFILTER[] = "ServiceFilter";
 static List_t *ServiceFilterList;
 
@@ -127,7 +129,7 @@ ServiceFilter_t ServiceFilterCreate(TSReader_t *reader, char* name)
     if (result)
     {
         result->name = strdup(name);
-        result->tsgroup = TSReaderCreateFilterGroup(reader, name, SERVICEFILTER, ServiceFilterFilterEventCallback, result);
+        result->tsgroup = TSReaderCreateFilterGroup(reader, name, ServiceFilterGroupType, ServiceFilterFilterEventCallback, result);
 
         sprintf(result->propertyPath, "filters.service.%s", name);
         PropertiesAddProperty(result->propertyPath, "service", "The service that is currently being filtered", 
@@ -138,6 +140,7 @@ ServiceFilter_t ServiceFilterCreate(TSReader_t *reader, char* name)
 
         cachePIDSUpdatedEvent = EventsFindEvent("cache.pidsupdated");
         EventsRegisterEventListener(cachePIDSUpdatedEvent, ServiceFilterPIDSUpdatedListener, result);
+        ListAdd(ServiceFilterList, result);
     }
     return result;
 }
@@ -192,15 +195,19 @@ ListIterator_t *ServiceFilterGetListIterator(void)
 }
 
 
-ServiceFilter_t ServiceFilterFindFilter(const char *name)
+ServiceFilter_t ServiceFilterFindFilter(TSReader_t *reader, const char *name)
 {
     ListIterator_t iterator;
-    ListIterator_ForEach(iterator,ServiceFilterList)
+    ListIterator_ForEach(iterator,reader->groups)
     {
-        ServiceFilter_t filter = ListIterator_Current(iterator);
-        if (strcmp(filter->name, name) == 0)
+        TSFilterGroup_t *group = ListIterator_Current(iterator);
+        if (strcmp(group->type, ServiceFilterGroupType) == 0)
         {
-            return filter;
+            ServiceFilter_t filter = group->userArg;
+            if (strcmp(filter->name, name) == 0)
+            {
+                return filter;
+            }
         }
     }
     return NULL;
@@ -260,7 +267,7 @@ bool ServiceFilterAVSOnlyGet(ServiceFilter_t filter)
 void ServiceFilterDeliveryMethodSet(ServiceFilter_t filter, DeliveryMethodInstance_t *instance)
 {
     DeliveryMethodInstance_t *prevInstance = filter->dmInstance;
-    DeliveryMethodReserveHeaderSpace(filter->dmInstance, HEADER_PACKETS);
+    DeliveryMethodReserveHeaderSpace(instance, HEADER_PACKETS);
     filter->dmInstance = instance;
     filter->setHeader = TRUE;
 

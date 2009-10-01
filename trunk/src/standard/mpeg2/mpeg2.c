@@ -39,6 +39,7 @@ Initialise/Deinitialise the MPEG2 Standard.
 * Global variables                                                             *
 *******************************************************************************/
 EventSource_t MPEG2EventSource = NULL;
+char MPEG2FilterType[]="MPEG2";
 static PATProcessor_t patProcessor;
 static PMTProcessor_t pmtProcessor;
 

@@ -30,23 +30,28 @@ Example plugin to print out the date/time from the TDT.
 #include "plugin.h"
 #include "dvbpsi/datetime.h"
 #include "dvbpsi/tdttot.h"
+#include "dvbpsi/atsc/stt.h"
 
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
 static void ProcessTDT(dvbpsi_tdt_tot_t *tdt);
+static void ProcessSTT(dvbpsi_atsc_stt_t *stt);
+static long GetMonotonicTime(void);
 static void CommandDateTime(int argc, char **argv);
 
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
-static dvbpsi_tdt_tot_t lastDateTime;
-static time_t lastReceived = 0;
+static time_t lastDateTime;
+static long lastReceived = 0;
+static bool timeReceived = FALSE;
 /*******************************************************************************
 * Plugin Setup                                                                 *
 *******************************************************************************/
 PLUGIN_FEATURES(
-    PLUGIN_FEATURE_TDTPROCESSOR(ProcessTDT)
+    PLUGIN_FEATURE_TDTPROCESSOR(ProcessTDT),
+    PLUGIN_FEATURE_STTPROCESSOR(ProcessSTT)
 );
 
 PLUGIN_COMMANDS(
@@ -60,10 +65,10 @@ PLUGIN_COMMANDS(
 );
 
 PLUGIN_INTERFACE_CF(
-    PLUGIN_FOR_DVB,
+    PLUGIN_FOR_ALL,
     "Date/Time", 
-    "0.1", 
-    "Example plugin that uses the TDT/TOT.", 
+    "1.0", 
+    "Plugin that receives the current date/time from the broadcast stream.", 
     "charrea6@users.sourceforge.net"
 );
 
@@ -72,13 +77,29 @@ PLUGIN_INTERFACE_CF(
 *******************************************************************************/
 static void ProcessTDT(dvbpsi_tdt_tot_t *tdt)
 {
-    lastDateTime = *tdt;
-    /*
-    Simple structure copy won't copy the descriptors and these will be free'd
-    when the call back returns 
-    */
-    lastDateTime.p_first_descriptor = NULL; 
-    lastReceived = time(NULL);
+    lastDateTime = timegm(&tdt->t_date_time);
+    lastReceived = GetMonotonicTime();
+    timeReceived = TRUE;
+}
+
+static void ProcessSTT(dvbpsi_atsc_stt_t *stt)
+{
+    lastDateTime = dvbpsi_atsc_unix_epoch_offset + stt->i_system_time -  stt->i_gps_utc_offset;
+    lastReceived = GetMonotonicTime();
+    timeReceived = TRUE;
+}
+
+static long GetMonotonicTime(void)
+{
+    struct timespec now;
+    
+    if (clock_gettime(CLOCK_MONOTONIC, &now) == -1)    
+    {        
+        /* Monotonic time failed use real time instead */        
+        clock_gettime(CLOCK_REALTIME, &now);    
+    }        
+
+    return (now.tv_sec * 1000) + ((now.tv_nsec)/ 1000000.0);
 }
 
 /*******************************************************************************
@@ -86,13 +107,10 @@ static void ProcessTDT(dvbpsi_tdt_tot_t *tdt)
 *******************************************************************************/
 static void CommandDateTime(int argc, char **argv)
 {
-    if (lastReceived)
+    if (timeReceived)
     {
-        CommandPrintf("UTC Date/Time (YYYY/MM/DD hh:mm:ss) %4d/%2d/%2d %02d:%02d:%02d\n",
-            lastDateTime.t_date_time.i_year, lastDateTime.t_date_time.i_month, lastDateTime.t_date_time.i_day,
-            lastDateTime.t_date_time.i_hour, lastDateTime.t_date_time.i_minute, lastDateTime.t_date_time.i_second);
-        
-        CommandPrintf("Last received %d seconds ago.\n", time(NULL) - lastReceived);
+        CommandPrintf("%s", ctime(&lastDateTime));
+        CommandPrintf("Last received %d ms ago.\n", GetMonotonicTime() - lastReceived);
     }
     else
     {

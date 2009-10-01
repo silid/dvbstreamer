@@ -118,12 +118,18 @@ void EventsRegisterListenerByName(const char *event, EventListener_t listener, v
     else if (strchr(event, '.') == NULL)
     {
         EventSource_t src = EventsFindSource(event);
-        EventsRegisterSourceListener(src, listener, arg);
+        if (src)
+        {
+            EventsRegisterSourceListener(src, listener, arg);
+        }
     }
     else
     {
         Event_t evt = EventsFindEvent(event);
-        EventsRegisterEventListener(evt, listener, arg);
+        if (evt)
+        {
+            EventsRegisterEventListener(evt, listener, arg);
+        }
     }
 }
 
@@ -251,7 +257,7 @@ Event_t EventsFindEvent(const char *name)
     int sourceNameLen;
     EventSource_t source = NULL;
     Event_t result = NULL;
-
+    LogModule(LOG_DEBUG, EVENTS, "Looking for %s", name);
     pthread_mutex_lock(&eventsMutex);
     for (sourceNameLen = 0; name[sourceNameLen];sourceNameLen ++)
     {
@@ -265,11 +271,12 @@ Event_t EventsFindEvent(const char *name)
     {
         memcpy(sourceName, name, sourceNameLen);
         sourceName[sourceNameLen] = 0;
-
+        LogModule(LOG_DEBUG, EVENTS, "Looking for source %s", sourceName);
         source = EventsFindSource(sourceName);
         if (source)
         {
             ListIterator_t iterator;
+            LogModule(LOG_DEBUG, EVENTS, "Looking for event %s", &name[sourceNameLen + 1]);            
             for (ListIterator_Init(iterator, source->events);
                  ListIterator_MoreEntries(iterator);
                  ListIterator_Next(iterator))

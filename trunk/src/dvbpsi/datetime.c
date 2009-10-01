@@ -34,11 +34,14 @@ Date and Time decoding functions.
 
 #include "dvbpsi.h"
 #include "datetime.h"
+#include "string.h"
 
 
-void dvbpsi_DecodeMJDUTC(uint8_t *p_mjdutc, dvbpsi_date_time_t *p_date_time)
+void dvbpsi_DecodeMJDUTC(uint8_t *p_mjdutc, struct tm *p_date_time)
 {
     #define BCD_CHAR_TO_INT(_bcd) (((_bcd >> 4) * 10) + (_bcd & 0x0f))
+    struct tm temp_time;
+    time_t secs;
 
     uint16_t i_mjd = (((uint16_t)p_mjdutc[0] << 8) | (uint16_t)(p_mjdutc[1] & 0xff));
     double d_mjd = (double)i_mjd;
@@ -60,11 +63,14 @@ void dvbpsi_DecodeMJDUTC(uint8_t *p_mjdutc, dvbpsi_date_time_t *p_date_time)
         i_k = 1;
     }
 
-    p_date_time->i_year = i_temp_y + i_k + 1900;
-    p_date_time->i_month = (i_temp_m - 1) - (i_k * 12);
-    p_date_time->i_day = (((i_mjd - 14956) - (int)((double)i_temp_y * 365.25)) - (int)((double)i_temp_m * 30.6001));
-    p_date_time->i_hour = BCD_CHAR_TO_INT(p_mjdutc[2]);
-    p_date_time->i_minute = BCD_CHAR_TO_INT(p_mjdutc[3]);
-    p_date_time->i_second = BCD_CHAR_TO_INT(p_mjdutc[4]);
+    temp_time.tm_year = i_temp_y + i_k;
+    temp_time.tm_mon = ((i_temp_m - 1) - (i_k * 12)) - 1;
+    temp_time.tm_mday = (((i_mjd - 14956) - (int)((double)i_temp_y * 365.25)) - (int)((double)i_temp_m * 30.6001));
+    temp_time.tm_hour = BCD_CHAR_TO_INT(p_mjdutc[2]);
+    temp_time.tm_min = BCD_CHAR_TO_INT(p_mjdutc[3]);
+    temp_time.tm_sec = BCD_CHAR_TO_INT(p_mjdutc[4]);
+    secs = timegm(&temp_time);
+    memcpy(p_date_time, gmtime(&secs), sizeof(struct tm));
+    
 }
 
