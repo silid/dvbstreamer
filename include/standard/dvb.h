@@ -23,7 +23,10 @@ DVB Broadcast standard.
 #ifndef _STANDARD_DVB_H
 #define _STANDARD_DVB_H
 #include "ts.h"
+
 extern EventSource_t DVBEventSource;
+extern char DVBFilterType[];
+
 int DVBStandardInit(TSReader_t *reader);
 int DVBStandardDeinit(TSReader_t *reader);
 #endif

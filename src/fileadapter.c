@@ -171,14 +171,13 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
         result->monitorSendFd = monitorFds[1];
 
         result->hardwareRestricted = hwRestricted;
-        /* Stream the entire TS to the DVR device */
         if (hwRestricted)
         {
-            LogModule(LOG_INFO, FILEADAPTER, "Running in hardware restricted mode!\n");
+            result->maxFilters = 16;
         }
         else
         {
-            DVBDemuxAllocateFilter(result, 8192, TRUE);
+            result->maxFilters = 256;
         }
 
         /* Start monitoring thread */
@@ -210,8 +209,7 @@ void DVBDispose(DVBAdapter_t *adapter)
     }
 
     LogModule(LOG_DEBUGV, FILEADAPTER, "Closing Demux file descriptors\n");
-    DVBDemuxReleaseAllFilters(adapter, FALSE);
-    DVBDemuxReleaseAllFilters(adapter, TRUE);
+    DVBDemuxReleaseAllFilters(adapter);
     adapter->monitorExit = TRUE;
 
     if (adapter->frontEndFd > -1)
@@ -355,34 +353,32 @@ int DVBDemuxSetBufferSize(DVBAdapter_t *adapter, unsigned long size)
 int DVBDemuxAllocateFilter(DVBAdapter_t *adapter, uint16_t pid)
 {
     int result = -1;
-    if (adapter->hardwareRestricted || (pid == 8192))
-    {
-        int i;
-        int idxToUse = -1;
+    int i;
+    int idxToUse = -1;
 
-        for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
+    for (i = 0; i < adapter->maxFilters; i ++)
+    {
+        if (adapter->filters[i].demuxFd == -1)
         {
-            if (adapter->filters[i].demuxFd == -1)
-            {
-                idxToUse = i;
-            }
-            else
-            {
-                if (adapter->filters[i].pid == pid)
-                {
-                    /* Already streaming this PID */
-                    idxToUse = -1;
-                    result = 0;
-                    break;
-                }
-            }
+            idxToUse = i;
         }
-        if (idxToUse != -1)
+        else
         {
-            LogModule(LOG_DEBUG, FILEADAPTER, "Allocation filter for pid 0x%x type %s\n", pid, system ? "System":"Service");
-            adapter->filters[idxToUse].demuxFd = 1;
+            if (adapter->filters[i].pid == pid)
+            {
+                /* Already streaming this PID */
+                idxToUse = -1;
+                result = 0;
+                break;
+            }
         }
     }
+    if (idxToUse != -1)
+    {
+        LogModule(LOG_DEBUG, FILEADAPTER, "Allocation filter for pid 0x%x\n", pid);
+        adapter->filters[idxToUse].demuxFd = 1;
+    }
+
     return result;
 }
 
@@ -392,12 +388,11 @@ int DVBDemuxReleaseFilter(DVBAdapter_t *adapter, uint16_t pid)
     if (adapter->hardwareRestricted || (pid == 8192))
     {
         int i;
-        for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
+        for (i = 0; i < adapter->maxFilters; i ++)
         {
             if ((adapter->filters[i].demuxFd != -1) && (adapter->filters[i].pid == pid))
             {
-                LogModule(LOG_DEBUG, FILEADAPTER, "Releasing filter for pid 0x%x type %s\n",
-                    pid, adapter->filters[i].system ? "System":"Service");
+                LogModule(LOG_DEBUG, FILEADAPTER, "Releasing filter for pid 0x%x\n", pid);
                 adapter->filters[i].demuxFd = -1;
                 result = 0;
                 break;
@@ -411,11 +406,10 @@ int DVBDemuxReleaseAllFilters(DVBAdapter_t *adapter)
 {
     int result = -1;
     int i;
-    LogModule(LOG_DEBUG, FILEADAPTER, "Releasing all filters for type %s\n",
-        system ? "System":"Service");
-    for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
+    LogModule(LOG_DEBUG, FILEADAPTER, "Releasing all filters\n");
+    for (i = 0; i < adapter->maxFilters; i ++)
     {
-        if ((adapter->filters[i].demuxFd != -1) && (adapter->filters[i].system == system))
+        if (adapter->filters[i].demuxFd != -1)
         {
             close(adapter->filters[i].demuxFd);
             adapter->filters[i].demuxFd = -1;
@@ -520,10 +514,25 @@ static void *DVBFrontEndMonitor(void *arg)
             }
             else
             {
-                bitsSent += r * 8;
-                if (write(sendFd, buffer, r) == -1)
+                int i, p;
+
+                for (i = 0; i < r/188; i ++)
                 {
-                    /* do nothing */
+                    TSPacket_t *packet = (TSPacket_t*)&buffer[i * 188];
+                    uint16_t pid = TSPACKET_GETPID(*packet);
+                    for (p = 0; p < adapter->maxFilters; p ++)
+                    {
+                        if (((adapter->filters[p].pid == 8192) || (pid == adapter->filters[p].pid)) && 
+                             (adapter->filters[p].demuxFd != -1))
+                        {
+                            if (write(sendFd, packet, 188) == -1)
+                            {
+                                /* do nothing */
+                            }
+                            bitsSent += 188 * 8;
+                            break;
+                        }
+                    }
                 }
             }
             usleep(100);

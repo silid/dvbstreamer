@@ -25,6 +25,7 @@ ATSC Broadcast standard.
 #include "ts.h"
 
 extern EventSource_t ATSCEventSource;
+extern char ATSCFilterType[];
 
 int ATSCStandardInit(TSReader_t *reader);
 int ATSCStandardDeinit(TSReader_t *reader);

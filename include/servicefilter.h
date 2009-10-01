@@ -31,10 +31,10 @@ the output to only include this service.
  */
  
 /**
- * String constant used to signify that a PIDFilter instance is being used as a 
+ * String constant used to signify that a TSFilterGroup_t instance is being used as a 
  * service filter.
  */
-extern char ServicePIDFilterType[];
+extern char ServiceFilterGroupType[];
 
 typedef struct ServiceFilter_s *ServiceFilter_t;
 
@@ -107,9 +107,7 @@ void ServiceFilterDeliveryMethodSet(ServiceFilter_t filter, DeliveryMethodInstan
 DeliveryMethodInstance_t * ServiceFilterDeliveryMethodGet(ServiceFilter_t filter);
 
 
-ListIterator_t *ServiceFilterGetListIterator(void);
-
-ServiceFilter_t ServiceFilterFindFilter(const char *name);
+ServiceFilter_t ServiceFilterFindFilter(TSReader_t *reader, const char *name);
 
 
 /**@}*/

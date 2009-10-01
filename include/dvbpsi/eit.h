@@ -39,6 +39,11 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define PID_EIT 0x12
+#define TABLE_ID_PF_ACTUAL 0x4e
+#define TABLE_ID_PF_OTHER  0x4f
+
 /*****************************************************************************
  * dvbpsi_eit_event_duration_t
  *****************************************************************************/
@@ -66,8 +71,8 @@ typedef struct dvbpsi_eit_event_duration_s
 typedef struct dvbpsi_eit_event_s
 {
   uint16_t                    i_event_id;             /*!< event_id */
-  dvbpsi_date_time_t          t_start_time;           /*!< start_time */
-  dvbpsi_eit_event_duration_t t_duration;             /*!< duration */
+  struct tm                   t_start_time;           /*!< start_time */
+  uint32_t                    i_duration;             /*!< duration */
   uint8_t                     i_running_status;       /*!< Running status */
   int                         b_free_ca;              /*!< Free CA mode flag */
   uint16_t                    i_descriptors_length;   /*!< Descriptors loop
@@ -232,8 +237,8 @@ void dvbpsi_EmptyEIT(dvbpsi_eit_t* p_eit);
  * \return a pointer to the added service description.
  */
 dvbpsi_eit_event_t* dvbpsi_EITAddEvent(dvbpsi_eit_t* p_eit,
-    uint16_t i_event_id, dvbpsi_date_time_t *p_start_time, 
-    dvbpsi_eit_event_duration_t *p_duration, uint8_t i_running_status, 
+    uint16_t i_event_id, struct tm *p_start_time, 
+    uint32_t i_duration, uint8_t i_running_status, 
     int b_free_ca);
 
 #ifdef __cplusplus

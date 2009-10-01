@@ -27,23 +27,19 @@ Plugin to display Present/Following (ie Now/Next) EPG information.
 #include <stdint.h>
 
 #include "plugin.h"
+#include "main.h"
 #include "dvbpsi/datetime.h"
 #include "dvbpsi/eit.h"
 #include "dvbpsi/dr_4d.h"
 
 #include "list.h"
 #include "logging.h"
-#include "subtableprocessor.h"
 
 
 
 /*******************************************************************************
 * Defines                                                                      *
 *******************************************************************************/
-#define EIT_PID 0x12
-#define TABLE_ID_PF_ACTUAL 0x4e
-#define TABLE_ID_PF_OTHER  0x4f
-
 #define MAX_STRING_LEN 256
 
 
@@ -51,21 +47,21 @@ Plugin to display Present/Following (ie Now/Next) EPG information.
 * Typedefs                                                                     *
 *******************************************************************************/
 
-typedef struct Event_s
+typedef struct NNEvent_s
 {
     char name[MAX_STRING_LEN];
     char description[MAX_STRING_LEN];
-    dvbpsi_date_time_t startTime;
-    dvbpsi_eit_event_duration_t duration;
-}Event_t;
+    struct tm startTime;
+    uint32_t duration;
+}NNEvent_t;
 
 typedef struct ServiceNowNextInfo_s
 {
     uint16_t networkId;
     uint16_t tsId;
     uint16_t serviceId;
-    Event_t  now;
-    Event_t  next;
+    NNEvent_t  now;
+    NNEvent_t  next;
 }ServiceNowNextInfo_t;
 
 
@@ -74,22 +70,22 @@ typedef struct ServiceNowNextInfo_s
 *******************************************************************************/
 static void CommandNow(int argc, char **argv);
 static void CommandNext(int argc, char **argv);
-static void PrintEvent(Event_t *event);
-static void Init0x12Filter(PIDFilter_t *filter);
-static void Deinit0x12Filter(PIDFilter_t *filter);
+static void PrintEvent(NNEvent_t *event);
+static void Install(bool installed);
+static void NowNextFilterEventHandler(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details);
 static ServiceNowNextInfo_t *FindServiceName(char *name);
 static ServiceNowNextInfo_t *FindService(uint16_t networkId, uint16_t tsId, uint16_t serviceId);
 static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension);
 static void ProcessEIT(void *arg, dvbpsi_eit_t *newEIT);
-static void UpdateEvent(Event_t *event, dvbpsi_eit_event_t *eitevent);
+static void UpdateEvent(NNEvent_t *event, dvbpsi_eit_event_t *eitevent);
 
 
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
-static PluginFilter_t filter = {NULL, Init0x12Filter, Deinit0x12Filter};
 static List_t *serviceNowNextInfoList;
-
+static TSFilterGroup_t *tsgroup = NULL;
+static dvbpsi_handle demux = NULL;
 static char NOWNEXT[]="NowNext";
 
 /*******************************************************************************
@@ -100,30 +96,30 @@ PLUGIN_COMMANDS(
     {
         "now",
         1, 1,
-        "Display the current program.",
-        "Display the current program on all channels (assuming the data is "
-        "present on the current TS). Dates are in YYYY/MM/DD format and times"
-        "are in HH:MM:SS",
+        "Display the current program on the specified service.",
+        "now <service>\n"
+        "Display the current program on the specified service (assuming the data is "
+        "present on the current TS).",
         CommandNow
     },
     {
         "next",
         1, 1,
-        "Display the next program.",
-        "Display the next program on all channels (assuming the data is "
-        "present on the current TS). Dates are in YYYY/MM/DD format and times"
-        "are in HH:MM:SS",
+        "Display the next program on the specified service.",
+        "next <service>\n"
+        "Display the next program on the specified service (assuming the data is "
+        "present on the current TS).",
         CommandNext
     }
 );
 
 PLUGIN_FEATURES(
-    PLUGIN_FEATURE_FILTER(filter)
+    PLUGIN_FEATURE_INSTALL(Install)
     );
 
 PLUGIN_INTERFACE_CF(
     PLUGIN_FOR_DVB,
-    "NowNext", "0.2",
+    "NowNext", "0.3",
     "Plugin to display present/following EPG information.",
     "charrea6@users.sourceforge.net"
     );
@@ -157,40 +153,46 @@ static void CommandNext(int argc, char **argv)
     }
 }
 
-static void PrintEvent(Event_t *event)
+static void PrintEvent(NNEvent_t *event)
 {
+    int h,m,s;
+    time_t startTime = timegm(&event->startTime);
+    time_t endTime = startTime + event->duration;
     CommandPrintf("Name       : %s\n", event->name);
-    CommandPrintf("Start time : %04d/%02d/%02d %02d:%02d:%02d\n",
-        event->startTime.i_year, event->startTime.i_month, event->startTime.i_day,
-        event->startTime.i_hour, event->startTime.i_minute, event->startTime.i_second);
-    CommandPrintf("Duration   : %02d:%02d:%02d\n",
-        event->duration.i_hours, event->duration.i_minutes, event->duration.i_seconds);
+    CommandPrintf("Start time : %s", ctime(&startTime));
+    CommandPrintf("End time   : %s", ctime(&endTime));    
+    h = event->duration / (60*60);
+    m = (event->duration / 60) - (h * 60);
+    s = event->duration - ((h * 60 * 60) + (m * 60));
+    CommandPrintf("Duration   : %02d:%02d:%02d\n", h, m, s);
     CommandPrintf("Description:\n%s\n", event->description);
 }
 /*******************************************************************************
 * Filter Functions                                                             *
 *******************************************************************************/
-static void Init0x12Filter(PIDFilter_t *filter)
+static void Install(bool installed)
 {
-    serviceNowNextInfoList = ListCreate();
-    filter->name = "Now/Next";
-    filter->enabled = TRUE;
-    SubTableProcessorInit(filter, 0x12, SubTableHandler, NULL, NULL, NULL);
-    if (filter->tsFilter->adapter->hardwareRestricted)
+    if (installed)
     {
-        DVBDemuxAllocateFilter(filter->tsFilter->adapter, EIT_PID, TRUE);
+        serviceNowNextInfoList = ListCreate();
+        tsgroup = TSReaderCreateFilterGroup(MainTSReaderGet(), "Now/Next", "DVB", NowNextFilterEventHandler,NULL);
+    }
+    else
+    {
+        TSFilterGroupDestroy(tsgroup);
+        ListFree(serviceNowNextInfoList, free);
     }
 }
 
-static void Deinit0x12Filter(PIDFilter_t *filter)
+static void NowNextFilterEventHandler(void *userArg, struct TSFilterGroup_t *group, TSFilterEventType_e event, void *details)
 {
-    filter->enabled = FALSE;
-    if (filter->tsFilter->adapter->hardwareRestricted)
+    if (event == TSFilterEventType_MuxChanged)
     {
-        DVBDemuxReleaseFilter(filter->tsFilter->adapter, EIT_PID);
+        TSFilterGroupRemoveSectionFilter(tsgroup, PID_EIT);
+        dvbpsi_DetachDemux(demux);
+        demux = dvbpsi_AttachDemux(SubTableHandler, NULL);
+        TSFilterGroupAddSectionFilter(tsgroup, PID_EIT, 3, demux);
     }
-    SubTableProcessorDeinit(filter);
-    ListFree(serviceNowNextInfoList, free);
 }
 
 static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension)
@@ -241,13 +243,13 @@ static void ProcessEIT(void *arg, dvbpsi_eit_t *newEIT)
     ObjectRefDec(newEIT);
 }
 
-static void UpdateEvent(Event_t *event, dvbpsi_eit_event_t *eitevent)
+static void UpdateEvent(NNEvent_t *event, dvbpsi_eit_event_t *eitevent)
 {
     dvbpsi_descriptor_t *descriptor;
     dvbpsi_short_event_dr_t * sedescriptor;
 
     event->startTime = eitevent->t_start_time;
-    event->duration  = eitevent->t_duration;
+    event->duration  = eitevent->i_duration;
 
     for (descriptor = eitevent->p_first_descriptor; descriptor; descriptor = descriptor->p_next)
     {

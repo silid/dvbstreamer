@@ -108,10 +108,11 @@ DeliveryMethodInstance_t *DeliveryMethodCreate(char *mrl)
 {
     ListIterator_t iterator;
     DeliveryMethodInstance_t *instance = NULL;
-    
+    LogModule(LOG_DEBUG, DELIVERYMETHOD, "Looking for handler for %s", mrl);
     for ( ListIterator_Init(iterator, DeliveryMethodsList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         DeliveryMethodHandler_t *handler = ListIterator_Current(iterator);
+        LogModule(LOG_DEBUG, DELIVERYMETHOD, "Checking handler %p", handler);
         if (handler->CanHandle(mrl))
         {
             instance = handler->CreateInstance(mrl);

@@ -33,9 +33,9 @@ Plugin to collect EPG schedule information from ATSC/PSIP.
 #include "dvbpsi/atsc/eit.h"
 
 
+#include "main.h"
 #include "list.h"
 #include "logging.h"
-#include "subtableprocessor.h"
 #include "atsctext.h"
 #include "tuning.h"
 #include "deferredproc.h"
@@ -68,17 +68,15 @@ typedef struct TSCEPGDeferredInfo_s
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
-static void InitEITFilter(PIDFilter_t *filter);
-static void DeinitEITFilter(PIDFilter_t *filter);
+static void Install(bool installed);
 
 static void NewMGT(dvbpsi_atsc_mgt_t *newMGT);
 static void NewSTT(dvbpsi_atsc_stt_t *newSTT);
 
-static int ATSCtoEPGFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet);
-static TSPacket_t * ATSCtoEPGProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet);
-static void ATSCtoEPGMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex);
+static void ATSCtoEPGFilterGroupEventCallback(void *arg, TSFilterGroup_t *group, TSFilterEventType_e event, void *details);
 
 static void ClearTableInfo(void);
+static void StartEPGCapture(void);
 
 static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension);
 static void ProcessETT(void *arg, dvbpsi_atsc_ett_t *newETT);
@@ -97,22 +95,21 @@ static void CommandEPGCapStop(int argc, char **argv);
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
-static PluginFilter_t filter = {NULL, InitEITFilter, DeinitEITFilter};
 static const char ATSCTOEPG[] = "ATSCtoEPG";
 
+static TSFilterGroup_t *tsgroup = NULL;
 static uint8_t GPStoUTCSecondsOffset = 14; /* From the test streams 24th May 2007 */
 
 static int EventInfoTableCount = 0;
 static TableInfo_t EventInfoTableInfo[MAX_EITS];
 static int ExtendedTextTableCount = 0;
 static TableInfo_t ExtendedTextTableInfo[MAX_ETTS];
-static time_t UnixEpochOffset = 315964800;
 
 /*******************************************************************************
 * Plugin Setup                                                                 *
 *******************************************************************************/
 PLUGIN_FEATURES(
-    PLUGIN_FEATURE_FILTER(filter),
+    PLUGIN_FEATURE_INSTALL(Install),
     PLUGIN_FEATURE_MGTPROCESSOR(NewMGT),
     PLUGIN_FEATURE_STTPROCESSOR(NewSTT)
     );
@@ -149,36 +146,32 @@ PLUGIN_INTERFACE_CF(
 /*******************************************************************************
 * Filter Functions                                                             *
 *******************************************************************************/
-static void InitEITFilter(PIDFilter_t *filter)
+static void Install(bool installed)
 {
-    filter->name = "ATSC to EPG";
-    filter->enabled = FALSE;
-    PIDFilterFilterPacketSet(filter, ATSCtoEPGFilterPacket, NULL);
-    PIDFilterMultiplexChangeSet(filter, ATSCtoEPGMultiplexChanged, NULL);
-    PIDFilterProcessPacketSet(filter, ATSCtoEPGProcessPacket, NULL);
-    ObjectRegisterType(ATSCEPGDeferredInfo_t);
-}
-
-static void DeinitEITFilter(PIDFilter_t *filter)
-{
-    filter->enabled = FALSE;
-
-    ClearTableInfo();
+    if (installed)
+    {
+        ObjectRegisterType(ATSCEPGDeferredInfo_t);
+    }
 }
 
 
 static void ClearTableInfo(void)
 {
     int i;
-    for (i = 0; i < EventInfoTableCount; i ++)
+    if (tsgroup)
     {
-        dvbpsi_DetachDemux(EventInfoTableInfo[i].decoder);
+        TSFilterGroupRemoveAllFilters(tsgroup);
+        for (i = 0; i < EventInfoTableCount; i ++)
+        {
+            dvbpsi_DetachDemux(EventInfoTableInfo[i].decoder);
+        }
+        for (i = 0; i < ExtendedTextTableCount; i ++)
+        {
+            dvbpsi_atsc_DetachETT(ExtendedTextTableInfo[i].decoder);
+        }
+
     }
     EventInfoTableCount = 0;
-    for (i = 0; i < ExtendedTextTableCount; i ++)
-    {
-        dvbpsi_atsc_DetachETT(ExtendedTextTableInfo[i].decoder);
-    }
     ExtendedTextTableCount = 0;
 }
 
@@ -192,16 +185,17 @@ static void NewMGT(dvbpsi_atsc_mgt_t *newMGT)
         if ((table->i_type >= 0x100) && (table->i_type <= 0x17f))
         {
             EventInfoTableInfo[EventInfoTableCount].pid = table->i_pid;
-            EventInfoTableInfo[EventInfoTableCount].decoder = dvbpsi_AttachDemux(SubTableHandler, NULL);
             EventInfoTableCount ++;
         }
         if ((table->i_type >= 0x200) && (table->i_type <= 0x27f))
         {
             ExtendedTextTableInfo[ExtendedTextTableCount].pid = table->i_pid;
-            ExtendedTextTableInfo[ExtendedTextTableCount].decoder = dvbpsi_atsc_AttachETT(ProcessETT, NULL);
             ExtendedTextTableCount ++;
         }
-
+    }
+    if (tsgroup)
+    {
+        StartEPGCapture();
     }
 }
 
@@ -210,52 +204,14 @@ static void NewSTT(dvbpsi_atsc_stt_t *newSTT)
     GPStoUTCSecondsOffset = newSTT->i_gps_utc_offset;
 }
 
-static int ATSCtoEPGFilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet)
+static void ATSCtoEPGFilterGroupEventCallback(void *arg, TSFilterGroup_t *group, TSFilterEventType_e event, void *details)
 {
-    int i;
-    for (i = 0; i < EventInfoTableCount; i ++)
+    if (event == TSFilterEventType_MuxChanged)
     {
-        if (EventInfoTableInfo[i].pid == pid)
-        {
-            return TRUE;
-        }
+        ClearTableInfo();
     }
-    for (i = 0; i < ExtendedTextTableCount; i ++)
-    {
-        if (ExtendedTextTableInfo[i].pid == pid)
-        {
-            return TRUE;
-        }
-    }
-
-    return FALSE;
 }
 
-static void ATSCtoEPGMultiplexChanged(PIDFilter_t *pidfilter, void *arg, Multiplex_t *newmultiplex)
-{
-    ClearTableInfo();
-}
-
-static TSPacket_t * ATSCtoEPGProcessPacket(PIDFilter_t *pidfilter, void *arg, TSPacket_t *packet)
-{
-    int i;
-    uint16_t pid = TSPACKET_GETPID(*packet);
-    for (i = 0; i < EventInfoTableCount; i ++)
-    {
-        if (EventInfoTableInfo[i].pid == pid)
-        {
-            dvbpsi_PushPacket(EventInfoTableInfo[i].decoder, (uint8_t*)packet);
-        }
-    }
-    for (i = 0; i < ExtendedTextTableCount; i ++)
-    {
-        if (ExtendedTextTableInfo[i].pid == pid)
-        {
-            dvbpsi_PushPacket(ExtendedTextTableInfo[i].decoder, (uint8_t*)packet);
-        }
-    }
-    return NULL;
-}
 
 static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension)
 {
@@ -351,24 +307,46 @@ static void DeferredProcessETT(void *arg)
 *******************************************************************************/
 static void CommandEPGCapRestart(int argc, char **argv)
 {
-    filter.filter->enabled = FALSE;
-    SubTableProcessorRestart(filter.filter);
-    filter.filter->enabled = TRUE;
+    if (!tsgroup)
+    {
+        CommandEPGCapStart(argc, argv);
+        return;
+    }
+    ClearTableInfo();
+    StartEPGCapture();
 }
 
 static void CommandEPGCapStart(int argc, char **argv)
 {
-    filter.filter->enabled = TRUE;
+    tsgroup = TSReaderCreateFilterGroup(MainTSReaderGet(), ATSCTOEPG, "ATSC", ATSCtoEPGFilterGroupEventCallback, NULL);
+    StartEPGCapture();
 }
 
 static void CommandEPGCapStop(int argc, char **argv)
 {
-    filter.filter->enabled = FALSE;
+    ClearTableInfo();
+    TSFilterGroupDestroy(tsgroup);
+    tsgroup = NULL;
 }
 
 /*******************************************************************************
 * Helper Functions                                                             *
 *******************************************************************************/
+static void StartEPGCapture(void)
+{
+    int i;
+    for (i = 0; i < EventInfoTableCount; i ++)
+    {
+        EventInfoTableInfo[i].decoder = dvbpsi_AttachDemux(SubTableHandler, NULL);
+        TSFilterGroupAddSectionFilter(tsgroup, EventInfoTableInfo[i].pid, 3, EventInfoTableInfo[i].decoder);
+    }
+    for (i = 0; i < ExtendedTextTableCount; i ++)
+    {
+        ExtendedTextTableInfo[i].decoder = dvbpsi_atsc_AttachETT(ProcessETT, NULL);
+        TSFilterGroupAddSectionFilter(tsgroup,ExtendedTextTableInfo[i].pid, 3, ExtendedTextTableInfo[i].decoder);
+    }
+}
+
 static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_atsc_eit_event_t *eitevent)
 {
     EPGEventRef_t eventRef;
@@ -426,7 +404,7 @@ static void ConvertToTM(uint32_t startSeconds, uint32_t duration,
     struct tm *temp_time;
     time_t secs;
 
-    secs = startSeconds + UnixEpochOffset - GPStoUTCSecondsOffset;
+    secs = startSeconds + dvbpsi_atsc_unix_epoch_offset - GPStoUTCSecondsOffset;
     temp_time = gmtime(&secs);
     *startTime = *temp_time;
 

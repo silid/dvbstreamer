@@ -23,6 +23,7 @@ Decode Time Date Table and Time Offset Table.
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 
 #include <dvbpsi/dvbpsi.h>
 #include <dvbpsi/psi.h>
@@ -128,16 +129,16 @@ void dvbpsi_DetachTDTTOT(dvbpsi_handle h_dvbpsi)
  *****************************************************************************
  * Initialize a pre-allocated dvbpsi_tdt_tot_t structure.
  *****************************************************************************/
-void dvbpsi_InitTDTTOT(dvbpsi_tdt_tot_t *p_tdt_tot,
-                        int i_year, int i_month, int i_day,
-                        int i_hour, int i_minute, int i_second)
+void dvbpsi_InitTDTTOT(dvbpsi_tdt_tot_t *p_tdt_tot, struct tm *p_date_time)
 {
-  p_tdt_tot->t_date_time.i_year = i_year;
-  p_tdt_tot->t_date_time.i_month = i_month;
-  p_tdt_tot->t_date_time.i_day = i_day;
-  p_tdt_tot->t_date_time.i_hour = i_hour;
-  p_tdt_tot->t_date_time.i_minute = i_minute;
-  p_tdt_tot->t_date_time.i_second = i_second;
+  if (p_date_time != NULL)
+  {
+    p_tdt_tot->t_date_time = *p_date_time;
+  }
+  else
+  {
+    memset(&p_tdt_tot->t_date_time, 0, sizeof(p_tdt_tot->t_date_time));
+  }
   p_tdt_tot->p_first_descriptor = NULL;
 }
 
@@ -165,7 +166,7 @@ void dvbpsi_GatherTDTTOTSections(dvbpsi_decoder_t* p_decoder,
   if(p_section->i_table_id == 0x70)
   {
     dvbpsi_tdt_tot_t* p_tdt;
-    dvbpsi_NewTDTTOT(p_tdt, 0,0,0,0,0,0);
+    dvbpsi_NewTDTTOT(p_tdt, NULL);
     dvbpsi_DecodeTDTSection(p_tdt, p_section);
     p_tdt_tot_decoder->pf_callback(p_tdt_tot_decoder->p_cb_data, p_tdt);
   }
@@ -173,7 +174,7 @@ void dvbpsi_GatherTDTTOTSections(dvbpsi_decoder_t* p_decoder,
   if(p_section->i_table_id == 0x73)
   {
     dvbpsi_tdt_tot_t* p_tot;
-    dvbpsi_NewTDTTOT(p_tot, 0,0,0,0,0,0);
+    dvbpsi_NewTDTTOT(p_tot, NULL);
     dvbpsi_DecodeTOTSection(p_tot, p_section);
     p_tdt_tot_decoder->pf_callback(p_tdt_tot_decoder->p_cb_data, p_tot);
   }

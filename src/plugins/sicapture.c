@@ -45,10 +45,8 @@ Plugin to capture only PSI/SI information to an MRL.
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
-static void InitFilter(PIDFilter_t *filter);
-static void DeinitFilter(PIDFilter_t *filter);
 static void NewMGT(dvbpsi_atsc_mgt_t *newMGT);
-static int FilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet);
+static void FilterPacket(void *arg, TSFilterGroup_t *group, TSPacket_t *packet);
 
 static void CommandEnableSICapture(int argc, char **argv);
 static void CommandDisableSICapture(int argc, char **argv);
@@ -56,7 +54,9 @@ static void CommandDisableSICapture(int argc, char **argv);
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
-static PluginFilter_t CaptureFilter = {NULL, InitFilter, DeinitFilter};
+static TSFilterGroup_t *tsgroup = NULL;
+static DeliveryMethodInstance_t *dmInstance;
+
 static const char SICAPTURE[] = "SICapture";
 
 static int EventInfoTableCount = 0;
@@ -72,7 +72,6 @@ static uint16_t channelETT = 0;
 *******************************************************************************/
 
 PLUGIN_FEATURES(
-    PLUGIN_FEATURE_FILTER(CaptureFilter),
     PLUGIN_FEATURE_MGTPROCESSOR(NewMGT)
     );
 
@@ -104,17 +103,6 @@ PLUGIN_INTERFACE_CF(
 /*******************************************************************************
 * Filter Functions                                                             *
 *******************************************************************************/
-static void InitFilter(PIDFilter_t *filter)
-{
-    filter->name = "PSI/SI Capture";
-
-    PIDFilterFilterPacketSet(filter, FilterPacket, NULL);
-}
-
-static void DeinitFilter(PIDFilter_t *filter)
-{
-    filter->enabled = FALSE;
-}
 
 static void NewMGT(dvbpsi_atsc_mgt_t *newMGT)
 {
@@ -144,11 +132,12 @@ static void NewMGT(dvbpsi_atsc_mgt_t *newMGT)
     }
 }
 
-static int FilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacket_t *packet)
+static void FilterPacket(void *arg, TSFilterGroup_t *group, TSPacket_t *packet)
 {
     int result = 0;
     int i;
     Multiplex_t *mux;
+    uint16_t pid = TSPACKET_GETPID(*packet);
 
     /* Handle PAT */
     if (pid == 0)
@@ -243,28 +232,48 @@ static int FilterPacket(PIDFilter_t *pidfilter, void *arg, uint16_t pid, TSPacke
             }
         }
     }
-    return result;
+    if (result)
+    {
+        DeliveryMethodOutputPacket(dmInstance, packet);
+    }
 }
 /*******************************************************************************
 * Command Functions                                                            *
 *******************************************************************************/
 static void CommandEnableSICapture(int argc, char **argv)
 {
-    if (DeliveryMethodManagerFind(argv[0], CaptureFilter.filter))
+    TSReader_t *reader = MainTSReaderGet();
+    if (tsgroup != NULL)
     {
+        CommandError(COMMAND_ERROR_GENERIC, "Already enabled!");
+        return;
+    }
+    tsgroup = TSReaderCreateFilterGroup(reader, "SI Capture", "Misc", NULL, NULL);
+    dmInstance = DeliveryMethodCreate(argv[0]);
+    if (dmInstance)
+    {
+        TSFilterGroupAddPacketFilter(tsgroup, TSREADER_PID_ALL, FilterPacket, NULL);
         CommandPrintf("SI Capture started (%s)\n", argv[0]);
+        
     }
     else
     {
         CommandPrintf("Failed to find handler for %s\n", argv[0]);
+        TSFilterGroupDestroy(tsgroup);
+        tsgroup = NULL;
     }
-    CaptureFilter.filter->enabled = TRUE;
 }
 
 static void CommandDisableSICapture(int argc, char **argv)
 {
-    CaptureFilter.filter->enabled = FALSE;
-    DeliveryMethodManagerFree(CaptureFilter.filter);
+    if (tsgroup != NULL)
+    {
+        CommandError(COMMAND_ERROR_GENERIC, "Not enabled!");
+        return;
+    }
+    TSFilterGroupDestroy(tsgroup);
+    DeliveryMethodDestroy(dmInstance);
     CommandPrintf("SI Capture stopped\n");
+    tsgroup = NULL;
 }
 

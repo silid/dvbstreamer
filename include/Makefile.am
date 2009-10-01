@@ -22,8 +22,6 @@ pkginclude_DATA = \
     list.h \
     commands.h \
     deliverymethod.h \
-    pesprocessor.h \
-    subtableprocessor.h \
     dvbtext.h \
     atsctext.h \
     utf8.h \

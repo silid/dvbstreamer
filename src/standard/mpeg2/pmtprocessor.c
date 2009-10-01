@@ -87,7 +87,7 @@ PMTProcessor_t PMTProcessorCreate(TSReader_t *reader)
     state = ObjectCreateType(PMTProcessor_t);
     if (state)
     {
-        state->tsgroup = TSReaderCreateFilterGroup(reader, PMTPROCESSOR, "MPEG2", PMTProcessorFilterEventCallback, state);
+        state->tsgroup = TSReaderCreateFilterGroup(reader, PMTPROCESSOR, MPEG2FilterType, PMTProcessorFilterEventCallback, state);
     }
     return state;
 }

@@ -26,6 +26,7 @@ Entry point to the application.
 #include "types.h"
 #include "dvbadapter.h"
 #include "ts.h"
+#include "servicefilter.h"
 #include "services.h"
 #include "multiplexes.h"
 #include "plugin.h"
@@ -66,6 +67,12 @@ TSReader_t *MainTSReaderGet(void);
  * @return The main DVBAdapter_t object.
  */
 DVBAdapter_t *MainDVBAdapterGet(void);
+
+/**
+ * Retrieve the Primary Service Filter object.
+ * @return A ServiceFilter_t object representing the primary filter.
+ */
+ServiceFilter_t MainServiceFilterGetPrimary(void);
 
 /**
  * Used to determine whether DVBStreamer is using a DVB frontend.

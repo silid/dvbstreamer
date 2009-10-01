@@ -22,36 +22,18 @@ Date and Time decoding functions.
 */
 #ifndef _DATETIME_H
 #define _DATETIME_H
-
-typedef struct dvbpsi_date_time_s
-{
-    int                     i_year;  /*!< Year in UTC */
-    int                     i_month; /*!< Month in UTC */
-    int                     i_day;   /*!< Day in UTC */
-    int                     i_hour;  /*!< Hour in UTC */
-    int                     i_minute;/*!< Minute in UTC */
-    int                     i_second;/*!< Second in UTC */
-}dvbpsi_date_time_t;
+#include <time.h>
 
 /*****************************************************************************
  * dvbpsi_DecodeMJDUTC
  *****************************************************************************/
 /*!
- * \fn void dvbpsi_DecodeMJDUTC(char *p_mjdutc, 
-                                int *p_year, 
-                                int *p_month, 
-                                int *p_day, 
-                                int *p_hour, 
-                                int *p_minute, 
-                                int *p_second)
+ * \fn void dvbpsi_DecodeMJDUTC(uint8_t *p_mjdutc, 
+                                struct tm *p_date_time)
  * \brief Decode date/time encoded in MJD UTC format into its constituent parts.
  * \param p_mjdutc pointer to MJD UTC encoded date time.
- * \param p_year Integer to store the decoded year in.
- * \param p_month Integer to store the decoded month in.
- * \param p_day Integer to store the decoded day in.
- * \param p_hour Integer to store the decoded hour in.
- * \param p_minute Integer to store the decoded minute in.
- * \param p_second Integer to store the decoded second in.
+ * \param p_date_time pointer to a tm structure to hold the converted date.
  */
-void dvbpsi_DecodeMJDUTC(uint8_t *p_mjdutc, dvbpsi_date_time_t *p_date_time);
+void dvbpsi_DecodeMJDUTC(uint8_t *p_mjdutc, struct tm *p_date_time);
+
 #endif /*_DATETIME_H*/

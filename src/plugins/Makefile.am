@@ -12,9 +12,7 @@ plugins_LTLIBRARIES = \
 	outputs.la \
 	manualfilters.la \
 	sicapture.la \
-	traffic.la \
 	eventsdispatcher.la \
-	sectionfilters.la \
 	$(atsc_plugins) \
 	$(dvb_plugins)
 
@@ -41,11 +39,6 @@ udpoutput_la_SOURCES = \
     sap.c
 
 udpoutput_la_LDFLAGS = -module -no-undefined -avoid-version
-
-nulloutput_la_SOURCES = \
-    nulloutput.c
-
-nulloutput_la_LDFLAGS = -module -no-undefined -avoid-version
 
 fileoutput_la_SOURCES = \
     fileoutput.c
@@ -92,17 +85,19 @@ sicapture_la_SOURCES = \
 
 sicapture_la_LDFLAGS = -module -no-undefined -avoid-version
 
-traffic_la_SOURCES = \
-    traffic.c
+# TODO: Rewrite to use new TSFilterGroup system.
+#traffic_la_SOURCES = \
+#    traffic.c
 
-traffic_la_LDFLAGS = -module -no-undefined -avoid-version
+#traffic_la_LDFLAGS = -module -no-undefined -avoid-version
 
 eventsdispatcher_la_SOURCES = \
     eventsdispatcher.c
 
 eventsdispatcher_la_LDFLAGS = -module -no-undefined -avoid-version
 
-sectionfilters_la_SOURCES = \
-    sectionfilters.c
+# TODO: Rewrite to use new TSFilterGroup system.
+#sectionfilters_la_SOURCES = \
+#   sectionfilters.c
 
-sectionfilters_la_LDFLAGS = -module -no-undefined -avoid-version
+#sectionfilters_la_LDFLAGS = -module -no-undefined -avoid-version

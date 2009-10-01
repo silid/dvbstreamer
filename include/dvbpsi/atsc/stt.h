@@ -23,6 +23,7 @@ Decode PSIP System Time Table.
 #ifndef _ATSC_STT_H
 #define _ATSC_STT_H 
 
+#define dvbpsi_atsc_unix_epoch_offset (315964800)
 
 /*****************************************************************************
  * dvbpsi_atsc_stt_t

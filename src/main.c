@@ -126,6 +126,7 @@ char DataDirectory[PATH_MAX];
 static char PidFile[PATH_MAX];
 static TSReader_t *TSReader;
 static DVBAdapter_t *DVBAdapter;
+static ServiceFilter_t PrimaryServiceFilter;
 static const char MAIN[] = "Main";
 static time_t StartTime;
 static char *versionStr = VERSION;
@@ -148,7 +149,7 @@ int main(int argc, char *argv[])
     bool remoteInterface = FALSE;
     bool disableConsoleInput = FALSE;
     bool hwRestricted = FALSE;
-    ServiceFilter_t primaryServiceFilter;
+    
     DeliveryMethodInstance_t *dmInstance;
     char logFilename[PATH_MAX] = {0};
 
@@ -351,8 +352,8 @@ int main(int argc, char *argv[])
     INIT(PluginManagerInit(), "plugin manager");
 
     /* Create Service filter */
-    primaryServiceFilter = ServiceFilterCreate(TSReader, (char *)PrimaryService);
-    if (!primaryServiceFilter)
+    PrimaryServiceFilter = ServiceFilterCreate(TSReader, (char *)PrimaryService);
+    if (!PrimaryServiceFilter)
     {
         LogModule(LOG_ERROR, MAIN, "Failed to create primary service filter\n");
         exit(1);
@@ -375,7 +376,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    ServiceFilterDeliveryMethodSet(primaryServiceFilter, dmInstance);
+    ServiceFilterDeliveryMethodSet(PrimaryServiceFilter, dmInstance);
 
     if (DaemonMode || remoteInterface)
     {
@@ -570,6 +571,11 @@ TSReader_t *MainTSReaderGet(void)
 DVBAdapter_t *MainDVBAdapterGet(void)
 {
     return DVBAdapter;
+}
+
+ServiceFilter_t MainServiceFilterGetPrimary(void)
+{
+    return PrimaryServiceFilter;
 }
 
 bool MainIsDVB()

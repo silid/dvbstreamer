@@ -500,8 +500,7 @@ static void DeferredInformListeners(void * arg)
                 }
                 if (outputLine)
                 {
-                    listener->arg.dmInstance->ops->SendBlock(listener->arg.dmInstance,
-                        outputLine, outputLineLen);
+                    DeliveryMethodOutputBlock(listener->arg.dmInstance, outputLine, outputLineLen);
                 }
             }
         }

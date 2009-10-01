@@ -77,7 +77,7 @@ PATProcessor_t PATProcessorCreate(TSReader_t *reader)
     state = ObjectCreateType(PATProcessor_t);
     if (state)
     {
-        state->tsgroup = TSReaderCreateFilterGroup(reader, PATPROCESSOR, "MPEG2", PATProcessorFilterEventCallback, state);
+        state->tsgroup = TSReaderCreateFilterGroup(reader, PATPROCESSOR, MPEG2FilterType, PATProcessorFilterEventCallback, state);
     }
     return state;
 }

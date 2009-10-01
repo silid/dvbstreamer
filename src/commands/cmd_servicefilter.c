@@ -54,11 +54,14 @@ Command functions for service filter related tasks
 *******************************************************************************/
 
 #define FIND_SERVICE_FILTER(_name) \
-    filter = ServiceFilterFindFilter(_name); \
-    if (filter == NULL) \
     {\
-        CommandError(COMMAND_ERROR_GENERIC, "Service filter not found!"); \
-        return; \
+        TSReader_t *reader = MainTSReaderGet();\
+        filter = ServiceFilterFindFilter(reader, _name); \
+        if (filter == NULL) \
+        {\
+            CommandError(COMMAND_ERROR_GENERIC, "Service filter not found!"); \
+            return; \
+        }\
     }
 
 /*******************************************************************************
@@ -256,7 +259,7 @@ static void CommandAddSF(int argc, char **argv)
     ServiceFilter_t filter;
     
     CommandCheckAuthenticated();
-    filter = ServiceFilterFindFilter(argv[0]);
+    filter = ServiceFilterFindFilter(tsReader, argv[0]);
     if (filter)
     {
         CommandError(COMMAND_ERROR_GENERIC, "Service Filter of that name already exists!");
@@ -293,17 +296,22 @@ static void CommandRemoveSF(int argc, char **argv)
 
 static void CommandListSF(int argc, char **argv)
 {
-    ListIterator_t *iterator;
+    ListIterator_t iterator;
+    TSReader_t *reader = MainTSReaderGet();
     
-    for (iterator = ServiceFilterGetListIterator(); ListIterator_MoreEntries(*iterator); ListIterator_Next(*iterator))
+    ListIterator_ForEach(iterator, reader->groups)
     {
-        ServiceFilter_t filter = ListIterator_Current(*iterator);
-        Service_t *service = ServiceFilterServiceGet(filter);
-        char *name = ServiceFilterNameGet(filter);
-        DeliveryMethodInstance_t *dmInstance = ServiceFilterDeliveryMethodGet(filter);
-        CommandPrintf("%10s : %s (%s)\n", name,
-                DeliveryMethodGetMRL(dmInstance),
-                service ? service->name:"<NONE>");
+        TSFilterGroup_t *group = ListIterator_Current(iterator);
+        if (strcmp(group->type, ServiceFilterGroupType) == 0)
+        {
+            ServiceFilter_t filter = group->userArg;
+            Service_t *service = ServiceFilterServiceGet(filter);
+            char *name = ServiceFilterNameGet(filter);
+            DeliveryMethodInstance_t *dmInstance = ServiceFilterDeliveryMethodGet(filter);
+            CommandPrintf("%10s : %s (%s)\n", name,
+                    DeliveryMethodGetMRL(dmInstance),
+                    service ? service->name:"<NONE>");
+        }
     }
 }
 

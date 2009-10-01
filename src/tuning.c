@@ -83,7 +83,7 @@ void TuningCurrentServiceSet(Service_t *service)
 {
     Multiplex_t *multiplex;
     TSReader_t *reader = MainTSReaderGet();
-    ServiceFilter_t primaryServiceFilter;
+    ServiceFilter_t primaryServiceFilter = MainServiceFilterGetPrimary();
 
     if (!service)
     {
@@ -96,8 +96,6 @@ void TuningCurrentServiceSet(Service_t *service)
         TSReaderEnable(reader, FALSE);
 
         multiplex = MultiplexFindUID(service->multiplexUID);
-        primaryServiceFilter = ServiceFilterFindFilter(PrimaryService);
-
         if ((CurrentMultiplex!= NULL) && MultiplexAreEqual(multiplex, CurrentMultiplex))
         {
             LogModule(LOG_DEBUGV, TUNING, "Same multiplex\n");
@@ -143,7 +141,7 @@ Multiplex_t *TuningCurrentMultiplexGet(void)
 void TuningCurrentMultiplexSet(Multiplex_t *multiplex)
 {
     TSReader_t *reader = MainTSReaderGet();
-    ServiceFilter_t primaryServiceFilter;
+    ServiceFilter_t primaryServiceFilter = MainServiceFilterGetPrimary();
 
     TSReaderLock(reader);
     LogModule(LOG_DEBUG, TUNING, "Writing changes back to database.\n");
@@ -153,7 +151,6 @@ void TuningCurrentMultiplexSet(Multiplex_t *multiplex)
     LogModule(LOG_DEBUGV, TUNING, "Disabling filters\n");
     TSReaderEnable(reader, FALSE);
 
-    primaryServiceFilter = ServiceFilterFindFilter(PrimaryService);
     ServiceFilterServiceSet(primaryServiceFilter, NULL);
 
     TuneMultiplex(multiplex);

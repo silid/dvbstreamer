@@ -43,7 +43,7 @@ Time Date Table and Time Offset Table.
  */
 typedef struct dvbpsi_tdt_tot_s
 {
-    dvbpsi_date_time_t      t_date_time; /*!< UTC Date/Time */
+    struct tm               t_date_time; /*!< UTC Date/Time */
     dvbpsi_descriptor_t*    p_first_descriptor; /*!< TOT descriptors, only present if the table was a TOT */
 } dvbpsi_tdt_tot_t;
 
@@ -96,38 +96,26 @@ void dvbpsi_DetachTDTTOT(dvbpsi_handle h_dvbpsi);
           uint8_t i_version, int b_current_next)
  * \brief Initialize a user-allocated dvbpsi_tdt_tot_t structure.
  * \param p_tdt_tot pointer to the TDT/TOT structure
- * \param i_year Year in UTC
- * \param i_month Month in UTC
- * \param i_day Day in UTC
- * \param i_hour Hour in UTC
- * \param i_minute Minute in UTC
- * \param i_second Second in UTC
+ * \param p_date_time pointer to a tm structure to initialise the table or NULL 
+ *        to set all to 0.
  * \return nothing.
  */
-void dvbpsi_InitTDTTOT(dvbpsi_tdt_tot_t *p_tdt_tot,
-                        int i_year, int i_month, int i_day,
-                        int i_hour, int i_minute, int i_second);
+void dvbpsi_InitTDTTOT(dvbpsi_tdt_tot_t *p_tdt_tot, struct tm *p_date_time);
 
 /*!
  * \def dvbpsi_NewTDTTOT(p_nit, i_network_id, i_version, b_current_next)
  * \brief Allocate and initialize a new dvbpsi_nit_t structure.
  * \param p_tdt_tot pointer to the TDT/TOT structure
- * \param i_year Year in UTC
- * \param i_month Month in UTC
- * \param i_day Day in UTC
- * \param i_hour Hour in UTC
- * \param i_minute Minute in UTC
- * \param i_second Second in UTC
+ * \param p_date_time pointer to a tm structure to initialise the table or NULL 
+ *        to set all to 0.
  * \return nothing.
  */
-#define dvbpsi_NewTDTTOT(p_tdt_tot, i_year, i_month, i_day,         \
-                         i_hour, i_minute, i_second)                \
+#define dvbpsi_NewTDTTOT(p_tdt_tot,p_date_time)                \
 do {                                                                \
   ObjectRegisterTypeDestructor(dvbpsi_tdt_tot_t, (ObjectDestructor_t)dvbpsi_EmptyTDTTOT);\
   p_tdt_tot = (dvbpsi_tdt_tot_t*)ObjectCreateType(dvbpsi_tdt_tot_t);\
   if(p_tdt_tot != NULL)                                             \
-    dvbpsi_InitTDTTOT(p_tdt_tot, i_year, i_month, i_day,            \
-                      i_hour, i_minute, i_second);                  \
+    dvbpsi_InitTDTTOT(p_tdt_tot, p_date_time);                      \
 } while(0);
 
 
