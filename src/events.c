@@ -122,6 +122,10 @@ void EventsRegisterListenerByName(const char *event, EventListener_t listener, v
         {
             EventsRegisterSourceListener(src, listener, arg);
         }
+        else
+        {
+            LogModule(LOG_INFO, EVENTS, "Failed to find event source %s", event);
+        }
     }
     else
     {
@@ -129,6 +133,10 @@ void EventsRegisterListenerByName(const char *event, EventListener_t listener, v
         if (evt)
         {
             EventsRegisterEventListener(evt, listener, arg);
+        }
+        else
+        {
+            LogModule(LOG_INFO, EVENTS, "Failed to find event %s", event);
         }
     }
 }
@@ -142,12 +150,26 @@ void EventsUnregisterListenerByName(const char *event, EventListener_t listener,
     else if (strchr(event, '.') == NULL)
     {
         EventSource_t src = EventsFindSource(event);
-        EventsUnregisterSourceListener(src, listener, arg);
+        if (src)
+        {
+            EventsUnregisterSourceListener(src, listener, arg);
+        }
+        else
+        {
+            LogModule(LOG_INFO, EVENTS, "Failed to find event source %s", event);
+        }
     }
     else
     {
         Event_t evt = EventsFindEvent(event);
-        EventsUnregisterEventListener(evt, listener, arg);
+        if (evt)
+        {
+            EventsUnregisterEventListener(evt, listener, arg);
+        }
+        else
+        {
+            LogModule(LOG_INFO, EVENTS, "Failed to find event %s", event);
+        }
     }
 }
 
