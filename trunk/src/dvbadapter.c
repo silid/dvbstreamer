@@ -124,11 +124,11 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
         sprintf(result->frontEndPath, "/dev/dvb/adapter%d/frontend0", adapter);
         sprintf(result->demuxPath, "/dev/dvb/adapter%d/demux0", adapter);
         sprintf(result->dvrPath, "/dev/dvb/adapter%d/dvr0", adapter);
-        result->maxFilters = -1;
+        result->maxFilters = DVB_MAX_PID_FILTERS;
         /* Determine max number of filters */
         for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
         {
-            if (result->maxFilters == -1)
+            if (result->maxFilters > i)
             {
                 result->filters[i].demuxFd = open(result->demuxPath, O_RDWR);
                 if (result->filters[i].demuxFd == -1)
@@ -142,7 +142,8 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
             }
             
         }
-
+	printf("Max PID Filters = %d\n", result->maxFilters);
+        LogModule(LOG_INFO, DVBADAPTER, "Maximum filters = %d", result->maxFilters);
         for (i = 0; i < result->maxFilters; i ++)
         {
             close(result->filters[i].demuxFd);
@@ -501,7 +502,7 @@ int DVBFrontEndSetActive(DVBAdapter_t *adapter, bool active)
 int DVBDemuxSetBufferSize(DVBAdapter_t *adapter, unsigned long size)
 {
     int i;
-    for (i = 0; i < DVB_MAX_PID_FILTERS; i++)
+    for (i = 0; i < adapter->maxFilters; i++)
     {
         int demuxFd = adapter->filters[0].demuxFd;
 
@@ -535,7 +536,7 @@ int DVBDemuxAllocateFilter(DVBAdapter_t *adapter, uint16_t pid)
     int i;
     int idxToUse = -1;
 
-    for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
+    for (i = 0; i < adapter->maxFilters; i ++)
     {
         if (adapter->filters[i].demuxFd == -1)
         {
@@ -599,7 +600,7 @@ int DVBDemuxReleaseFilter(DVBAdapter_t *adapter, uint16_t pid)
     if (adapter->hardwareRestricted || (pid == 8192))
     {
         int i;
-        for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
+        for (i = 0; i < adapter->maxFilters; i ++)
         {
             if ((adapter->filters[i].demuxFd != -1) && (adapter->filters[i].pid == pid))
             {
@@ -619,7 +620,7 @@ int DVBDemuxReleaseAllFilters(DVBAdapter_t *adapter)
     int result = -1;
     int i;
     LogModule(LOG_DEBUG, DVBADAPTER, "Releasing all filters");
-    for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
+    for (i = 0; i < adapter->maxFilters; i ++)
     {
         if (adapter->filters[i].demuxFd != -1)
         {
@@ -667,7 +668,7 @@ static int DVBDemuxStopFilter(DVBAdapter_t *adapter, DVBAdapterPIDFilter_t *filt
 static void DVBDemuxStartAllFilters(DVBAdapter_t *adapter)
 {
     int i = 0;
-    for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
+    for (i = 0; i < adapter->maxFilters; i ++)
     {
         if (adapter->filters[i].demuxFd != -1)
         {
@@ -679,7 +680,7 @@ static void DVBDemuxStartAllFilters(DVBAdapter_t *adapter)
 static void DVBDemuxStopAllFilters(DVBAdapter_t *adapter)
 {
     int i = 0;
-    for (i = 0; i < DVB_MAX_PID_FILTERS; i ++)
+    for (i = 0; i < adapter->maxFilters; i ++)
     {
         if (adapter->filters[i].demuxFd != -1)
         {
