@@ -158,10 +158,13 @@ static void Install(bool installed)
 
 static void DVBtoEPGFilterGroupEventCallback(void *arg, TSFilterGroup_t *group, TSFilterEventType_e event, void *details)
 {
-    if (event == TSFilterEventType_MuxChanged)
+    if ((event == TSFilterEventType_MuxChanged) && tsgroup)
     {
-        TSFilterGroupRemoveSectionFilter(tsgroup, PID_EIT);
-        dvbpsi_DetachDemux(demux);
+        if (demux)
+        {
+            TSFilterGroupRemoveSectionFilter(tsgroup, PID_EIT);
+            dvbpsi_DetachDemux(demux);
+        }
         demux = dvbpsi_AttachDemux(SubTableHandler, NULL);
         TSFilterGroupAddSectionFilter(tsgroup, PID_EIT, 3, demux);
     }

@@ -229,7 +229,10 @@ void ServiceFilterServiceSet(ServiceFilter_t filter, Service_t *service)
         filter->multiplex = MultiplexFindUID(service->multiplexUID);
         ServiceRefInc(service);
         ServiceFilterPATRewrite(filter);
-        ServiceFilterPMTRewrite(filter);
+        if (filter->avsOnly)
+        {
+            ServiceFilterPMTRewrite(filter);
+        }
         ServiceFilterAllocateFilters(filter);
     }
     else
@@ -292,8 +295,14 @@ static void ServiceFilterFilterEventCallback(void *userArg, TSFilterGroup_t *gro
     TSFilterGroupRemoveAllFilters(filter->tsgroup);
     if (event == TSFilterEventType_StructureChanged)
     {
-        ServiceFilterPATRewrite(filter);
-        ServiceFilterPMTRewrite(filter);
+        if (filter->service)
+        {
+            ServiceFilterPATRewrite(filter);
+            if (filter->avsOnly)
+            {
+                ServiceFilterPMTRewrite(filter);
+            }
+        }
     }
     ServiceFilterAllocateFilters(filter);
 }
@@ -302,7 +311,7 @@ static void ServiceFilterPIDSUpdatedListener(void *userArg, Event_t event, void 
 {
     ServiceFilter_t filter = (ServiceFilter_t)userArg;
     Service_t *updatedService = details;
-    if (ServiceAreEqual(filter->service, updatedService))
+    if (filter->service && ServiceAreEqual(filter->service, updatedService))
     {
         TSFilterGroupRemoveAllFilters(filter->tsgroup);    
         ServiceFilterPMTRewrite(filter);
@@ -504,7 +513,7 @@ static void ServiceFilterAllocateFilters(ServiceFilter_t filter)
     MultiplexRefDec(mux);    
 
     /* Service is not part of the current mux */
-    if (filter->service->multiplexUID != muxUID)
+    if ((filter->service == NULL) || (filter->service->multiplexUID != muxUID))
     {
         return;
     }

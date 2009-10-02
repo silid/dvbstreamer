@@ -188,8 +188,11 @@ static void NowNextFilterEventHandler(void *userArg, struct TSFilterGroup_t *gro
 {
     if (event == TSFilterEventType_MuxChanged)
     {
-        TSFilterGroupRemoveSectionFilter(tsgroup, PID_EIT);
-        dvbpsi_DetachDemux(demux);
+        if (demux)
+        {
+            TSFilterGroupRemoveSectionFilter(tsgroup, PID_EIT);
+            dvbpsi_DetachDemux(demux);
+        }
         demux = dvbpsi_AttachDemux(SubTableHandler, NULL);
         TSFilterGroupAddSectionFilter(tsgroup, PID_EIT, 3, demux);
     }
