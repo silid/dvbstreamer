@@ -533,8 +533,8 @@ void dvbpsi_DecodeEITSections(dvbpsi_eit_t* p_eit,
 
       dvbpsi_DecodeMJDUTC(&p_byte[2], &t_start_time);
 
-      i_duration = ((((unsigned int)(p_byte[7] >> 4) & 0xf) * 10) + ((unsigned int)(p_byte[7] & 0xf)) * (60 * 60)) +
-                   ((((unsigned int)(p_byte[8] >> 4) & 0xf) * 10) + ((unsigned int)(p_byte[8] & 0xf)) * 60) +
+      i_duration = (((((unsigned int)(p_byte[7] >> 4) & 0xf) * 10) + ((unsigned int)(p_byte[7] & 0xf))) * (60 * 60)) +
+                   (((((unsigned int)(p_byte[8] >> 4) & 0xf) * 10) + ((unsigned int)(p_byte[8] & 0xf))) * 60) +
                    (((unsigned int)(p_byte[9] >> 4) & 0xf) * 10) + ((unsigned int)(p_byte[9] & 0xf));
 
       dvbpsi_eit_event_t* p_event = dvbpsi_EITAddEvent(p_eit,
