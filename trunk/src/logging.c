@@ -240,7 +240,7 @@ static void LogImpl(int level, const char *module, const char * format, va_list 
 
     if ((level == LOG_ERROR) && (errno != 0))
     {
-        fprintf(logFP, "%-19s | %-15s | %2d |  %-15s | errno = %d (%s)\n", timeBuffer,
+        fprintf(logFP, "%-19s | %-15s | %2d | %-15s | errno = %d (%s)\n", timeBuffer,
             module ? module:"<Unknown>", level, thread, errno, strerror(errno));
     }
 
