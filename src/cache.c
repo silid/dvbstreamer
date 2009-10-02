@@ -192,7 +192,13 @@ static pthread_t  cacheUpdateThread;
 
 int CacheInit()
 {
-    pthread_mutex_init(&cacheUpdateMutex, NULL);
+    pthread_mutexattr_t mutexAttr;    
+
+    pthread_mutexattr_init(&mutexAttr);
+    pthread_mutexattr_settype(&mutexAttr, PTHREAD_MUTEX_RECURSIVE);
+    pthread_mutex_init(&cacheUpdateMutex, &mutexAttr);
+    pthread_mutexattr_destroy(&mutexAttr);
+
 
     eventSource = EventsRegisterSource("cache");
     pidsUpdatedEvent = EventsRegisterEvent(eventSource, "pidsupdated", NULL);
