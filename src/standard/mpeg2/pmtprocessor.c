@@ -53,7 +53,6 @@ Process Program Map Tables and update the services information and PIDs.
 struct PMTProcessor_s
 {
     TSFilterGroup_t *tsgroup;
-    Multiplex_t   *multiplex;
     Service_t     *services[MAX_HANDLES];
     unsigned short pmtpids[MAX_HANDLES];
     dvbpsi_handle  pmthandles[MAX_HANDLES];
@@ -106,7 +105,6 @@ void PMTProcessorDestroy(PMTProcessor_t processor)
             processor->services[i]   = NULL;
         }
     }
-    MultiplexRefDec(processor->multiplex);
     ObjectRefDec(processor);
 }
 
@@ -147,14 +145,7 @@ static void PMTProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_
         state->pmthandles[i] = dvbpsi_AttachPMT(services[i]->id, PMTHandler, (void*)services[i]);
         TSFilterGroupAddSectionFilter(state->tsgroup, services[i]->pmtPid, 0, state->pmthandles[i]);
     }
-    CacheServicesRelease();
-    if (event == TSFilterEventType_MuxChanged)
-    {
-        MultiplexRefDec(state->multiplex);
-        state->multiplex = (Multiplex_t*)details;
-        MultiplexRefInc(state->multiplex);
-    }
-    
+    CacheServicesRelease();    
 }
 
 static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)

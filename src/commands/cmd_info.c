@@ -77,6 +77,7 @@ static void CommandListProperties(int argc, char **argv);
 static void CommandGetProperty(int argc, char **argv);
 static void CommandSetProperty(int argc, char **argv);
 static void CommandPropertyInfo(int argc, char **argv);
+static void CommandDumpTSReader(int argc, char **argv);
 static char* GetPropertyTypeString(PropertyType_e type);
 
 /*******************************************************************************
@@ -197,6 +198,13 @@ Command_t CommandDetailsInfo[] =
         "propinfo <property path>\n"
         "Display information about the specified property.",
         CommandPropertyInfo
+    },
+    {
+        "dumptsr",
+        0,0,
+        "Dump information from the TSReader",
+        "Dump information from the TSReader",
+        CommandDumpTSReader
     },
     COMMANDS_SENTINEL
 };
@@ -551,7 +559,7 @@ static void CommandStats(int argc, char **argv)
         CommandPrintf("%s\n", typeStats->type);
         for (groupStats = typeStats->groups; groupStats; groupStats = groupStats->next)
         {
-            CommandPrintf("    %20s : %d (%d)\n", groupStats->name, groupStats->packetsProcessed, groupStats->sectionsProcessed);
+            CommandPrintf("    %20s : %lld (%lld)\n", groupStats->name, groupStats->packetsProcessed, groupStats->sectionsProcessed);
         }
         CommandPrintf("\n");
     }
@@ -805,7 +813,63 @@ static void CommandPropertyInfo(int argc, char **argv)
     }
 }
 
-
+static void CommandDumpTSReader(int argc, char **argv)
+{
+    TSReader_t *reader = MainTSReaderGet();
+    ListIterator_t iterator;
+    int p;
+    CommandPrintf("PIDs Filters\n");
+    for (p = 0; p < TSREADER_PIDFILTER_BUCKETS; p ++)
+    {
+        List_t *list = reader->pidFilterBuckets[p];
+        ListIterator_ForEach(iterator, list)
+        {
+            ListIterator_t iterator_pf;
+            TSPacketFilterList_t *pfList = ListIterator_Current(iterator);
+            TSPacketFilter_t *pf;
+            CommandPrintf("    0x%04x\n", pfList->pid);
+            ListIterator_ForEach(iterator_pf, pfList->filters)
+            {
+                pf = ListIterator_Current(iterator_pf);
+                if (pf->group)
+                {
+                    CommandPrintf("        %s\n", pf->group->name);
+                }
+                else
+                {
+                    CommandPrintf("        <Section Filter>\n");
+                }
+            }
+        }
+        
+    }
+    CommandPrintf("Section filters - Active\n");
+    ListIterator_ForEach(iterator, reader->activeSectionFilters)
+    {
+        ListIterator_t iterator_sf;
+        TSSectionFilterList_t *sfList = ListIterator_Current(iterator);
+        TSSectionFilter_t *sf;
+        CommandPrintf("    0x%04x\n", sfList->pid);
+        ListIterator_ForEach(iterator_sf, sfList->filters)
+        {
+            sf = ListIterator_Current(iterator_sf);
+            CommandPrintf("        %s\n", sf->group->name);
+        }
+    }
+    CommandPrintf("Section filters - Awaiting scheduling\n");
+    ListIterator_ForEach(iterator, reader->sectionFilters)
+    {
+        ListIterator_t iterator_sf;
+        TSSectionFilterList_t *sfList = ListIterator_Current(iterator);
+        TSSectionFilter_t *sf;
+        CommandPrintf("    0x%04x\n", sfList->pid);
+        ListIterator_ForEach(iterator_sf, sfList->filters)
+        {
+            sf = ListIterator_Current(iterator_sf);
+            CommandPrintf("        %s\n", sf->group->name);
+        }
+    }
+}
 static char* GetPropertyTypeString(PropertyType_e type)
 {
     char *typeStr = NULL;

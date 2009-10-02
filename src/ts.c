@@ -189,7 +189,7 @@ TSReaderStats_t *TSReaderExtractStats(TSReader_t *reader)
 
         filterGroupStats->name = group->name;
         filterGroupStats->packetsProcessed = group->packetsProcessed;
-        filterGroupStats->sectionsProcessed= group->sectionsProcessed;
+        filterGroupStats->sectionsProcessed = group->sectionsProcessed;
         StatsAddFilterGroupStats(stats, group->type, filterGroupStats);
     }
     pthread_mutex_unlock(&reader->mutex);
@@ -289,6 +289,7 @@ TSFilterGroup_t* TSReaderFindFilterGroup(TSReader_t *reader, const char *name, c
 
 void TSFilterGroupDestroy(TSFilterGroup_t* group)
 {
+    LogModule(LOG_DEBUG, TSREADER, "Destroying filter group %s", group->name);
     TSFilterGroupRemoveAllFilters(group);
     pthread_mutex_lock(&group->tsReader->mutex);
     ListRemove(group->tsReader->groups, group);
@@ -298,6 +299,7 @@ void TSFilterGroupDestroy(TSFilterGroup_t* group)
 
 void  TSFilterGroupResetStats(TSFilterGroup_t* group)
 {
+    LogModule(LOG_DEBUG, TSREADER, "Resetting stats for filter group %s", group->name);
     pthread_mutex_lock(&group->tsReader->mutex);
     group->packetFilters = 0;
     group->sectionFilters = 0;
@@ -310,7 +312,7 @@ void TSFilterGroupRemoveAllFilters(TSFilterGroup_t* group)
     TSPacketFilter_t *packetFilterNext;
     TSSectionFilter_t *sectionFilter;
     TSSectionFilter_t *sectionFilterNext;
-    
+    LogModule(LOG_DEBUG, TSREADER, "Removing all filters for filter group %s", group->name);    
     pthread_mutex_lock(&group->tsReader->mutex);    
     for (packetFilter = group->packetFilters; packetFilter; packetFilter = packetFilterNext)
     {
@@ -336,7 +338,7 @@ void TSFilterGroupAddSectionFilter(TSFilterGroup_t *group, uint16_t pid, int pri
     sectionFilter->priority = priority;
     sectionFilter->sectionHandle = handle;
     sectionFilter->group = group;
-
+    LogModule(LOG_DEBUG, TSREADER, "Adding section filter 0x%04x for filter group %s", pid, group->name);    
     pthread_mutex_lock(&group->tsReader->mutex); 
     sectionFilter->next = group->sectionFilters;
     group->sectionFilters = sectionFilter;
@@ -348,6 +350,7 @@ void TSFilterGroupRemoveSectionFilter(TSFilterGroup_t *group, uint16_t pid)
 {
     TSSectionFilter_t *sectionFilter;
     TSSectionFilter_t *sectionFilterPrev = NULL;
+    LogModule(LOG_DEBUG, TSREADER, "Removing section filter 0x%04x for filter group %s", pid, group->name);        
     pthread_mutex_lock(&group->tsReader->mutex); 
     for (sectionFilter = group->sectionFilters; sectionFilter; sectionFilter = sectionFilter->next)
     {
@@ -373,15 +376,20 @@ bool TSFilterGroupAddPacketFilter(TSFilterGroup_t *group, uint16_t pid, TSPacket
 {
     TSPacketFilter_t *packetFilter = ObjectCreateType(TSPacketFilter_t);
     bool result = TRUE;
+
+    LogModule(LOG_DEBUG, TSREADER, "Adding packet filter 0x%04x for filter group %s", pid, group->name);        
     packetFilter->pid = pid;
     packetFilter->userArg = userArg;
     packetFilter->callback = callback;
+    packetFilter->group = group;
     pthread_mutex_lock(&group->tsReader->mutex);
     if (!PacketFilterListAddFilter(group->tsReader, packetFilter))
     {
         ObjectRefDec(packetFilter);
         result = FALSE;
     }
+    packetFilter->next = group->packetFilters;
+    group->packetFilters = packetFilter;
     pthread_mutex_unlock(&group->tsReader->mutex);
     return result;
 }
@@ -390,6 +398,8 @@ void TSFilterGroupRemovePacketFilter(TSFilterGroup_t *group, uint16_t pid)
 {
     TSPacketFilter_t *packetFilter;
     TSPacketFilter_t *packetFilterPrev = NULL;
+
+    LogModule(LOG_DEBUG, TSREADER, "Removing packet filter 0x%04x for filter group %s", pid, group->name);        
     pthread_mutex_lock(&group->tsReader->mutex);
     for (packetFilter = group->packetFilters; packetFilter; packetFilter = packetFilter->next)
     {
@@ -418,13 +428,18 @@ void TSFilterGroupRemovePacketFilter(TSFilterGroup_t *group, uint16_t pid)
 *******************************************************************************/
 static void NotifyThread(TSReader_t* reader, char id)
 {
+    LogModule(LOG_DEBUG, TSREADER, "Sending notification %c", id);
     pthread_mutex_lock(&reader->mutex);
     if (!reader->notificationSent)
     {
         reader->notificationSent = TRUE;
-        write(reader->notificationFds[1], &id, 1);
+        if (write(reader->notificationFds[1], &id, 1) == -1)
+        {
+            LogModule(LOG_ERROR, TSREADER, "Failed to send notification!");
+        }
     }
-    pthread_mutex_lock(&reader->mutex);
+    pthread_mutex_unlock(&reader->mutex);
+    LogModule(LOG_DEBUG, TSREADER, "Notification %c sent", id);
 }
 
 static void TSReaderStatsDestructor(void *ptr)
@@ -470,10 +485,12 @@ static void StatsAddFilterGroupStats(TSReaderStats_t *stats, const char *type, T
 static TSPacketFilterList_t *PacketFilterListCreate(TSReader_t *reader, uint16_t pid)
 {
     List_t *list;
+    LogModule(LOG_DEBUG, TSREADER, "Creating packet filter 0x%04x", pid);    
     if (!reader->promiscuousMode || reader->adapter->hardwareRestricted)
     {
         if (DVBDemuxAllocateFilter(reader->adapter, pid))
         {
+             LogModule(LOG_INFO, TSREADER, "Failed to allocate filter for 0x%04x", pid);
             return NULL;
         }
     }
@@ -481,13 +498,14 @@ static TSPacketFilterList_t *PacketFilterListCreate(TSReader_t *reader, uint16_t
     TSPacketFilterList_t *pfList = ObjectCreateType(TSPacketFilterList_t);
     pfList->pid = pid;
     pfList->filters = ListCreate();
-    if (TSREADER_PID_ALL)
+    if (pid == TSREADER_PID_ALL)
     {
         reader->promiscuousPidFilters = pfList;
         reader->promiscuousMode = TRUE;
     }
     else
     {
+        LogModule(LOG_DEBUG, TSREADER, "PID Bucket %d", pid / (TS_MAX_PIDS / TSREADER_PIDFILTER_BUCKETS));            
         list = TSREADER_PIDFILTER_GETBUCKET(reader, pid);
         ListAdd(list, pfList);
     }
@@ -500,7 +518,7 @@ static void PacketFilterListDestroy(TSReader_t *reader, TSPacketFilterList_t *pf
     {
         DVBDemuxReleaseFilter(reader->adapter, pfList->pid);
     }
-    if (TSREADER_PID_ALL)
+    if (pfList->pid == TSREADER_PID_ALL)
     {
         reader->promiscuousPidFilters = NULL;
     }
@@ -552,10 +570,20 @@ static bool PacketFilterListAddFilter(TSReader_t *reader, TSPacketFilter_t *pack
 static void PacketFilterListRemoveFilter(TSReader_t *reader, TSPacketFilter_t *packetFilter)
 {
     TSPacketFilterList_t *pfList = PacketFilterListFind(reader,packetFilter->pid);
-    ListRemove(pfList->filters, packetFilter);
-    if (ListCount(pfList->filters) == 0)
+    LogModule(LOG_DEBUG, TSREADER, "Removing packet filter %p on pid 0x%02x", packetFilter, packetFilter->pid);
+    if (pfList)
     {
-        PacketFilterListDestroy(reader, pfList);
+        ListRemove(pfList->filters, packetFilter);
+        LogModule(LOG_DEBUG, TSREADER, "Packet filter list for pid 0x%02x now contains %d filters", packetFilter->pid, ListCount(pfList->filters));
+        if (ListCount(pfList->filters) == 0)
+        {
+            PacketFilterListDestroy(reader, pfList);
+            SectionFilterListScheduleFilters(reader);            
+        }
+    }
+    else
+    {
+        LogModule(LOG_DEBUG, TSREADER, "Packet filter list not found for pid 0x%02x", packetFilter->pid);
     }
 }
 
@@ -564,12 +592,14 @@ static TSSectionFilterList_t * SectionFilterListCreate(TSReader_t *reader, uint1
     TSSectionFilterList_t *sfList = ObjectCreateType(TSSectionFilterList_t);
     sfList->pid = pid;
     sfList->filters = ListCreate();
+    sfList->tsReader = reader;
     sfList->sectionHandle = dvbpsi_AttachSections(SectionFilterListPushSection, sfList);
     sfList->packetFilter = ObjectCreateType(TSPacketFilter_t);
     sfList->packetFilter->pid = sfList->pid;
     sfList->packetFilter->userArg = sfList;
     sfList->packetFilter->callback = SectionFilterListPacketCallback;
     ListAdd(reader->sectionFilters, sfList);
+    return sfList;
 }
 
 static void SectionFilterListDestroy(TSReader_t *reader, TSSectionFilterList_t *sfList)
@@ -577,7 +607,6 @@ static void SectionFilterListDestroy(TSReader_t *reader, TSSectionFilterList_t *
     if (ListRemove(reader->activeSectionFilters, sfList))
     {
         PacketFilterListRemoveFilter(reader, sfList->packetFilter);
-        SectionFilterListScheduleFilters(reader);
     }
     else
     {
@@ -602,19 +631,23 @@ static void SectionFilterListAddFilter(TSReader_t *reader, TSSectionFilter_t *fi
     }
     ListAdd(sfList->filters, filter);
     SectionFilterListUpdatePriority(sfList);
+    SectionFilterListScheduleFilters(reader);
 }
 
 static void SectionFilterListRemoveFilter(TSReader_t *reader, TSSectionFilter_t *filter)
 {
     TSSectionFilterList_t *sfList = SectionFilterListFind(reader, filter->pid);
-    ListRemove(sfList->filters, filter);
-    if (ListCount(sfList->filters) == 0)
+    if (sfList)
     {
-        SectionFilterListDestroy(reader, sfList);
-    }
-    else
-    {
-        SectionFilterListUpdatePriority(sfList);
+        ListRemove(sfList->filters, filter);
+        if (ListCount(sfList->filters) == 0)
+        {
+            SectionFilterListDestroy(reader, sfList);
+        }
+        else
+        {
+            SectionFilterListUpdatePriority(sfList);
+        }
     }
 }
 
@@ -674,6 +707,7 @@ static TSSectionFilterList_t * SectionFilterListFind(TSReader_t *reader, uint16_
 static void SectionFilterListScheduleFilters(TSReader_t *reader)
 {
     ListIterator_t iterator;
+    LogModule(LOG_DEBUG, TSREADER, "Scheduling section filters");
     /* TODO: Take into account priority */
     for (ListIterator_Init(iterator, reader->sectionFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
@@ -691,7 +725,7 @@ static void SectionFilterListScheduleFilters(TSReader_t *reader)
 static void SectionFilterListDescheduleFilters(TSReader_t *reader)
 {
     ListIterator_t iterator;
-
+    LogModule(LOG_DEBUG, TSREADER, "Descheduling section filters");
     for (ListIterator_Init(iterator, reader->activeSectionFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         TSSectionFilterList_t *sfList = ListIterator_Current(iterator);
@@ -771,19 +805,22 @@ static void *FilterTS(void *arg)
 
     gettimeofday(&last, 0);
       
-    pfd[0].fd = state->notificationFds[0];
-    pfd[0].events = POLLIN;
-    pfd[0].revents = 0;
+   
     
     while (!state->quit)
     {
         int p;
+        int n;
 
+        pfd[0].fd = state->notificationFds[0];
+        pfd[0].events = POLLIN;
         pfd[0].revents = 0;
         pfd[1].fd = DVBDVRGetFD(adapter);
         pfd[1].events = POLLIN;
         pfd[1].revents = 0;
-        if (poll(pfd, MAX_FDS, 0) == -1)
+
+        n = poll(pfd, MAX_FDS, -1);
+        if (n == -1)
         {
             LogModule(LOG_ERROR, TSREADER, "Poll() failed! %s");
             ObjectFree(readBuffer);

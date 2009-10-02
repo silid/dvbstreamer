@@ -375,8 +375,10 @@ int DVBDemuxAllocateFilter(DVBAdapter_t *adapter, uint16_t pid)
     }
     if (idxToUse != -1)
     {
-        LogModule(LOG_DEBUG, FILEADAPTER, "Allocation filter for pid 0x%x\n", pid);
+        LogModule(LOG_DEBUG, FILEADAPTER, "Allocated filter for pid 0x%x\n", pid);
         adapter->filters[idxToUse].demuxFd = 1;
+        adapter->filters[idxToUse].pid = pid;
+        result = 0;
     }
 
     return result;
