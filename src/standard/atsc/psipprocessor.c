@@ -232,7 +232,7 @@ static void ProcessVCT(void *arg, dvbpsi_atsc_vct_t *newVCT)
     dvbpsi_atsc_vct_channel_t *channel;
     int count,i;
     Service_t **services;
-    TSReader_t *tsfilter = (TSReader_t*)arg;
+    TSReader_t *tsReader = ((TSFilterGroup_t*)arg)->tsReader;
     
     LogModule(LOG_DEBUG, PSIPPROCESSOR, "New VCT Recieved! Version %d Protocol %d Cable VCT? %s TS Id = 0x%04x\n", 
         newVCT->i_version, newVCT->i_protocol, newVCT->b_cable_vct ? "Yes":"No", newVCT->i_ts_id);
@@ -342,7 +342,7 @@ static void ProcessVCT(void *arg, dvbpsi_atsc_vct_t *newVCT)
                 services = CacheServicesGet(&count);
                 i --;
                 /* Cause a TS Structure change call back*/
-                tsfilter->tsStructureChanged = TRUE;
+                tsReader->tsStructureChanged = TRUE;
             }
         }
     }
