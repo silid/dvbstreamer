@@ -44,7 +44,6 @@ Process Program Association Tables and update the services information.
 *******************************************************************************/
 struct PATProcessor_s
 {
-    TSReader_t *tsfilter;
     TSFilterGroup_t *tsgroup;
     Multiplex_t *multiplex;
     dvbpsi_handle pathandle;
@@ -131,7 +130,7 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
     if (multiplex->patVersion == -1)
     {
         /* Cause a TS Structure change call back*/
-        state->tsfilter->tsStructureChanged = TRUE;
+        state->tsgroup->tsReader->tsStructureChanged = TRUE;
     }
     /* Version has changed update the services */
 
@@ -146,7 +145,7 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
                 LogModule(LOG_DEBUG, PATPROCESSOR, "Service not found in cache while processing PAT, adding 0x%04x\n", patentry->i_number);
                 service = CacheServiceAdd(patentry->i_number);
                 /* Cause a TS Structure change call back*/
-                state->tsfilter->tsStructureChanged = TRUE;
+                state->tsgroup->tsReader->tsStructureChanged = TRUE;
             }
             else
             {
@@ -189,7 +188,7 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
                 services = CacheServicesGet(&count);
                 i --;
                 /* Cause a TS Structure change call back*/
-                state->tsfilter->tsStructureChanged = TRUE;
+                state->tsgroup->tsReader->tsStructureChanged = TRUE;
             }
         }
     }
