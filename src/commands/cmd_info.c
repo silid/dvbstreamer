@@ -818,7 +818,15 @@ static void CommandDumpTSReader(int argc, char **argv)
     TSReader_t *reader = MainTSReaderGet();
     ListIterator_t iterator;
     int p;
-    CommandPrintf("PIDs Filters\n");
+    int count = 0;
+
+    for (p = 0; p < TSREADER_PIDFILTER_BUCKETS; p ++)
+    {
+        List_t *list = reader->pidFilterBuckets[p];
+        count += ListCount(list);
+    }
+    
+    CommandPrintf("PID Filters (%d)\n",count);
     for (p = 0; p < TSREADER_PIDFILTER_BUCKETS; p ++)
     {
         List_t *list = reader->pidFilterBuckets[p];
@@ -843,7 +851,7 @@ static void CommandDumpTSReader(int argc, char **argv)
         }
         
     }
-    CommandPrintf("Section filters - Active\n");
+    CommandPrintf("Section filters - Active (%d)\n", ListCount(reader->activeSectionFilters));
     ListIterator_ForEach(iterator, reader->activeSectionFilters)
     {
         ListIterator_t iterator_sf;
@@ -856,7 +864,7 @@ static void CommandDumpTSReader(int argc, char **argv)
             CommandPrintf("        %s\n", sf->group->name);
         }
     }
-    CommandPrintf("Section filters - Awaiting scheduling\n");
+    CommandPrintf("Section filters - Awaiting scheduling (%d)\n", ListCount(reader->sectionFilters));
     ListIterator_ForEach(iterator, reader->sectionFilters)
     {
         ListIterator_t iterator_sf;
