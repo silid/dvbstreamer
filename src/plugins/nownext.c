@@ -180,6 +180,10 @@ static void Install(bool installed)
     else
     {
         TSFilterGroupDestroy(tsgroup);
+        if (demux)
+        {
+            dvbpsi_DetachDemux(demux);
+        }
         ListFree(serviceNowNextInfoList, free);
     }
 }
@@ -226,20 +230,19 @@ static void ProcessEIT(void *arg, dvbpsi_eit_t *newEIT)
             info->tsId = newEIT->i_ts_id;
             info->serviceId = newEIT->i_service_id;
         }
-        else
-        {
-            return;
-        }
     }
 
-    memset(&info->now, 0, sizeof(Event_t));
-    memset(&info->next, 0, sizeof(Event_t));
-    if (newEIT->p_first_event)
+    if (info)
     {
-        UpdateEvent(&info->now, newEIT->p_first_event);
-        if (newEIT->p_first_event->p_next)
+        memset(&info->now, 0, sizeof(Event_t));
+        memset(&info->next, 0, sizeof(Event_t));
+        if (newEIT->p_first_event)
         {
-            UpdateEvent(&info->next, newEIT->p_first_event->p_next);
+            UpdateEvent(&info->now, newEIT->p_first_event);
+            if (newEIT->p_first_event->p_next)
+            {
+                UpdateEvent(&info->next, newEIT->p_first_event->p_next);
+            }
         }
     }
 
