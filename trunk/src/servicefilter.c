@@ -160,7 +160,10 @@ void ServiceFilterDestroy(ServiceFilter_t filter)
     {
         MultiplexRefDec(filter->multiplex);
     }
-    ServiceRefDec(filter->service);
+    if (filter->service)
+    {
+        ServiceRefDec(filter->service);
+    }
     ListRemove(ServiceFilterList, filter);
     free(filter->name);
     ObjectRefDec(filter);

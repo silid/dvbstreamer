@@ -83,9 +83,10 @@ PATProcessor_t PATProcessorCreate(TSReader_t *reader)
 
 void PATProcessorDestroy(PATProcessor_t processor)
 {
+    TSFilterGroupDestroy(processor->tsgroup);
+
     if (processor->multiplex)
     {
-        TSFilterGroupDestroy(processor->tsgroup);
         dvbpsi_DetachPAT(processor->pathandle);
         MultiplexRefDec(processor->multiplex);
     }

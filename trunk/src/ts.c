@@ -139,19 +139,13 @@ TSReader_t* TSReaderCreate(DVBAdapter_t *adapter)
 void TSReaderDestroy(TSReader_t* reader)
 {
     int i;
-    ListIterator_t iterator;
     SectionFilterListDescheduleFilters(reader);
     reader->quit = TRUE;
     NotifyThread(reader, 'q');
     pthread_join(reader->thread, NULL);
     pthread_mutex_destroy(&reader->mutex);
-
-    for (ListIterator_Init(iterator, reader->groups); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
-    {
-        TSFilterGroup_t *group = ListIterator_Current(iterator);
-        TSFilterGroupDestroy(group);
-    }
-    ListFree(reader->groups, NULL);
+    
+    ListFree(reader->groups, (void (*)(void*))TSFilterGroupDestroy);
     
     for (i = 0; i < TSREADER_PIDFILTER_BUCKETS; i ++)
     {
@@ -259,7 +253,6 @@ TSFilterGroup_t* TSReaderCreateFilterGroup(TSReader_t *reader, const char *name,
         group->eventCallback = callback;
         group->userArg = userArg;
         group->tsReader = reader;
-        ObjectRefInc(group);
         pthread_mutex_lock(&reader->mutex);        
         ListAdd(reader->groups, group);
         pthread_mutex_unlock(&reader->mutex);
