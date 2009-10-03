@@ -279,7 +279,6 @@ Event_t EventsFindEvent(const char *name)
     int sourceNameLen;
     EventSource_t source = NULL;
     Event_t result = NULL;
-    LogModule(LOG_DEBUG, EVENTS, "Looking for %s", name);
     pthread_mutex_lock(&eventsMutex);
     for (sourceNameLen = 0; name[sourceNameLen];sourceNameLen ++)
     {
@@ -293,12 +292,10 @@ Event_t EventsFindEvent(const char *name)
     {
         memcpy(sourceName, name, sourceNameLen);
         sourceName[sourceNameLen] = 0;
-        LogModule(LOG_DEBUG, EVENTS, "Looking for source %s", sourceName);
         source = EventsFindSource(sourceName);
         if (source)
         {
             ListIterator_t iterator;
-            LogModule(LOG_DEBUG, EVENTS, "Looking for event %s", &name[sourceNameLen + 1]);            
             for (ListIterator_Init(iterator, source->events);
                  ListIterator_MoreEntries(iterator);
                  ListIterator_Next(iterator))
@@ -320,7 +317,7 @@ Event_t EventsFindEvent(const char *name)
 void EventsFireEventListeners(Event_t event, void *payload)
 {
     pthread_mutex_lock(&eventsMutex);
-    LogModule(LOG_DEBUG, EVENTS, "Firing event %s.%s\n", event->source->name, event->name);
+    LogModule(LOG_DEBUGV, EVENTS, "Firing event %s.%s\n", event->source->name, event->name);
     FireEventListeners(globalListenersList, event, payload);
     FireEventListeners(event->source->listeners, event, payload);
     FireEventListeners(event->listeners, event, payload);
@@ -425,7 +422,6 @@ static void FireEventListeners(List_t *listenerList, Event_t event, void *payloa
     for (ListIterator_Init(iterator, listenerList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         EventListenerDetails_t *details = (EventListenerDetails_t*)ListIterator_Current(iterator);
-        LogModule(LOG_DEBUG, EVENTS, "Sending event to %p\n", details);
         details->callback(details->arg, event, payload);
     }
 }
