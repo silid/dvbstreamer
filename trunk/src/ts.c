@@ -498,7 +498,6 @@ static TSPacketFilterList_t *PacketFilterListCreate(TSReader_t *reader, uint16_t
     }
     else
     {
-        LogModule(LOG_DEBUG, TSREADER, "PID Bucket %d", pid / (TS_MAX_PIDS / TSREADER_PIDFILTER_BUCKETS));            
         list = TSREADER_PIDFILTER_GETBUCKET(reader, pid);
         ListAdd(list, pfList);
     }

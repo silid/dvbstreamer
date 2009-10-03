@@ -142,7 +142,7 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
             }
             
         }
-	printf("Max PID Filters = %d\n", result->maxFilters);
+
         LogModule(LOG_INFO, DVBADAPTER, "Maximum filters = %d", result->maxFilters);
         for (i = 0; i < result->maxFilters; i ++)
         {
