@@ -48,6 +48,11 @@ Transport stream processing and filter management.
 #define MAX_PACKETS 20
 
 /**
+ * Minimum number of PID Filters to reserve for section filters.
+ */
+#define MIN_SECTION_FILTER_PIDS 4
+
+/**
  * Retrieve the bucket a specific pid filter should be stored in.
  */
 #define TSREADER_PIDFILTER_GETBUCKET(_reader, _pid) (_reader)->pidFilterBuckets[(_pid) / (TS_MAX_PIDS / TSREADER_PIDFILTER_BUCKETS)]
@@ -58,7 +63,8 @@ Transport stream processing and filter management.
 static void NotifyThread(TSReader_t* reader, char id);
 static void TSReaderStatsDestructor(void *ptr);
 static void StatsAddFilterGroupStats(TSReaderStats_t *stats, const char *type, TSFilterGroupStats_t *filterGroupStats);
-static TSPacketFilterList_t *PacketFilterListCreate(TSReader_t *reader, uint16_t pid);
+static void PromiscusModeEnable(TSReader_t *reader, bool enable);
+static TSPacketFilterList_t *PacketFilterListCreate(TSReader_t *reader, uint16_t pid, bool forSF);
 static void PacketFilterListDestroy(TSReader_t *reader, TSPacketFilterList_t *pfList);
 static TSPacketFilterList_t *PacketFilterListFind(TSReader_t *reader, uint16_t pid);
 static bool PacketFilterListAddFilter(TSReader_t *reader, TSPacketFilter_t *packetFilter);
@@ -71,6 +77,7 @@ static void SectionFilterListUpdatePriority(TSSectionFilterList_t *sfList);
 static TSSectionFilterList_t * SectionFilterListFind(TSReader_t *reader, uint16_t pid);
 static void SectionFilterListScheduleFilters(TSReader_t *reader);
 static void SectionFilterListDescheduleFilters(TSReader_t *reader);
+static void SectionFilterListDescheduleOneFilter(TSReader_t *reader);
 static void SectionFilterListPacketCallback(void *userArg, struct TSFilterGroup_t *group, TSPacket_t *packet);
 static void SectionFilterListPushSection(void *userArg, dvbpsi_handle sectionsHandle, dvbpsi_psi_section_t *section);
 
@@ -309,8 +316,10 @@ void TSFilterGroupRemoveAllFilters(TSFilterGroup_t* group)
     pthread_mutex_lock(&group->tsReader->mutex);    
     for (packetFilter = group->packetFilters; packetFilter; packetFilter = packetFilterNext)
     {
+        LogModule(LOG_DEBUG, TSREADER, "Removing %p", packetFilter);
         PacketFilterListRemoveFilter(group->tsReader, packetFilter);
         packetFilterNext = packetFilter->next;
+        LogModule(LOG_DEBUG, TSREADER, "Removed %p next %p", packetFilter, packetFilterNext);
         ObjectRefDec(packetFilter);
     }
     group->packetFilters = NULL;
@@ -475,17 +484,94 @@ static void StatsAddFilterGroupStats(TSReaderStats_t *stats, const char *type, T
     typeStats->groups = filterGroupStats;
 }
 
-static TSPacketFilterList_t *PacketFilterListCreate(TSReader_t *reader, uint16_t pid)
+static void PromiscusModeEnable(TSReader_t *reader, bool enable)
+{
+    int i;
+    ListIterator_t iterator;
+    if (enable == reader->promiscuousMode)
+    {
+        return;
+    }
+
+    for (i = 0; i < TSREADER_PIDFILTER_BUCKETS; i ++)
+    {
+        ListIterator_ForEach(iterator, reader->pidFilterBuckets[i])
+        {
+            TSPacketFilterList_t *pfList = ListIterator_Current(iterator);
+            if (enable)
+            {
+                DVBDemuxReleaseFilter(reader->adapter, pfList->pid);
+            }
+            else
+            {
+                DVBDemuxAllocateFilter(reader->adapter, pfList->pid);
+                LogModule(LOG_INFO, TSREADER, "Failed to allocate filter for 0x%04x", pfList->pid);
+            }
+        }
+    }
+    if (enable)
+    {
+        DVBDemuxAllocateFilter(reader->adapter, TSREADER_PID_ALL);
+
+    }
+    else
+    {
+        DVBDemuxReleaseFilter(reader->adapter, TSREADER_PID_ALL);
+    }
+    reader->promiscuousMode = enable;
+}
+
+static TSPacketFilterList_t *PacketFilterListCreate(TSReader_t *reader, uint16_t pid, bool forSF)
 {
     List_t *list;
     LogModule(LOG_DEBUG, TSREADER, "Creating packet filter 0x%04x", pid);    
-    if (!reader->promiscuousMode || reader->adapter->hardwareRestricted)
+    if (!reader->promiscuousMode && (pid != TSREADER_PID_ALL))
     {
-        if (DVBDemuxAllocateFilter(reader->adapter, pid))
+        int p, pidCount = 0;
+        
+        for (p = 0; p < TSREADER_PIDFILTER_BUCKETS; p ++)
         {
-             LogModule(LOG_INFO, TSREADER, "Failed to allocate filter for 0x%04x", pid);
+            pidCount += ListCount(reader->pidFilterBuckets[p]);
+        }
+
+        if (!forSF && ((pidCount - ListCount(reader->activeSectionFilters))<=MIN_SECTION_FILTER_PIDS))
+        {
             return NULL;
         }
+        
+        if (DVBDemuxAllocateFilter(reader->adapter, pid))
+        {
+            if (reader->adapter->hardwareRestricted)
+            {
+                /* If this is a section filter and we are HW restricted fail straight away*/
+                if (forSF)
+                {
+                    return NULL;
+                }
+                /* If this is not for a section filter and we are HW restricted try 
+                 * and release a Section Filter PID filter so we can start this one.
+                 */
+                if (!forSF && (ListCount(reader->activeSectionFilters) > MIN_SECTION_FILTER_PIDS))
+                {
+                    SectionFilterListDescheduleOneFilter(reader);
+                }
+                if (DVBDemuxAllocateFilter(reader->adapter, pid))
+                {
+                    LogModule(LOG_INFO, TSREADER, "Failed to allocate filter for 0x%04x", pid);
+                    return NULL;
+                }
+            }
+            else
+            {
+                PromiscusModeEnable(reader, TRUE);
+            }
+
+        }
+    }
+
+    if (!reader->adapter->hardwareRestricted && !reader->promiscuousMode && (pid == TSREADER_PID_ALL))
+    {
+        PromiscusModeEnable(reader, TRUE);
     }
 
     TSPacketFilterList_t *pfList = ObjectCreateType(TSPacketFilterList_t);
@@ -494,7 +580,6 @@ static TSPacketFilterList_t *PacketFilterListCreate(TSReader_t *reader, uint16_t
     if (pid == TSREADER_PID_ALL)
     {
         reader->promiscuousPidFilters = pfList;
-        reader->promiscuousMode = TRUE;
     }
     else
     {
@@ -506,11 +591,11 @@ static TSPacketFilterList_t *PacketFilterListCreate(TSReader_t *reader, uint16_t
 
 static void PacketFilterListDestroy(TSReader_t *reader, TSPacketFilterList_t *pfList)
 {
-    if (!reader->promiscuousMode || reader->adapter->hardwareRestricted)
+    if (!reader->promiscuousMode && (pfList->pid != TSREADER_PID_ALL))
     {
         DVBDemuxReleaseFilter(reader->adapter, pfList->pid);
     }
-    if (pfList->pid == TSREADER_PID_ALL)
+    if (pfList == reader->promiscuousPidFilters )
     {
         reader->promiscuousPidFilters = NULL;
     }
@@ -549,7 +634,7 @@ static bool PacketFilterListAddFilter(TSReader_t *reader, TSPacketFilter_t *pack
     TSPacketFilterList_t *pfList = PacketFilterListFind(reader, packetFilter->pid);
     if (pfList == NULL)
     {
-        pfList = PacketFilterListCreate(reader, packetFilter->pid);
+        pfList = PacketFilterListCreate(reader, packetFilter->pid, packetFilter->group == NULL);
         if (pfList == NULL)
         {
             return FALSE;
@@ -724,6 +809,34 @@ static void SectionFilterListDescheduleFilters(TSReader_t *reader)
         PacketFilterListRemoveFilter(sfList->tsReader, sfList->packetFilter);
         ListRemoveCurrent(&iterator);
         ListAdd(reader->sectionFilters, sfList);
+    }
+}
+
+static void SectionFilterListDescheduleOneFilter(TSReader_t *reader)
+{
+    ListIterator_t iterator;
+    TSSectionFilterList_t *toDeschedule = NULL;
+    
+    LogModule(LOG_DEBUG, TSREADER, "Descheduling one section filter");
+    for (ListIterator_Init(iterator, reader->activeSectionFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    {
+        TSSectionFilterList_t *sfList = ListIterator_Current(iterator);
+        TSPacketFilterList_t *pfList = PacketFilterListFind(reader, sfList->pid);
+        
+        if (pfList && (ListCount(pfList->filters) == 1))
+        {
+            if ((toDeschedule == NULL) || (toDeschedule->priority < sfList->priority))
+            {
+                toDeschedule = sfList;
+            }
+        }
+    }
+    if (toDeschedule)
+    {
+        LogModule(LOG_DEBUG, TSREADER, "Chose %d to deschedule.", toDeschedule->pid);
+        PacketFilterListRemoveFilter(reader, toDeschedule->packetFilter);
+        ListRemove(reader->activeSectionFilters, toDeschedule);
+        ListAdd(reader->sectionFilters, toDeschedule);
     }
 }
 
