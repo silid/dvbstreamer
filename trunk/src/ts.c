@@ -385,13 +385,16 @@ bool TSFilterGroupAddPacketFilter(TSFilterGroup_t *group, uint16_t pid, TSPacket
     packetFilter->callback = callback;
     packetFilter->group = group;
     pthread_mutex_lock(&group->tsReader->mutex);
-    if (!PacketFilterListAddFilter(group->tsReader, packetFilter))
+    if (PacketFilterListAddFilter(group->tsReader, packetFilter))
     {
+        packetFilter->next = group->packetFilters;
+        group->packetFilters = packetFilter;
+    }
+    else
+    {        
         ObjectRefDec(packetFilter);
         result = FALSE;
     }
-    packetFilter->next = group->packetFilters;
-    group->packetFilters = packetFilter;
     pthread_mutex_unlock(&group->tsReader->mutex);
     return result;
 }
@@ -528,13 +531,20 @@ static TSPacketFilterList_t *PacketFilterListCreate(TSReader_t *reader, uint16_t
     if (!reader->promiscuousMode && (pid != TSREADER_PID_ALL))
     {
         int p, pidCount = 0;
+        int freePIDCount;
         
         for (p = 0; p < TSREADER_PIDFILTER_BUCKETS; p ++)
         {
             pidCount += ListCount(reader->pidFilterBuckets[p]);
         }
 
-        if (!forSF && ((pidCount - ListCount(reader->activeSectionFilters))<=MIN_SECTION_FILTER_PIDS))
+        freePIDCount = reader->adapter->maxFilters - pidCount;
+        if (ListCount(reader->activeSectionFilters) < MIN_SECTION_FILTER_PIDS)
+        {
+            freePIDCount -= MIN_SECTION_FILTER_PIDS - ListCount(reader->activeSectionFilters);
+        }
+        
+        if (!forSF && (freePIDCount <= 0))
         {
             return NULL;
         }
