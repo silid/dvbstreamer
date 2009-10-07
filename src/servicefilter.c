@@ -528,15 +528,15 @@ static void ServiceFilterAllocateFilters(ServiceFilter_t filter)
 
     if (filter->avsOnly)
     {
-        if (filter->audioPID != INVALID_PID)
+        if ((filter->audioPID != INVALID_PID) && (filter->audioPID != filter->service->pcrPid))
         {
             TSFilterGroupAddPacketFilter(filter->tsgroup, filter->audioPID, ServiceFilterProcessPacket, filter);
         }
-        if (filter->videoPID != INVALID_PID)
+        if ((filter->videoPID != INVALID_PID) && (filter->audioPID != filter->service->pcrPid))
         {
             TSFilterGroupAddPacketFilter(filter->tsgroup, filter->videoPID, ServiceFilterProcessPacket, filter);
         }
-        if (filter->subPID != INVALID_PID)
+        if ((filter->subPID != INVALID_PID) && (filter->audioPID != filter->service->pcrPid))
         {
             TSFilterGroupAddPacketFilter(filter->tsgroup, filter->subPID, ServiceFilterProcessPacket, filter);
         }
@@ -549,7 +549,10 @@ static void ServiceFilterAllocateFilters(ServiceFilter_t filter)
             int i;
             for (i = 0; i < pids->count; i ++)
             {
-                TSFilterGroupAddPacketFilter(filter->tsgroup, pids->pids[i].pid, ServiceFilterProcessPacket, filter);
+                if (pids->pids[i].pid != filter->service->pcrPid)
+                {
+                    TSFilterGroupAddPacketFilter(filter->tsgroup, pids->pids[i].pid, ServiceFilterProcessPacket, filter);
+                }
             }
         }
         CachePIDsRelease();
