@@ -253,6 +253,7 @@ typedef struct TSReader_t
 
     bool promiscuousMode;               /**< Whether no filtering is applied at the adapter level all packets are available to PID filters. */
     List_t *groups;                     /**< List of TS Filter groups. */
+    TSPacketFilterList_t currentlyProcessingPid;
     TSPacketFilterList_t *promiscuousPidFilters;
     List_t *pidFilterBuckets[TSREADER_PIDFILTER_BUCKETS]; /**< List of active PID filters */
     List_t *sectionFilters;             /**< List of section filters that are awaiting scheduling */
