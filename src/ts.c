@@ -42,6 +42,8 @@ Transport stream processing and filter management.
 /*******************************************************************************
 * Defines                                                                      *
 *******************************************************************************/
+#define TSREADER_PID_INVALID 0xffff
+
 /**
  * Maximum number of packets to read from the DVB adapter in one go,
  */
@@ -82,6 +84,7 @@ static void SectionFilterListPacketCallback(void *userArg, struct TSFilterGroup_
 static void SectionFilterListPushSection(void *userArg, dvbpsi_handle sectionsHandle, dvbpsi_psi_section_t *section);
 
 static void *FilterTS(void *arg);
+static void RemovePacketFiliers(TSReader_t *reader);
 static void ProcessPacket(TSReader_t *state, TSPacket_t *packet);
 static void SendToPacketFilters(TSPacketFilterList_t *pfList, TSPacket_t *packet);
 static void InformTSStructureChanged(TSReader_t *state);
@@ -128,6 +131,7 @@ TSReader_t* TSReaderCreate(DVBAdapter_t *adapter)
         result->groups = ListCreate();
         result->activeSectionFilters = ListCreate();
         result->sectionFilters = ListCreate();
+        result->currentlyProcessingPid.filters = ListCreate();
 
         for (i = 0; i < TSREADER_PIDFILTER_BUCKETS; i ++)
         {
@@ -660,12 +664,21 @@ static void PacketFilterListRemoveFilter(TSReader_t *reader, TSPacketFilter_t *p
     LogModule(LOG_DEBUG, TSREADER, "Removing packet filter %p on pid 0x%02x", packetFilter, packetFilter->pid);
     if (pfList)
     {
-        ListRemove(pfList->filters, packetFilter);
-        LogModule(LOG_DEBUG, TSREADER, "Packet filter list for pid 0x%02x now contains %d filters", packetFilter->pid, ListCount(pfList->filters));
-        if ((ListCount(pfList->filters) == 0) && (!pthread_equal(reader->thread, pthread_self())))
+        if (reader->currentlyProcessingPid.pid == packetFilter->pid)
         {
-            PacketFilterListDestroy(reader, pfList);
-            SectionFilterListScheduleFilters(reader);            
+            LogModule(LOG_DEBUG, TSREADER, "Removing packet filter, adding to list for removal after processing.");
+
+            ListAdd(reader->currentlyProcessingPid.filters,packetFilter);
+        }
+        else
+        {
+            ListRemove(pfList->filters, packetFilter);
+            LogModule(LOG_DEBUG, TSREADER, "Packet filter list for pid 0x%02x now contains %d filters", packetFilter->pid, ListCount(pfList->filters));
+            if (ListCount(pfList->filters) == 0)
+            {
+                PacketFilterListDestroy(reader, pfList);
+                SectionFilterListScheduleFilters(reader);            
+            }
         }
     }
     else
@@ -986,19 +999,6 @@ static void *FilterTS(void *arg)
                     state->tsStructureChanged = FALSE;
                 }
             }
-            for (p = 0; p < TSREADER_PID_ALL; p ++)
-            {
-                List_t *list = state->pidFilterBuckets[p];
-                ListIterator_t iterator;
-                ListIterator_ForEach(iterator, list)
-                {
-                    TSPacketFilterList_t *pfList = ListIterator_Current(iterator);
-                    if (ListCount(pfList->filters) == 0)
-                    {
-                        PacketFilterListDestroy(state, pfList);
-                    }
-                }
-            }
             gettimeofday(&now, 0);
             diff =(now.tv_sec - last.tv_sec) * 1000 + (now.tv_usec - last.tv_usec) / 1000;
             if (diff > 1000)
@@ -1026,8 +1026,28 @@ static void ProcessPacket(TSReader_t *state, TSPacket_t *packet)
         return;
     }
     pfList = PacketFilterListFind(state, pid);
-    SendToPacketFilters(pfList, packet);
+    if (pfList)
+    {
+        state->currentlyProcessingPid.pid = pid;
+        SendToPacketFilters(pfList, packet);
+        state->currentlyProcessingPid.pid = TSREADER_PID_INVALID;
+        RemovePacketFiliers(state);
+    }
+    state->currentlyProcessingPid.pid = TSREADER_PID_ALL;    
     SendToPacketFilters(state->promiscuousPidFilters, packet);        
+    state->currentlyProcessingPid.pid = TSREADER_PID_INVALID;
+    RemovePacketFiliers(state);
+}
+
+static void RemovePacketFiliers(TSReader_t *reader)
+{
+    ListIterator_t iterator;
+    for (ListIterator_Init(iterator, reader->currentlyProcessingPid.filters); ListIterator_MoreEntries(iterator);)
+    {
+        TSPacketFilter_t *pf = ListIterator_Current(iterator);
+        PacketFilterListRemoveFilter(reader,pf);
+        ListRemoveCurrent(&iterator);
+    }
 }
 
 static void SendToPacketFilters(TSPacketFilterList_t *pfList, TSPacket_t *packet)
