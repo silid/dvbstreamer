@@ -1165,13 +1165,6 @@ static void ScanMultiplex(Multiplex_t *multiplex, bool needNIT)
 
     if (PMTsReceived)
     {
-        int i;
-        DVBAdapter_t *adapter = MainDVBAdapterGet();
-        /* Make sure we remove all the PMT filters */
-        for (i = 0; i < PMTCount; i ++)
-        {
-            DVBDemuxReleaseFilter(adapter,PMTsReceived[i].pid);
-        }
         ObjectFree(PMTsReceived);
     }
 
