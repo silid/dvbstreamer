@@ -662,7 +662,7 @@ static void PacketFilterListRemoveFilter(TSReader_t *reader, TSPacketFilter_t *p
     {
         ListRemove(pfList->filters, packetFilter);
         LogModule(LOG_DEBUG, TSREADER, "Packet filter list for pid 0x%02x now contains %d filters", packetFilter->pid, ListCount(pfList->filters));
-        if (ListCount(pfList->filters) == 0)
+        if ((ListCount(pfList->filters) == 0) && (!pthread_equal(reader->thread, pthread_self())))
         {
             PacketFilterListDestroy(reader, pfList);
             SectionFilterListScheduleFilters(reader);            
@@ -1008,13 +1008,19 @@ static void *FilterTS(void *arg)
 static void ProcessPacket(TSReader_t *state, TSPacket_t *packet)
 {
     uint16_t pid = TSPACKET_GETPID(*packet);
-
+    TSPacketFilterList_t *pfList;
     if (!TSPACKET_ISVALID(*packet))
     {
         return;
     }
-    SendToPacketFilters(PacketFilterListFind(state, pid), packet);
+    pfList = PacketFilterListFind(state, pid);
+    SendToPacketFilters(pfList, packet);
     SendToPacketFilters(state->promiscuousPidFilters, packet);
+    if (pfList && (ListCount(pfList->filters) == 0))
+    {
+        PacketFilterListDestroy(state, pfList);
+    }
+        
 }
 
 static void SendToPacketFilters(TSPacketFilterList_t *pfList, TSPacket_t *packet)
