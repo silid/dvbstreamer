@@ -986,7 +986,19 @@ static void *FilterTS(void *arg)
                     state->tsStructureChanged = FALSE;
                 }
             }
-
+            for (p = 0; p < TSREADER_PID_ALL; p ++)
+            {
+                List_t *list = state->pidFilterBuckets[p];
+                ListIterator_t iterator;
+                ListIterator_ForEach(iterator, list)
+                {
+                    TSPacketFilterList_t *pfList = ListIterator_Current(iterator);
+                    if (ListCount(pfList->filters) == 0)
+                    {
+                        PacketFilterListDestroy(state, pfList);
+                    }
+                }
+            }
             gettimeofday(&now, 0);
             diff =(now.tv_sec - last.tv_sec) * 1000 + (now.tv_usec - last.tv_usec) / 1000;
             if (diff > 1000)
@@ -1015,12 +1027,7 @@ static void ProcessPacket(TSReader_t *state, TSPacket_t *packet)
     }
     pfList = PacketFilterListFind(state, pid);
     SendToPacketFilters(pfList, packet);
-    SendToPacketFilters(state->promiscuousPidFilters, packet);
-    if (pfList && (ListCount(pfList->filters) == 0))
-    {
-        PacketFilterListDestroy(state, pfList);
-    }
-        
+    SendToPacketFilters(state->promiscuousPidFilters, packet);        
 }
 
 static void SendToPacketFilters(TSPacketFilterList_t *pfList, TSPacket_t *packet)
