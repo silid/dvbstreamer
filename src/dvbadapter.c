@@ -565,6 +565,8 @@ int DVBDemuxAllocateFilter(DVBAdapter_t *adapter, uint16_t pid)
         {
             struct dmx_pes_filter_params pesFilterParam;
 
+            LogModule(LOG_DEBUG, DVBADAPTER, "Filter fd %d\n", adapter->filters[idxToUse].demuxFd);
+
             adapter->filters[idxToUse].pid = pid;
 
             pesFilterParam.pid = pid;
@@ -604,7 +606,7 @@ int DVBDemuxReleaseFilter(DVBAdapter_t *adapter, uint16_t pid)
         {
             if ((adapter->filters[i].demuxFd != -1) && (adapter->filters[i].pid == pid))
             {
-                LogModule(LOG_DEBUG, DVBADAPTER, "Releasing filter for pid 0x%x\n",pid);
+                LogModule(LOG_DEBUG, DVBADAPTER, "Releasing filter for pid 0x%x fd %d\n",pid, adapter->filters[i].demuxFd);
                 close(adapter->filters[i].demuxFd);
                 adapter->filters[i].demuxFd = -1;
                 result = 0;
@@ -642,7 +644,7 @@ static int DVBDemuxStartFilter(DVBAdapter_t *adapter, DVBAdapterPIDFilter_t *fil
 
     if (ioctl(filter->demuxFd , DMX_START, NULL) < 0)
     {
-        LogModule(LOG_ERROR, DVBADAPTER,"filter start: %s\n", strerror(errno));
+        LogModule(LOG_ERROR, DVBADAPTER,"filter(fd %d) start: %s\n", filter->demuxFd, strerror(errno));
         result = -1;
     }
 
@@ -658,7 +660,7 @@ static int DVBDemuxStopFilter(DVBAdapter_t *adapter, DVBAdapterPIDFilter_t *filt
 
     if (ioctl(filter->demuxFd , DMX_STOP, NULL) < 0)
     {
-        LogModule(LOG_ERROR, DVBADAPTER,"filter start: %s\n", strerror(errno));
+        LogModule(LOG_ERROR, DVBADAPTER,"filter(fd %d) stop: %s\n", filter->demuxFd, strerror(errno));
         result = -1;
     }
 
