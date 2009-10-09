@@ -84,11 +84,10 @@ static void SectionFilterListPacketCallback(void *userArg, struct TSFilterGroup_
 static void SectionFilterListPushSection(void *userArg, dvbpsi_handle sectionsHandle, dvbpsi_psi_section_t *section);
 
 static void *FilterTS(void *arg);
-static void RemovePacketFiliers(TSReader_t *reader);
-static void ProcessPacket(TSReader_t *state, TSPacket_t *packet);
-static void SendToPacketFilters(TSPacketFilterList_t *pfList, TSPacket_t *packet);
-static void InformTSStructureChanged(TSReader_t *state);
-static void InformMultiplexChanged(TSReader_t *state);
+static void ProcessPacket(TSReader_t *reader, TSPacket_t *packet);
+static void SendToPacketFilters(TSReader_t *reader, TSPacketFilterList_t *pfList, TSPacket_t *packet);
+static void InformTSStructureChanged(TSReader_t *reader);
+static void InformMultiplexChanged(TSReader_t *reader);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -131,7 +130,7 @@ TSReader_t* TSReaderCreate(DVBAdapter_t *adapter)
         result->groups = ListCreate();
         result->activeSectionFilters = ListCreate();
         result->sectionFilters = ListCreate();
-        result->currentlyProcessingPid.filters = ListCreate();
+        result->currentlyProcessingPid = TSREADER_PID_INVALID;
 
         for (i = 0; i < TSREADER_PIDFILTER_BUCKETS; i ++)
         {
@@ -664,11 +663,10 @@ static void PacketFilterListRemoveFilter(TSReader_t *reader, TSPacketFilter_t *p
     LogModule(LOG_DEBUG, TSREADER, "Removing packet filter %p on pid 0x%02x", packetFilter, packetFilter->pid);
     if (pfList)
     {
-        if (reader->currentlyProcessingPid.pid == packetFilter->pid)
+        if (reader->currentlyProcessingPid == packetFilter->pid)
         {
-            LogModule(LOG_DEBUG, TSREADER, "Removing packet filter, adding to list for removal after processing.");
-
-            ListAdd(reader->currentlyProcessingPid.filters,packetFilter);
+            LogModule(LOG_DEBUG, TSREADER, "Removing packet filter (replaced with NULL)");
+            ListReplace(pfList->filters, packetFilter, NULL);
         }
         else
         {
@@ -913,8 +911,8 @@ static void *FilterTS(void *arg)
     int diff;
     unsigned long long prevpackets = 0;
     struct pollfd pfd[MAX_FDS];
-    TSReader_t *state = (TSReader_t*)arg;
-    DVBAdapter_t *adapter = state->adapter;
+    TSReader_t *reader = (TSReader_t*)arg;
+    DVBAdapter_t *adapter = reader->adapter;
     int count = 0;
     TSPacket_t *readBuffer = NULL;
     int readBufferSize;
@@ -935,12 +933,12 @@ static void *FilterTS(void *arg)
       
    
     
-    while (!state->quit)
+    while (!reader->quit)
     {
         int p;
         int n;
 
-        pfd[0].fd = state->notificationFds[0];
+        pfd[0].fd = reader->notificationFds[0];
         pfd[0].events = POLLIN;
         pfd[0].revents = 0;
         pfd[1].fd = DVBDVRGetFD(adapter);
@@ -959,20 +957,20 @@ static void *FilterTS(void *arg)
         {
             int i;
             char id;
-            pthread_mutex_lock(&state->mutex);
-            state->notificationSent = FALSE;
-            pthread_mutex_unlock(&state->mutex);
-            i = read(state->notificationFds[0], &id, 1);
+            pthread_mutex_lock(&reader->mutex);
+            reader->notificationSent = FALSE;
+            pthread_mutex_unlock(&reader->mutex);
+            i = read(reader->notificationFds[0], &id, 1);
             
-            if (state->quit)
+            if (reader->quit)
             {
                 break;
             }
 
-            if (state->multiplexChanged)
+            if (reader->multiplexChanged)
             {
-                InformMultiplexChanged(state);
-                state->multiplexChanged = FALSE;
+                InformMultiplexChanged(reader);
+                reader->multiplexChanged = FALSE;
             }            
         }
         
@@ -984,19 +982,23 @@ static void *FilterTS(void *arg)
             {
                 continue;
             }
-            pthread_mutex_lock(&state->mutex);
-            for (p = 0; (p < (count / TSPACKET_SIZE)) && state->enabled; p ++)
+            pthread_mutex_lock(&reader->mutex);
+            for (p = 0; (p < (count / TSPACKET_SIZE)) && reader->enabled; p ++)
             {
-                ProcessPacket(state, &readBuffer[p]);
-                state->totalPackets ++;
+                if (!TSPACKET_ISVALID(readBuffer[p]))
+                {
+                    continue;
+                }
+                ProcessPacket(reader, &readBuffer[p]);
+                
                 /* The structure of the transport stream has changed in a major way,
                     (ie new services, services removed) so inform all of the filters
                     that are interested.
                   */
-                if (state->tsStructureChanged)
+                if (reader->tsStructureChanged)
                 {
-                    InformTSStructureChanged(state);
-                    state->tsStructureChanged = FALSE;
+                    InformTSStructureChanged(reader);
+                    reader->tsStructureChanged = FALSE;
                 }
             }
             gettimeofday(&now, 0);
@@ -1004,11 +1006,11 @@ static void *FilterTS(void *arg)
             if (diff > 1000)
             {
                 // Work out bit rates
-                state->bitrate = (unsigned long)((state->totalPackets - prevpackets) * (188 * 8));
-                prevpackets = state->totalPackets;
+                reader->bitrate = (unsigned long)((reader->totalPackets - prevpackets) * (188 * 8));
+                prevpackets = reader->totalPackets;
                 last = now;
             }
-            pthread_mutex_unlock(&state->mutex);
+            pthread_mutex_unlock(&reader->mutex);
         }
         
     }
@@ -1017,60 +1019,62 @@ static void *FilterTS(void *arg)
     return NULL;
 }
 
-static void ProcessPacket(TSReader_t *state, TSPacket_t *packet)
+static void ProcessPacket(TSReader_t *reader, TSPacket_t *packet)
 {
     uint16_t pid = TSPACKET_GETPID(*packet);
-    TSPacketFilterList_t *pfList;
-    if (!TSPACKET_ISVALID(*packet))
+    TSPacketFilterList_t *pfList = PacketFilterListFind(reader, pid);
+    if (pfList)
+    {
+        SendToPacketFilters(reader, pfList, packet);
+    }
+    SendToPacketFilters(reader, reader->promiscuousPidFilters, packet);        
+    reader->totalPackets ++;
+}
+
+static void SendToPacketFilters(TSReader_t *reader, TSPacketFilterList_t *pfList, TSPacket_t *packet)
+{
+    ListIterator_t iterator;
+    if (pfList == NULL)
     {
         return;
     }
-    pfList = PacketFilterListFind(state, pid);
-    if (pfList)
+    reader->currentlyProcessingPid = pfList->pid;
+    for (ListIterator_Init(iterator, pfList->filters); ListIterator_MoreEntries(iterator);ListIterator_Next(iterator))
     {
-        state->currentlyProcessingPid.pid = pid;
-        SendToPacketFilters(pfList, packet);
-        state->currentlyProcessingPid.pid = TSREADER_PID_INVALID;
-        RemovePacketFiliers(state);
+        TSPacketFilter_t *filter = (TSPacketFilter_t*)ListIterator_Current(iterator);
+        if (filter == NULL)
+        {
+            continue;
+        }
+        if (filter->group)
+        {
+            filter->group->packetsProcessed ++;
+        }
+        filter->callback(filter->userArg, filter->group, packet);
     }
-    state->currentlyProcessingPid.pid = TSREADER_PID_ALL;    
-    SendToPacketFilters(state->promiscuousPidFilters, packet);        
-    state->currentlyProcessingPid.pid = TSREADER_PID_INVALID;
-    RemovePacketFiliers(state);
-}
-
-static void RemovePacketFiliers(TSReader_t *reader)
-{
-    ListIterator_t iterator;
-    for (ListIterator_Init(iterator, reader->currentlyProcessingPid.filters); ListIterator_MoreEntries(iterator);)
+    reader->currentlyProcessingPid = TSREADER_PID_INVALID;
+    for (ListIterator_Init(iterator, pfList->filters); ListIterator_MoreEntries(iterator);)
     {
         TSPacketFilter_t *pf = ListIterator_Current(iterator);
-        PacketFilterListRemoveFilter(reader,pf);
-        ListRemoveCurrent(&iterator);
-    }
-}
-
-static void SendToPacketFilters(TSPacketFilterList_t *pfList, TSPacket_t *packet)
-{
-    ListIterator_t iterator;
-    if (pfList)
-    {
-        for (ListIterator_Init(iterator, pfList->filters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+        if (pf == NULL)
         {
-            TSPacketFilter_t *filter = (TSPacketFilter_t*)ListIterator_Current(iterator);
-            if (filter->group)
-            {
-                filter->group->packetsProcessed ++;
-            }
-            filter->callback(filter->userArg, filter->group, packet);
+            ListRemoveCurrent(&iterator);
+        }
+        else
+        {
+            ListIterator_Next(iterator);
         }
     }
+    if (ListCount( pfList->filters) == 0)
+    {
+        PacketFilterListDestroy(reader, pfList);
+    }
 }
 
-static void InformTSStructureChanged(TSReader_t *state)
+static void InformTSStructureChanged(TSReader_t *reader)
 {
     ListIterator_t iterator;
-    for (ListIterator_Init(iterator, state->groups); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    for (ListIterator_Init(iterator, reader->groups); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         TSFilterGroup_t *group =(TSFilterGroup_t *)ListIterator_Current(iterator);
         if (group->eventCallback)
@@ -1080,15 +1084,15 @@ static void InformTSStructureChanged(TSReader_t *state)
     }
 }
 
-static void InformMultiplexChanged(TSReader_t *state)
+static void InformMultiplexChanged(TSReader_t *reader)
 {
     ListIterator_t iterator;
-    for (ListIterator_Init(iterator, state->groups); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    for (ListIterator_Init(iterator, reader->groups); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
     {
         TSFilterGroup_t *group =(TSFilterGroup_t *)ListIterator_Current(iterator);
         if (group->eventCallback)
         {
-            group->eventCallback(group->userArg, group, TSFilterEventType_MuxChanged, state->multiplex);
+            group->eventCallback(group->userArg, group, TSFilterEventType_MuxChanged, reader->multiplex);
         }
     }
 }
