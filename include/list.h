@@ -101,6 +101,13 @@ typedef void (*ListDataDestructor_t)(void *);
 #define ListIterator_MoreEntries(_iterator) ((_iterator).current)
 
 /**
+ * Set the data at the current iterator location.
+ * @param _iterator The iterator containing the location to set.
+ * @param _data The new data to set.
+ */
+#define ListIterator_SetCurrent(_iterator, _data) (_iterator).current->data = (_data)
+
+/**
  * Convenience macro for defining a for loop to iterate over all items in a list.
  * @param _iterator The iterator to initialise (not a pointer),
  * @param _list The list to initialise the iterator to use.
@@ -165,6 +172,15 @@ bool ListGet(List_t * list, int index, void * * data);
  * @return true if the data was found.
  */
 bool ListRemove(List_t *list, void *data);
+
+/**
+ * Replace the first instance of old data in the list with new data.
+ * @param list The list to replace the old data in.
+ * @param oldData The data to replace.
+ * @param newData The data to set.
+ * @return true if the old data was found.
+ */
+bool ListReplace(List_t *list, void *oldData, void *newData);
 
 /**
  * Insert an entry before the current entry in a list.

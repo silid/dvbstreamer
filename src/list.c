@@ -159,6 +159,20 @@ bool ListRemove(List_t *list, void *data)
     return FALSE;
 }
 
+bool ListReplace(List_t *list, void *oldData, void *newData)
+{
+    ListIterator_t iterator;
+    for ( ListIterator_Init(iterator, list); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    {
+        if (oldData == ListIterator_Current(iterator))
+        {
+            ListIterator_SetCurrent(iterator, newData);
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
 void ListRemoveCurrent(ListIterator_t *iterator)
 {
     List_t *list = iterator->list;
