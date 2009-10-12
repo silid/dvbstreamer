@@ -820,33 +820,37 @@ static void CommandDumpTSReader(int argc, char **argv)
     int p;
     int count = 0;
 
-    for (p = 0; p < TSREADER_PIDFILTER_BUCKETS; p ++)
+    for (p = 0; p < TSREADER_NROF_FILTERS; p ++)
     {
-        List_t *list = reader->pidFilterBuckets[p];
-        count += ListCount(list);
+        count += reader->packetFilters[p] == NULL ? 0:1;
     }
     
     CommandPrintf("PID Filters (%d)\n",count);
-    for (p = 0; p < TSREADER_PIDFILTER_BUCKETS; p ++)
+    for (p = 0; p < TSREADER_NROF_FILTERS; p ++)
     {
-        List_t *list = reader->pidFilterBuckets[p];
-        ListIterator_ForEach(iterator, list)
+        TSPacketFilter_t *filter;
+        if (reader->packetFilters[p] == NULL)
         {
-            ListIterator_t iterator_pf;
-            TSPacketFilterList_t *pfList = ListIterator_Current(iterator);
-            TSPacketFilter_t *pf;
-            CommandPrintf("    0x%04x\n", pfList->pid);
-            ListIterator_ForEach(iterator_pf, pfList->filters)
+            continue;
+        }
+        CommandPrintf("    0x%04x : ", p);
+        for (filter = reader->packetFilters[p]; filter; filter = filter->flNext)
+        {
+            if (filter->group)
             {
-                pf = ListIterator_Current(iterator_pf);
-                if (pf->group)
-                {
-                    CommandPrintf("        %s\n", pf->group->name);
-                }
-                else
-                {
-                    CommandPrintf("        <Section Filter>\n");
-                }
+                CommandPrintf("\"%s\"", filter->group->name);
+            }
+            else
+            {
+                CommandPrintf("<Section Filter>");
+            }
+            if (filter->flNext)
+            {
+                CommandPrintf(", ");
+            }
+            else
+            {
+                CommandPrintf("\n");
             }
         }
         

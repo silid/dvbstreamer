@@ -179,6 +179,8 @@ typedef struct TSPacketFilter_t
     struct TSFilterGroup_t *group;
     
     struct TSPacketFilter_t *next;
+
+    struct TSPacketFilter_t *flNext;
 }TSPacketFilter_t;
 
 typedef struct TSPacketFilterList_t
@@ -207,7 +209,7 @@ typedef struct TSSectionFilterList_t
     int priority;
     List_t *filters;
     dvbpsi_handle sectionHandle;
-    TSPacketFilter_t *packetFilter;
+    TSPacketFilter_t packetFilter;
     struct TSReader_t *tsReader;
 }TSSectionFilterList_t;
 
@@ -229,7 +231,7 @@ typedef struct TSFilterGroup_t
 }TSFilterGroup_t;
 
 #define TSREADER_PID_ALL 8192
-
+#define TSREADER_NROF_FILTERS 8193
 #define TSREADER_PIDFILTER_BUCKETS 8
 
 /**
@@ -255,7 +257,9 @@ typedef struct TSReader_t
     List_t *groups;                     /**< List of TS Filter groups. */
     uint16_t currentlyProcessingPid;
     TSPacketFilterList_t *promiscuousPidFilters;
-    List_t *pidFilterBuckets[TSREADER_PIDFILTER_BUCKETS]; /**< List of active PID filters */
+
+    TSPacketFilter_t *packetFilters[TSREADER_NROF_FILTERS];
+
     List_t *sectionFilters;             /**< List of section filters that are awaiting scheduling */
     List_t *activeSectionFilters;       /**< List of active section filters. */
 }
