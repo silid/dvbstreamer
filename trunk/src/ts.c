@@ -982,7 +982,7 @@ static void ProcessPacket(TSReader_t *reader, TSPacket_t *packet)
 
 static void SendToPacketFilters(TSReader_t *reader, uint16_t pid, TSPacket_t *packet)
 {
-    TSPacketFilter_t *cur, *prev=NULL;
+    TSPacketFilter_t *cur, *prev=NULL, *next;
     if (reader->packetFilters[pid] == NULL)
     {
         return;
@@ -1002,8 +1002,9 @@ static void SendToPacketFilters(TSReader_t *reader, uint16_t pid, TSPacket_t *pa
     }
     reader->currentlyProcessingPid = TSREADER_PID_INVALID;
     
-    for (cur = reader->packetFilters[pid]; cur; cur = cur->flNext)
+    for (cur = reader->packetFilters[pid]; cur; cur = next)
     {
+        next = cur->flNext;
         if (cur->pid & PACKET_FILTER_DISABLED)
         {
             if (prev == NULL)
@@ -1018,6 +1019,10 @@ static void SendToPacketFilters(TSReader_t *reader, uint16_t pid, TSPacket_t *pa
             if (cur->group)
             {
                 ObjectRefDec(cur);
+            }
+            else
+            {
+                cur->pid &= ~PACKET_FILTER_DISABLED;
             }
         }
         else
