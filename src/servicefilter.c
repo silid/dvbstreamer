@@ -522,9 +522,10 @@ static void ServiceFilterAllocateFilters(ServiceFilter_t filter)
     }
     
     TSReaderLock(filter->tsgroup->tsReader);
-    TSFilterGroupAddPacketFilter(filter->tsgroup, filter->service->pmtPid, ServiceFilterProcessPacket, filter);
+    TSFilterGroupAddPacketFilter(filter->tsgroup, 0x00, ServiceFilterProcessPacket, filter);                    /* PAT */
+    TSFilterGroupAddPacketFilter(filter->tsgroup, filter->service->pmtPid, ServiceFilterProcessPacket, filter); /* PMT */
     /* Make sure we also stream the PCR PID just in case its not the audio/video */
-    TSFilterGroupAddPacketFilter(filter->tsgroup, filter->service->pcrPid, ServiceFilterProcessPacket, filter);
+    TSFilterGroupAddPacketFilter(filter->tsgroup, filter->service->pcrPid, ServiceFilterProcessPacket, filter); /* PCR */
 
     if (filter->avsOnly)
     {
