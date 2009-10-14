@@ -819,6 +819,7 @@ static void CommandDumpTSReader(int argc, char **argv)
     ListIterator_t iterator;
     int p;
     int count = 0;
+    TSReaderLock(reader);
 
     for (p = 0; p < TSREADER_NROF_FILTERS; p ++)
     {
@@ -881,6 +882,7 @@ static void CommandDumpTSReader(int argc, char **argv)
             CommandPrintf("        %s\n", sf->group->name);
         }
     }
+    TSReaderUnLock(reader);
 }
 static char* GetPropertyTypeString(PropertyType_e type)
 {
