@@ -183,12 +183,6 @@ typedef struct TSPacketFilter_t
     struct TSPacketFilter_t *flNext;
 }TSPacketFilter_t;
 
-typedef struct TSPacketFilterList_t
-{
-    uint16_t pid;
-    List_t *filters;
-}TSPacketFilterList_t;
-
 typedef struct TSSectionFilter_t
 {
     uint16_t pid;
@@ -256,7 +250,6 @@ typedef struct TSReader_t
     bool promiscuousMode;               /**< Whether no filtering is applied at the adapter level all packets are available to PID filters. */
     List_t *groups;                     /**< List of TS Filter groups. */
     uint16_t currentlyProcessingPid;
-    TSPacketFilterList_t *promiscuousPidFilters;
 
     TSPacketFilter_t *packetFilters[TSREADER_NROF_FILTERS];
 
