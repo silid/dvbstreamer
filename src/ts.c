@@ -106,7 +106,6 @@ TSReader_t* TSReaderCreate(DVBAdapter_t *adapter)
     ObjectRegisterType(TSSectionFilter_t);
     ObjectRegisterType(TSSectionFilterList_t);
     ObjectRegisterType(TSPacketFilter_t);
-    ObjectRegisterType(TSPacketFilterList_t);
     ObjectRegisterTypeDestructor(TSReaderStats_t, TSReaderStatsDestructor);
     ObjectRegisterType(TSFilterGroupTypeStats_t);
     ObjectRegisterType(TSFilterGroupStats_t);    
@@ -602,7 +601,7 @@ static bool PacketFilterListAddFilter(TSReader_t *reader, TSPacketFilter_t *pack
 static bool PacketFilterListRemoveFilter(TSReader_t *reader, TSPacketFilter_t *packetFilter)
 {
     LogModule(LOG_DEBUG, TSREADER, "Removing packet filter %p on pid 0x%02x", packetFilter, packetFilter->pid);
-    if (reader->currentlyProcessingPid == packetFilter->pid)
+    if (reader->currentlyProcessingPid == (packetFilter->pid & ~PACKET_FILTER_DISABLED))
     {
         LogModule(LOG_DEBUG, TSREADER, "Removing packet filter (replaced with NULL)");
         packetFilter->pid |= PACKET_FILTER_DISABLED;
@@ -660,12 +659,15 @@ static void SectionFilterListDestroy(TSReader_t *reader, TSSectionFilterList_t *
 {
     if (ListRemove(reader->activeSectionFilters, sfList))
     {
+        LogModule(LOG_DEBUG, TSREADER, "Removed active section filter %p", sfList);
         PacketFilterListRemoveFilter(reader, &sfList->packetFilter);
     }
     else
     {
+        LogModule(LOG_DEBUG, TSREADER, "Removed section filter %p", sfList);
         ListRemove(reader->sectionFilters, sfList);
     }
+
     ListFree(sfList->filters, NULL);
     dvbpsi_DetachSections(sfList->sectionHandle);
     ObjectRefDec(sfList);
@@ -762,10 +764,13 @@ static void SectionFilterListScheduleFilters(TSReader_t *reader)
     ListIterator_t iterator;
     LogModule(LOG_DEBUG, TSREADER, "Scheduling section filters");
     /* TODO: Take into account priority */
-    for (ListIterator_Init(iterator, reader->sectionFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    for (ListIterator_Init(iterator, reader->sectionFilters); ListIterator_MoreEntries(iterator);)
     {
         TSSectionFilterList_t *sfList = ListIterator_Current(iterator);
         sfList->flags |= TSSectFilterListFlags_PAYLOAD_START;
+        sfList->packetFilter.pid = sfList->pid;
+        sfList->packetFilter.next = NULL;
+        sfList->packetFilter.flNext = NULL;
         if (!PacketFilterListAddFilter(reader, &sfList->packetFilter))
         {
             break;
@@ -779,7 +784,7 @@ static void SectionFilterListDescheduleFilters(TSReader_t *reader)
 {
     ListIterator_t iterator;
     LogModule(LOG_DEBUG, TSREADER, "Descheduling section filters");
-    for (ListIterator_Init(iterator, reader->activeSectionFilters); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    for (ListIterator_Init(iterator, reader->activeSectionFilters); ListIterator_MoreEntries(iterator);)
     {
         TSSectionFilterList_t *sfList = ListIterator_Current(iterator);
         PacketFilterListRemoveFilter(sfList->tsReader, &sfList->packetFilter);
@@ -809,9 +814,9 @@ static void SectionFilterListDescheduleOneFilter(TSReader_t *reader)
     if (toDeschedule)
     {
         LogModule(LOG_DEBUG, TSREADER, "Chose %d to deschedule.", toDeschedule->pid);
-        PacketFilterListRemoveFilter(reader, &toDeschedule->packetFilter);
         ListRemove(reader->activeSectionFilters, toDeschedule);
         ListAdd(reader->sectionFilters, toDeschedule);
+        PacketFilterListRemoveFilter(reader, &toDeschedule->packetFilter);
     }
 }
 
@@ -851,10 +856,9 @@ static void SectionFilterListPushSection(void *userArg, dvbpsi_handle sectionsHa
 
     if (ListCount(sfList->tsReader->sectionFilters))
     {
-        PacketFilterListRemoveFilter(sfList->tsReader, &sfList->packetFilter);
         ListRemove(sfList->tsReader->activeSectionFilters, sfList);
         ListAdd(sfList->tsReader->sectionFilters, sfList);
-        SectionFilterListScheduleFilters(sfList->tsReader);
+        PacketFilterListRemoveFilter(sfList->tsReader, &sfList->packetFilter);
     }
 }
 
@@ -932,7 +936,7 @@ static void *FilterTS(void *arg)
         {
             /* Read in packet */
             count = DVBDVRRead(adapter, (char*)readBuffer, readBufferSize, 1000);
-            if (!adapter->frontEndLocked)
+            if (!adapter->frontEndLocked || !reader->enabled)
             {
                 continue;
             }
@@ -1001,19 +1005,19 @@ static void SendToPacketFilters(TSReader_t *reader, uint16_t pid, TSPacket_t *pa
         cur->callback(cur->userArg, cur->group, packet);
     }
     reader->currentlyProcessingPid = TSREADER_PID_INVALID;
-    
     for (cur = reader->packetFilters[pid]; cur; cur = next)
     {
         next = cur->flNext;
         if (cur->pid & PACKET_FILTER_DISABLED)
         {
+            LogModule(LOG_DEBUG, TSREADER, "Removing %p (%d) as marked as disabled", cur, cur->pid & 0x7fff);
             if (prev == NULL)
             {
-                reader->packetFilters[pid] = cur->next;
+                reader->packetFilters[pid] = cur->flNext;
             }
             else
             {
-                prev->next = cur->next;
+                prev->flNext = cur->flNext;
             }
             /* Only free the filter if this is not a section filter */
             if (cur->group)
@@ -1036,6 +1040,7 @@ static void SendToPacketFilters(TSReader_t *reader, uint16_t pid, TSPacket_t *pa
         {
             DVBDemuxReleaseFilter(reader->adapter, pid);
         }
+        SectionFilterListScheduleFilters(reader);
     }
 }
 
