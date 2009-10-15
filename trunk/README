@@ -297,6 +297,8 @@ Louis Croisez    - Help finding critical MRL bug and other testing.
 Chris Allison    - Patch to add Series/Content ids to xmltv output.
 Marcel Ritter    - Bug fix
 A C G Mennucc - Several bug fixes/patches.
+Tom Albers       - Test stream and testing of patch for support of extended 
+                   event descriptors.
 
 VideoLan libdvbpsi Team for the excellent libdvbpsi. (http://www.videolan.org/developers/libdvbpsi.html)
 

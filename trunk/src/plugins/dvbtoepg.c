@@ -33,6 +33,7 @@ Plugin to collect EPG schedule information.
 #include "dvbpsi/datetime.h"
 #include "dvbpsi/eit.h"
 #include "dvbpsi/dr_4d.h"
+#include "dvbpsi/dr_4e.h"
 #include "dvbpsi/dr_55.h"
 #include "dvbpsi/dr_76.h"
 
@@ -42,6 +43,7 @@ Plugin to collect EPG schedule information.
 #include "deferredproc.h"
 
 
+
 /*******************************************************************************
 * Defines                                                                      *
 *******************************************************************************/
@@ -49,11 +51,23 @@ Plugin to collect EPG schedule information.
 #define MAX_STRING_LEN 256
 
 #define SHORT_EVENT_DR      0x4d
+#define EXTENDED_EVENT_DR   0x4e
 #define PARENTAL_RATINGS_DR 0x55
 #define CRID_DR             0x76
 
 #define UK_FREEVIEW_CONTENT 49
 #define UK_FREEVIEW_SERIES  50
+
+#define  EED_MAX_TEXT_DESCS 16
+
+/*******************************************************************************
+* Typedefs                                                                     *
+*******************************************************************************/
+typedef struct ExtTextDesc_s
+{
+    char lang[4];
+    char *text[16];
+}ExtTextDesc_t;
 
 /*******************************************************************************
 * Prototypes                                                                   *
@@ -72,6 +86,7 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *event)
 static void ConvertToTM(struct tm *startTime, uint32_t duration, struct tm *endTime);
 
 static char *ResolveCRID(EPGServiceRef_t *serviceRef, char *relativeCRID);
+static void ExtTextDescDestructor(void *ptr);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -146,7 +161,11 @@ static dvbpsi_handle demux = NULL;
 *******************************************************************************/
 static void Install(bool installed)
 {
-    if (!installed)
+    if (installed)
+    {
+        ObjectRegisterTypeDestructor(ExtTextDesc_t, ExtTextDescDestructor);
+    }
+    else
     {
         if (tsgroup)
         {
@@ -253,7 +272,8 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *eiteve
     struct tm endTime;
     char startTimeStr[25];
     char endTimeStr[25];
-    
+    ListIterator_t iterator;
+    List_t *extTextDescs = ObjectListCreate();
     eventRef.serviceRef = *serviceRef;
     eventRef.eventId = eitevent->i_event_id;
     
@@ -297,6 +317,40 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *eiteve
                     {
                         EPGChannelNewDetail(&eventRef, lang, EPG_EVENT_DETAIL_DESCRIPTION, temp);
                         free(temp);
+                    }
+                }
+                break;
+            case EXTENDED_EVENT_DR:
+                {
+                    char lang[4];
+                    char *temp;
+                    ExtTextDesc_t *desc = NULL;
+                    dvbpsi_extended_event_dr_t *eed = dvbpsi_DecodeExtendedEventDr(descriptor);
+                    LogModule(LOG_DEBUG, DVBTOEPG, "EED: Descriptor number %d of %d", eed->i_descriptor_number, eed->i_last_descriptor_number);                    
+                    lang[0] = eed->i_iso_639_code[0];
+                    lang[1] = eed->i_iso_639_code[1];
+                    lang[2] = eed->i_iso_639_code[2];
+                    lang[3] = 0;
+                    temp = DVBTextToUTF8((char *)eed->i_text, eed->i_text_length);
+                    if (temp)
+                    {
+                        for (ListIterator_Init(iterator, extTextDescs); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+                        {
+                            ExtTextDesc_t *cur = ListIterator_Current(iterator);
+                            if (strcmp(cur->lang, lang) == 0)
+                            {
+                                desc = cur;
+                                break;
+                            }
+                        }
+                        if (desc == NULL)
+                        {
+                            desc = ObjectCreateType(ExtTextDesc_t);
+                            strcpy(desc->lang, lang);
+                            ListAdd(extTextDescs, desc);
+                        }
+                        desc->text[eed->i_descriptor_number] = temp;
+                        LogModule(LOG_DEBUG, DVBTOEPG, "EED: Text \"%s\"", temp);
                     }
                 }
                 break;
@@ -377,8 +431,33 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *eiteve
                 }
                 break;
         }
-
     }
+    for (ListIterator_Init(iterator, extTextDescs); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
+    {
+        ExtTextDesc_t *cur = ListIterator_Current(iterator);
+        char *text;
+        int len = 0;
+        int i;
+        for (i = 0; i < EED_MAX_TEXT_DESCS; i ++)
+        {
+            if (cur->text[i]!= NULL)
+            {
+                len += strlen(cur->text[i]);
+            }
+        }
+        text = malloc(len + 1);
+        text[0] = 0;
+        for (i = 0; i < EED_MAX_TEXT_DESCS; i ++)
+        {
+            if (cur->text[i]!= NULL)
+            {
+                strcat(text, cur->text[i]);
+            }
+        }
+        EPGChannelNewDetail(&eventRef, cur->lang, EPG_EVENT_DETAIL_DESCRIPTION, text);
+        free(text);
+    }
+    ObjectListFree(extTextDescs);
     LogModule(LOG_DEBUG, DVBTOEPG, "(%x:%x:%x) Event %x Finished\n",
         eventRef.serviceRef.netId, eventRef.serviceRef.tsId, eventRef.serviceRef.serviceId, eventRef.eventId);    
 }
@@ -414,4 +493,17 @@ static char *ResolveCRID(EPGServiceRef_t *serviceRef, char *relativeCRID)
     }
 
     return result;
+}
+
+static void ExtTextDescDestructor(void *ptr)
+{
+    ExtTextDesc_t *ext = ptr;
+    int i;
+    for (i = 0; i < EED_MAX_TEXT_DESCS; i ++)
+    {
+        if (ext->text[i] != NULL)
+        {
+            free(ext->text[i]);
+        }
+    }
 }
