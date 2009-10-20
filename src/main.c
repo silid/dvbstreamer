@@ -36,6 +36,7 @@ Entry point to the application.
 #include <readline/readline.h>
 #include <readline/history.h>
 
+
 #include "parsezap.h"
 #include "dbase.h"
 #include "epgtypes.h"
@@ -45,6 +46,7 @@ Entry point to the application.
 #include "dvbadapter.h"
 #include "ts.h"
 #include "main.h"
+#include "dispatchers.h"
 #include "servicefilter.h"
 #include "cache.h"
 #include "logging.h"
@@ -286,6 +288,7 @@ int main(int argc, char *argv[])
     INIT(EPGChannelInit(), "EPG channel");
     INIT(MultiplexInit(), "multiplex");
     INIT(ServiceInit(), "service");
+    INIT(DispatchersInit(), "dispatchers");
     INIT(CacheInit(), "cache");
     INIT(DeliveryMethodManagerInit(), "delivery method manager");
     INIT(DeferredProcessingInit(), "deferred processing");
@@ -413,28 +416,22 @@ int main(int argc, char *argv[])
     }
 
     LogModule(LOG_INFO, MAIN, "DVBStreamer ready.");
-    
+
     if (DaemonMode)
     {
-        RemoteInterfaceAcceptConnections();
+        DispatchersStart(TRUE);
         LogModule(LOG_DEBUGV, MAIN, "Remote interface finished, shutting down\n");
         RemoteInterfaceDeInit();
     }
     else
     {
-        if (remoteInterface)
-        {
-            RemoteInterfaceAsyncAcceptConnections();
-        }
         if (disableConsoleInput)
         {
-            while(!ExitProgram)
-            {
-                usleep(5000); /* Wake every half second */
-            }
+            DispatchersStart(TRUE);
         }
         else
         {
+            DispatchersStart(FALSE);
             CommandLoop();
             LogModule(LOG_DEBUGV, MAIN, "Command loop finished, shutting down\n");
             ExitProgram = TRUE;
@@ -445,7 +442,7 @@ int main(int argc, char *argv[])
             RemoteInterfaceDeInit();
         }
     }
-
+    DispatchersStop();
     TSReaderEnable(TSReader, FALSE);
 
     ServiceFilterDestroyAll(TSReader);
@@ -493,7 +490,7 @@ int main(int argc, char *argv[])
     DEINIT(DVBDispose(DVBAdapter), "DVB adapter");
 
     DEINIT(CacheDeInit(), "cache");
-
+    DEINIT(DispatchersDeInit(), "dispatchers");
     DEINIT(ServiceDeInit(), "service");
     DEINIT(MultiplexDeInit(), "multiplex");
     DEINIT(EPGChannelDeInit(), "EPG channel");

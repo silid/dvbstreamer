@@ -26,7 +26,9 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 #include <pthread.h>
 #include <linux/dvb/dmx.h>
 #include <linux/dvb/frontend.h>
+#include <sys/types.h>
 
+#include <ev.h>
 #include "types.h"
 
 /**
@@ -131,8 +133,10 @@ typedef struct DVBAdapter_t
                                            portion of the transport stream */
     pthread_t monitorThread;          /**< Thread monitoring the lock state of the frontend. */
     bool monitorExit;                 /**< Boolean to exit monitor thread. */
-    int monitorRecvFd;                /**< File descriptor for monitor task to recieve commands */
-    int monitorSendFd;                /**< File descriptor to send commands to monitor task. */
+    int cmdRecvFd;                /**< File descriptor for monitor task to recieve commands */
+    int cmdSendFd;                /**< File descriptor to send commands to monitor task. */
+    ev_io commandWatcher;
+    ev_io frontendWatcher;
 }
 DVBAdapter_t;
 
@@ -217,16 +221,6 @@ int DVBDemuxReleaseFilter(DVBAdapter_t *adapter, uint16_t pid);
  * @return 0 on success, non-zero otherwise.
  */ 
 int DVBDemuxReleaseAllFilters(DVBAdapter_t *adapter);
-
-/**
- * Read upto max bytes from the dvr device belonging to the specified adapter.
- * @param adapter The adapter to read from.
- * @param data Buffer to read into.
- * @param max Maximum number of bytes to read.
- * @param timeout Maximum amount of time to wait for data.
- * @return 0 on success, non-zero otherwise.
- */
-int DVBDVRRead(DVBAdapter_t *adapter, char *data, int max, int timeout);
 
 /**
  * Get the file descriptor for the DVR device to use in poll() etc.

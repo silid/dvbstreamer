@@ -37,6 +37,7 @@ Remote Interface functions.
 #include <netdb.h>
 
 #include "main.h"
+#include "dispatchers.h"
 #include "logging.h"
 #include "commands.h"
 #include "remoteintf.h"
@@ -70,6 +71,7 @@ Connection_t;
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
+static void RemoteInterfaceAcceptCallback(struct ev_loop *loop, ev_io *w, int revents);
 static void AddConnection(int socketfd, struct sockaddr_storage *clientAddress);
 static void RemoveConnection(Connection_t *connection);
 static void HandleConnection(Connection_t *connection);
@@ -115,12 +117,11 @@ static Command_t ConnectionCommands[] = {
 
 static bool remoteIntfExit = FALSE;
 
-static pthread_t acceptThread;
 static pthread_mutex_t connectionsMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t connectionCondVar = PTHREAD_COND_INITIALIZER;
 
 static int serverSocket;
-
+static ev_io serverSocketWatcher;
 static List_t *connectionsList;
 
 static char *infoStreamerName;
@@ -134,11 +135,13 @@ static char responselineStart[] = "DVBStreamer/" VERSION "/";
 static char REMOTEINTERFACE[] = "RemoteInterface";
 
 
+
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
 int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char *username, char *password)
 {
+    struct ev_loop *netLoop = DispatchersGetNetwork();
 #ifdef USE_GETADDRINFO
     socklen_t address_len;
     struct sockaddr_storage address;
@@ -205,7 +208,7 @@ int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char
     connectionsList = ListCreate();
 
     listen(serverSocket, 1);
-
+    
     infoStreamerName = strdup(streamerName);
     authUsername = strdup(username);
     authPassword = strdup(password);
@@ -227,13 +230,19 @@ int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char
     PropertiesAddProperty("sys.rc", "password", "Password used to authenticate.",
                           PropertyType_String, &infoStreamerName,
                           NULL, PropertiesSimplePropertySet);
+
+    ev_io_init(&serverSocketWatcher, RemoteInterfaceAcceptCallback, serverSocket, EV_READ);
+    ev_io_start(netLoop, &serverSocketWatcher);
+    
     return 0;
 }
 
 void RemoteInterfaceDeInit(void)
 {
     ListIterator_t iterator;
-
+    
+    ev_io_start(DispatchersGetNetwork(), &serverSocketWatcher);
+    
     CommandUnRegisterCommands(RemoteInterfaceCommands);
 
     remoteIntfExit = TRUE;
@@ -260,40 +269,19 @@ void RemoteInterfaceDeInit(void)
     ListFree(connectionsList, NULL);
 }
 
-void RemoteInterfaceAsyncAcceptConnections(void)
+static void RemoteInterfaceAcceptCallback(struct ev_loop *loop, ev_io *w, int revents)
 {
-    pthread_create(&acceptThread, NULL, (void*)RemoteInterfaceAcceptConnections, NULL);
-    LogRegisterThread(acceptThread, "RemoteIntfSvr");    
-}
+    int clientfd;
+    struct sockaddr_storage clientAddress;
+    socklen_t clientAddressSize;
 
-void RemoteInterfaceAcceptConnections(void)
-{
-    struct pollfd pfd[1];
-
-    pfd[0].fd = serverSocket;
-    pfd[0].events = POLLIN;
-
-    while (!remoteIntfExit && !ExitProgram)
+    clientAddressSize = sizeof(clientAddress);
+    clientfd = accept(serverSocket, (struct sockaddr *) &clientAddress, &clientAddressSize);
+    if (clientfd < 0)
     {
-        if (poll(pfd, 1, 200))
-        {
-            if (pfd[0].revents & POLLIN)
-            {
-                int clientfd;
-                struct sockaddr_storage clientAddress;
-                socklen_t clientAddressSize;
-
-                clientAddressSize = sizeof(clientAddress);
-                clientfd = accept(serverSocket, (struct sockaddr *) &clientAddress, &clientAddressSize);
-                if (clientfd < 0)
-                {
-                    continue;
-                }
-                AddConnection(clientfd, &clientAddress);
-            }
-        }
+        return;
     }
-    LogModule(LOG_DEBUG,REMOTEINTERFACE,"Accept thread exiting.\n");
+    AddConnection(clientfd, &clientAddress);
 }
 
 static void AddConnection(int socketfd, struct sockaddr_storage *clientAddress)

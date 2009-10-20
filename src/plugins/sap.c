@@ -33,6 +33,7 @@ Session Announcement Protocol.
 #include <pthread.h>
 
 #include "main.h"
+#include "dispatchers.h"
 #include "logging.h"
 #include "list.h"
 #include "objects.h"

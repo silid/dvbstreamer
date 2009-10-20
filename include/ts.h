@@ -25,6 +25,7 @@ Transport stream processing and filter management.
 
 #include <stdint.h>
 #include <pthread.h>
+#include <ev.h>
 
 #include "dvbpsi/dvbpsi.h"
 #include "types.h"
@@ -158,6 +159,10 @@ TSPacket_t;
  * @defgroup TSReader Transport Stream Reader
  * @{
  */
+ /**
+ * Maximum number of packets to read from the DVB adapter in one go,
+ */
+#define TSREADER_MAX_PACKETS 20
 
 typedef enum TSFilterEventType_e
 {
@@ -235,9 +240,6 @@ typedef struct TSReader_t
 {
     bool quit;                          /**< Whether the filters thread should finish. */
     DVBAdapter_t *adapter;              /**< DVBAdapter packets should be read from */
-    int notificationFds[2];             /**< File descriptors for waking up the reader thread. */
-    bool notificationSent;
-    pthread_t thread;                   /**< Thread used to read and process TS packets */
     bool enabled;                       /**< Whether packets should be read/processed */
     pthread_mutex_t mutex;              /**< Mutex used to protect access to this structure */
     bool multiplexChanged;              /**< Whether the multiplex has been changed. */
@@ -255,6 +257,14 @@ typedef struct TSReader_t
 
     List_t *sectionFilters;             /**< List of section filters that are awaiting scheduling */
     List_t *activeSectionFilters;       /**< List of active section filters. */
+
+    ev_io dvrWatcher;
+    ev_timer bitrateWatcher;
+    ev_async notificationWatcher;
+    
+    unsigned long long prevTotalPackets;
+    ev_tstamp prevTime;
+    TSPacket_t buffer[TSREADER_MAX_PACKETS];
 }
 TSReader_t;
 

@@ -15,18 +15,20 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 
-remoteintf.h
+dispatchers.h
 
-Remote Interface functions.
+File descriptor monitoring and event dispatching.
 
 */
-#ifndef _REMOTEINTF_H
-#define _REMOTEINTF_H
-#include "types.h"
+#ifndef _DISPATCHERS_H
+#define _DISPATCHERS_H
+#include <ev.h>
 
-#define REMOTEINTERFACE_PORT 54197 // 0xd3b5 ~= DVBS
-
-int RemoteInterfaceInit(int adapter, char *streamerName, char *bindAddress, char *username, char *password);
-void RemoteInterfaceDeInit(void);
-
+int DispatchersInit(void);
+int DispatchersDeInit(void);
+void DispatchersStart(bool sync);
+void DispatchersStop(void);
+struct ev_loop * DispatchersGetInput(void);
+struct ev_loop * DispatchersGetNetwork(void);
+struct ev_loop * DispatchersGetUserInput(void);
 #endif

@@ -28,16 +28,17 @@ Transport stream processing and filter management.
 #include <stdint.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <poll.h>
 
 #include <dvbpsi/dvbpsi.h>
 #include <dvbpsi/descriptor.h>
 #include <dvbpsi/psi.h>
 #include <dvbpsi/sections.h>
+
 #include "multiplexes.h"
 #include "services.h"
 #include "ts.h"
 #include "logging.h"
+#include "dispatchers.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -45,25 +46,17 @@ Transport stream processing and filter management.
 #define PACKET_FILTER_DISABLED 0x8000
 #define TSREADER_PID_INVALID 0xffff
 
-/**
- * Maximum number of packets to read from the DVB adapter in one go,
- */
-#define MAX_PACKETS 20
+
 
 /**
  * Minimum number of PID Filters to reserve for section filters.
  */
 #define MIN_SECTION_FILTER_PIDS 4
 
-/**
- * Retrieve the bucket a specific pid filter should be stored in.
- */
-#define TSREADER_PIDFILTER_GETBUCKET(_reader, _pid) (_reader)->pidFilterBuckets[(_pid) / (TS_MAX_PIDS / TSREADER_PIDFILTER_BUCKETS)]
 
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
-static void NotifyThread(TSReader_t* reader, char id);
 static void TSReaderStatsDestructor(void *ptr);
 static void StatsAddFilterGroupStats(TSReaderStats_t *stats, const char *type, TSFilterGroupStats_t *filterGroupStats);
 static void PromiscusModeEnable(TSReader_t *reader, bool enable);
@@ -81,7 +74,10 @@ static void SectionFilterListDescheduleOneFilter(TSReader_t *reader);
 static void SectionFilterListPacketCallback(void *userArg, struct TSFilterGroup_t *group, TSPacket_t *packet);
 static void SectionFilterListPushSection(void *userArg, dvbpsi_handle sectionsHandle, dvbpsi_psi_section_t *section);
 
-static void *FilterTS(void *arg);
+static void TSReaderDVRCallback(struct ev_loop *loop, ev_io *w, int revents);
+static void TSReaderBitrateCallback(struct ev_loop *loop, ev_timer *w, int revents);
+static void TSReaderNotificationCallback(struct ev_loop *loop, ev_async *w, int revents);
+
 static void ProcessPacket(TSReader_t *reader, TSPacket_t *packet);
 static void SendToPacketFilters(TSReader_t *reader, uint16_t pid, TSPacket_t *packet);
 static void InformTSStructureChanged(TSReader_t *reader);
@@ -100,7 +96,7 @@ static char TSREADER[] = "TSReader";
 TSReader_t* TSReaderCreate(DVBAdapter_t *adapter)
 {
     TSReader_t *result;
-    
+    struct ev_loop *inputLoop;
     ObjectRegisterType(TSReader_t);
     ObjectRegisterType(TSFilterGroup_t);
     ObjectRegisterType(TSSectionFilter_t);
@@ -116,13 +112,7 @@ TSReader_t* TSReaderCreate(DVBAdapter_t *adapter)
         pthread_mutexattr_t mutexAttr;
 
         result->adapter = adapter;
-
-        if (pipe(result->notificationFds) == -1)
-        {
-            LogModule(LOG_ERROR, TSREADER, "Failed to create notification file descriptors!");
-            ObjectRefDec(result);
-            return NULL;
-        }
+        DVBDemuxSetBufferSize(adapter, TSREADER_MAX_PACKETS * TSPACKET_SIZE);
         result->groups = ListCreate();
         result->activeSectionFilters = ListCreate();
         result->sectionFilters = ListCreate();
@@ -131,8 +121,16 @@ TSReader_t* TSReaderCreate(DVBAdapter_t *adapter)
         pthread_mutexattr_settype(&mutexAttr, PTHREAD_MUTEX_RECURSIVE);
         pthread_mutex_init(&result->mutex, &mutexAttr);
         pthread_mutexattr_destroy(&mutexAttr);
-        
-        pthread_create(&result->thread, NULL, FilterTS, result);
+        inputLoop = DispatchersGetInput();
+        ev_io_init(&result->dvrWatcher, TSReaderDVRCallback, DVBDVRGetFD(adapter), EV_READ);
+        ev_timer_init(&result->bitrateWatcher, TSReaderBitrateCallback, 1.0, 1.0);
+        ev_async_init(&result->notificationWatcher, TSReaderNotificationCallback);
+        result->dvrWatcher.data = result;
+        result->bitrateWatcher.data = result;
+        result->notificationWatcher.data = result;
+        ev_io_start(inputLoop, &result->dvrWatcher);
+        ev_timer_start(inputLoop, &result->bitrateWatcher);
+        ev_async_start(inputLoop, &result->notificationWatcher);
     }
     return result;
 }
@@ -140,10 +138,10 @@ TSReader_t* TSReaderCreate(DVBAdapter_t *adapter)
 void TSReaderDestroy(TSReader_t* reader)
 {
     int i;
+    struct ev_loop *inputLoop = DispatchersGetInput();
+    ev_io_stop(inputLoop, &reader->dvrWatcher);
+    ev_timer_stop(inputLoop, &reader->bitrateWatcher);
     SectionFilterListDescheduleFilters(reader);
-    reader->quit = TRUE;
-    NotifyThread(reader, 'q');
-    pthread_join(reader->thread, NULL);
     pthread_mutex_destroy(&reader->mutex);
     
     ListFree(reader->groups, (void (*)(void*))TSFilterGroupDestroy);
@@ -222,11 +220,11 @@ void TSReaderZeroStats(TSReader_t* reader)
 
 void TSReaderMultiplexChanged(TSReader_t *reader, Multiplex_t *newmultiplex)
 {
-    pthread_mutex_lock(&reader->mutex);
+    struct ev_loop *inputLoop = DispatchersGetInput();
     reader->multiplexChanged = TRUE;
     reader->multiplex = newmultiplex;
-    NotifyThread(reader, 'm');
-    pthread_mutex_unlock(&reader->mutex);
+    LogModule(LOG_INFO, TSREADER, "Notifying mux changed!");
+    ev_async_send(inputLoop, &reader->notificationWatcher);
 }
 
 
@@ -440,22 +438,6 @@ void TSFilterGroupRemovePacketFilter(TSFilterGroup_t *group, uint16_t pid)
 /*******************************************************************************
 * Internal Functions                                                           *
 *******************************************************************************/
-static void NotifyThread(TSReader_t* reader, char id)
-{
-    LogModule(LOG_DEBUG, TSREADER, "Sending notification %c", id);
-    pthread_mutex_lock(&reader->mutex);
-    if (!reader->notificationSent)
-    {
-        reader->notificationSent = TRUE;
-        if (write(reader->notificationFds[1], &id, 1) == -1)
-        {
-            LogModule(LOG_ERROR, TSREADER, "Failed to send notification!");
-        }
-    }
-    pthread_mutex_unlock(&reader->mutex);
-    LogModule(LOG_DEBUG, TSREADER, "Notification %c sent", id);
-}
-
 static void TSReaderStatsDestructor(void *ptr)
 {
     TSReaderStats_t *stats = ptr;
@@ -862,120 +844,58 @@ static void SectionFilterListPushSection(void *userArg, dvbpsi_handle sectionsHa
     }
 }
 
-#define MAX_FDS 2
-static void *FilterTS(void *arg)
+static void TSReaderDVRCallback(struct ev_loop *loop, ev_io *w, int revents)
 {
-    struct timeval now, last;
-    int diff;
-    unsigned long long prevpackets = 0;
-    struct pollfd pfd[MAX_FDS];
-    TSReader_t *reader = (TSReader_t*)arg;
+    TSReader_t *reader = (TSReader_t*)w->data;
     DVBAdapter_t *adapter = reader->adapter;
-    int count = 0;
-    TSPacket_t *readBuffer = NULL;
-    int readBufferSize;
-    
-    LogRegisterThread(pthread_self(), TSREADER);
-
-    readBufferSize = sizeof(TSPacket_t) * MAX_PACKETS;
-    readBuffer = ObjectAlloc(readBufferSize);
-    if (readBuffer == NULL)
+    int count, p;
+  
+    count = read(DVBDVRGetFD(adapter), (char*)reader->buffer, sizeof(reader->buffer));
+    if (!adapter->frontEndLocked || !reader->enabled)
     {
-        LogModule(LOG_ERROR, TSREADER, "Failed to allocate packet read buffer!");
-        return NULL;
+        return;
     }
-    DVBDemuxSetBufferSize(adapter, readBufferSize * 2);
-    
-
-    gettimeofday(&last, 0);
-      
-   
-    
-    while (!reader->quit)
+    pthread_mutex_lock(&reader->mutex);
+    for (p = 0; (p < (count / TSPACKET_SIZE)) && reader->enabled; p ++)
     {
-        int p;
-        int n;
-
-        pfd[0].fd = reader->notificationFds[0];
-        pfd[0].events = POLLIN;
-        pfd[0].revents = 0;
-        pfd[1].fd = DVBDVRGetFD(adapter);
-        pfd[1].events = POLLIN;
-        pfd[1].revents = 0;
-
-        n = poll(pfd, MAX_FDS, -1);
-        if (n == -1)
+        if (!TSPACKET_ISVALID(reader->buffer[p]))
         {
-            LogModule(LOG_ERROR, TSREADER, "Poll() failed! %s");
-            ObjectFree(readBuffer);
-            return NULL;
+            continue;
         }
-
-        if (pfd[0].revents & POLLIN)
-        {
-            int i;
-            char id;
-            pthread_mutex_lock(&reader->mutex);
-            reader->notificationSent = FALSE;
-            pthread_mutex_unlock(&reader->mutex);
-            i = read(reader->notificationFds[0], &id, 1);
-            
-            if (reader->quit)
-            {
-                break;
-            }
-
-            if (reader->multiplexChanged)
-            {
-                InformMultiplexChanged(reader);
-                reader->multiplexChanged = FALSE;
-            }            
-        }
+        ProcessPacket(reader, &reader->buffer[p]);
         
-        if (pfd[1].revents & POLLIN)
+        /* The structure of the transport stream has changed in a major way,
+            (ie new services, services removed) so inform all of the filters
+            that are interested.
+          */
+        if (reader->tsStructureChanged)
         {
-            /* Read in packet */
-            count = DVBDVRRead(adapter, (char*)readBuffer, readBufferSize, 1000);
-            if (!adapter->frontEndLocked || !reader->enabled)
-            {
-                continue;
-            }
-            pthread_mutex_lock(&reader->mutex);
-            for (p = 0; (p < (count / TSPACKET_SIZE)) && reader->enabled; p ++)
-            {
-                if (!TSPACKET_ISVALID(readBuffer[p]))
-                {
-                    continue;
-                }
-                ProcessPacket(reader, &readBuffer[p]);
-                
-                /* The structure of the transport stream has changed in a major way,
-                    (ie new services, services removed) so inform all of the filters
-                    that are interested.
-                  */
-                if (reader->tsStructureChanged)
-                {
-                    InformTSStructureChanged(reader);
-                    reader->tsStructureChanged = FALSE;
-                }
-            }
-            gettimeofday(&now, 0);
-            diff =(now.tv_sec - last.tv_sec) * 1000 + (now.tv_usec - last.tv_usec) / 1000;
-            if (diff > 1000)
-            {
-                // Work out bit rates
-                reader->bitrate = (unsigned long)((reader->totalPackets - prevpackets) * (188 * 8));
-                prevpackets = reader->totalPackets;
-                last = now;
-            }
-            pthread_mutex_unlock(&reader->mutex);
+            InformTSStructureChanged(reader);
+            reader->tsStructureChanged = FALSE;
         }
-        
     }
-    ObjectFree(readBuffer);    
-    LogModule(LOG_DEBUG, TSREADER, "Filter thread exiting.\n");
-    return NULL;
+    pthread_mutex_unlock(&reader->mutex);
 }
+
+static void TSReaderBitrateCallback(struct ev_loop *loop, ev_timer *w, int revents)
+{
+    TSReader_t *reader = (TSReader_t*)w->data;
+    reader->bitrate = (unsigned long)((reader->totalPackets - reader->prevTotalPackets) * (188 * 8));
+    reader->prevTotalPackets = reader->totalPackets;
+}
+
+static void TSReaderNotificationCallback(struct ev_loop *loop, ev_async *w, int revents)
+{
+    TSReader_t *reader = (TSReader_t*)w->data;
+
+    if (reader->multiplexChanged)
+    {
+        LogModule(LOG_INFO, TSREADER, "Informing mux changed!");
+        InformMultiplexChanged(reader);
+        reader->multiplexChanged = FALSE;
+    }
+}
+    
 
 static void ProcessPacket(TSReader_t *reader, TSPacket_t *packet)
 {
