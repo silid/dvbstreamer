@@ -167,8 +167,8 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
             return NULL;
         }
 
-        result->monitorRecvFd = monitorFds[0];
-        result->monitorSendFd = monitorFds[1];
+        result->cmdRecvFd= monitorFds[0];
+        result->cmdSendFd = monitorFds[1];
 
         result->hardwareRestricted = hwRestricted;
         if (hwRestricted)
@@ -224,8 +224,8 @@ void DVBDispose(DVBAdapter_t *adapter)
     {
         DVBFrontEndMonitorSend(adapter, MONITOR_CMD_EXIT);
         pthread_join(adapter->monitorThread, NULL);
-        close(adapter->monitorRecvFd);
-        close(adapter->monitorSendFd);
+        close(adapter->cmdRecvFd);
+        close(adapter->cmdSendFd);
     }
     PropertiesRemoveAllProperties(propertyParent);
 
@@ -422,29 +422,10 @@ int DVBDemuxReleaseAllFilters(DVBAdapter_t *adapter)
     return result;
 }
 
-int DVBDVRRead(DVBAdapter_t *adapter, char *data, int max, int timeout)
-{
-
-    int result = -1;
-    struct pollfd pfd[1];
-
-    pfd[0].fd = adapter->dvrFd;
-    pfd[0].events = POLLIN;
-
-    if (poll(pfd,1,timeout))
-    {
-        if (pfd[0].revents & POLLIN)
-        {
-            result = read(adapter->dvrFd, data, max);
-        }
-    }
-
-    return result;
-}
 
 static void DVBFrontEndMonitorSend(DVBAdapter_t *adapter, char cmd)
 {
-    if (write(adapter->monitorSendFd, &cmd, 1) != 1)
+    if (write(adapter->cmdSendFd, &cmd, 1) != 1)
     {
         LogModule(LOG_ERROR, FILEADAPTER, "Failed to write to monitor pipe!");
     }
@@ -460,7 +441,7 @@ static void *DVBFrontEndMonitor(void *arg)
     unsigned long bitsSent = 0;
     char buffer[188 * 10];
     int pollDelay = -1;
-    pfd[0].fd = adapter->monitorRecvFd;
+    pfd[0].fd = adapter->cmdRecvFd;
     pfd[0].events = POLLIN;
 
     while (!adapter->monitorExit)
@@ -471,7 +452,7 @@ static void *DVBFrontEndMonitor(void *arg)
             if ((pfd[0].revents & POLLIN) == POLLIN)
             {
 
-                if (read(adapter->monitorRecvFd, &cmd, 1) == 1)
+                if (read(adapter->cmdRecvFd, &cmd, 1) == 1)
                 {
                     switch (cmd)
                     {

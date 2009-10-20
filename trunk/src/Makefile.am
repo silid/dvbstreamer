@@ -26,6 +26,7 @@ common_src = \
     commands/cmd_info.c\
     commands/cmd_scanning.c\
     commands/cmd_epg.c\
+    dispatchers.c \
     remoteintf.c\
     deliverymethod.c\
     pluginmgr.c \
@@ -73,7 +74,7 @@ dvbstreamer_SOURCES = \
 dvbstreamer_LDFLAGS = -rdynamic -Wl,-whole-archive -Wl,dvbpsi/libdvbpsi.a -Wl,-no-whole-archive
 
 dvbstreamer_LDADD = \
-	  -lpthread -lsqlite3 -lreadline @GETTIME_LIB@ @ICONV_LIB@ @READLINE_TERMCAP@ @LIBLTDL@
+	  -lpthread -lsqlite3 -lreadline -lev @GETTIME_LIB@ @ICONV_LIB@ @READLINE_TERMCAP@ @LIBLTDL@
 
 
 if ENABLE_FSTREAMER
@@ -90,7 +91,7 @@ fdvbstreamer_SOURCES = \
 fdvbstreamer_LDFLAGS = -rdynamic -Wl,-whole-archive -Wl,dvbpsi/libdvbpsi.a -Wl,-no-whole-archive
 
 fdvbstreamer_LDADD = \
-	  -lpthread -lsqlite3 -lreadline @GETTIME_LIB@ @ICONV_LIB@ @READLINE_TERMCAP@ @LIBLTDL@
+	  -lpthread -lsqlite3 -lreadline -lev  @GETTIME_LIB@ @ICONV_LIB@ @READLINE_TERMCAP@ @LIBLTDL@
 else
 fstreamer_app =
 endif
