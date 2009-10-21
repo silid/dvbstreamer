@@ -33,7 +33,7 @@ Caches service and PID information from the database for the current multiplex.
 #include "cache.h"
 #include "dbase.h"
 #include "main.h"
-#include "messageq.h"
+#include "deferredproc.h"
 #include "events.h"
 
 /*******************************************************************************
@@ -166,8 +166,7 @@ typedef struct CacheUpdateMessage_s
 * Prototypes                                                                   *
 *******************************************************************************/
 static void CacheServicesFree(void);
-static void *CacheUpdateProcessor(void *arg);
-static void CacheProcessUpdateMessage(CacheUpdateMessage_t *msg);
+static void CacheProcessUpdateMessage(void *ptr);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -182,9 +181,6 @@ static pthread_mutex_t cacheUpdateMutex;
 static enum CacheFlags cacheFlags[SERVICES_MAX];
 static Service_t*      cachedServices[SERVICES_MAX];
 static PIDList_t*      cachedPIDs[SERVICES_MAX];
-
-static MessageQ_t cacheUpdateQ;
-static pthread_t  cacheUpdateThread;
 
 /*******************************************************************************
 * Global functions                                                             *
@@ -203,24 +199,14 @@ int CacheInit()
     eventSource = EventsRegisterSource("cache");
     pidsUpdatedEvent = EventsRegisterEvent(eventSource, "pidsupdated", NULL);
     
-    cacheUpdateQ = MessageQCreate();
     ObjectRegisterType(CacheUpdateMessage_t);
-    pthread_create(&cacheUpdateThread, NULL, CacheUpdateProcessor, NULL);
-    LogRegisterThread(cacheUpdateThread, CACHE);
     return 0;
 }
 
 void CacheDeInit()
 {
-    /* Send quit signal to update thread */
-    MessageQSetQuit(cacheUpdateQ);
-    pthread_join(cacheUpdateThread, NULL);
-    MessageQDestroy(cacheUpdateQ);
-
     CacheServicesFree();
     pthread_mutex_destroy(&cacheUpdateMutex);
-    pthread_detach(cacheUpdateThread);
-
 }
 
 int CacheLoad(Multiplex_t *multiplex)
@@ -390,7 +376,7 @@ void CacheUpdateMultiplex(Multiplex_t *multiplex, int patversion, int tsid)
             msg->details.multiplexPATVersionTSId.multiplex = multiplex;
             msg->details.multiplexPATVersionTSId.patVersion = patversion;
             msg->details.multiplexPATVersionTSId.tsId = tsid;
-            MessageQSend(cacheUpdateQ, msg);
+            DeferredProcessingAddJob(CacheProcessUpdateMessage, msg);
             ObjectRefDec(msg);
         }
     }
@@ -413,7 +399,7 @@ void CacheUpdateNetworkId(Multiplex_t *multiplex, int netid)
             ObjectRefInc(multiplex);
             msg->details.multiplexNetworkId.multiplex = multiplex;
             msg->details.multiplexNetworkId.networkId = netid;
-            MessageQSend(cacheUpdateQ, msg);
+            DeferredProcessingAddJob(CacheProcessUpdateMessage, msg);
             ObjectRefDec(msg);
         }
     }
@@ -439,7 +425,7 @@ void CacheUpdateServicePMTPID(Service_t *service, int pmtpid)
                 ObjectRefInc(service);
                 msg->details.servicePMTPID.service = service;
                 msg->details.servicePMTPID.pmtPid = pmtpid;
-                MessageQSend(cacheUpdateQ, msg);
+                DeferredProcessingAddJob(CacheProcessUpdateMessage, msg);
                 ObjectRefDec(msg);
             }
             break;
@@ -481,7 +467,7 @@ void CacheUpdateServiceName(Service_t *service, char *name)
                 {
                     msg->details.serviceName.name = strdup(name);
                 }
-                MessageQSend(cacheUpdateQ, msg);
+                DeferredProcessingAddJob(CacheProcessUpdateMessage, msg);
                 ObjectRefDec(msg);
             }
             break;
@@ -523,7 +509,7 @@ void CacheUpdateServiceProvider(Service_t *service, char *provider)
                 {
                     msg->details.serviceProvider.provider = strdup(provider);
                 }
-                MessageQSend(cacheUpdateQ, msg);
+                DeferredProcessingAddJob(CacheProcessUpdateMessage, msg);
                 ObjectRefDec(msg);
             }
             break;
@@ -565,7 +551,7 @@ void CacheUpdateServiceDefaultAuthority(Service_t *service, char *defaultAuthori
                 {
                     msg->details.serviceDefaultAuthority.defaultAuthority = strdup(defaultAuthority);
                 }
-                MessageQSend(cacheUpdateQ, msg);
+                DeferredProcessingAddJob(CacheProcessUpdateMessage, msg);
                 ObjectRefDec(msg);
             }
             break;
@@ -593,7 +579,7 @@ void CacheUpdateServiceSource(Service_t *service, uint16_t source)
                 ObjectRefInc(service);
                 msg->details.serviceSource.service = service;
                 msg->details.serviceSource.source = source;
-                MessageQSend(cacheUpdateQ, msg);
+                DeferredProcessingAddJob(CacheProcessUpdateMessage, msg);
                 ObjectRefDec(msg);
             }
             break;
@@ -621,7 +607,7 @@ void CacheUpdateServiceConditionalAccess(Service_t *service, bool ca)
                 ObjectRefInc(service);
                 msg->details.serviceCA.service = service;
                 msg->details.serviceCA.ca = ca;
-                MessageQSend(cacheUpdateQ, msg);
+                DeferredProcessingAddJob(CacheProcessUpdateMessage, msg);
                 ObjectRefDec(msg);
             }
             break;
@@ -649,7 +635,7 @@ void CacheUpdateServiceType(Service_t *service, ServiceType type)
                 ObjectRefInc(service);
                 msg->details.serviceType.service = service;
                 msg->details.serviceType.type = type;
-                MessageQSend(cacheUpdateQ, msg);
+                DeferredProcessingAddJob(CacheProcessUpdateMessage, msg);
                 ObjectRefDec(msg);
             }
             break;
@@ -687,7 +673,7 @@ void CacheUpdatePIDs(Service_t *service, int pcrpid, PIDList_t *pids, int pmtver
                 msg->details.servicePIDs.pids = PIDListClone(pids);
                 msg->details.servicePIDs.pcrPid = pcrpid;
                 msg->details.servicePIDs.pmtVersion = pmtversion;
-                MessageQSend(cacheUpdateQ, msg);
+                DeferredProcessingAddJob(CacheProcessUpdateMessage, msg);
                 ObjectRefDec(msg);
             }
             EventsFireEventListeners(pidsUpdatedEvent, cachedServices[i]);
@@ -739,7 +725,7 @@ Service_t *CacheServiceAdd(int id)
             msg->details.serviceAdd.multiplexUID = cachedServicesMultiplex->uid;
             msg->details.serviceAdd.source = result->source;
             msg->details.serviceAdd.name = strdup(result->name);
-            MessageQSend(cacheUpdateQ, msg);
+            DeferredProcessingAddJob(CacheProcessUpdateMessage, msg);
             ObjectRefDec(msg);
         }
 
@@ -825,7 +811,7 @@ void CacheServiceDelete(Service_t *service)
             msg->type = CacheUpdate_Service_Deleted;
             ObjectRefInc(service);
             msg->details.serviceDelete.service = service;
-            MessageQSend(cacheUpdateQ, msg);
+            DeferredProcessingAddJob(CacheProcessUpdateMessage, msg);
             ObjectRefDec(msg);
         }
     }
@@ -859,31 +845,9 @@ static void CacheServicesFree()
     cachedServicesMultiplex = NULL;
 }
 
-static void *CacheUpdateProcessor(void *arg)
+static void CacheProcessUpdateMessage(void *ptr)
 {
-    CacheUpdateMessage_t *msg;
-    LogModule(LOG_DEBUG, CACHE, "Cache Update thread started.\n");
-    while(!MessageQIsQuitSet(cacheUpdateQ))
-    {
-        msg = MessageQReceive(cacheUpdateQ);
-        if (msg)
-        {
-            CacheProcessUpdateMessage(msg);
-        }
-    }
-
-    MessageQResetQuit(cacheUpdateQ);
-    while(MessageQAvailable(cacheUpdateQ))
-    {
-        msg = MessageQReceive(cacheUpdateQ);
-        CacheProcessUpdateMessage(msg);
-    }
-    LogModule(LOG_DEBUG, CACHE, "Cache Update thread finished.\n");
-    return NULL;
-}
-
-static void CacheProcessUpdateMessage(CacheUpdateMessage_t *msg)
-{
+    CacheUpdateMessage_t *msg = ptr;
     int rc;
     Multiplex_t *mux = NULL;
     Service_t *service = NULL;
