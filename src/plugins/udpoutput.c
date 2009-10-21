@@ -507,6 +507,7 @@ static void CreateSAPSession(struct UDPOutputState_t *state, bool rtp, unsigned 
         port = ntohs(in6addr->sin6_port);
     }
 #endif
+    SDPAdd('t',"0 0");
 
     if (rtp)
     {
