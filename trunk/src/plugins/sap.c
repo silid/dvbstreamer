@@ -39,6 +39,7 @@ Session Announcement Protocol.
 #include "objects.h"
 #include "udp.h"
 #include "sap.h"
+#include "dispatchers.h"
 /*******************************************************************************
 * Defines                                                                      *
 *******************************************************************************/
@@ -61,7 +62,7 @@ typedef struct SAPSession_s {
 static void SAPSessionFree(void *data);
 static int CreateSAPPacket(SAPSession_t *session, uint8_t *packet);
 static void DetermineSAPMulticast(SAPSession_t *session, struct sockaddr_storage *sockAddr);
-static void *SAPServer(void *arg);
+static void AnnouncementCallback(struct ev_loop *loop, ev_timer *w, int revent);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -69,15 +70,15 @@ static void *SAPServer(void *arg);
 static const char mimeType[] = "application/sdp";
 static List_t *sessionList;
 
-static pthread_cond_t messageDelayCond = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t sessionListMutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_t serverThread;
 
 static uint16_t nextMessageIdHash = 1;
 
-static bool quit = FALSE;
-
 static char SAP[] = "SAP";
+
+static int socket4 = -1;
+static int socket6 = -1;
+static ev_timer announcementTimer;
 
 /*******************************************************************************
 * Global functions                                                             *
@@ -103,17 +104,36 @@ bool IsMulticastAddress(struct sockaddr_storage *addr)
 
 void SAPServerInit(void)
 {
+    int ttl = 255;
     ObjectRegisterType(SAPSession_t);
     sessionList = ListCreate();
-    pthread_create(&serverThread, NULL, SAPServer, NULL);
+    socket4 = UDPCreateSocket(PF_INET);
+    socket6 = UDPCreateSocket(PF_INET6);
+
+    if (socket4 != -1)
+    {
+        setsockopt(socket4,IPPROTO_IP,IP_MULTICAST_TTL, &ttl,sizeof(ttl));
+    }
+    if (socket6 != -1)
+    {
+        setsockopt(socket6,IPPROTO_IPV6,IPV6_MULTICAST_HOPS, &ttl,sizeof(ttl));
+    }
+    ev_timer_init(&announcementTimer, AnnouncementCallback, 1.0, 1.0);
+    ev_timer_start(DispatchersGetNetwork(), &announcementTimer);
+
 }
 
 void SAPServerDeinit(void)
 {
-    quit = TRUE;
-    pthread_cond_signal(&messageDelayCond);
-    pthread_join(serverThread, NULL);
-    LogUnregisterThread(serverThread);
+    ev_timer_stop(DispatchersGetNetwork(), &announcementTimer);    
+    if (socket4 != -1)
+    {
+        close(socket4);
+    }
+    if (socket6 != -1)
+    {
+        close(socket6);
+    }
     ListFree(sessionList, SAPSessionFree);
 }
 
@@ -240,9 +260,8 @@ static void DetermineSAPMulticast(SAPSession_t *session, struct sockaddr_storage
     }
 }
 
-static void *SAPServer(void *arg)
+static void AnnouncementCallback(struct ev_loop *loop, ev_timer *w, int revent)
 {
-    struct timespec waitFor;
     uint8_t packet[UDP_PAYLOAD_SIZE];
     int packetLen;
     SAPSession_t *session;
@@ -250,74 +269,42 @@ static void *SAPServer(void *arg)
     ListIterator_t iterator;
     struct sockaddr_storage sapMulticastAddr;
 
-    int socket4 = UDPCreateSocket(PF_INET);
-    int socket6 = UDPCreateSocket(PF_INET6);
-    int ttl = 255;
-
-    LogRegisterThread(serverThread, "SAP");
-
-    if (socket4 != -1)
+    pthread_mutex_lock(&sessionListMutex);
+    sessionCount = ListCount(sessionList);
+    if (sessionCount > 0)
     {
-        setsockopt(socket4,IPPROTO_IP,IP_MULTICAST_TTL, &ttl,sizeof(ttl));
-    }
-    if (socket6 != -1)
-    {
-        setsockopt(socket6,IPPROTO_IPV6,IPV6_MULTICAST_HOPS, &ttl,sizeof(ttl));
-    }
-    LogModule(LOG_DEBUG, SAP, "Annoucement thread starting\n");
-    while (!quit)
-    {
-        pthread_mutex_lock(&sessionListMutex);
-        clock_gettime(CLOCK_REALTIME, &waitFor);
-        sessionCount = ListCount(sessionList);
-        if (sessionCount > 0)
+        /* Remove the first message from the front of the list, send it and
+         * add it to the back.
+         */
+        ListIterator_Init(iterator, sessionList);
+        session = (SAPSession_t*)ListIterator_Current(iterator);
+        ListRemoveCurrent(&iterator);
+        if (session->deleted)
         {
-            /* Remove the first message from the front of the list, send it and
-             * add it to the back.
-             */
-            ListIterator_Init(iterator, sessionList);
-            session = (SAPSession_t*)ListIterator_Current(iterator);
-            ListRemoveCurrent(&iterator);
-            if (session->deleted)
-            {
-                ObjectRefDec(session);
-            }
-            else
-            {
-                ListAdd(sessionList, session);
-            }
+            ObjectRefDec(session);
+        }
+        else
+        {
+            ListAdd(sessionList, session);
+        }
 
-            packetLen = CreateSAPPacket(session, packet);
-            DetermineSAPMulticast(session, &sapMulticastAddr);
-            /* Send the message */
-            if (session->originatingSource.ss_family == PF_INET)
+        packetLen = CreateSAPPacket(session, packet);
+        DetermineSAPMulticast(session, &sapMulticastAddr);
+        /* Send the message */
+        if (session->originatingSource.ss_family == PF_INET)
+        {
+            if (socket4 != -1)
             {
-                if (socket4 != -1)
-                {
-                    UDPSendTo(socket4, packet, packetLen, (struct sockaddr *)&sapMulticastAddr, sizeof(struct sockaddr_in));
-                }
-            }
-            else
-            {
-                if (socket6 != -1)
-                {
-                    UDPSendTo(socket6, packet, packetLen, (struct sockaddr *)&sapMulticastAddr, sizeof(struct sockaddr_in6));
-                }
+                UDPSendTo(socket4, packet, packetLen, (struct sockaddr *)&sapMulticastAddr, sizeof(struct sockaddr_in));
             }
         }
-        waitFor.tv_sec += 1;
-        pthread_cond_timedwait(&messageDelayCond, &sessionListMutex, &waitFor);
-        pthread_mutex_unlock(&sessionListMutex);
-
+        else
+        {
+            if (socket6 != -1)
+            {
+                UDPSendTo(socket6, packet, packetLen, (struct sockaddr *)&sapMulticastAddr, sizeof(struct sockaddr_in6));
+            }
+        }
     }
-    LogModule(LOG_DEBUG, SAP, "Annoucement thread finished.\n");
-    if (socket4 != -1)
-    {
-        close(socket4);
-    }
-    if (socket6 != -1)
-    {
-        close(socket6);
-    }
-    return NULL;
+    pthread_mutex_unlock(&sessionListMutex);
 }
