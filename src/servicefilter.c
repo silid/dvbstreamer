@@ -260,8 +260,14 @@ void ServiceFilterAVSOnlySet(ServiceFilter_t filter, bool enable)
     {
         TSFilterGroupRemoveAllFilters(filter->tsgroup);
         filter->avsOnly = enable;
-        ServiceFilterPMTRewrite(filter);
-        ServiceFilterAllocateFilters(filter);
+        if (filter->service)
+        {
+            if (filter->avsOnly)
+            {
+                ServiceFilterPMTRewrite(filter);
+            }
+            ServiceFilterAllocateFilters(filter);
+        }
     }
 }
 
