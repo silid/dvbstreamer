@@ -137,6 +137,7 @@ void FileOutputSendBlock(DeliveryMethodInstance_t *this, void *block, unsigned l
     {
         LogModule(LOG_INFO, FILEOUTPUT, "Failed to write entire block to file!\n");
     }
+    fflush(instance->fp);
 }
 
 void FileOutputDestroy(DeliveryMethodInstance_t *this)
