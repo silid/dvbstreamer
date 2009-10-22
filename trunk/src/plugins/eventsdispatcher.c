@@ -43,11 +43,6 @@ Plugin to allow access to internal event information.
 /*******************************************************************************
 * Typedefs                                                                     *
 *******************************************************************************/
-typedef struct ConsoleContext_s {
-    CommandContext_t *context;
-    pthread_mutex_t printMutex;
-}ConsoleContext_t;
-
 typedef struct EventDescription_s {
     struct timeval at;
     char *description;
@@ -57,19 +52,14 @@ typedef struct EventDispatcherListener_s {
     char *name;
     bool allEvents;
     List_t *events;
+    DeliveryMethodInstance_t *dmInstance;
 
-    bool console;
-    union {
-        ConsoleContext_t *console;
-        DeliveryMethodInstance_t *dmInstance;
-    }arg;
 }EventDispatcherListener_t;
 
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
 static void EventDispatcherInstalled(bool installed);
-static void CommandListen(int argc, char **argv);
 static void CommandAddListener(int argc, char **argv);
 static void CommandRemoveListener(int argc, char **argv);
 static void CommandListListeners(int argc, char **argv);
@@ -80,8 +70,6 @@ static void CommandListListenEvents(int argc, char **argv);
 
 static void EventCallback(void *arg, Event_t event, void *payload);
 static void DeferredInformListeners(void *arg);
-
-static void ConsoleContextEventPrint(ConsoleContext_t *context, ...);
 
 static void EventDescriptionDestructor(void *arg);
 static void EventDispatcherListenerDestructor(void *arg);
@@ -99,7 +87,6 @@ static int ListenerPropertyTableCount(void *userArg);
 *******************************************************************************/
 static List_t *listenersList;
 static pthread_mutex_t listenersMutex = PTHREAD_MUTEX_INITIALIZER;
-static const char console[] = "<Console>";
 static const char EVENTDISPATCH[] = "EventDispatch";
 static const char propertiesParentPath[] = "commands.eventlisteners";
 static PropertyTableDescription_t tableDescription = {
@@ -111,22 +98,6 @@ static PropertyTableDescription_t tableDescription = {
 * Plugin Setup                                                                 *
 *******************************************************************************/
 PLUGIN_COMMANDS(
-    {
-        "listen",
-        0, 0,
-        "Listen for events.",
-        "listen\n"
-        "Listen for internal events, to add events to listen to, type\n"
-        "+<SourceName>.<EventName>\n"
-        "To stop listening for an event, type\n"
-        "-<SourceName>.<EventName>\n"
-        "To find out what events are being listened to, type\n"
-        "=\n"
-        "To end listening to events type\n"
-        "e\n"
-        "NOTE: Console only! For remote connections use addlistener",
-        CommandListen
-    },
     {
         "addlistener",
         2, 2,
@@ -207,118 +178,15 @@ static void EventDispatcherInstalled(bool installed)
         for (ListIterator_Init(iterator, listenersList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
         {
             EventDispatcherListener_t *listener = ListIterator_Current(iterator);
-            listener->arg.dmInstance = NULL; /* Delivery Method Manager will already have destroyed this by the time we get here! */
+            listener->dmInstance = NULL; /* Delivery Method Manager will already have destroyed this by the time we get here! */
         }
         ObjectListFree(listenersList);
     }
 }
 
 /*******************************************************************************
-* Command Functions                                                              *
+* Command Functions                                                            *
 *******************************************************************************/
-static void CommandListen(int argc, char **argv)
-{
-    bool quit=FALSE;
-    char buffer[256];
-    char *eventStr;
-    ConsoleContext_t context;
-    CommandContext_t *cmdContext = CommandContextGet();
-    EventDispatcherListener_t *listener;
-    if (cmdContext->remote)
-    {
-        CommandError(COMMAND_ERROR_GENERIC, "Only supported from the console!");
-        return;
-    }
-
-    context.context = CommandContextGet();
-    pthread_mutex_init(&context.printMutex, NULL);
-
-    listener = ObjectCreateType(EventDispatcherListener_t);
-    listener->name = strdup((char *)console);
-    listener->events = ListCreate();
-    listener->console = TRUE;
-    listener->arg.console = &context;
-
-    CommandPrintf("Listening\n");
-    AddListener(listener);
-
-
-    while(!quit && !ExitProgram)
-    {
-        if (CommandGets(buffer, sizeof(buffer) - 1))
-        {
-            char *nl = strchr(buffer, '\n');
-            if (nl)
-            {
-                *nl = 0;
-            }
-            nl = strchr(buffer, '\r');
-            if (nl)
-            {
-                *nl = 0;
-            }
-            pthread_mutex_lock(&context.printMutex);
-            switch(buffer[0])
-            {
-                case '+':
-                    /* Register for events */
-                    if (buffer[1] == 0)
-                    {
-                        eventStr = "<all>";
-                    }
-                    else
-                    {
-                        eventStr = buffer + 1;
-                    }
-                    AddListenerEvent(listener, eventStr);
-                    CommandPrintf("+%s\n", eventStr);
-                    break;
-                case '-':
-                    /* Unregister an event */
-                    if (buffer[1] == 0)
-                    {
-                        eventStr = "<all>";
-                    }
-                    else
-                    {
-                        eventStr = buffer + 1;
-                    }
-                    if (RemoveListenerEvent(listener, eventStr))
-                    {
-                        CommandPrintf("-%s\n", eventStr);
-                    }
-                    break;
-                case '=':
-                    /* Display registered events */
-                    if (listener->allEvents)
-                    {
-                        CommandPrintf("=<All>\n");
-                    }
-                    else
-                    {
-                        ListIterator_t iterator;
-                        for (ListIterator_Init(iterator, listener->events);
-                             ListIterator_MoreEntries(iterator);
-                             ListIterator_Next(iterator))
-                        {
-                            char *eventStr = ListIterator_Current(iterator);
-                            CommandPrintf("=%s\n", eventStr);
-                        }
-                    }
-                    break;
-                case 'e':
-                    quit=TRUE;
-                    break;
-            }
-            pthread_mutex_unlock(&context.printMutex);
-        }
-    }
-
-    RemoveListener(listener);
-    ObjectRefDec(listener);
-    pthread_mutex_destroy(&context.printMutex);
-}
-
 static void CommandAddListener(int argc, char **argv)
 {
     EventDispatcherListener_t *listener;
@@ -327,6 +195,7 @@ static void CommandAddListener(int argc, char **argv)
     listener = FindListener(argv[0]);
     if (listener)
     {
+        ObjectRefDec(listener);
         CommandError(COMMAND_ERROR_GENERIC, "Listener already exists!");
         return;
     }
@@ -341,8 +210,7 @@ static void CommandAddListener(int argc, char **argv)
     listener = ObjectCreateType(EventDispatcherListener_t);
     listener->name = strdup(argv[0]);
     listener->events = ListCreate();
-    listener->console = FALSE;
-    listener->arg.dmInstance = mrlInstance;
+    listener->dmInstance = mrlInstance;
 
     AddListener(listener);
     PropertiesAddTableProperty(propertiesParentPath, argv[0], "Event Listener", &tableDescription, listener,
@@ -362,6 +230,7 @@ static void CommandRemoveListener(int argc, char **argv)
 
     RemoveListener(listener);
     ObjectRefDec(listener);
+    ObjectRefDec(listener); /* Do this twice as FindListener increments the ref count */
     PropertiesRemoveProperty(propertiesParentPath, argv[1]);
 }
 
@@ -375,7 +244,7 @@ static void CommandListListeners(int argc, char **argv)
          ListIterator_Next(iterator))
     {
         EventDispatcherListener_t *listener = (EventDispatcherListener_t *)ListIterator_Current(iterator);
-        CommandPrintf("%s : %s\n", listener->name, listener->console ? console:listener->arg.dmInstance->mrl);
+        CommandPrintf("%s : %s\n", listener->name, listener->dmInstance->mrl);
     }
     pthread_mutex_unlock(&listenersMutex);
 }
@@ -390,6 +259,7 @@ static void CommandAddListenEvent(int argc, char **argv)
         return;
     }
     AddListenerEvent(listener, argv[1]);
+    ObjectRefDec(listener);
 }
 
 static void CommandRemoveListenEvent(int argc, char **argv)
@@ -428,6 +298,7 @@ static void CommandListListenEvents(int argc, char **argv)
         char *eventStr = ListIterator_Current(iterator);
         CommandPrintf("%s\n", eventStr);
     }
+    ObjectRefDec(listener);
 }
 /*******************************************************************************
 * Local Functions                                                              *
@@ -483,41 +354,24 @@ static void DeferredInformListeners(void * arg)
         if (inform)
         {
             LogModule(LOG_DEBUG, EVENTDISPATCH, "Informing listener %s\n", listener->name);
-            if (listener->console)
+            if (outputLine == NULL)
             {
-                ConsoleContextEventPrint(listener->arg.console, eventDesc->description);
+                struct tm *localtm = localtime(&eventDesc->at.tv_sec);
+                char timeStr[21]; /* xxxx-xx-xx xx:xx:xx */
+                strftime(timeStr, sizeof(timeStr)-1, "%F %T", localtm);
+                outputLineLen = asprintf(&outputLine, "%s.%ld %d %s\n",
+                    timeStr, eventDesc->at.tv_usec, adapter->adapter,
+                    eventDesc->description);
             }
-            else
+            if (outputLine)
             {
-                if (outputLine == NULL)
-                {
-                    struct tm *localtm = localtime(&eventDesc->at.tv_sec);
-                    char timeStr[21]; /* xxxx-xx-xx xx:xx:xx */
-                    strftime(timeStr, sizeof(timeStr)-1, "%F %T", localtm);
-                    outputLineLen = asprintf(&outputLine, "%s.%ld %d %s\n",
-                        timeStr, eventDesc->at.tv_usec, adapter->adapter,
-                        eventDesc->description);
-                }
-                if (outputLine)
-                {
-                    DeliveryMethodOutputBlock(listener->arg.dmInstance, outputLine, outputLineLen);
-                }
+                DeliveryMethodOutputBlock(listener->dmInstance, outputLine, outputLineLen);
             }
         }
     }
 
     pthread_mutex_unlock(&listenersMutex);
     ObjectRefDec(eventDesc);
-}
-
-static void ConsoleContextEventPrint(ConsoleContext_t *context, ...)
-{
-    va_list args;
-    pthread_mutex_lock(&context->printMutex);
-    va_start(args, context);
-    vfprintf(context->context->outfp, "!%s\n", args);
-    va_end(args);
-    pthread_mutex_unlock(&context->printMutex);
 }
 
 static void EventDescriptionDestructor(void *arg)
@@ -531,13 +385,11 @@ static void EventDispatcherListenerDestructor(void *arg)
     EventDispatcherListener_t *listener = arg;
     ListFree(listener->events, free);
     free(listener->name);
-    if (!listener->console)
+    if (listener->dmInstance)
     {
-        if (listener->arg.dmInstance)
-        {
-            DeliveryMethodDestroy(listener->arg.dmInstance);
-        }
+        DeliveryMethodDestroy(listener->dmInstance);
     }
+
 }
 
 static void AddListener(EventDispatcherListener_t *listener)
@@ -578,6 +430,7 @@ static EventDispatcherListener_t *FindListener(char *name)
         if (strcmp(listener->name, name) == 0)
         {
             result = listener;
+            ObjectRefInc(result);
             break;
         }
     }
