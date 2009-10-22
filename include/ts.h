@@ -208,7 +208,7 @@ typedef struct TSSectionFilterList_t
     int priority;
     List_t *filters;
     dvbpsi_handle sectionHandle;
-    TSPacketFilter_t packetFilter;
+    TSPacketFilter_t *packetFilter;
     struct TSReader_t *tsReader;
 }TSSectionFilterList_t;
 
