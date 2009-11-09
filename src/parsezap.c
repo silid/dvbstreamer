@@ -357,9 +357,9 @@ static int parsezapline(char * str, fe_type_t fe_type)
         MultiplexAdd(fe_type, &front_param, &diseqcsettings, &muxUID);
     }
 
-    /* Video PID - not used but we'll take it anyway */
+    /* Video PID - not used */
     NEXTFIELD();
-    /* Audio PID - it's only for mpegaudio so we don't use it anymore */
+    /* Audio PID - not used */
     NEXTFIELD();
     /* service ID */
     NEXTFIELD();
@@ -373,7 +373,7 @@ static int parsezapline(char * str, fe_type_t fe_type)
         source = id;
     }
     LogModule(LOG_DEBUGV, PARSEZAP, "Adding service \"%s\" %d\n", name, id);
-    if (ServiceAdd(muxUID, name, id, source, FALSE, ServiceType_Unknown, -1, -1, -1))
+    if (ServiceAdd(muxUID, name, id, source, FALSE, ServiceType_Unknown, -1, 0x1fff, -1))
     {
         LogModule(LOG_ERROR, PARSEZAP, "Failed to add service \"%s\", possible reason already in database?\n", name);
     }

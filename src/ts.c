@@ -46,7 +46,14 @@ Transport stream processing and filter management.
 #define PACKET_FILTER_DISABLED 0x8000
 #define TSREADER_PID_INVALID 0xffff
 
-
+#define CHECK_PID_VALID(pid) \
+    do{\
+        if ((pid) > TSREADER_PID_ALL)\
+        {\
+            LogModule(LOG_ERROR, TSREADER, "Invalid PID %u supplied to %s", pid, __func__);\
+            return;\
+        }\
+    }while(0)
 
 /**
  * Minimum number of PID Filters to reserve for section filters.
@@ -337,7 +344,11 @@ void TSFilterGroupRemoveAllFilters(TSFilterGroup_t* group)
 
 void TSFilterGroupAddSectionFilter(TSFilterGroup_t *group, uint16_t pid, int priority, dvbpsi_handle handle)
 {
-    TSSectionFilter_t *sectionFilter = ObjectCreateType(TSSectionFilter_t);
+    TSSectionFilter_t *sectionFilter;
+
+    CHECK_PID_VALID(pid);
+    
+    sectionFilter = ObjectCreateType(TSSectionFilter_t);
     sectionFilter->pid = pid;
     sectionFilter->priority = priority;
     sectionFilter->sectionHandle = handle;
@@ -354,6 +365,9 @@ void TSFilterGroupRemoveSectionFilter(TSFilterGroup_t *group, uint16_t pid)
 {
     TSSectionFilter_t *sectionFilter;
     TSSectionFilter_t *sectionFilterPrev = NULL;
+
+    CHECK_PID_VALID(pid);
+    
     LogModule(LOG_DEBUG, TSREADER, "Removing section filter 0x%04x for filter group %s", pid, group->name);        
     pthread_mutex_lock(&group->tsReader->mutex); 
     for (sectionFilter = group->sectionFilters; sectionFilter; sectionFilter = sectionFilter->next)
@@ -380,6 +394,13 @@ bool TSFilterGroupAddPacketFilter(TSFilterGroup_t *group, uint16_t pid, TSPacket
 {
     TSPacketFilter_t *packetFilter;
     bool result = TRUE;
+
+    if (pid > TSREADER_PID_ALL)
+    {
+        LogModule(LOG_ERROR, TSREADER, "Invalid PID %u supplied to %s", pid, __func__);
+        return FALSE;
+    }
+    
     LogModule(LOG_DEBUG, TSREADER, "Adding packet filter 0x%04x for filter group %s", pid, group->name);        
     pthread_mutex_lock(&group->tsReader->mutex);
     packetFilter = PacketFilterListAddFilter(group->tsReader, group, pid, callback, userArg); 
@@ -401,6 +422,8 @@ void TSFilterGroupRemovePacketFilter(TSFilterGroup_t *group, uint16_t pid)
     TSPacketFilter_t *packetFilter;
     TSPacketFilter_t *packetFilterPrev = NULL;
 
+    CHECK_PID_VALID(pid);
+    
     LogModule(LOG_DEBUG, TSREADER, "Removing packet filter 0x%04x for filter group %s", pid, group->name);        
     pthread_mutex_lock(&group->tsReader->mutex);
     for (packetFilter = group->packetFilters; packetFilter; packetFilter = packetFilter->next)
