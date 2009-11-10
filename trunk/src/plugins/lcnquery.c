@@ -97,7 +97,7 @@ PLUGIN_FEATURES(
 PLUGIN_COMMANDS(
     {
         "lslcn",
-        0, 0,
+        0, 1,
         "List the logical channel numbers to services.",
         "List all the logical channel numbers and the services they refer to.",
         CommandListLCN
@@ -254,6 +254,19 @@ static void CommandListLCN(int argc, char **argv)
 {
     int i;
     int count = 0;
+    bool printId = FALSE;
+    if (argc > 0)
+    {
+        
+        for (i = 0; i < argc; i ++)
+        {
+            if (strcmp(argv[i], "-id") == 0)
+            {
+                printId = TRUE;
+            }
+        }
+    }
+    
 
     for ( i = 0; i < MAX_ENTRIES; i ++)
     {
@@ -264,7 +277,18 @@ static void CommandListLCN(int argc, char **argv)
             {
                 if (entries[i].visible)
                 {
-                    CommandPrintf("%4d : %s\n", i + 1, service->name);
+                    if (printId)
+                    {
+                        Multiplex_t *multiplex = MultiplexFindUID(service->multiplexUID);
+                        CommandPrintf("%4d : %04x.%04x.%04x : %s\n", i + 1,
+                        multiplex->networkId & 0xffff, multiplex->tsId & 0xffff,
+                        service->id, service->name);
+                        MultiplexRefDec(multiplex);
+                    }
+                    else
+                    {
+                        CommandPrintf("%4d : %s\n", i + 1, service->name);
+                    }
                     count ++;
                 }
                 ServiceRefDec(service);
