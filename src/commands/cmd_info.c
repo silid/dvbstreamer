@@ -795,17 +795,6 @@ static void CommandPropertyInfo(int argc, char **argv)
         CommandPrintf("Writeable   : %s\n", propInfo.writeable   == TRUE ? "Yes":"No");
         CommandPrintf("Has Children: %s\n", propInfo.hasChildren == TRUE ? "Yes":"No");
         CommandPrintf("Description :\n%s\n", propInfo.desc == NULL ? "":propInfo.desc);
-        if (propInfo.type == PropertyType_Table)
-        {
-            int i;
-            CommandPrintf("\nColumns     : %d\n", propInfo.tableDesc->nrofColumns);
-            for (i = 0; i < propInfo.tableDesc->nrofColumns; i ++)
-            {
-                CommandPrintf("(%d) Name: %s\n", i, propInfo.tableDesc->columns[i].name);
-                CommandPrintf("(%d) Type: %s\n", i, GetPropertyTypeString(propInfo.tableDesc->columns[i].type));
-                CommandPrintf("(%d) Description: %s\n\n", i, propInfo.tableDesc->columns[i].description);
-            }
-        }
     }
     else
     {
@@ -912,9 +901,6 @@ static char* GetPropertyTypeString(PropertyType_e type)
             break;
         case PropertyType_IPAddress:
             typeStr = "IP Address";
-            break;
-        case PropertyType_Table:
-            typeStr = "Table";
             break;
         default:
             typeStr = "Unknown";
