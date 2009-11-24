@@ -41,7 +41,6 @@ typedef enum PropertyType_e {
     /* Special types */    
     PropertyType_PID,       /**< 12Bit unsigned integer, special value of 8192 allowed for all PIDs*/
     PropertyType_IPAddress, /**< IPv4 or IPv6 IP address/hostname */
-    PropertyType_Table,     /**< 2-dimensional table, need to use PropertyTableDescription_t to describe the table */    
 }PropertyType_e;
 
 typedef void *PropertiesEnumerator_t;
@@ -58,17 +57,6 @@ typedef struct PropertyValue_s{
         uint16_t pid;
     }u;
 }PropertyValue_t;
-    
-typedef struct PropertyTableColumn_s{
-    char *name;
-    char *description;
-    PropertyType_e type;
-}PropertyTableColumn_t;
-
-typedef struct PropertyTableDescription_s{
-    int nrofColumns;
-    PropertyTableColumn_t columns[PROPERTIES_TABLE_COLUMNS_MAX];
-}PropertyTableDescription_t;
 
 typedef struct PropertyInfo_s
 {
@@ -78,12 +66,18 @@ typedef struct PropertyInfo_s
     bool readable;
     bool writeable;
     bool hasChildren;
-    PropertyTableDescription_t *tableDesc;
 }PropertyInfo_t;
 
 typedef int (*PropertySimpleAccessor_t)(void *userArg, PropertyValue_t *value);
-typedef int (*PropertyTableAccessor_t)(void *userArg, int row, int column, PropertyValue_t *value);
-typedef int (*PropertyTableCounter_t)(void *userArg);
+
+
+#define PROPERTY_MAX_PATH_ELEMENTS 256
+
+typedef struct PropertyPathElements_s
+{
+    int nrofElements;
+    char *elements[PROPERTY_MAX_PATH_ELEMENTS];
+}PropertyPathElements_t;
 
 /**
  * Initialise properties module.
@@ -101,10 +95,6 @@ int PropertiesDeInit(void);
 int PropertiesAddProperty(const char *path, const char *name, const char *desc, PropertyType_e type, 
                               void *userArg, PropertySimpleAccessor_t get, PropertySimpleAccessor_t set);
 
-int PropertiesAddTableProperty(const char *path, const char *name, const char *desc, PropertyTableDescription_t *tableDesc,
-                              void *userArg, PropertyTableAccessor_t get, PropertyTableAccessor_t set, 
-                              PropertyTableCounter_t count);
-
 int PropertiesRemoveProperty(const char *path, const char *name);
 
 int PropertiesRemoveAllProperties(const char *path);
@@ -116,7 +106,9 @@ int PropertiesGet(char *path, PropertyValue_t *value);
 int PropertiesSetStr(char *path, char *value);
 
 int PropertiesEnumerate(char *path, PropertiesEnumerator_t *pos);
+
 PropertiesEnumerator_t PropertiesEnumNext(PropertiesEnumerator_t pos);
+
 void PropertiesEnumGetInfo(PropertiesEnumerator_t pos, PropertyInfo_t *propInfo);
 
 int PropertiesGetInfo(char *path, PropertyInfo_t *propInfo);
@@ -142,5 +134,19 @@ int PropertiesSimplePropertyGet(void *userArg, PropertyValue_t *value);
  * @return 0 if the property type was supported, -1 otherwise.
  */
 int PropertiesSimplePropertySet(void *userArg, PropertyValue_t *value);
+
+/**
+ * Helper macro to a add simple property accessor.
+ * @param path Path to the parent to add this property to.
+ * @param name Name of the property to add.
+ * @param desc Description of this property.
+ * @param type Type of this property.
+ * @param valueptr Pointer to the location the value of this property is stored.
+ * @param readable Whether this property is readable.
+ * @param writable Whether this property is writable.
+ * @return 0 on success, 1 otherwise.
+ */
+#define PropertiesAddSimpleProperty(path, name, desc, type, valueptr, readable, writable) \
+    PropertiesAddProperty(path, name, desc, type, valueptr, (readable)?PropertiesSimplePropertyGet:NULL, (writable)?PropertiesSimplePropertySet:NULL)
 #endif
 

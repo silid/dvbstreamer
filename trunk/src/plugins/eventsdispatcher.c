@@ -79,8 +79,6 @@ static void RemoveListener(EventDispatcherListener_t *listener);
 static EventDispatcherListener_t *FindListener(char *name);
 static void AddListenerEvent(EventDispatcherListener_t *listener, char *filter);
 static bool RemoveListenerEvent(EventDispatcherListener_t *listener, char *filter);
-static int ListenerPropertyTableGet(void *userArg, int row, int column, PropertyValue_t *value);
-static int ListenerPropertyTableCount(void *userArg);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -88,11 +86,6 @@ static int ListenerPropertyTableCount(void *userArg);
 static List_t *listenersList;
 static pthread_mutex_t listenersMutex = PTHREAD_MUTEX_INITIALIZER;
 static const char EVENTDISPATCH[] = "EventDispatch";
-static const char propertiesParentPath[] = "commands.eventlisteners";
-static PropertyTableDescription_t tableDescription = {
-    .nrofColumns = 1,
-    .columns[0] = {"Event", "Events the listener is registered to received", PropertyType_String}
-};
 
 /*******************************************************************************
 * Plugin Setup                                                                 *
@@ -168,12 +161,10 @@ static void EventDispatcherInstalled(bool installed)
         ObjectRegisterTypeDestructor(EventDescription_t, EventDescriptionDestructor);
         ObjectRegisterTypeDestructor(EventDispatcherListener_t, EventDispatcherListenerDestructor);
         listenersList = ListCreate();
-        PropertiesAddProperty("commands", "eventlisteners", "", PropertyType_None, NULL, NULL, NULL);
     }
     else
     {
         ListIterator_t iterator;
-        PropertiesRemoveAllProperties(propertiesParentPath);
         EventsUnregisterListener(EventCallback, NULL);
         for (ListIterator_Init(iterator, listenersList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
         {
@@ -213,9 +204,6 @@ static void CommandAddListener(int argc, char **argv)
     listener->dmInstance = mrlInstance;
 
     AddListener(listener);
-    PropertiesAddTableProperty(propertiesParentPath, argv[0], "Event Listener", &tableDescription, listener,
-        ListenerPropertyTableGet, NULL, ListenerPropertyTableCount);
-
 }
 
 static void CommandRemoveListener(int argc, char **argv)
@@ -231,7 +219,6 @@ static void CommandRemoveListener(int argc, char **argv)
     RemoveListener(listener);
     ObjectRefDec(listener);
     ObjectRefDec(listener); /* Do this twice as FindListener increments the ref count */
-    PropertiesRemoveProperty(propertiesParentPath, argv[1]);
 }
 
 static void CommandListListeners(int argc, char **argv)
@@ -483,55 +470,3 @@ static bool RemoveListenerEvent(EventDispatcherListener_t *listener, char *filte
     return found;
 }
 
-static int ListenerPropertyTableGet(void *userArg, int row, int column, PropertyValue_t *value)
-{
-    EventDispatcherListener_t *listener = userArg;
-    int count = ListenerPropertyTableCount(userArg);
-    int i = 0;
-    ListIterator_t iterator;
-    if (row > count)
-    {
-        return -1;
-    }
-    value->u.string = NULL;
-    if (listener->allEvents)
-    {
-        if (row == 0)
-        {
-            value->u.string = strdup("*");
-        }
-        else
-        {
-            i = 1;
-        }
-    }
-    if (value->u.string == NULL)
-    {
-
-        for (ListIterator_Init(iterator, listener->events);
-             ListIterator_MoreEntries(iterator);
-             ListIterator_Next(iterator))
-        {
-            if (i == row)
-            {
-                char *eventStr = ListIterator_Current(iterator);
-                value->u.string = strdup(eventStr);
-                break;
-            }
-            i ++;
-        }
-    }
-    return 0;
-}
-
-static int ListenerPropertyTableCount(void *userArg)
-{
-    EventDispatcherListener_t *listener = userArg;
-    int count = 0;
-    if (listener->allEvents)
-    {
-        count ++;
-    }
-    count = ListCount(listener->events);
-    return count;
-}

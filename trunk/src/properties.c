@@ -44,7 +44,6 @@ Expose internal properties to the user.
 typedef struct PropertyNode_s {
     struct PropertyNode_s *parent;
     struct PropertyNode_s *next;
-    struct PropertyNode_s *prev;
     
     const char *name;
     const char *desc;
@@ -55,12 +54,6 @@ typedef struct PropertyNode_s {
             PropertySimpleAccessor_t set;
             PropertySimpleAccessor_t get;
         }simple;
-        struct {
-            PropertyTableDescription_t *tableDesc;
-            PropertyTableAccessor_t set;
-            PropertyTableAccessor_t get;
-            PropertyTableCounter_t  count;
-        }table;
     }accessors;
     struct PropertyNode_s *childNodes;
 }PropertyNode_t;
@@ -71,8 +64,10 @@ typedef struct PropertyNode_s {
 *******************************************************************************/
 static PropertyNode_t *PropertiesCreateNodes(const char *path);
 static PropertyNode_t *PropertiesCreateNode(PropertyNode_t *parentNode, const char *newProp);
-static PropertyNode_t *PropertiesFindNode(const char *path, char **leftOver);
+static PropertyNode_t *PropertiesFindNode(PropertyPathElements_t *pathElements, int *leftOver, PropertyNode_t **before);
 static int PropertiesStrToValue(char *input, PropertyType_e toType, PropertyValue_t *output);
+static PropertyPathElements_t * PropertyPathSplitElements(const char *path);
+static void PropertyPathElementsDestructor(void * ptr);
 static void PropertryDestructor(void *ptr);
 /*******************************************************************************
 * Global variables                                                             *
@@ -87,12 +82,12 @@ int PropertiesInit(void)
 {
     rootProperty.parent = NULL;
     rootProperty.next = NULL;
-    rootProperty.prev = NULL;
     rootProperty.name = "";
     rootProperty.desc = "Root of all properties";
     rootProperty.type = PropertyType_None;
     rootProperty.childNodes = NULL;
     ObjectRegisterTypeDestructor(PropertyNode_t, PropertryDestructor);
+    ObjectRegisterTypeDestructor(PropertyPathElements_t, PropertyPathElementsDestructor);
     return 0;
 }
 
@@ -122,30 +117,15 @@ int PropertiesAddProperty(const char *path, const char *name, const char *desc, 
     return 0;
 }
 
-int PropertiesAddTableProperty(const char *path, const char *name, const char *desc, PropertyTableDescription_t *tableDesc,
-                              void *userArg, PropertyTableAccessor_t get, PropertyTableAccessor_t set, 
-                              PropertyTableCounter_t count)
-{
-    PropertyNode_t *parentNode = PropertiesCreateNodes(path);
-    PropertyNode_t *propertyNode = PropertiesCreateNode(parentNode, name);
-    
-    propertyNode->desc = desc;
-    propertyNode->type = PropertyType_Table;
-    propertyNode->userArg = userArg;
-    propertyNode->accessors.table.tableDesc = tableDesc;
-    propertyNode->accessors.table.get = get;
-    propertyNode->accessors.table.set = set;
-    propertyNode->accessors.table.count = count;
-    return 0;
-
-}
-
 int PropertiesRemoveProperty(const char *path, const char *name)
 {
     int result = 0;
-    char *leftOver;
-    PropertyNode_t *parentNode = PropertiesFindNode(path, &leftOver);
-    if ((path == NULL) || (leftOver != NULL))
+    int leftOver;
+    PropertyPathElements_t *pathElements = PropertyPathSplitElements(path);
+    PropertyNode_t *parentNode = PropertiesFindNode(pathElements, &leftOver, NULL);
+    ObjectRefDec(pathElements);
+    
+    if ((parentNode == NULL) || (leftOver != -1))
     {
         LogModule(LOG_ERROR, PROPERTIES, "Couldn't find parent \"%s\" while trying to remove node %s", path, name);
         result = -1;
@@ -177,7 +157,6 @@ int PropertiesRemoveProperty(const char *path, const char *name)
             else
             {
                 prevNode->next = currentNode->next;
-                currentNode->next->prev = prevNode;
                 ObjectRefDec(currentNode);
             }
             
@@ -189,12 +168,14 @@ int PropertiesRemoveProperty(const char *path, const char *name)
 int PropertiesRemoveAllProperties(const char *path)
 {
     int result = 0;
-    char *leftOver;
-    PropertyNode_t *node = PropertiesFindNode(path, &leftOver);
+    int leftOver;
+    PropertyPathElements_t *pathElements = PropertyPathSplitElements(path);
+    PropertyNode_t *prevNode = NULL;
+    PropertyNode_t *node = PropertiesFindNode(pathElements, &leftOver, &prevNode);
     PropertyNode_t *nextNode;
     PropertyNode_t *parentNode = node;
     
-    if ((node == NULL) || (leftOver != NULL))
+    if ((node == NULL) || (leftOver != -1))
     {
         LogModule(LOG_ERROR, PROPERTIES, "Couldn't find parent \"%s\" while trying to remove nodes", path);
         result = -1;
@@ -221,145 +202,97 @@ int PropertiesRemoveAllProperties(const char *path)
         }while (node != parentNode);
 
         nextNode = parentNode->next;
-        if (nextNode != NULL)
-        {
-            nextNode->prev = parentNode->prev;
-        }
-        if (parentNode->prev != NULL)
-        {
-            parentNode->prev->next = nextNode;
-        }
-        else
+        if (parentNode->parent->childNodes == parentNode)
         {
             parentNode->parent->childNodes = nextNode;
         }
+        if (prevNode != NULL)
+        {
+            prevNode->next = nextNode;
+        }
         ObjectRefDec(parentNode);        
     }
+    ObjectRefDec(pathElements);
     return result;
 }
 
 int PropertiesSet(char *path, PropertyValue_t *value)
 {
     int result = -1;
-    char *leftOver;
-    PropertyNode_t *node = PropertiesFindNode(path, &leftOver);
+    int leftOver;
+    PropertyPathElements_t *pathElements = PropertyPathSplitElements(path);
+    PropertyNode_t *node = PropertiesFindNode(pathElements, &leftOver, NULL);
 
-    if ((node != NULL) && ((leftOver == NULL) || (node->type == PropertyType_Table)))
+    if ((node != NULL) && (leftOver == -1))
     {
-        if (node->type == PropertyType_Table)
+        if ((node->type == value->type) && (node->accessors.simple.set != NULL))
         {
-            int row, column;
-            /* Check that all dimensions are specified */
-            if (sscanf(leftOver, ".%d.%d", &row, &column) == 2)
-            {
-                PropertyTableDescription_t *tableDesc = node->accessors.table.tableDesc;
-                if (column < tableDesc->nrofColumns)
-                {
-                    if ((tableDesc->columns[column].type == value->type) &&
-                        (node->accessors.table.set != NULL))
-                    {
-                        result = node->accessors.table.set(node->userArg, row, column, value);
-                    }
-                }
-            }
+            result = node->accessors.simple.set(node->userArg, value);
         }
         else
         {
-            if ((node->type == value->type) && (node->accessors.simple.set != NULL))
-            {
-                result = node->accessors.simple.set(node->userArg, value);
-            }
-            else
-            {
-                LogModule(LOG_ERROR, PROPERTIES, "Wrong type supplied as value while trying to set property %s!", path);
-            }
+            LogModule(LOG_ERROR, PROPERTIES, "Wrong type supplied as value while trying to set property %s!", path);
         }
     }
+    ObjectRefDec(pathElements);
     return result;
 }
 
 int PropertiesGet(char *path, PropertyValue_t *value)
 {
     int result = -1;
-    char *leftOver;
-    PropertyNode_t *node = PropertiesFindNode(path, &leftOver);
-    if ((node != NULL) && ((leftOver == NULL) || (node->type == PropertyType_Table)))
+    int leftOver;
+    PropertyPathElements_t *pathElements = PropertyPathSplitElements(path);
+    PropertyNode_t *node = PropertiesFindNode(pathElements, &leftOver, NULL);
+    
+    if ((node != NULL) && (leftOver == -1))
     {
-        if (node->type == PropertyType_Table)
+        if (node->accessors.simple.get != NULL)
         {
-            /* Check that all dimensions are specified and call get */
-            /* Otherwise call count */
-            if (leftOver == NULL)
-            {
-                value->type = PropertyType_Int;
-                value->u.integer = node->accessors.table.count(node->userArg);
-                result = 0;
-            }
-            else
-            {
-                int row, column;
-                /* Check that all dimensions are specified */
-                if (sscanf(leftOver, "%d.%d", &row, &column) == 2)
-                {
-                    if (column < node->accessors.table.tableDesc->nrofColumns)
-                    {
-                        value->type = node->accessors.table.tableDesc->columns[column].type;
-                        result = node->accessors.table.get(node->userArg, row, column, value);
-                    }
-                }
-            }
-        }
-        else
-        {
-            if (node->accessors.simple.get != NULL)
-            {
-                value->type = node->type;
-                result = node->accessors.simple.get(node->userArg, value);
-            }
+            value->type = node->type;
+            result = node->accessors.simple.get(node->userArg, value);
         }
     }
+    ObjectRefDec(pathElements);
     return result;
 }
 
 int PropertiesSetStr(char *path, char *value)
 {
     int result = -1;
-    char *leftOver;
     PropertyValue_t newValue;
-    PropertyNode_t *node = PropertiesFindNode(path, &leftOver);
+    int leftOver;
+    PropertyPathElements_t *pathElements = PropertyPathSplitElements(path);
+    PropertyNode_t *node = PropertiesFindNode(pathElements, &leftOver, NULL);
 
-    if ((node == NULL) || ((leftOver != NULL) && (node->type != PropertyType_Table)))
+    if ((node == NULL) || (leftOver != -1))
     {
         result = -1;
     }
     else
     {
-        if (node->type == PropertyType_Table)
+        PropertiesStrToValue(value, node->type, &newValue);
+
+        if (node->type == newValue.type)
         {
-            /* Check that all dimensions are specified */
+            result = node->accessors.simple.set(node->userArg, &newValue);
         }
         else
         {
-            PropertiesStrToValue(value, node->type, &newValue);
-
-            if (node->type == newValue.type)
-            {
-                result = node->accessors.simple.set(node->userArg, &newValue);
-            }
-            else
-            {
-                LogModule(LOG_ERROR, PROPERTIES, "Wrong type supplied as value while trying to set property %s!", path);
-                result = -1;
-            }
+            LogModule(LOG_ERROR, PROPERTIES, "Wrong type supplied as value while trying to set property %s!", path);
+            result = -1;
         }
+
     } 
+    ObjectRefDec(pathElements);    
     return result;
 }
 
 int PropertiesEnumerate(char *path, PropertiesEnumerator_t *pos)
 {
     int result = 0;
-    char *leftOver = NULL;
+    int leftOver = -1;
+    PropertyPathElements_t *pathElements = NULL;
     PropertyNode_t *node = NULL;
     if ((path == NULL) || (path[0] == 0))
     {
@@ -367,16 +300,21 @@ int PropertiesEnumerate(char *path, PropertiesEnumerator_t *pos)
     }
     else
     {
-        node = PropertiesFindNode(path, &leftOver);
+        pathElements = PropertyPathSplitElements(path);
+        node = PropertiesFindNode(pathElements, &leftOver, NULL);
     }
-
-    if ((node == NULL) || (leftOver != NULL))
+    if ((node == NULL) || (leftOver != -1))
     {
         result = -1;
     }
     else
     {
         *pos = node->childNodes;
+    }
+    
+    if (pathElements)
+    {
+        ObjectRefDec(pathElements);
     }
     
     return result;
@@ -401,19 +339,8 @@ void PropertiesEnumGetInfo(PropertiesEnumerator_t pos, PropertyInfo_t *propInfo)
         propInfo->name = (char *)node->name;
         propInfo->desc = (char *)node->desc;
         propInfo->type = node->type;
-        if (node->type == PropertyType_Table)
-        {
-            propInfo->readable = (node->accessors.table.get != NULL);
-            propInfo->writeable = (node->accessors.table.set != NULL);
-            propInfo->tableDesc = node->accessors.table.tableDesc;
-        }
-        else
-        {
-            propInfo->readable = (node->accessors.simple.get != NULL);
-            propInfo->writeable = (node->accessors.simple.set != NULL);
-            propInfo->tableDesc = NULL;
-        }
-        
+        propInfo->readable = (node->accessors.simple.get != NULL);
+        propInfo->writeable = (node->accessors.simple.set != NULL);       
         propInfo->hasChildren = (node->childNodes != NULL);
         
     }
@@ -422,9 +349,11 @@ void PropertiesEnumGetInfo(PropertiesEnumerator_t pos, PropertyInfo_t *propInfo)
 int PropertiesGetInfo(char *path, PropertyInfo_t *propInfo)
 {
     int result = 0;
-    char *leftOver;
-    PropertyNode_t *node = PropertiesFindNode(path, &leftOver);
-    if ((node == NULL) || (leftOver != NULL))
+    int leftOver;
+    PropertyPathElements_t *pathElements = PropertyPathSplitElements(path);
+    PropertyNode_t *node = PropertiesFindNode(pathElements, &leftOver, NULL);
+    
+    if ((node == NULL) || (leftOver != -1))
     {
         result = -1;
     }
@@ -433,21 +362,11 @@ int PropertiesGetInfo(char *path, PropertyInfo_t *propInfo)
         propInfo->name = (char *)node->name;
         propInfo->desc = (char *)node->desc;
         propInfo->type = node->type;
-        if (node->type == PropertyType_Table)
-        {
-            propInfo->readable = (node->accessors.table.get != NULL);
-            propInfo->writeable = (node->accessors.table.set != NULL);
-            propInfo->tableDesc = node->accessors.table.tableDesc;
-        }
-        else
-        {
-            propInfo->readable = (node->accessors.simple.get != NULL);
-            propInfo->writeable = (node->accessors.simple.set != NULL);
-            propInfo->tableDesc = NULL;
-        }
-        
+        propInfo->readable = (node->accessors.simple.get != NULL);
+        propInfo->writeable = (node->accessors.simple.set != NULL);       
         propInfo->hasChildren = (node->childNodes != NULL);
     }
+    ObjectRefDec(pathElements);
     return result;
 }
 
@@ -599,44 +518,32 @@ int PropertiesSimplePropertySet(void *userArg, PropertyValue_t *value)
 
 static PropertyNode_t *PropertiesCreateNodes(const char *path)
 {
-    char *toCreate = NULL;
+    int toCreate = -1;
+    int i;
     PropertyNode_t *currentNode;
-    char *elementStart = NULL;
-    char *elementEnd = NULL;
-    char nodeName[PROPERTIES_PATH_MAX];
-
-    currentNode = PropertiesFindNode(path, &toCreate);
+    PropertyPathElements_t *pathElements = PropertyPathSplitElements(path);
+    
+    currentNode = PropertiesFindNode(pathElements, &toCreate, NULL);
 
     if (currentNode == NULL)
     {
         currentNode = &rootProperty;
     }
-    if (toCreate != NULL)
+    if (toCreate != -1)
     {
-        for (elementStart = toCreate; elementStart != NULL; )
+        for (i = toCreate; i < pathElements->nrofElements; i ++)
         {
-            elementEnd = strchr(elementStart, '.');
-            if (elementEnd)
-            {
-                int len = elementEnd - elementStart;
-                strncpy(nodeName, elementStart, len);
-                nodeName[len] = 0;
-                elementStart = elementEnd + 1;
-            }
-            else
-            {
-                strcpy(nodeName, elementStart);
-                elementStart = NULL;
-            }
-            currentNode = PropertiesCreateNode(currentNode, nodeName);
+            currentNode = PropertiesCreateNode(currentNode, pathElements->elements[i]);
         }
     }
+    ObjectRefDec(pathElements);
     return currentNode;
 }
 
 static PropertyNode_t *PropertiesCreateNode(PropertyNode_t *parentNode, const char *newProp)
 {
     PropertyNode_t *childNode = NULL;
+
     childNode = ObjectCreateType(PropertyNode_t);
     childNode->name = strdup(newProp);
     childNode->type = PropertyType_None;
@@ -657,13 +564,10 @@ static PropertyNode_t *PropertiesCreateNode(PropertyNode_t *parentNode, const ch
         {
             prevNode->next = childNode;
             childNode->next = NULL;
-            childNode->prev = prevNode;            
         }
         else
         {
             childNode->next = node;
-            node->prev = childNode;
-            childNode->prev = prevNode;
             if (prevNode)
             {
                 prevNode->next = childNode;
@@ -677,24 +581,62 @@ static PropertyNode_t *PropertiesCreateNode(PropertyNode_t *parentNode, const ch
     else
     {
         parentNode->childNodes = childNode;
-        childNode->prev = NULL;
-        childNode->next = NULL;
     }
     return childNode;
 }
 
-static PropertyNode_t *PropertiesFindNode(const char *path, char **leftOver)
+static PropertyNode_t *PropertiesFindNode(PropertyPathElements_t *pathElements, int *leftOver, PropertyNode_t **before)
 {
     PropertyNode_t *result = NULL;
     PropertyNode_t *currentNode = &rootProperty;
+    PropertyNode_t *prevNode = NULL;
     PropertyNode_t *childNode;
-    char *elementStart = (char *)path;
+    int i;
+    bool nodeFound = TRUE;
+    *leftOver = -1;
+    for (i = 0; (i < pathElements->nrofElements); i ++)
+    {
+        nodeFound = FALSE;
+        prevNode = NULL;
+        for (childNode = currentNode->childNodes; childNode; childNode = childNode->next)
+        {
+            if (strcmp(childNode->name, pathElements->elements[i]) == 0)
+            {
+                currentNode = childNode;
+                nodeFound = TRUE;
+                break;
+            }
+            prevNode = childNode;
+        }
+        if (!nodeFound)
+        {
+            break;
+        }
+    }
+    if (before != NULL)
+    {
+        *before = prevNode;
+    }
+    
+    if (i < pathElements->nrofElements)
+    {
+        *leftOver = i;    
+    }
+    
+    if (currentNode != &rootProperty)
+    {
+        result = currentNode;
+    }
+    return result;
+}
+
+static PropertyPathElements_t * PropertyPathSplitElements(const char *path)
+{
+    PropertyPathElements_t *pathElements = ObjectCreateType(PropertyPathElements_t);
+    char *elementStart = (char *)path;  
     char *elementEnd = NULL;
     char nodeName[PROPERTIES_PATH_MAX];
-
-    bool nodeFound = FALSE;
-    *leftOver = (char *)path;
-    do
+    while(elementStart != NULL)
     {
         elementEnd = strchr(elementStart, '.');
         if (elementEnd)
@@ -709,30 +651,20 @@ static PropertyNode_t *PropertiesFindNode(const char *path, char **leftOver)
             strcpy(nodeName, elementStart);
             elementStart = NULL;
         }
-        nodeFound = FALSE;
-        for (childNode = currentNode->childNodes; childNode; childNode = childNode->next)
-        {
-            if (strcmp(childNode->name, nodeName) == 0)
-            {
-                currentNode = childNode;
-                nodeFound = TRUE;
-                *leftOver = elementStart;
-                break;
-            }
-        }
-    }while(nodeFound && (elementStart != NULL));
-    
-    if (currentNode != &rootProperty)
+        pathElements->elements[pathElements->nrofElements] = strdup(nodeName);
+        pathElements->nrofElements += 1;
+    };
+    return pathElements;
+}
+
+static void PropertyPathElementsDestructor(void *ptr)
+{
+    PropertyPathElements_t *pathElements = ptr;
+    int i;
+    for (i = 0; i < pathElements->nrofElements; i ++)
     {
-        result = currentNode;
+        free(pathElements->elements[i]);
     }
-    
-    if (*leftOver && (strlen(*leftOver) == 0))
-    {
-        *leftOver = NULL;
-    }
-    
-    return result;
 }
 
 static void PropertryDestructor(void *ptr)

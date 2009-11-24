@@ -147,7 +147,7 @@ void OutputsInstall(bool installed)
     {
         ObjectRegisterTypeDestructor(Output_t, OutputDestructor);
         outputsList = ObjectListCreate();
-        PropertiesAddProperty("", propertiesParent, "Branch containing all created outputs", PropertyType_None, NULL, NULL, NULL);
+        PropertiesAddProperty(NULL, propertiesParent, "Branch containing all created outputs", PropertyType_None, NULL, NULL, NULL);
     }
     else
     {
