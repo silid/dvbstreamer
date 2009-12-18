@@ -31,6 +31,8 @@ Manage services and PIDs.
 
 #include "types.h"
 #include "objects.h"
+#include "dbase.h"
+#include "events.h"
 #include "multiplexes.h"
 
 /**
@@ -115,7 +117,7 @@ int ServiceDeInit(void);
  * Return the number of services in the database.
  * @return The number of services in the database.
  */
-int ServiceCount();
+#define ServiceCount() DBaseCount(SERVICES_TABLE)
 
 /**
  * Retrieve the number of services on the specified multplex.
@@ -384,6 +386,12 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator);
                 ObjectRefDec(__service); \
             } \
         }while(0)
+
+/**
+ * Use as the toString parameter when registering an event where the payload will
+ * be a service object.
+ */
+char *ServiceEventToString(Event_t event,void * payload);
 
 /** @} */
 #endif

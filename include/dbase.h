@@ -358,14 +358,22 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 
 /**
  * Constant for Metadata property for LNB settings.
+ * String defining the name of the LNB being used.
+ */
+#define METADATA_NAME_LNB             "lnb"
+/**
+ * Constant for Metadata property for LNB settings.
+ * unsigned long for low frequency setting.
  */
 #define METADATA_NAME_LNB_LOW_FREQ     "lnb.lowfreq"
 /**
  * Constant for Metadata property for LNB settings.
+ * unsigned long for high frequency setting.
  */
 #define METADATA_NAME_LNB_HIGH_FREQ    "lnb.highfreq"
 /**
  * Constant for Metadata property for LNB settings.
+ * unsigned long for switch frequency setting.
  */
 #define METADATA_NAME_LNB_SWITCH_FREQ  "lnb.switchfreq"
 
@@ -518,6 +526,12 @@ int DBaseTransactionBegin(void);
  * @return 0 on success, otherwise an SQLite error code.
  */
 int DBaseTransactionCommit(void);
+
+/**
+ * Return the number of entries in the specified table.
+ * @return Number of entries in the table.
+ */
+int DBaseCount(char *table);
 
 /**
  * Retrieve the specified metadata property.

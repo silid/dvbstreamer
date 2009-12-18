@@ -28,6 +28,8 @@ Manage multiplexes and tuning parameters.
 #include "objects.h"
 #include "dvbadapter.h"
 #include "list.h"
+#include "dbase.h"
+#include "events.h"
 
 /**
  * @defgroup Multiplex Multiplex information
@@ -77,7 +79,7 @@ int MultiplexDeInit(void);
  * Number of multiplexes stored in the database.
  * @return The number of multiplexes in the database.
  */
-int MultiplexCount();
+#define MultiplexCount() DBaseCount(MULTIPLEXES_TABLE)
 
 /**
  * Retrieve a Multiplex_t structure for the string mux.
@@ -173,10 +175,10 @@ int MultiplexFrontendParametersGet(Multiplex_t *multiplex, struct dvb_frontend_p
  * @param type The type of frontend used to receive this transport stream.
  * @param feparams The parameters to pass to the frontend to tune to the new TS.
  * @param diseqc Any DiSEqC properties required to tune.
- * @param uid On exit used to store the UID of the new multiplex.
+ * @param mux On exit, if successful, contains a pointer to a Multiplex_t object.
  * @return 0 on success, otherwise an SQLite error code.
  */
-int MultiplexAdd(fe_type_t type, struct dvb_frontend_parameters *feparams, DVBDiSEqCSettings_t *diseqc, int *uid);
+int MultiplexAdd(fe_type_t type, struct dvb_frontend_parameters *feparams, DVBDiSEqCSettings_t *diseqc, Multiplex_t **mux);
 
 /**
  * Remove a multiplex and all its services from the database.
@@ -240,5 +242,10 @@ int MultiplexNetworkIdSet(Multiplex_t *multiplex, int netid);
             } \
         }while(0)
 
+/**
+ * Use as the toString parameter when registering an event where the payload will
+ * be a multiplex object.
+ */
+char *MultiplexEventToString(Event_t event,void * payload);
 /** @} */
 #endif

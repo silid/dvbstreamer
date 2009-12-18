@@ -31,6 +31,8 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 #include "types.h"
 #include "main.h"
 #include "logging.h"
+#include "objects.h"
+#include "deferredproc.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -43,8 +45,10 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
+
 static int DBaseCreateTables(double version);
 static int DBaseCheckVersion();
+
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -54,6 +58,7 @@ static sqlite3 *DBaseInstance;
 static char DBASE[] = "dbase";
 static char dbaseFile[PATH_MAX];
 static pthread_key_t dbaseKey;
+static pthread_key_t deferUpdateKey;
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
@@ -76,6 +81,8 @@ int DBaseInit(int adapter)
         sqlite3_busy_timeout(DBaseInstance, 500);
         rc = DBaseCheckVersion();
     }
+    
+    ObjectCreateType(DBaseDeferredAction_t);
     return rc;
 }
 
@@ -119,6 +126,24 @@ int DBaseTransactionCommit(void)
 {
     sqlite3 *connection = DBaseConnectionGet();
     return sqlite3_exec(connection, "COMMIT TRANSACTION;", NULL, NULL, NULL);
+}
+
+int DBaseCount(char *table)
+{
+    STATEMENT_INIT;
+    int result = -1;
+
+    STATEMENT_PREPAREVA("SELECT count() FROM %s;", table);
+    RETURN_ON_ERROR(-1);
+
+    STATEMENT_STEP();
+    if (rc == SQLITE_ROW)
+    {
+        result = STATEMENT_COLUMN_INT(0);
+        rc = 0;
+    }
+    STATEMENT_FINALIZE();
+    return result;
 }
 
 /*******************************************************************************
