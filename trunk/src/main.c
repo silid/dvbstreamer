@@ -151,6 +151,7 @@ int main(int argc, char *argv[])
     bool remoteInterface = FALSE;
     bool disableConsoleInput = FALSE;
     bool hwRestricted = FALSE;
+    LNBInfo_t lnbInfo;
     
     DeliveryMethodInstance_t *dmInstance;
     char logFilename[PATH_MAX] = {0};
@@ -293,7 +294,8 @@ int main(int argc, char *argv[])
     INIT(DeliveryMethodManagerInit(), "delivery method manager");
     INIT(DeferredProcessingInit(), "deferred processing");
 
-    LogModule(LOG_INFO, MAIN, "%d Services available on %d Multiplexes\n", ServiceCount(), MultiplexCount());
+    LogModule(LOG_INFO, MAIN, "%d Services available on %d Multiplexes\n", DBaseCount(SERVICES_TABLE), 
+                                                                           DBaseCount(MULTIPLEXES_TABLE));
 
     /* Initialise the DVB adapter */
     DVBAdapter = DVBInit(adapterNumber, hwRestricted);
@@ -306,14 +308,20 @@ int main(int argc, char *argv[])
 #if defined(ENABLE_DVB)
     if (DVBAdapter->info.type == FE_QPSK)
     {
-        int lowFreq = 0;
-        int highFreq = 0;
-        int switchFreq = 0;
-
-        DBaseMetadataGetInt(METADATA_NAME_LNB_LOW_FREQ, &lowFreq);
-        DBaseMetadataGetInt(METADATA_NAME_LNB_HIGH_FREQ, &highFreq);
-        DBaseMetadataGetInt(METADATA_NAME_LNB_SWITCH_FREQ, &switchFreq);
-        DVBFrontEndLNBInfoSet(DVBAdapter, lowFreq, highFreq, switchFreq);
+        char *lnb;
+        if (DBaseMetadataGet(METADATA_NAME_LNB, &lnb))
+        {
+            memset(&lnbInfo, 0, sizeof(lnbInfo));
+            DBaseMetadataGetInt(METADATA_NAME_LNB_LOW_FREQ, (int*)&lnbInfo.lowFrequency);
+            DBaseMetadataGetInt(METADATA_NAME_LNB_HIGH_FREQ, (int*)&lnbInfo.highFrequency);
+            DBaseMetadataGetInt(METADATA_NAME_LNB_SWITCH_FREQ, (int*)&lnbInfo.switchFrequency);
+        }
+        else
+        {
+            LNBDecode(lnb, &lnbInfo);
+            free(lnb);
+        }
+        DVBFrontEndLNBInfoSet(DVBAdapter, &lnbInfo);
     }
 #endif
 
@@ -520,10 +528,10 @@ void UpdateDatabase()
 static void InstallSysProperties(void)
 {
     sprintf(hexVersionStr, "%02x%02x", DVBSTREAMER_MAJOR, DVBSTREAMER_MINOR);
-    PropertiesAddProperty("sys", "version", "Version of this instance of DVBStreamer", PropertyType_String,
-                        &versionStr, PropertiesSimplePropertyGet, NULL);
-    PropertiesAddProperty("sys", "hexversion", "Version of this instance of DVBStreamer as a 16 bit hex number", PropertyType_String,
-                        &hexVersionStr, PropertiesSimplePropertyGet, NULL);
+    PropertiesAddSimpleProperty("sys", "version", "Version of this instance of DVBStreamer", PropertyType_String,
+                        &versionStr, SIMPLEPROPERTY_R);
+    PropertiesAddSimpleProperty("sys", "hexversion", "Version of this instance of DVBStreamer as a 16 bit hex number", PropertyType_String,
+                        &hexVersionStr, SIMPLEPROPERTY_R);
     PropertiesAddProperty("sys", "uptime", "The time that this instance has been running in days/hours/minutes/seconds.",
                       PropertyType_String, NULL, SysPropertyGetUptime, NULL);
     PropertiesAddProperty("sys.uptime", "seconds", "The time that this instance has been running in seconds.",

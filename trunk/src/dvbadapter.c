@@ -67,7 +67,6 @@ static void DVBCommandSend(DVBAdapter_t *adapter, char cmd);
 
 static char *DVBEventToString(Event_t event, void *payload);
 
-static int DVBPropertyNameGet(void *userArg, PropertyValue_t *value);
 static int DVBPropertyActiveGet(void *userArg, PropertyValue_t *value);
 static int DVBPropertyActiveSet(void *userArg, PropertyValue_t *value);
 
@@ -228,18 +227,18 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
         ev_io_start(inputLoop, &result->commandWatcher);        
         
         /* Add properties */
-        PropertiesAddProperty(propertyParent, "number", "The number of the adapter being used",
-            PropertyType_Int, &result->adapter, PropertiesSimplePropertyGet, NULL);
-        PropertiesAddProperty(propertyParent, "name", "Hardware driver name",
-            PropertyType_String, result, DVBPropertyNameGet, NULL);
-        PropertiesAddProperty(propertyParent, "hwrestricted", "Whether the hardware is not capable of supplying the entire TS.",
-            PropertyType_Boolean, &result->hardwareRestricted, PropertiesSimplePropertyGet, NULL);
-        PropertiesAddProperty(propertyParent, "maxfilters", "The maximum number of PID filters available.",
-            PropertyType_Boolean, &result->maxFilters, PropertiesSimplePropertyGet, NULL);
-        PropertiesAddProperty(propertyParent, "type", "The type of broadcast the frontend is capable of receiving",
-            PropertyType_String, &FETypesStr[result->info.type], PropertiesSimplePropertyGet, NULL);
-        PropertiesAddProperty(propertyParent, "system", "The broadcast system the frontend is capable of receiving",
-            PropertyType_String, &BroadcastSysemStr[result->info.type], PropertiesSimplePropertyGet, NULL);
+        PropertiesAddSimpleProperty(propertyParent, "number", "The number of the adapter being used",
+            PropertyType_Int, &result->adapter, SIMPLEPROPERTY_R);
+        PropertiesAddSimpleProperty(propertyParent, "name", "Hardware driver name",
+            PropertyType_String, result->info.name, SIMPLEPROPERTY_R);
+        PropertiesAddSimpleProperty(propertyParent, "hwrestricted", "Whether the hardware is not capable of supplying the entire TS.",
+            PropertyType_Boolean, &result->hardwareRestricted, SIMPLEPROPERTY_R);
+        PropertiesAddSimpleProperty(propertyParent, "maxfilters", "The maximum number of PID filters available.",
+            PropertyType_Boolean, &result->maxFilters, SIMPLEPROPERTY_R);
+        PropertiesAddSimpleProperty(propertyParent, "type", "The type of broadcast the frontend is capable of receiving",
+            PropertyType_String, &FETypesStr[result->info.type], SIMPLEPROPERTY_R);
+        PropertiesAddSimpleProperty(propertyParent, "system", "The broadcast system the frontend is capable of receiving",
+            PropertyType_String, &BroadcastSysemStr[result->info.type], SIMPLEPROPERTY_R);
         PropertiesAddProperty(propertyParent, "active","Whether the frontend is currently in use.",
             PropertyType_Boolean, result,DVBPropertyActiveGet,DVBPropertyActiveSet);
     }
@@ -306,44 +305,16 @@ void DVBFrontEndParametersGet(DVBAdapter_t *adapter, struct dvb_frontend_paramet
     }
 }
 
-void DVBFrontEndLNBInfoSet(DVBAdapter_t *adapter, int lowFreq, int highFreq, int switchFreq)
+void DVBFrontEndLNBInfoSet(DVBAdapter_t *adapter, LNBInfo_t *lnbInfo)
 {
-    adapter->lnbLowFreq = lowFreq;
-    adapter->lnbHighFreq = highFreq;
-    adapter->lnbSwitchFreq = switchFreq;
+    adapter->lnbInfo = *lnbInfo;
 }
 
 static int DVBFrontEndSatelliteSetup(DVBAdapter_t *adapter, struct dvb_frontend_parameters *frontend, DVBDiSEqCSettings_t *diseqc)
 {
-    int hiband = 0;
-    int ifreq = 0;
     bool tone = FALSE;
 
-    if (adapter->lnbSwitchFreq && adapter->lnbHighFreq &&
-        (frontend->frequency >= adapter->lnbSwitchFreq))
-    {
-        hiband = 1;
-    }
-
-    if (hiband)
-    {
-      ifreq = frontend->frequency - adapter->lnbHighFreq ;
-      tone = TRUE;
-    }
-    else
-    {
-      if (frontend->frequency < adapter->lnbLowFreq)
-      {
-          ifreq = adapter->lnbLowFreq - frontend->frequency;
-      }
-      else
-      {
-          ifreq = frontend->frequency - adapter->lnbLowFreq;
-      }
-      tone = FALSE;
-    }
-
-    frontend->frequency = ifreq;
+    frontend->frequency = LNBTransponderToIntermediateFreq(&adapter->lnbInfo, frontend->frequency, &tone);
 
     return DVBFrontEndDiSEqCSet(adapter, diseqc, tone);
 }
@@ -386,7 +357,7 @@ static int DVBFrontEndDiSEqCSet(DVBAdapter_t *adapter, DVBDiSEqCSettings_t *dise
 }
 
 
-int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status,
+int DVBFrontEndStatus(DVBAdapter_t *adapter, DVBFrontEndStatus_e *status,
                             unsigned int *ber, unsigned int *strength,
                             unsigned int *snr, unsigned int *ucblock)
 {
@@ -395,7 +366,7 @@ int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status,
 
     if (status)
     {
-        if (ioctl(adapter->frontEndFd, FE_READ_STATUS, status) < 0)
+        if (ioctl(adapter->frontEndFd, FE_READ_STATUS, (fe_status_t*)status) < 0)
         {
             LogModule(LOG_ERROR, DVBADAPTER,"FE_READ_STATUS: %s\n", strerror(errno));
             return -1;
@@ -779,13 +750,6 @@ static char *DVBEventToString(Event_t event, void *payload)
         LogModule(LOG_ERROR, DVBADAPTER, "Failed to allocate memory for event description when converting event to string\n");
     }
     return result;
-}
-
-static int DVBPropertyNameGet(void *userArg, PropertyValue_t *value)
-{
-    DVBAdapter_t *adapter = userArg;
-    value->u.string = strdup(adapter->info.name);
-    return 0;
 }
 
 static int DVBPropertyActiveGet(void *userArg, PropertyValue_t *value)

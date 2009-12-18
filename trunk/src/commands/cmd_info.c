@@ -571,7 +571,7 @@ static void CommandStats(int argc, char **argv)
 
 static void CommandFEStatus(int argc, char **argv)
 {
-    fe_status_t status;
+    DVBFrontEndStatus_e status;
     unsigned int ber, strength, snr, ucblocks;
 
     if (DVBFrontEndStatus(MainDVBAdapterGet(), &status, &ber, &strength, &snr, &ucblocks))
@@ -581,12 +581,12 @@ static void CommandFEStatus(int argc, char **argv)
     }
 
     CommandPrintf("Tuner status:  %s%s%s%s%s%s\n",
-             (status & FE_HAS_SIGNAL)?"Signal ":"",
-             (status & FE_TIMEDOUT)?"Timed out ":"",
-             (status & FE_HAS_LOCK)?"Lock ":"",
-             (status & FE_HAS_CARRIER)?"Carrier ":"",
-             (status & FE_HAS_VITERBI)?"VITERBI ":"",
-             (status & FE_HAS_SYNC)?"Sync ":"");
+             (status & FESTATUS_HAS_SIGNAL)?"Signal ":"",
+             (status & FESTATUS_TIMEDOUT)?"Timed out ":"",
+             (status & FESTATUS_HAS_LOCK)?"Lock ":"",
+             (status & FESTATUS_HAS_CARRIER)?"Carrier ":"",
+             (status & FESTATUS_HAS_VITERBI)?"VITERBI ":"",
+             (status & FESTATUS_HAS_SYNC)?"Sync ":"");
     CommandPrintf("Signal Strength = %d%% SNR = %d%% BER = %x Uncorrected Blocks = %x\n",
         (strength * 100) / 0xffff, (snr * 100) / 0xffff, ber, ucblocks);
 }

@@ -29,6 +29,7 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 #include <sys/types.h>
 
 #include <ev.h>
+#include "lnb.h"
 #include "types.h"
 
 /**
@@ -81,6 +82,78 @@ typedef struct DVBAdapterPIDFilter_s
     uint16_t pid; /**< PID that is being filtered. */
 }DVBAdapterPIDFilter_t;
 
+typedef enum DVBTuneDeliverySys_s {
+    DELSYS_UNDEFINED,
+    DELSYS_DVBC_ANNEX_AC,
+    DELSYS_DVBC_ANNEX_B,
+    DELSYS_DVBT,
+    DELSYS_DSS,
+    DELSYS_DVBS,
+    DELSYS_DVBS2,
+    DELSYS_DVBH,
+    DELSYS_ISDBT,
+    DELSYS_ISDBS,
+    DELSYS_ISDBC,
+    DELSYS_ATSC,
+    DELSYS_ATSCMH,
+    DELSYS_DMBTH,
+    DELSYS_CMMB,
+    DELSYS_DAB,
+} DVBTuneDeliverySys_e; 
+
+typedef enum DVBFrontEndType_e{
+    FETYPE_DVBS,  /* only supports DVB-S delivery system*/
+    FETYPE_DVBS2, /* supports DVB-S and DVB-S2 delivery systems */
+    FETYPE_DVBT,  /* support DVB-T delivery system */
+    FETYPE_DVBC,  /* supports DVB-C Annex AC/B delivery systems */
+    FETYPE_ATSC,  /* supports ATSC delivery system */
+}DVBFrontEndType_e;
+
+/* These are the same as defined by v5 of the linuxdvb api */
+#define DVBTUNEPROP_FREQ                3 /* used for the intermediate frequency when tuning satellite muxes */
+#define DVBTUNEPROP_MODULATION          4
+#define DVBTUNEPROP_BANDWIDTH_HZ        5
+#define DVBTUNEPROP_INVERSION           6
+#define DVBTUNEPROP_DISEQC_MASTER       7
+#define DVBTUNEPROP_SYMBOL_RATE         8
+#define DVBTUNEPROP_INNER_FEC           9
+#define DVBTUNEPROP_VOLTAGE             10
+#define DVBTUNEPROP_TONE                11
+#define DVBTUNEPROP_PILOT               12
+#define DVBTUNEPROP_ROLLOFF             13 
+
+/* DVBStreamer special properties for satellites */
+#define DVBTUNEPROP_POLARISATION        0x80000001
+#define DVBTUNEPROP_SATELLITE_NUMBER    0x80000002
+
+typedef struct DVBTuneProperty_s{
+    uint32_t cmd;
+    union {
+        uint32_t data;
+        struct {
+            uint8_t data[32];
+            uint32_t len;
+        }buffer;
+    }u;
+}DVBTuneProperty_t;
+
+typedef struct DVBTuneProperties_s{
+    DVBTuneDeliverySys_e deliverySys;
+    uint32_t frequency;
+    uint32_t nrofProperties;
+    DVBTuneProperty_t *properties;
+}DVBTuneProperties_t;
+
+typedef enum DVBFrontEndStatus_e {
+    FESTATUS_HAS_SIGNAL = 0x01,     /**< Found something above the noise level */
+    FESTATUS_HAS_CARRIER= 0x02,     /**< Found a DVB signal  */
+    FESTATUS_HAS_VITERBI= 0x04,     /**< FEC is stable  */
+    FESTATUS_HAS_SYNC   = 0x08,     /**< Found sync bytes  */
+    FESTATUS_HAS_LOCK   = 0x10,     /**< Everything is working... */
+    FESTATUS_TIMEDOUT   = 0x20,     /**< No lock within the last ~2 seconds */
+    FESTATUS_REINIT     = 0x40      /**< Frontend was reinitialized */
+} DVBFrontEndStatus_e;           
+
 /**
  * Enum to represent the different polarisation available for satellite
  * transmission.
@@ -109,32 +182,33 @@ typedef struct DVBDiSEqCSettings_s
 typedef struct DVBAdapter_t
 {
     int adapter;                      /**< The adapter number ie /dev/dvb/adapter<#adapter> */
+
+    /* TODO Remove and replace with non-linuxdvb structure */
     struct dvb_frontend_info info;    /**< Information about the front end */
 
     char frontEndPath[30];            /**< Path to the frontend device */
     int frontEndFd;                   /**< File descriptor for the frontend device */
     bool frontEndLocked;              /**< Whether the frontend is currently locked onto a signal. */
+
+    /* TODO Remove and replace with tuning properties */
     __u32 frontEndRequestedFreq;      /**< The frequency that the application requested, may be different from one used (ie DVB-S intermediate frequency) */
     struct dvb_frontend_parameters frontEndParams; /**< The current frontend configuration parameters. These may be updated when the frontend locks. */
     DVBDiSEqCSettings_t diseqcSettings; /**< Current DiSEqC settings for DVB-S */
 
+    DVBTuneProperties_t tuningProperties;
+    LNBInfo_t lnbInfo;                /**< LNB Information for DVB-S/S2 receivers */
+
     char demuxPath[30];               /**< Path to the demux device */
+    bool hardwareRestricted;          /**< Whether the adapter can only stream a
+                                           portion of the transport stream */
     int maxFilters;                   /**< Maximum number of available filters. */
     DVBAdapterPIDFilter_t filters[DVB_MAX_PID_FILTERS];/**< File descriptor for the demux device.*/
 
     char dvrPath[30];                 /**< Path to the dvr device */
     int dvrFd;                        /**< File descriptor for the dvr device */
 
-    int lnbLowFreq;                   /**< LNB LO frequency information */
-    int lnbHighFreq;                  /**< LNB LO frequency information */
-    int lnbSwitchFreq;                /**< LNB LO frequency information */
-
-    bool hardwareRestricted;          /**< Whether the adapter can only stream a
-                                           portion of the transport stream */
-    pthread_t monitorThread;          /**< Thread monitoring the lock state of the frontend. */
-    bool monitorExit;                 /**< Boolean to exit monitor thread. */
-    int cmdRecvFd;                /**< File descriptor for monitor task to recieve commands */
-    int cmdSendFd;                /**< File descriptor to send commands to monitor task. */
+    int cmdRecvFd;                    /**< File descriptor for monitor task to recieve commands */
+    int cmdSendFd;                    /**< File descriptor to send commands to monitor task. */
     ev_io commandWatcher;
     ev_io frontendWatcher;
 }
@@ -170,12 +244,10 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *front
 /**
  * Set the LNB LO frequencies.
  * @param adapter The adapter to set the LNB information on.
- * @param lowFreq Low LO frequency.
- * @param highFreq high LO frequency.
- * @param switchFreq switch LO frequency.
+ * @param lnbInfo Pointer to an LNBInfo structure.
  * @return 0 on success, non-zero otherwise.
  */
-void DVBFrontEndLNBInfoSet(DVBAdapter_t *adapter, int lowFreq, int highFreq, int switchFreq);
+void DVBFrontEndLNBInfoSet(DVBAdapter_t *adapter, LNBInfo_t *lnbInfo);
 
 /**
  * Retrieve the status of the frontend of the specified adapter.
@@ -187,7 +259,7 @@ void DVBFrontEndLNBInfoSet(DVBAdapter_t *adapter, int lowFreq, int highFreq, int
  * @param ucblocks Used to return the uncorrected block count (may be NULL).
  * @return 0 on success, non-zero otherwise.
  */
-int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status, 
+int DVBFrontEndStatus(DVBAdapter_t *adapter, DVBFrontEndStatus_e *status, 
                             unsigned int *ber, unsigned int *strength, 
                             unsigned int *snr, unsigned int *ucblocks);
 

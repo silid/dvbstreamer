@@ -39,7 +39,8 @@ common_src = \
     logging.c\
     properties.c \
     threading/messageq.c \
-    threading/deferredproc.c
+    threading/deferredproc.c \
+    lnb.c
 
 if ENABLE_ATSC
 atsc_src =\

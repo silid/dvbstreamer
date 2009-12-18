@@ -58,7 +58,6 @@ static sqlite3 *DBaseInstance;
 static char DBASE[] = "dbase";
 static char dbaseFile[PATH_MAX];
 static pthread_key_t dbaseKey;
-static pthread_key_t deferUpdateKey;
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
