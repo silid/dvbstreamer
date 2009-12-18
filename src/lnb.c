@@ -131,3 +131,35 @@ int LNBDecode(char *str, LNBInfo_t *lnb)
     lnb->switchFrequency = strtoul(cp, NULL, 0);
     return 0;
 }
+
+unsigned long LNBTransponderToIntermediateFreq(LNBInfo_t *info, unsigned long freq, bool *tone)
+{
+    bool hiband = FALSE;
+    unsigned long ifreq = 0;
+    *tone = FALSE;
+
+    if (info->switchFrequency&& info->highFrequency&&
+        (freq >= info->switchFrequency))
+    {
+        hiband = TRUE;
+    }
+
+    if (hiband)
+    {
+      ifreq = freq - info->highFrequency;
+      *tone = TRUE;
+    }
+    else
+    {
+      if (freq < info->lowFrequency)
+      {
+          ifreq = info->lowFrequency- freq;
+      }
+      else
+      {
+          ifreq = freq - info->lowFrequency;
+      }
+      *tone = FALSE;
+    }
+    return ifreq;
+}

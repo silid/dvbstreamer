@@ -42,6 +42,7 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 #include "events.h"
 #include "properties.h"
 #include "main.h"
+#include "dispatchers.h"
 
 
 /*******************************************************************************
@@ -58,11 +59,10 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 static int DVBOpenAdapterFile(DVBAdapter_t *adapter);
 static int DVBOpenStreamFile(int adapter, uint32_t freq, int *fd, unsigned long *rate);
 static void DVBFrontEndMonitorSend(DVBAdapter_t *adapter, char cmd);
-static void *DVBFrontEndMonitor(void *arg);
-
+static void DVBCommandCallback(struct ev_loop *loop, ev_io *w, int revents);
+static void DVBFilterPackets(struct ev_loop *loop, ev_timer *w, int revents);
 static char *DVBEventToString(Event_t event, void *payload);
 
-static int DVBPropertyNameGet(void *userArg, PropertyValue_t *value);
 static int DVBPropertyActiveGet(void *userArg, PropertyValue_t *value);
 static int DVBPropertyActiveSet(void *userArg, PropertyValue_t *value);
 
@@ -92,7 +92,7 @@ static char *BroadcastSysemStr[] = {
     "DVB-T",
     "ATSC",
 };
-
+static ev_timer sendTimer;
 static int sendFd;
 
 /*******************************************************************************
@@ -103,6 +103,7 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
     DVBAdapter_t *result = NULL;
     int monitorFds[2];
     int sendRecvFds[2];
+    struct ev_loop *inputLoop;
 
     if (dvbSource == NULL)
     {
@@ -159,7 +160,6 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
         result->dvrFd = sendRecvFds[0];
         sendFd = sendRecvFds[1];
 
-
         if (pipe(monitorFds) == -1)
         {
             LogModule(LOG_ERROR, FILEADAPTER, "Failed to create pipe : %s\n", strerror(errno));
@@ -179,21 +179,26 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
         {
             result->maxFilters = 256;
         }
+        
+        inputLoop = DispatchersGetInput();
+        ev_io_init(&result->commandWatcher, DVBCommandCallback, result->cmdRecvFd, EV_READ);
+        ev_timer_init(&sendTimer, DVBFilterPackets, 0.1, 0.1);
+        sendTimer.data = result;
+        result->commandWatcher.data = result;
+        ev_timer_start(inputLoop, &sendTimer);
+        ev_io_start(inputLoop, &result->commandWatcher);   
 
-        /* Start monitoring thread */
-        pthread_create(&result->monitorThread, NULL, DVBFrontEndMonitor, result);
-        LogRegisterThread(result->monitorThread, "AdapterMonitor");
         /* Add properties */
-        PropertiesAddProperty(propertyParent, "number", "The number of the adapter being used",
-            PropertyType_Int, &result->adapter, PropertiesSimplePropertyGet, NULL);
-        PropertiesAddProperty(propertyParent, "name", "Hardware driver name",
-            PropertyType_String, result, DVBPropertyNameGet, NULL);
-        PropertiesAddProperty(propertyParent, "hwrestricted", "Whether the hardware is not capable of supplying the entire TS.",
-            PropertyType_Boolean, &result->hardwareRestricted, PropertiesSimplePropertyGet, NULL);
-        PropertiesAddProperty(propertyParent, "type", "The type of broadcast the frontend is capable of receiving",
-            PropertyType_String, &FETypesStr[result->info.type], PropertiesSimplePropertyGet, NULL);
-        PropertiesAddProperty(propertyParent, "system", "The broadcast system the frontend is capable of receiving",
-            PropertyType_String, &BroadcastSysemStr[result->info.type], PropertiesSimplePropertyGet, NULL);
+        PropertiesAddSimpleProperty(propertyParent, "number", "The number of the adapter being used",
+            PropertyType_Int, &result->adapter, SIMPLEPROPERTY_R);
+        PropertiesAddSimpleProperty(propertyParent, "name", "Hardware driver name",
+            PropertyType_String, result->info.name, SIMPLEPROPERTY_R);
+        PropertiesAddSimpleProperty(propertyParent, "hwrestricted", "Whether the hardware is not capable of supplying the entire TS.",
+            PropertyType_Boolean, &result->hardwareRestricted, SIMPLEPROPERTY_R);
+        PropertiesAddSimpleProperty(propertyParent, "type", "The type of broadcast the frontend is capable of receiving",
+            PropertyType_String, &FETypesStr[result->info.type], SIMPLEPROPERTY_R);
+        PropertiesAddSimpleProperty(propertyParent, "system", "The broadcast system the frontend is capable of receiving",
+            PropertyType_String, &BroadcastSysemStr[result->info.type], SIMPLEPROPERTY_R);
         PropertiesAddProperty(propertyParent, "active","Whether the frontend is currently in use.",
             PropertyType_Boolean, result,DVBPropertyActiveGet,DVBPropertyActiveSet);
     }
@@ -202,6 +207,7 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
 
 void DVBDispose(DVBAdapter_t *adapter)
 {
+    struct ev_loop *inputLoop = DispatchersGetInput();
     if (adapter->dvrFd > -1)
     {
         LogModule(LOG_DEBUGV, FILEADAPTER, "Closing DVR file descriptor\n");
@@ -210,7 +216,6 @@ void DVBDispose(DVBAdapter_t *adapter)
 
     LogModule(LOG_DEBUGV, FILEADAPTER, "Closing Demux file descriptors\n");
     DVBDemuxReleaseAllFilters(adapter);
-    adapter->monitorExit = TRUE;
 
     if (adapter->frontEndFd > -1)
     {
@@ -220,13 +225,12 @@ void DVBDispose(DVBAdapter_t *adapter)
         adapter->frontEndFd = -1;
     }
 
-    if (adapter->monitorThread)
-    {
-        DVBFrontEndMonitorSend(adapter, MONITOR_CMD_EXIT);
-        pthread_join(adapter->monitorThread, NULL);
-        close(adapter->cmdRecvFd);
-        close(adapter->cmdSendFd);
-    }
+    ev_io_stop(inputLoop, &adapter->commandWatcher);
+    ev_timer_stop(inputLoop, &sendTimer);
+    
+    close(adapter->cmdRecvFd);
+    close(adapter->cmdSendFd);
+
     PropertiesRemoveAllProperties(propertyParent);
 
     ObjectFree(adapter);
@@ -259,15 +263,13 @@ void DVBFrontEndParametersGet(DVBAdapter_t *adapter, struct dvb_frontend_paramet
     }
 }
 
-void DVBFrontEndLNBInfoSet(DVBAdapter_t *adapter, int lowFreq, int highFreq, int switchFreq)
+void DVBFrontEndLNBInfoSet(DVBAdapter_t *adapter, LNBInfo_t *info)
 {
-    adapter->lnbLowFreq = lowFreq;
-    adapter->lnbHighFreq = highFreq;
-    adapter->lnbSwitchFreq = switchFreq;
+    adapter->lnbInfo = *info;
 }
 
 
-int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status,
+int DVBFrontEndStatus(DVBAdapter_t *adapter, DVBFrontEndStatus_e *status,
                             unsigned int *ber, unsigned int *strength,
                             unsigned int *snr, unsigned int *ucblock)
 {
@@ -275,7 +277,7 @@ int DVBFrontEndStatus(DVBAdapter_t *adapter, fe_status_t *status,
     {
         if (adapter->frontEndLocked)
         {
-            *status = FE_HAS_LOCK | FE_HAS_CARRIER | FE_HAS_SIGNAL | FE_HAS_VITERBI;
+            *status = FESTATUS_HAS_LOCK | FESTATUS_HAS_CARRIER | FESTATUS_HAS_SIGNAL | FESTATUS_HAS_VITERBI;
         }
         else
         {
@@ -431,100 +433,82 @@ static void DVBFrontEndMonitorSend(DVBAdapter_t *adapter, char cmd)
     }
 }
 
-static void *DVBFrontEndMonitor(void *arg)
+static void DVBCommandCallback(struct ev_loop *loop, ev_io *w, int revents)
 {
-    DVBAdapter_t *adapter = arg;
+    DVBAdapter_t *adapter = w->data;
     unsigned long rate;
-    #define MAX_FDS 1
-    struct pollfd pfd[MAX_FDS];
     char cmd;
-    unsigned long bitsSent = 0;
-    char buffer[188 * 10];
-    int pollDelay = -1;
-    pfd[0].fd = adapter->cmdRecvFd;
-    pfd[0].events = POLLIN;
-
-    while (!adapter->monitorExit)
+    ev_io_start(loop, w);
+    
+    if (read(adapter->cmdRecvFd, &cmd, 1) == 1)
     {
-        int n = poll(pfd, 1, pollDelay);
-        if (n > 0)
+        switch (cmd)
         {
-            if ((pfd[0].revents & POLLIN) == POLLIN)
-            {
+            case MONITOR_CMD_EXIT: /* Exit */
+                break;
+            case MONITOR_CMD_RETUNING:
+                adapter->frontEndLocked = FALSE;
+                EventsFireEventListeners(unlockedEvent, adapter);
 
-                if (read(adapter->cmdRecvFd, &cmd, 1) == 1)
+            case MONITOR_CMD_FE_ACTIVATE:
+                /* Open description file for freq */
+                if (DVBOpenStreamFile(adapter->adapter, adapter->frontEndRequestedFreq, &adapter->frontEndFd, &rate) == 0)
                 {
-                    switch (cmd)
-                    {
-                        case MONITOR_CMD_EXIT: /* Exit */
-                            break;
-                        case MONITOR_CMD_RETUNING:
-                            adapter->frontEndLocked = FALSE;
-                            EventsFireEventListeners(unlockedEvent, adapter);
-
-                        case MONITOR_CMD_FE_ACTIVATE:
-                            /* Open description file for freq */
-                            if (DVBOpenStreamFile(adapter->adapter, adapter->frontEndRequestedFreq, &adapter->frontEndFd, &rate) == 0)
-                            {
-                                adapter->frontEndLocked = TRUE;
-                                EventsFireEventListeners(lockedEvent, adapter);
-                                pollDelay = 10;
-                            }
-                            else
-                            {
-                                pollDelay = -1;
-                            }
-                            break;
-                        case MONITOR_CMD_FE_DEACTIVATE:
-                            close(adapter->frontEndFd);
-                            adapter->frontEndFd = -1;
-                            pollDelay = -1;
-                            break;
-                    }
+                    adapter->frontEndLocked = TRUE;
+                    EventsFireEventListeners(lockedEvent, adapter);
+                    ev_timer_set(&sendTimer, 0.1,0.1);
+                    ev_timer_start(loop, &sendTimer);
                 }
-            }
-        }
-        else if (n == -1)
-        {
-            break;
-        }
-        if (adapter->frontEndFd != -1)
-        {
-            int r = read(adapter->frontEndFd, buffer, sizeof(buffer));
-            if (r <= 0)
-            {
-                lseek(adapter->frontEndFd, 0, SEEK_SET);
-            }
-            else
-            {
-                int i, p;
-
-                for (i = 0; i < r/188; i ++)
+                else
                 {
-                    TSPacket_t *packet = (TSPacket_t*)&buffer[i * 188];
-                    uint16_t pid = TSPACKET_GETPID(*packet);
-                    for (p = 0; p < adapter->maxFilters; p ++)
-                    {
-                        if (((adapter->filters[p].pid == 8192) || (pid == adapter->filters[p].pid)) && 
-                             (adapter->filters[p].demuxFd != -1))
-                        {
-                            if (write(sendFd, packet, 188) == -1)
-                            {
-                                /* do nothing */
-                            }
-                            bitsSent += 188 * 8;
-                            break;
-                        }
-                    }
+                    ev_timer_stop(loop, &sendTimer);
                 }
-            }
-            usleep(100);
+                break;
+            case MONITOR_CMD_FE_DEACTIVATE:
+                close(adapter->frontEndFd);
+                adapter->frontEndFd = -1;
+                ev_timer_stop(loop, &sendTimer);
+                break;
         }
     }
-    close(sendFd);
-    LogModule(LOG_DEBUG, FILEADAPTER, "Monitoring thread exited.\n");
-    return NULL;
 }
+
+static void DVBFilterPackets(struct ev_loop *loop, ev_timer *w, int revents)
+{
+    DVBAdapter_t *adapter = w->data;
+    char buffer[188 * 10];
+    if (adapter->frontEndFd != -1)
+    {
+        int r = read(adapter->frontEndFd, buffer, sizeof(buffer));
+        if (r <= 0)
+        {
+            lseek(adapter->frontEndFd, 0, SEEK_SET);
+        }
+        else
+        {
+            int i, p;
+
+            for (i = 0; i < r/188; i ++)
+            {
+                TSPacket_t *packet = (TSPacket_t*)&buffer[i * 188];
+                uint16_t pid = TSPACKET_GETPID(*packet);
+                for (p = 0; p < adapter->maxFilters; p ++)
+                {
+                    if (((adapter->filters[p].pid == 8192) || (pid == adapter->filters[p].pid)) && 
+                         (adapter->filters[p].demuxFd != -1))
+                    {
+                        if (write(sendFd, packet, 188) == -1)
+                        {
+                            /* do nothing */
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 static int DVBOpenAdapterFile(DVBAdapter_t *adapter)
 {
@@ -627,13 +611,6 @@ static char *DVBEventToString(Event_t event, void *payload)
         LogModule(LOG_ERROR, FILEADAPTER, "Failed to allocate memory for event description when converting event to string\n");
     }
     return result;
-}
-
-static int DVBPropertyNameGet(void *userArg, PropertyValue_t *value)
-{
-    DVBAdapter_t *adapter = userArg;
-    value->u.string = strdup(adapter->info.name);
-    return 0;
 }
 
 static int DVBPropertyActiveGet(void *userArg, PropertyValue_t *value)
