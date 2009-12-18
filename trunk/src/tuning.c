@@ -35,8 +35,7 @@ Control tuning of the dvb adapter.
 * Prototypes                                                                   *
 *******************************************************************************/
 static void TuneMultiplex(Multiplex_t *multiplex);
-static char *MultiplexChangedEventToString(Event_t event,void * payload);
-static char *ServiceChangedEventToString(Event_t event,void * payload);
+
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
@@ -56,8 +55,8 @@ static const char TUNING[] = "tuning";
 int TuningInit(void)
 {
     tuningSource = EventsRegisterSource("Tuning");
-    serviceChangedEvent = EventsRegisterEvent(tuningSource, "ServiceChanged", ServiceChangedEventToString);
-    mulitplexChangedEvent = EventsRegisterEvent(tuningSource, "MultiplexChanged", MultiplexChangedEventToString);
+    serviceChangedEvent = EventsRegisterEvent(tuningSource, "ServiceChanged", ServiceEventToString);
+    mulitplexChangedEvent = EventsRegisterEvent(tuningSource, "MultiplexChanged", MultiplexEventToString);
     return 0;
 }
 
@@ -200,24 +199,3 @@ static void TuneMultiplex(Multiplex_t *multiplex)
     EventsFireEventListeners(mulitplexChangedEvent, multiplex);
 }
 
-static char *MultiplexChangedEventToString(Event_t event,void * payload)
-{
-    char *result=NULL;
-    Multiplex_t *mux = payload;
-    if (asprintf(&result, "%d", mux->uid) == -1)
-    {
-        LogModule(LOG_INFO, TUNING, "Failed to allocate memory for multiplex changed event description string.\n");
-    }
-    return result;
-}
-
-static char *ServiceChangedEventToString(Event_t event,void * payload)
-{
-    char *result=NULL;
-    Service_t *service = payload;
-    if (asprintf(&result, "%d %04x %s",service->multiplexUID, service->id, service->name) == -1)
-    {
-        LogModule(LOG_INFO, TUNING, "Failed to allocate memory for service changed event description string.\n");
-    }
-    return result;
-}
