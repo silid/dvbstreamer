@@ -136,17 +136,30 @@ int PropertiesSimplePropertyGet(void *userArg, PropertyValue_t *value);
 int PropertiesSimplePropertySet(void *userArg, PropertyValue_t *value);
 
 /**
+ * Mode flag indicating the simple property is readable.
+ */
+#define SIMPLEPROPERTY_R    1
+/**
+ * Mode flag indicating the simple property is writeable.
+ */
+#define SIMPLEPROPERTY_W    2
+/**
+ * Mode flag indicating the simple property is both readable and writeable.
+ */
+#define SIMPLEPROPERTY_RW   (SIMPLEPROPERTY_R|SIMPLEPROPERTY_W)
+/**
  * Helper macro to a add simple property accessor.
  * @param path Path to the parent to add this property to.
  * @param name Name of the property to add.
  * @param desc Description of this property.
  * @param type Type of this property.
  * @param valueptr Pointer to the location the value of this property is stored.
- * @param readable Whether this property is readable.
- * @param writable Whether this property is writable.
+ * @param mode Whether this property is readable/writable (see SIMPLEPROPTERY_[R/W/RW]).
  * @return 0 on success, 1 otherwise.
  */
-#define PropertiesAddSimpleProperty(path, name, desc, type, valueptr, readable, writable) \
-    PropertiesAddProperty(path, name, desc, type, valueptr, (readable)?PropertiesSimplePropertyGet:NULL, (writable)?PropertiesSimplePropertySet:NULL)
+#define PropertiesAddSimpleProperty(path, name, desc, type, valueptr, mode) \
+    PropertiesAddProperty(path, name, desc, type, valueptr, \
+            ((mode) & SIMPLEPROPERTY_R)?PropertiesSimplePropertyGet:NULL,\
+            ((mode) & SIMPLEPROPERTY_W)?PropertiesSimplePropertySet:NULL)
 #endif
 
