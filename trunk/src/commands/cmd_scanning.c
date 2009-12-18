@@ -74,6 +74,15 @@ typedef struct TransponderEntry_s
     DVBDiSEqCSettings_t diseqc;
 }TransponderEntry_t;
 
+typedef struct ScanEntry_s
+{
+    fe_type_t type;
+    int plusMinusOffset;
+    struct dvb_frontend_parameters feparams;
+    DVBDiSEqCSettings_t diseqc;
+    struct ScanEntry_s *next;
+}ScanEntry_t;
+
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
@@ -1019,7 +1028,6 @@ static int TuneFrequency(fe_type_t type, struct dvb_frontend_parameters *feparam
     struct timespec timeout;
     DVBAdapter_t *adapter = MainDVBAdapterGet();
     int result;
-    int muxUID;
     bool lockFailed = TRUE;
     TSReader_t *tsFilter = MainTSReaderGet();
 
@@ -1055,11 +1063,7 @@ static int TuneFrequency(fe_type_t type, struct dvb_frontend_parameters *feparam
             if (mux == NULL)
             {
                 /* Add multiplex to DBase, set the new multiplex as current and reenabled TSReader */
-                result = MultiplexAdd(type, feparams, diseqc, &muxUID);
-                if (result == 0)
-                {
-                    mux = MultiplexFindUID(muxUID);
-                }
+                result = MultiplexAdd(type, feparams, diseqc, &mux);
             }
 
             if (mux != NULL)

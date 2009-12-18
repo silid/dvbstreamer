@@ -47,7 +47,7 @@ Param;
 *******************************************************************************/
 
 static int find_param(const Param *list, const char *name);
-static int findMultiplex(fe_type_t fe_type, int freq, DVBDiSEqCSettings_t *diseqcsettings, int *uid);
+static int findMultiplex(fe_type_t fe_type, int freq, DVBDiSEqCSettings_t *diseqcsettings, Multiplex_t **mux);
 static int parsezapline(char * str, fe_type_t fe_type);
 
 /*******************************************************************************
@@ -166,9 +166,9 @@ static int find_param(const Param *list, const char *name)
     return list->value;;
 }
 
-static int findMultiplex(fe_type_t fe_type, int freq, DVBDiSEqCSettings_t *diseqcsettings, int *uid)
+static int findMultiplex(fe_type_t fe_type, int freq, DVBDiSEqCSettings_t *diseqcsettings, Multiplex_t **mux)
 {
-    int notFound = 1;
+    bool notFound = TRUE;
     MultiplexEnumerator_t enumerator = MultiplexEnumeratorGet();
     Multiplex_t *multiplex;
     do
@@ -188,18 +188,20 @@ static int findMultiplex(fe_type_t fe_type, int freq, DVBDiSEqCSettings_t *diseq
                     if ((muxdiseqcsettings.polarisation == diseqcsettings->polarisation) &&
                         (muxdiseqcsettings.satellite_number == diseqcsettings->satellite_number))
                     {
-                        *uid = multiplex->uid;
-                        notFound = 0;
+                        *mux = multiplex;
+                        notFound = FALSE;
                     }
                 }
                 else
                 {
-                    *uid = multiplex->uid;
-                    notFound = 0;
+                    *mux = multiplex;
+                    notFound = FALSE;
                 }
             }
-            
-            MultiplexRefDec(multiplex);
+            if (notFound)
+            {
+                MultiplexRefDec(multiplex);
+            }
         }
     }while(multiplex && notFound);
     MultiplexEnumeratorDestroy(enumerator);
@@ -247,7 +249,7 @@ static int parsezapline(char * str, fe_type_t fe_type)
     char *name;
     int id;
     int source;
-    int muxUID;
+    Multiplex_t *mux;
 
     tmp = str;
 #define NEXTFIELD() if(!(field = strsep(&tmp, ":")))return -1
@@ -351,10 +353,10 @@ static int parsezapline(char * str, fe_type_t fe_type)
             break;
     }
 
-    if (findMultiplex(fe_type, front_param.frequency, &diseqcsettings, &muxUID))
+    if (findMultiplex(fe_type, front_param.frequency, &diseqcsettings, &mux))
     {
         LogModule(LOG_DEBUGV, PARSEZAP, "Adding frequency %d (type %d)\n", front_param.frequency, fe_type);
-        MultiplexAdd(fe_type, &front_param, &diseqcsettings, &muxUID);
+        MultiplexAdd(fe_type, &front_param, &diseqcsettings, &mux);
     }
 
     /* Video PID - not used */
@@ -373,10 +375,11 @@ static int parsezapline(char * str, fe_type_t fe_type)
         source = id;
     }
     LogModule(LOG_DEBUGV, PARSEZAP, "Adding service \"%s\" %d\n", name, id);
-    if (ServiceAdd(muxUID, name, id, source, FALSE, ServiceType_Unknown, -1, 0x1fff, -1))
+    if (ServiceAdd(mux->uid, name, id, source, FALSE, ServiceType_Unknown, -1, 0x1fff, -1))
     {
         LogModule(LOG_ERROR, PARSEZAP, "Failed to add service \"%s\", possible reason already in database?\n", name);
     }
+    MultiplexRefDec(mux);
     free(name);
     return 0;
 }
