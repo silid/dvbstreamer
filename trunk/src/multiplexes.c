@@ -59,7 +59,10 @@ static int VSBParametersDelete(int uid);
 * Global variables                                                             *
 *******************************************************************************/
 static int uidSeed;
-
+static const char MULTIPLEXES[] = "Multiplexes";
+static EventSource_t multiplexSource;
+static Event_t multiplexAddedEvent;
+static Event_t multiplexRemovedEvent;
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
@@ -67,30 +70,16 @@ static int uidSeed;
 int MultiplexInit(void)
 {
     uidSeed = (int)time(NULL);
+    multiplexSource = EventsRegisterSource("Multiplexes");
+    multiplexAddedEvent = EventsRegisterEvent(multiplexSource, "Added", MultiplexEventToString);
+    multiplexRemovedEvent = EventsRegisterEvent(multiplexSource, "Removed", MultiplexEventToString);    
+    
     return  ObjectRegisterType(Multiplex_t);
 }
 
 int MultiplexDeInit(void)
 {
     return 0;
-}
-
-int MultiplexCount()
-{
-    STATEMENT_INIT;
-    int result = -1;
-
-    STATEMENT_PREPARE("SELECT count() FROM " MULTIPLEXES_TABLE ";");
-    RETURN_ON_ERROR(-1);
-
-    STATEMENT_STEP();
-    if (rc == SQLITE_ROW)
-    {
-        result = STATEMENT_COLUMN_INT(0);
-        rc = 0;
-    }
-    STATEMENT_FINALIZE();
-    return result;
 }
 
 Multiplex_t *MultiplexFind(char *mux)
@@ -285,8 +274,9 @@ int MultiplexFrontendParametersGet(Multiplex_t *multiplex, struct dvb_frontend_p
     return result;
 }
 
-int MultiplexAdd(fe_type_t type, struct dvb_frontend_parameters *feparams, DVBDiSEqCSettings_t *diseqc, int *uid)
+int MultiplexAdd(fe_type_t type, struct dvb_frontend_parameters *feparams, DVBDiSEqCSettings_t *diseqc, Multiplex_t **mux)
 {
+    Multiplex_t *multiplex;
     STATEMENT_INIT;
     
     switch (type)
@@ -313,12 +303,22 @@ int MultiplexAdd(fe_type_t type, struct dvb_frontend_parameters *feparams, DVBDi
                         MULTIPLEX_TYPE ")"
                         "VALUES (%d,%d,%d);", uidSeed, feparams->frequency, type);
     RETURN_RC_ON_ERROR;
-    *uid = uidSeed;
-    uidSeed ++;
 
     STATEMENT_STEP();
 
     STATEMENT_FINALIZE();
+
+    multiplex = MultiplexNew();
+    multiplex->uid = uidSeed;
+    uidSeed ++;
+    multiplex->freq = feparams->frequency;
+    multiplex->tsId = 0;
+    multiplex->networkId = 0;
+    multiplex->type = type;
+    multiplex->patVersion = -1;
+
+    EventsFireEventListeners(multiplexAddedEvent, multiplex);
+    *mux = multiplex;
     return rc;
 }
 
@@ -353,6 +353,7 @@ int MultiplexDelete(Multiplex_t *multiplex)
         default:
             break;
     }
+    EventsFireEventListeners(multiplexRemovedEvent, multiplex);
     
     return 0;
 }
@@ -400,6 +401,17 @@ int MultiplexNetworkIdSet(Multiplex_t *multiplex, int netid)
 
     STATEMENT_FINALIZE();
     return rc;
+}
+
+char *MultiplexEventToString(Event_t event,void * payload)
+{
+    char *result=NULL;
+    Multiplex_t *mux = payload;
+    if (asprintf(&result, "%d", mux->uid) == -1)
+    {
+        LogModule(LOG_INFO, MULTIPLEXES, "Failed to allocate memory for multiplex changed event description string.\n");
+    }
+    return result;
 }
 
 /*******************************************************************************

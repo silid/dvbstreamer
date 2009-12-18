@@ -52,8 +52,6 @@ Manage services and PIDs.
 
 static List_t *ServiceCreateList(ServiceEnumerator_t enumerator);
 static void ServiceDestructor(void * arg);
-static char *ServiceEventToString(Event_t event,void * payload);
-static char *ServiceEventAllDeletedToString(Event_t event,void * payload);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -79,7 +77,7 @@ int ServiceInit(void)
         servicesSource = EventsRegisterSource("Services");
         serviceAddedEvent = EventsRegisterEvent(servicesSource, "Added", ServiceEventToString);
         serviceDeletedEvent = EventsRegisterEvent(servicesSource, "Deleted", ServiceEventToString);
-        serviceAllDeletedEvent = EventsRegisterEvent(servicesSource, "AllDeleted", ServiceEventAllDeletedToString);
+        serviceAllDeletedEvent = EventsRegisterEvent(servicesSource, "AllDeleted", MultiplexEventToString);
     }
     return  result;
 }
@@ -88,24 +86,6 @@ int ServiceDeInit(void)
 {
     EventsUnregisterSource(servicesSource);
     return 0;
-}
-
-int ServiceCount()
-{
-    int result = -1;
-    STATEMENT_INIT;
-
-    STATEMENT_PREPARE("SELECT count() FROM " SERVICES_TABLE ";");
-    RETURN_ON_ERROR(-1);
-
-    STATEMENT_STEP();
-    if (rc == SQLITE_ROW)
-    {
-        result = STATEMENT_COLUMN_INT( 0);
-        rc = 0;
-    }
-    STATEMENT_FINALIZE();
-    return result;
 }
 
 int ServiceDelete(Service_t  *service)
@@ -707,25 +687,13 @@ static void ServiceDestructor(void * arg)
     }
 }
 
-static char *ServiceEventToString(Event_t event,void * payload)
+char *ServiceEventToString(Event_t event,void * payload)
 {
     char *result=NULL;
     Service_t *service = payload;
     if (asprintf(&result, "%d %04x %s",service->multiplexUID, service->id, service->name) == -1)
     {
         LogModule(LOG_INFO, SERVICES, "Failed to allocate memory for service event description string.\n");
-    }
-    return result;
-}
-
-
-static char *ServiceEventAllDeletedToString(Event_t event,void * payload)
-{
-    char *result=NULL;
-    Multiplex_t *mux = payload;
-    if (asprintf(&result, "%d", mux->uid) == -1)
-    {
-        LogModule(LOG_INFO, SERVICES, "Failed to allocate memory for service all deleted event description string.\n");
     }
     return result;
 }
