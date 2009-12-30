@@ -362,12 +362,18 @@ void CachePIDsRelease(void)
 void CacheUpdateMultiplex(Multiplex_t *multiplex, int patversion, int tsid)
 {
     CacheUpdateMessage_t *msg;
+    int i;
     pthread_mutex_lock(&cacheUpdateMutex);
 
     if (cachedServicesMultiplex && MultiplexAreEqual(multiplex, cachedServicesMultiplex))
     {
         cachedServicesMultiplex->patVersion = patversion;
         cachedServicesMultiplex->tsId = tsid;
+        for (i = 0; i < cachedServicesCount; i ++)
+        {
+            cachedServices[i]->tsId = tsid;
+        }
+
         msg = ObjectCreateType(CacheUpdateMessage_t);
         if (msg)
         {
@@ -387,11 +393,16 @@ void CacheUpdateMultiplex(Multiplex_t *multiplex, int patversion, int tsid)
 void CacheUpdateNetworkId(Multiplex_t *multiplex, int netid)
 {
     CacheUpdateMessage_t *msg;
+    int i;
     pthread_mutex_lock(&cacheUpdateMutex);
 
     if (cachedServicesMultiplex && MultiplexAreEqual(multiplex, cachedServicesMultiplex))
     {
         cachedServicesMultiplex->networkId = netid;
+        for (i = 0; i < cachedServicesCount; i ++)
+        {
+            cachedServices[i]->networkId = netid;
+        }
         msg = ObjectCreateType(CacheUpdateMessage_t);
         if (msg)
         {
