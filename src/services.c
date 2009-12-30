@@ -44,7 +44,9 @@ Manage services and PIDs.
                        SERVICES_TABLE "." SERVICE_PMTPID ","\
                        SERVICES_TABLE "." SERVICE_PCRPID "," \
                        SERVICES_TABLE "." SERVICE_PROVIDER "," \
-                       SERVICES_TABLE "." SERVICE_DEFAUTHORITY " "
+                       SERVICES_TABLE "." SERVICE_DEFAUTHORITY "," \
+                       MULTIPLEXES_TABLE "." MULTIPLEX_NETID ","  \
+                       MULTIPLEXES_TABLE "." MULTIPLEX_TSID " "
 
 /*******************************************************************************
 * Prototypes                                                                   *
@@ -419,7 +421,8 @@ Service_t *ServiceFindName(char *name)
     Service_t *result;
 
     STATEMENT_PREPAREVA("SELECT " SERVICE_FIELDS
-                        "FROM " SERVICES_TABLE " WHERE " SERVICE_NAME "='%q';",
+                        "FROM " SERVICES_TABLE "," MULTIPLEXES_TABLE " WHERE " SERVICES_TABLE "." SERVICE_NAME "='%q' AND " 
+                        MULTIPLEXES_TABLE "." MULTIPLEX_UID "=" SERVICES_TABLE "." SERVICE_MULTIPLEXUID ";",
                         name);
     RETURN_ON_ERROR(NULL);
 
@@ -435,7 +438,9 @@ Service_t *ServiceFindId(Multiplex_t *multiplex, int id)
     Service_t *result;
 
     STATEMENT_PREPAREVA("SELECT " SERVICE_FIELDS
-                        "FROM " SERVICES_TABLE " WHERE " SERVICE_MULTIPLEXUID "=%d AND " SERVICE_ID "=%d;",
+                        "FROM " SERVICES_TABLE "," MULTIPLEXES_TABLE " WHERE " SERVICES_TABLE "." SERVICE_MULTIPLEXUID "=%d AND " 
+                        SERVICES_TABLE "." SERVICE_ID "=%d AND " 
+                        MULTIPLEXES_TABLE "." MULTIPLEX_UID "=" SERVICES_TABLE "." SERVICE_MULTIPLEXUID ";",
                         multiplex->uid, id);
     RETURN_ON_ERROR(NULL);
 
@@ -482,7 +487,8 @@ ServiceEnumerator_t ServiceEnumeratorGet()
 {
     STATEMENT_INIT;
     STATEMENT_PREPARE("SELECT " SERVICE_FIELDS
-                      "FROM " SERVICES_TABLE ";");
+                      "FROM " SERVICES_TABLE"," MULTIPLEXES_TABLE " WHERE " 
+                      SERVICES_TABLE "." SERVICE_MULTIPLEXUID "=" MULTIPLEXES_TABLE "." MULTIPLEX_UID ";");
     RETURN_ON_ERROR(NULL);
     return stmt;
 }
@@ -520,8 +526,10 @@ ServiceEnumerator_t ServiceEnumeratorForMultiplex(Multiplex_t *multiplex)
     STATEMENT_INIT;
 
     STATEMENT_PREPAREVA("SELECT " SERVICE_FIELDS
-                        "FROM " SERVICES_TABLE " WHERE " SERVICE_MULTIPLEXUID"=%d;",
-                        multiplex->uid);
+                        "FROM " SERVICES_TABLE"," MULTIPLEXES_TABLE " WHERE " 
+                        SERVICES_TABLE "." SERVICE_MULTIPLEXUID "=" MULTIPLEXES_TABLE "." MULTIPLEX_UID " AND "
+                        SERVICES_TABLE "."SERVICE_MULTIPLEXUID"=%d;",
+                         multiplex->uid);
     RETURN_ON_ERROR(NULL);
 
     return stmt;
@@ -560,8 +568,9 @@ ServiceEnumerator_t ServiceFindByPID(int pid, Multiplex_t *multiplex)
 
 
     STATEMENT_PREPAREVA("SELECT DISTINCT " SERVICE_FIELDS
-                        "FROM " SERVICES_TABLE "," PIDS_TABLE " "
+                        "FROM " SERVICES_TABLE "," MULTIPLEXES_TABLE "," PIDS_TABLE " "
                         "WHERE " SERVICE_ID "=" PID_SERVICEID " %s AND "
+                        SERVICES_TABLE "." SERVICE_MULTIPLEXUID "=" MULTIPLEXES_TABLE "." MULTIPLEX_UID " AND "
                         "(" PIDS_TABLE "." PID_PID "=%d "
                         "OR " SERVICES_TABLE "." SERVICE_PMTPID "=%d "
                         "OR " SERVICES_TABLE "." SERVICE_PCRPID "=%d );",
@@ -584,7 +593,9 @@ ServiceEnumerator_t ServiceQueryNameLike(char *query)
     STATEMENT_INIT;
 
     STATEMENT_PREPAREVA("SELECT " SERVICE_FIELDS
-                        "FROM " SERVICES_TABLE " WHERE " SERVICE_NAME " LIKE %Q;",
+                        "FROM " SERVICES_TABLE"," MULTIPLEXES_TABLE " WHERE " 
+                        SERVICES_TABLE "." SERVICE_MULTIPLEXUID "=" MULTIPLEXES_TABLE "." MULTIPLEX_UID " AND " 
+                        SERVICES_TABLE "." SERVICE_NAME " LIKE %Q;",
                         query);
     RETURN_ON_ERROR(NULL);
 
@@ -638,6 +649,8 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
         {
             service->defaultAuthority= strdup(name);
         }
+        service->networkId = STATEMENT_COLUMN_INT(11);
+        service->tsId =  STATEMENT_COLUMN_INT(12);
         return service;
     }
 

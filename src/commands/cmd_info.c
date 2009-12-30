@@ -486,7 +486,6 @@ static void CommandCurrent(int argc, char **argv)
 static void CommandServiceInfo(int argc, char **argv)
 {
     Service_t *service;
-    Multiplex_t *multiplex;
 
     UpdateDatabase();
     
@@ -495,19 +494,17 @@ static void CommandServiceInfo(int argc, char **argv)
     if (service)
     {
         static const char *serviceType[]= {"Digital TV", "Digital Radio", "Data", "Unknown"};
-        multiplex = MultiplexFindUID(service->multiplexUID);            
         CommandPrintf("Name                : %s\n", service->name);
         CommandPrintf("Provider            : %s\n", service->provider);
         CommandPrintf("Type                : %s\n", serviceType[service->type]);
         CommandPrintf("Conditional Access? : %s\n", service->conditionalAccess ? "CA":"Free to Air");
-        CommandPrintf("ID                  : %04x.%04x.%04x\n", multiplex->networkId, multiplex->tsId, service->id);
+        CommandPrintf("ID                  : %04x.%04x.%04x\n", service->networkId, service->tsId, service->id);
         CommandPrintf("Multiplex UID       : %d\n", service->multiplexUID);
         CommandPrintf("Source              : 0x%04x\n", service->source);
         CommandPrintf("Default Authority   : %s\n", service->defaultAuthority);
         CommandPrintf("PMT PID             : 0x%04x\n", service->pmtPid);
         CommandPrintf("    Version         : %d\n", service->pmtVersion);
         ServiceRefDec(service);
-        MultiplexRefDec(multiplex);
     }
     else
     {

@@ -73,6 +73,8 @@ typedef struct Service_t
 {
     char *name;             /**< Name of the service. */
     int multiplexUID;       /**< Multiplex frequency this service is broadcast on. */
+    int networkId;          /**< Network ID the service is part of */
+    int tsId;               /**< Transport stream ID the service is part of */
     int id;                 /**< Service/Program ID of the service. */
     int source;             /**< Source id of this service (for DVB this is the same 
                                  as the service ID for ATSC this is the channels 
