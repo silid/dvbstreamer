@@ -91,6 +91,15 @@ typedef struct Service_t
 Service_t;
 
 /**
+ * A collection of service.
+ */
+typedef struct ServiceList_s
+{
+    unsigned int nrofServices;
+    Service_t *services[0];
+}ServiceList_t;
+
+/**
  * Handle for enumerating services.
  */
 typedef void *ServiceEnumerator_t;
@@ -119,14 +128,7 @@ int ServiceDeInit(void);
  * Return the number of services in the database.
  * @return The number of services in the database.
  */
-#define ServiceCount() DBaseCount(SERVICES_TABLE)
-
-/**
- * Retrieve the number of services on the specified multplex.
- * @param multiplexuid The multiplex to retrieve the service count for.
- * @return The number of services on the specified multiplex.
- */
-int ServiceForMultiplexCount(int multiplexuid);
+#define ServiceCount() DBaseCount(SERVICES_TABLE, NULL)
 
 /**
  * Remove a service from the database.

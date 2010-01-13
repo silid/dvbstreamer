@@ -346,12 +346,33 @@ char *EventsEventToString(Event_t event, void *payload)
     if (payload && event->toString)
     {
         char *payloadStr = event->toString(event, payload);
-        ret = asprintf(&result, "%s.%s %s", event->source->name, event->name, payloadStr);
+        int count;
+        int i, r;
+        for (i = 0; payloadStr[i]; i ++)
+        {
+            if (payloadStr[i] == '\n')
+            {
+                count ++;
+            }
+        }
+        result = malloc(8 + strlen(event->source->name) + strlen(event->name) + strlen(payloadStr) + (count * 4) + 1);
+        ret = sprintf(result, "Name: %s.%s\nDetails: \n    ", event->source->name, event->name);
+        r = strlen(result);    
+        for (i = 0; payloadStr[i]; i ++)
+        {
+            result[r] = payloadStr[i];
+            r ++;
+            if ((payloadStr[i] == '\n') && (payloadStr[i + 1] != 0))
+            {
+                memcpy(&result[r], "    ", 4);
+                r += 4;
+            }
+        }
         free(payloadStr);
     }
     else
     {
-        ret = asprintf(&result, "%s.%s", event->source->name, event->name);
+        ret = asprintf(&result, "Name: %s.%s", event->source->name, event->name);
     }
 
     if (ret == -1)

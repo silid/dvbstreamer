@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2006  Adam Charrett
+Copyright (C) 2010  Adam Charrett
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -31,6 +31,7 @@ Majority of the parsing code taken from the xine input_dvb plugin code.
 #include "services.h"
 #include "logging.h"
 #include "dvbadapter.h"
+#include "yamlutils.h"
 /*******************************************************************************
 * Typedefs                                                                     *
 *******************************************************************************/
@@ -38,7 +39,7 @@ Majority of the parsing code taken from the xine input_dvb plugin code.
 typedef struct
 {
     char *name;
-    int value;
+    char *value;
 }
 Param;
 
@@ -46,9 +47,9 @@ Param;
 * Prototypes                                                                   *
 *******************************************************************************/
 
-static int find_param(const Param *list, const char *name);
-static int findMultiplex(fe_type_t fe_type, int freq, DVBDiSEqCSettings_t *diseqcsettings, Multiplex_t **mux);
-static int parsezapline(char * str, fe_type_t fe_type);
+static char *find_param(const Param *list, const char *name);
+static int findMultiplex(DVBDeliverySystem_e delSys, char *freq, char *polarisation, char *satelliteNumber, Multiplex_t **mux);
+static int parsezapline(char * str, DVBDeliverySystem_e delSys);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -56,77 +57,77 @@ static int parsezapline(char * str, fe_type_t fe_type);
 
 static const Param inversion_list [] =
     {
-        { "INVERSION_OFF", INVERSION_OFF },
-        { "INVERSION_ON", INVERSION_ON },
-        { "INVERSION_AUTO", INVERSION_AUTO },
+        { "INVERSION_OFF", "OFF" },
+        { "INVERSION_ON", "ON" },
+        { "INVERSION_AUTO", "AUTO" },
         { NULL, 0 }
     };
 
 static const Param bw_list [] =
     {
-        { "BANDWIDTH_6_MHZ", BANDWIDTH_6_MHZ },
-        { "BANDWIDTH_7_MHZ", BANDWIDTH_7_MHZ },
-        { "BANDWIDTH_8_MHZ", BANDWIDTH_8_MHZ },
-        { "BANDWIDTH_AUTO", BANDWIDTH_AUTO },
+        { "BANDWIDTH_6_MHZ", "6000000" },
+        { "BANDWIDTH_7_MHZ", "7000000" },
+        { "BANDWIDTH_8_MHZ", "8000000" },
+        { "BANDWIDTH_AUTO", "AUTO" },
         { NULL, 0 }
     };
 
 static const Param fec_list [] =
     {
-        { "FEC_AUTO", FEC_AUTO },
-        { "FEC_1_2", FEC_1_2 },
-        { "FEC_2_3", FEC_2_3 },
-        { "FEC_3_4", FEC_3_4 },
-        { "FEC_4_5", FEC_4_5 },
-        { "FEC_5_6", FEC_5_6 },
-        { "FEC_6_7", FEC_6_7 },
-        { "FEC_7_8", FEC_7_8 },
-        { "FEC_8_9", FEC_8_9 },
-        { "FEC_NONE", FEC_NONE },
+        { "FEC_AUTO", "AUTO" },
+        { "FEC_1_2", "1/2" },
+        { "FEC_2_3", "2/3" },
+        { "FEC_3_4", "3/4" },
+        { "FEC_4_5", "4/5" },
+        { "FEC_5_6", "5/6" },
+        { "FEC_6_7", "6/7" },
+        { "FEC_7_8", "7/8" },
+        { "FEC_8_9", "8/9" },
+        { "FEC_NONE", "NONE" },
         { NULL, 0 }
     };
 
 static const Param guard_list [] =
     {
-        {"GUARD_INTERVAL_1_16", GUARD_INTERVAL_1_16 },
-        {"GUARD_INTERVAL_1_32", GUARD_INTERVAL_1_32 },
-        {"GUARD_INTERVAL_1_4", GUARD_INTERVAL_1_4 },
-        {"GUARD_INTERVAL_1_8", GUARD_INTERVAL_1_8 },
-        {"GUARD_INTERVAL_AUTO", GUARD_INTERVAL_AUTO },
+        {"GUARD_INTERVAL_1_16", "1/16" },
+        {"GUARD_INTERVAL_1_32", "1/32" },
+        {"GUARD_INTERVAL_1_4", "1/4" },
+        {"GUARD_INTERVAL_1_8", "1/8" },
+        {"GUARD_INTERVAL_AUTO", "AUTO" },
         { NULL, 0 }
     };
 
 static const Param hierarchy_list [] =
     {
-        { "HIERARCHY_NONE", HIERARCHY_NONE },
-        { "HIERARCHY_1", HIERARCHY_1 },
-        { "HIERARCHY_2", HIERARCHY_2 },
-        { "HIERARCHY_4", HIERARCHY_4 },
-        { "HIERARCHY_AUTO", HIERARCHY_AUTO },            
+        { "HIERARCHY_NONE", "NONE" },
+        { "HIERARCHY_1", "1" },
+        { "HIERARCHY_2", "2" },
+        { "HIERARCHY_4", "4" },
+        { "HIERARCHY_AUTO", "AUTO" },            
         { NULL, 0 }
     };
 
 static const Param modulation_list [] =
     {
-        { "QPSK", QPSK },
-        { "QAM_16", QAM_16 },
-        { "QAM_32", QAM_32 },
-        { "QAM_64", QAM_64 },
-        { "QAM_128", QAM_128 },
-        { "QAM_256", QAM_256 },
-        { "QAM_AUTO", QAM_AUTO },
+        { "QPSK", "QPSK" },
+        { "QAM_16", "16QAM" },
+        { "QAM_32", "32QAM" },
+        { "QAM_64", "64QAM" },
+        { "QAM_128", "128QAM" },
+        { "QAM_256", "256QAM" },
+        { "QAM_AUTO", "AUTO QAM" },
 #if defined(ENABLE_ATSC)            
-        { "8VSB", VSB_8 },
-        { "16VSB", VSB_16 },
+        { "8VSB", "8VSB" },
+        { "16VSB", "16VSB" },
 #endif            
         { NULL, 0 }
     };
 
 static const Param transmissionmode_list [] =
     {
-        { "TRANSMISSION_MODE_2K", TRANSMISSION_MODE_2K },
-        { "TRANSMISSION_MODE_8K", TRANSMISSION_MODE_8K },
-        { "TRANSMISSION_MODE_AUTO", TRANSMISSION_MODE_AUTO },
+        { "TRANSMISSION_MODE_2K", "2000" },
+        { "TRANSMISSION_MODE_8K", "8000" },
+        { "TRANSMISSION_MODE_AUTO", "AUTO" },
         { NULL, 0 }
     };
 static const char PARSEZAP[] = "ParseZap";
@@ -134,7 +135,7 @@ static const char PARSEZAP[] = "ParseZap";
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
-int parsezapfile(char *path, fe_type_t fe_type)
+int parsezapfile(char *path, DVBDeliverySystem_e delSys)
 {
     FILE      *f;
     char       str[255];
@@ -149,7 +150,7 @@ int parsezapfile(char *path, fe_type_t fe_type)
 
     while ( fgets (str, sizeof(str), f))
     {
-        result = parsezapline(str, fe_type);
+        result = parsezapline(str, delSys);
     }
 
     return 1;
@@ -159,56 +160,66 @@ int parsezapfile(char *path, fe_type_t fe_type)
 * Local Functions                                                              *
 *******************************************************************************/
 
-static int find_param(const Param *list, const char *name)
+static char * find_param(const Param *list, const char *name)
 {
     while (list->name && strcmp(list->name, name))
+    {
         list++;
+    }
     return list->value;;
 }
 
-static int findMultiplex(fe_type_t fe_type, int freq, DVBDiSEqCSettings_t *diseqcsettings, Multiplex_t **mux)
+static int findMultiplex(DVBDeliverySystem_e delSys, char *freq, char *polarisation, char *satelliteNumber, Multiplex_t **mux)
 {
     bool notFound = TRUE;
-    MultiplexEnumerator_t enumerator = MultiplexEnumeratorGet();
+    MultiplexList_t *muxes = MultiplexGetAll();
+    int i;
+
     Multiplex_t *multiplex;
-    do
+    for (i = 0; (i < muxes->nrofMultiplexes) && notFound; i ++)
     {
-        multiplex = MultiplexGetNext(enumerator);
+        multiplex = muxes->multiplexes[i];
         if (multiplex)
         {
-            struct dvb_frontend_parameters feparams;
-            DVBDiSEqCSettings_t muxdiseqcsettings;
-
-            MultiplexFrontendParametersGet(multiplex, &feparams, &muxdiseqcsettings);
-
-            if (feparams.frequency == freq)
+            yaml_document_t document;
+            yaml_node_t *root;
+            yaml_node_t *node;
+            memset(&document, 0, sizeof(document));
+            YamlUtils_Parse(multiplex->tuningParams,&document);
+            root = yaml_document_get_root_node(&document);
+            node = YamlUtils_MappingFind(&document, root, "Frequency");
+            if (node && (node->type == YAML_SCALAR_NODE) && (strcmp((char*)node->data.scalar.value, freq) == 0))
             {
-                if (fe_type == FE_QPSK)
+                if ((delSys == DELSYS_DVBS) || (delSys == DELSYS_DVBS2))
                 {
-                    if ((muxdiseqcsettings.polarisation == diseqcsettings->polarisation) &&
-                        (muxdiseqcsettings.satellite_number == diseqcsettings->satellite_number))
+                    node = YamlUtils_MappingFind(&document, root, "Polarisation");
+                    if (node && (node->type == YAML_SCALAR_NODE) && (strcmp((char*)node->data.scalar.value, polarisation) == 0))
                     {
-                        *mux = multiplex;
-                        notFound = FALSE;
+                        node = YamlUtils_MappingFind(&document, root, "Satellite Number");
+                        if (node && (node->type == YAML_SCALAR_NODE) && (strcmp((char*)node->data.scalar.value, satelliteNumber) == 0))
+                        {
+                            *mux = multiplex;
+                            MultiplexRefInc(multiplex);
+                            notFound = FALSE;
+                        }
+                        
                     }
                 }
                 else
                 {
                     *mux = multiplex;
+                    MultiplexRefInc(multiplex);
                     notFound = FALSE;
                 }
             }
-            if (notFound)
-            {
-                MultiplexRefDec(multiplex);
-            }
+            yaml_document_delete(&document);
         }
-    }while(multiplex && notFound);
-    MultiplexEnumeratorDestroy(enumerator);
+    }
+    ObjectRefDec(muxes);
     return notFound;
 }
 
-static int parsezapline(char * str, fe_type_t fe_type)
+static int parsezapline(char * str, DVBDeliverySystem_e delSys)
 {
     /*
         try to extract channel data from a string in the following format
@@ -242,17 +253,27 @@ static int parsezapline(char * str, fe_type_t fe_type)
         <service id>   = MPEG2 program id/DVB service id
 
     */
+    char params[256];
+    char frequency[16] = {0};
+    char *polarisation = NULL;
+    char satelliteNumber[4] = {0};
     unsigned long freq;
     char *field, *tmp;
-    struct dvb_frontend_parameters   front_param;
-    DVBDiSEqCSettings_t diseqcsettings;
     char *name;
     int id;
     int source;
     Multiplex_t *mux;
 
     tmp = str;
+    params[0] = 0;
 #define NEXTFIELD() if(!(field = strsep(&tmp, ":")))return -1
+#define SETFREQ(_freq) \
+    do{\
+        sprintf(params, "Frequency: %lu\n", _freq);\
+        sprintf(frequency, "%lu", _freq);\
+    }while(0)
+
+#define PARAMADD(p...) sprintf(params + strlen(params), p)
 
     /* find the channel name */
     NEXTFIELD();
@@ -263,100 +284,98 @@ static int parsezapline(char * str, fe_type_t fe_type)
     freq = strtoul(field,NULL,0);
 
 
-    switch(fe_type)
+    switch(delSys)
     {
-        case FE_QPSK:
-
-            front_param.frequency = freq * 1000;
-            front_param.inversion = INVERSION_AUTO;
+        case DELSYS_DVBS:
+            SETFREQ(freq * 1000);
+            PARAMADD("Inversion: AUTO\n");
             /* find out the polarisation */
             NEXTFIELD();
-            diseqcsettings.polarisation = (field[0] == 'h' ? POL_HORIZONTAL: POL_VERTICAL);
-
+            polarisation = (field[0] == 'h' ? "Horizontal":"Vertical");
+            PARAMADD("Polarisation: %s\n", polarisation); 
             /* satellite number */
             NEXTFIELD();
-            diseqcsettings.satellite_number = strtoul(field, NULL, 0);
-
+            strncpy(satelliteNumber, field, sizeof(satelliteNumber) - 1);
+            satelliteNumber[sizeof(satelliteNumber) - 1] = 0;
+            PARAMADD("Satellite: %lu\n",  strtoul(field, NULL, 0));
             /* symbol rate */
             NEXTFIELD();
-            front_param.u.qpsk.symbol_rate = strtoul(field, NULL, 0) * 1000;
-
-            front_param.u.qpsk.fec_inner = FEC_AUTO;
+            PARAMADD("Symbol Rate: %lu\n", strtoul(field, NULL, 0) * 1000);
+            PARAMADD("FEC: AUTO\n");
         break;
-        case FE_QAM:
-            front_param.frequency = freq;
-
+        case DELSYS_DVBC:
+            SETFREQ(freq);
             /* find out the inversion */
             NEXTFIELD();
-            front_param.inversion = find_param(inversion_list, field);
+            PARAMADD("Inversion: %s\n", find_param(inversion_list, field));
 
             /* find out the symbol rate */
             NEXTFIELD();
-            front_param.u.qam.symbol_rate = strtoul(field, NULL, 0);
+            PARAMADD("Symbol Rate: %lu\n",strtoul(field, NULL, 0));
 
             /* find out the fec */
             NEXTFIELD();
-            front_param.u.qam.fec_inner = find_param(fec_list, field);
+            PARAMADD("FEC: %s\n", find_param(fec_list, field));
 
             /* find out the qam */
             NEXTFIELD();
-            front_param.u.qam.modulation = find_param(modulation_list, field);
+            PARAMADD("Modulation: %s\n", find_param(modulation_list, field));
         break;
-        case FE_OFDM:
+        case DELSYS_DVBT:
             /* DVB-T frequency is in kHz - workaround broken channels.confs */
             if (freq < 1000000)
             {
                 freq*=1000;
             }
-            front_param.frequency = freq;
+            SETFREQ(freq);
 
             /* find out the inversion */
             NEXTFIELD();
-            front_param.inversion = find_param(inversion_list, field);
+            PARAMADD("Inversion: %s\n", find_param(inversion_list, field));
 
             /* find out the bandwidth */
             NEXTFIELD();
-            front_param.u.ofdm.bandwidth = find_param(bw_list, field);
+            PARAMADD("Bandwidth: %s\n", find_param(bw_list, field));
 
             /* find out the fec_hp */
             NEXTFIELD();
-            front_param.u.ofdm.code_rate_HP = find_param(fec_list, field);
+            PARAMADD("FEC HP: %s\n", find_param(fec_list, field));
 
             /* find out the fec_lp */
             NEXTFIELD();
-            front_param.u.ofdm.code_rate_LP = find_param(fec_list, field);
+            PARAMADD("FEC LP: %s\n", find_param(fec_list, field));
 
             /* find out the qam */
             NEXTFIELD();
-            front_param.u.ofdm.constellation = find_param(modulation_list, field);
+            PARAMADD("Modulation: %s\n", find_param(modulation_list, field));
 
             /* find out the transmission mode */
             NEXTFIELD();
-            front_param.u.ofdm.transmission_mode = find_param(transmissionmode_list, field);
+            PARAMADD("Transmission Mode: %s\n", find_param(transmissionmode_list, field));
 
             /* guard list */
             NEXTFIELD();
-            front_param.u.ofdm.guard_interval = find_param(guard_list, field);
+            PARAMADD("Guard Interval: %s\n", find_param(guard_list, field));
 
             NEXTFIELD();
-            front_param.u.ofdm.hierarchy_information = find_param(hierarchy_list, field);
+            PARAMADD("Hierarchy: %s\n", find_param(hierarchy_list, field));
             break;
 #if defined(ENABLE_ATSC)            
-        case FE_ATSC:
-            front_param.frequency = freq;
-            front_param.inversion = INVERSION_AUTO;            
+        case DELSYS_ATSC:
+            SETFREQ(freq);
+            PARAMADD("Inversion: AUTO\n");
             NEXTFIELD();
-            front_param.u.vsb.modulation = find_param(modulation_list, field);
+            PARAMADD("Modulation: %s\n", find_param(modulation_list, field));
             break;
 #endif            
         default:
             break;
     }
 
-    if (findMultiplex(fe_type, front_param.frequency, &diseqcsettings, &mux))
+    if (findMultiplex(delSys, frequency, polarisation, satelliteNumber, &mux))
     {
-        LogModule(LOG_DEBUGV, PARSEZAP, "Adding frequency %d (type %d)\n", front_param.frequency, fe_type);
-        MultiplexAdd(fe_type, &front_param, &diseqcsettings, &mux);
+        LogModule(LOG_DEBUGV, PARSEZAP, "Adding frequency %d (delivery system %d)\n", freq, delSys);
+        MultiplexAdd(delSys, params, &mux);
     }
 
     /* Video PID - not used */
@@ -366,7 +385,7 @@ static int parsezapline(char * str, fe_type_t fe_type)
     /* service ID */
     NEXTFIELD();
     id = strtoul(field, NULL, 0);
-    if (fe_type == FE_ATSC)
+    if (delSys == DELSYS_ATSC)
     {
         source = -1;
     }

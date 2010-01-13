@@ -53,7 +53,9 @@ Manage services and PIDs.
 *******************************************************************************/
 
 static List_t *ServiceCreateList(ServiceEnumerator_t enumerator);
+static ServiceList_t *ServiceGetList(char *where);
 static void ServiceDestructor(void * arg);
+static void ServiceListDestructor(void * arg);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -74,6 +76,10 @@ int ServiceInit(void)
 {
     int result = 0;
     result = ObjectRegisterTypeDestructor(Service_t, ServiceDestructor);
+    if (!result)
+    {
+        result = ObjectRegisterCollection(TOSTRING(ServiceList_t),sizeof(Service_t *),ServiceListDestructor);
+    }
     if (!result)
     {
         servicesSource = EventsRegisterSource("Services");
@@ -498,27 +504,9 @@ List_t *ServiceListAll()
     return ServiceCreateList(ServiceEnumeratorGet());
 }
 
-
-
-int ServiceForMultiplexCount(int uid)
+ServiceList_t *ServiceGetAll()
 {
-    STATEMENT_INIT;
-    int result = -1;
-
-    STATEMENT_PREPAREVA("SELECT count() "
-                        "FROM " SERVICES_TABLE " WHERE " SERVICE_MULTIPLEXUID "=%d;",
-                        uid);
-    RETURN_ON_ERROR(-1);
-
-    STATEMENT_STEP();
-    if (rc == SQLITE_ROW)
-    {
-        result = STATEMENT_COLUMN_INT( 0);
-        rc = 0;
-    }
-
-    STATEMENT_FINALIZE();
-    return result;
+    return ServiceGetList(NULL);
 }
 
 ServiceEnumerator_t ServiceEnumeratorForMultiplex(Multiplex_t *multiplex)
@@ -538,6 +526,13 @@ ServiceEnumerator_t ServiceEnumeratorForMultiplex(Multiplex_t *multiplex)
 List_t *ServiceListForMultiplex(Multiplex_t *multiplex)
 {
     return ServiceCreateList(ServiceEnumeratorForMultiplex(multiplex));
+}
+
+ServiceList_t *ServiceGetListForMultiplex(Multiplex_t *multiplex)
+{
+    char where[50];
+    sprintf(where, SERVICES_TABLE "." SERVICE_MULTIPLEXUID"=%d", multiplex->uid);
+    return ServiceGetList(where);
 }
 
 ServiceEnumerator_t ServiceFindByPID(int pid, Multiplex_t *multiplex)
@@ -607,6 +602,16 @@ List_t *ServiceListForNameLike(char *query)
     return ServiceCreateList(ServiceQueryNameLike(query));
 }
 
+ServiceList_t *ServiceGetListForNameLike(char *query)
+{
+    char *where;
+    ServiceList_t *list;
+    
+    where = sqlite3_mprintf(SERVICES_TABLE "." SERVICE_NAME " LIKE %Q", query);
+    list = ServiceGetList(where);
+    sqlite3_free(where);
+    return list;
+}
 void ServiceEnumeratorDestroy(ServiceEnumerator_t enumerator)
 {
     int rc;
@@ -683,6 +688,37 @@ static List_t *ServiceCreateList(ServiceEnumerator_t enumerator)
     return list;
 }
 
+static ServiceList_t *ServiceGetList(char *where)
+{
+    int count, i;
+    ServiceList_t *list;    
+    STATEMENT_INIT;
+    count = DBaseCount(SERVICES_TABLE, where);
+    if (where)
+    {
+        STATEMENT_PREPAREVA("SELECT " SERVICE_FIELDS
+                        "FROM " SERVICES_TABLE"," MULTIPLEXES_TABLE " WHERE " 
+                        SERVICES_TABLE "." SERVICE_MULTIPLEXUID "=" MULTIPLEXES_TABLE "." MULTIPLEX_UID " AND %s;", where);
+    }
+    else
+    {
+        STATEMENT_PREPARE("SELECT " SERVICE_FIELDS
+                          "FROM " SERVICES_TABLE"," MULTIPLEXES_TABLE " WHERE " 
+                          SERVICES_TABLE "." SERVICE_MULTIPLEXUID "=" MULTIPLEXES_TABLE "." MULTIPLEX_UID ";");
+
+    }
+    list = (ServiceList_t*)ObjectCollectionCreate(TOSTRING(ServiceList_t), count);
+    if (list)
+    {
+        for (i = 0; i < count; i ++)
+        {
+            list->services[i] = ServiceGetNext((ServiceEnumerator_t)stmt);
+        }
+    }
+    STATEMENT_FINALIZE();
+    return list;
+}
+
 static void ServiceDestructor(void * arg)
 {
     Service_t *service = arg;
@@ -700,11 +736,24 @@ static void ServiceDestructor(void * arg)
     }
 }
 
-char *ServiceEventToString(Event_t event,void * payload)
+static void ServiceListDestructor(void * arg)
+{
+    ServiceList_t *list = arg;
+    int i;
+    for (i = 0;i < list->nrofServices; i ++)
+    {
+        ObjectRefDec(list->services[i]);
+    }
+}
+
+
+char *ServiceEventToString(Event_t event, void * payload)
 {
     char *result=NULL;
     Service_t *service = payload;
-    if (asprintf(&result, "%d %04x %s",service->multiplexUID, service->id, service->name) == -1)
+    if (asprintf(&result, "Service ID: %04x.%04x.%04x\n"
+                          "ServiceName %s",
+                          service->networkId, service->tsId, service->id, service->name) == -1)
     {
         LogModule(LOG_INFO, SERVICES, "Failed to allocate memory for service event description string.\n");
     }

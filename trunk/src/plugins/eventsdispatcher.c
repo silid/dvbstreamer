@@ -306,7 +306,6 @@ static void DeferredInformListeners(void * arg)
     ListIterator_t iterator;
     char *outputLine = NULL;
     size_t outputLineLen = 0;
-    DVBAdapter_t *adapter = MainDVBAdapterGet();
 
     LogModule(LOG_DEBUG, EVENTDISPATCH, "Processing event (%ld.%ld) %s\n",
         eventDesc->at.tv_sec, eventDesc->at.tv_usec, eventDesc->description);
@@ -345,9 +344,13 @@ static void DeferredInformListeners(void * arg)
             {
                 struct tm *localtm = localtime(&eventDesc->at.tv_sec);
                 char timeStr[21]; /* xxxx-xx-xx xx:xx:xx */
+                PropertyValue_t value;
+                PropertiesGet("adapter.number", &value);
                 strftime(timeStr, sizeof(timeStr)-1, "%F %T", localtm);
-                outputLineLen = asprintf(&outputLine, "%s.%ld %d %s\n",
-                    timeStr, eventDesc->at.tv_usec, adapter->adapter,
+                outputLineLen = asprintf(&outputLine, "Time: %s.%ld\n"
+                                                      "Adapter: %d\n"
+                                                      "%s\n",
+                    timeStr, eventDesc->at.tv_usec, value.u.integer,
                     eventDesc->description);
             }
             if (outputLine)

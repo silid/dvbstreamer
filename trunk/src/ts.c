@@ -542,7 +542,7 @@ static TSPacketFilter_t * PacketFilterListAddFilter(TSReader_t *reader, TSFilter
                 pidCount += (reader->packetFilters[p] != NULL) ?  1:0;
             }
 
-            freePIDCount = reader->adapter->maxFilters - pidCount;
+            freePIDCount = DVBDemuxGetMaxFilters(reader->adapter) - pidCount;
             if (ListCount(reader->activeSectionFilters) < MIN_SECTION_FILTER_PIDS)
             {
                 freePIDCount -= MIN_SECTION_FILTER_PIDS - ListCount(reader->activeSectionFilters);
@@ -555,7 +555,7 @@ static TSPacketFilter_t * PacketFilterListAddFilter(TSReader_t *reader, TSFilter
             
             if (DVBDemuxAllocateFilter(reader->adapter, pid))
             {
-                if (reader->adapter->hardwareRestricted)
+                if (DVBDemuxIsHardwareRestricted(reader->adapter))
                 {
                     /* If this is a section filter and we are HW restricted fail straight away*/
                     if (group == NULL)
@@ -583,7 +583,7 @@ static TSPacketFilter_t * PacketFilterListAddFilter(TSReader_t *reader, TSFilter
             }
         }
 
-        if (!reader->adapter->hardwareRestricted && !reader->promiscuousMode && (pid == TSREADER_PID_ALL))
+        if (!DVBDemuxIsHardwareRestricted(reader->adapter) && !reader->promiscuousMode && (pid == TSREADER_PID_ALL))
         {
             PromiscusModeEnable(reader, TRUE);
         }
@@ -865,7 +865,7 @@ static void TSReaderDVRCallback(struct ev_loop *loop, ev_io *w, int revents)
     int count, p;
   
     count = read(DVBDVRGetFD(adapter), (char*)reader->buffer, sizeof(reader->buffer));
-    if (!adapter->frontEndLocked || !reader->enabled)
+    if (!DVBFrontEndIsLocked(adapter) || !reader->enabled)
     {
         return;
     }

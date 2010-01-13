@@ -46,6 +46,9 @@ static EventSource_t tuningSource;
 static Event_t serviceChangedEvent;
 static Event_t mulitplexChangedEvent;
 
+static pthread_mutex_t lockMutex = PTHREAD_MUTEX_INITIALIZER;
+static bool locked = FALSE;
+
 static const char TUNING[] = "tuning";
 
 /*******************************************************************************
@@ -72,13 +75,42 @@ int TuningDeInit(void)
 /*******************************************************************************
 * Channel Change functions                                                     *
 *******************************************************************************/
+bool TuningCurrentServiceLock(void)
+{
+    bool r = FALSE;
+    pthread_mutex_lock(&lockMutex);
+    if (!locked)
+    {
+        locked = TRUE;
+        r = TRUE;
+    }
+    pthread_mutex_unlock(&lockMutex);
+    return r;
+}
+
+void TuningCurrentServiceUnlock(void)
+{
+    pthread_mutex_lock(&lockMutex);
+    locked = FALSE;
+    pthread_mutex_unlock(&lockMutex);
+}
+
+bool TuningCurrentServiceIsLocked(void)
+{
+    bool r;
+    pthread_mutex_lock(&lockMutex);
+    r = locked;
+    pthread_mutex_unlock(&lockMutex);
+    return r;
+}
+
 Service_t *TuningCurrentServiceGet(void)
 {
     ServiceRefInc(CurrentService);
     return CurrentService;
 }
 
-void TuningCurrentServiceSet(Service_t *service)
+bool TuningCurrentServiceSet(Service_t *service)
 {
     Multiplex_t *multiplex;
     TSReader_t *reader = MainTSReaderGet();
@@ -86,7 +118,12 @@ void TuningCurrentServiceSet(Service_t *service)
 
     if (!service)
     {
-        return;
+        return FALSE;
+    }
+    
+    if (TuningCurrentServiceIsLocked())
+    {
+        return FALSE;
     }
 
     if ((CurrentService == NULL) || (!ServiceAreEqual(service,CurrentService)))
@@ -129,6 +166,40 @@ void TuningCurrentServiceSet(Service_t *service)
         LogModule(LOG_DEBUGV, TUNING, "Enabling filters\n");
         TSReaderEnable(reader, TRUE);
     }
+    return TRUE;
+}
+
+void TuningCurrentServiceRetune(void)
+{
+    Multiplex_t *multiplex;
+    TSReader_t *reader = MainTSReaderGet();
+
+    LogModule(LOG_DEBUGV, TUNING, "Disabling filters\n");
+    TSReaderEnable(reader, FALSE);
+
+    multiplex = MultiplexFindUID(CurrentService->multiplexUID);
+    if ((CurrentMultiplex!= NULL) && MultiplexAreEqual(multiplex, CurrentMultiplex))
+    {
+        LogModule(LOG_DEBUGV, TUNING, "Same multiplex\n");
+        ObjectRefDec(multiplex);
+        multiplex = CurrentMultiplex;
+        ObjectRefInc(multiplex);
+    }
+    else
+    {
+        LogModule(LOG_DEBUG, TUNING, "New Multiplex UID = %d (%04x.%04x)\n", multiplex->uid,
+            multiplex->networkId & 0xffff, multiplex->tsId & 0xffff);
+    }
+
+    TuneMultiplex(multiplex);
+    /* Reset all stats as this is a new TS */
+    TSReaderZeroStats(reader);
+
+    MultiplexRefDec(multiplex);
+
+    LogModule(LOG_DEBUGV, TUNING, "Enabling filters\n");
+    TSReaderEnable(reader, TRUE);
+    
 }
 
 Multiplex_t *TuningCurrentMultiplexGet(void)
@@ -140,7 +211,6 @@ Multiplex_t *TuningCurrentMultiplexGet(void)
 void TuningCurrentMultiplexSet(Multiplex_t *multiplex)
 {
     TSReader_t *reader = MainTSReaderGet();
-    ServiceFilter_t primaryServiceFilter = MainServiceFilterGetPrimary();
 
     TSReaderLock(reader);
     LogModule(LOG_DEBUG, TUNING, "Writing changes back to database.\n");
@@ -149,8 +219,6 @@ void TuningCurrentMultiplexSet(Multiplex_t *multiplex)
 
     LogModule(LOG_DEBUGV, TUNING, "Disabling filters\n");
     TSReaderEnable(reader, FALSE);
-
-    ServiceFilterServiceSet(primaryServiceFilter, NULL);
 
     TuneMultiplex(multiplex);
 
@@ -171,8 +239,6 @@ void TuningCurrentMultiplexSet(Multiplex_t *multiplex)
 *******************************************************************************/
 static void TuneMultiplex(Multiplex_t *multiplex)
 {
-    struct dvb_frontend_parameters feparams;
-    DVBDiSEqCSettings_t diseqc;
     DVBAdapter_t *dvbAdapter = MainDVBAdapterGet();
     TSReader_t *reader = MainTSReaderGet();
 
@@ -184,11 +250,8 @@ static void TuneMultiplex(Multiplex_t *multiplex)
     MultiplexRefInc(multiplex);
     CurrentMultiplex = multiplex;
 
-    LogModule(LOG_DEBUGV, TUNING, "Getting Frondend parameters\n");
-    MultiplexFrontendParametersGet((Multiplex_t*)CurrentMultiplex, &feparams, &diseqc);
-
     LogModule(LOG_DEBUGV, TUNING, "Tuning\n");
-    if (DVBFrontEndTune(dvbAdapter, &feparams, &diseqc))
+    if (DVBFrontEndTune(dvbAdapter, multiplex->deliverySystem, multiplex->tuningParams))
     {
         LogModule(LOG_ERROR, TUNING, "Tuning failed!\n");
     }

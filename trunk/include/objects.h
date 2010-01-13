@@ -34,6 +34,14 @@ Object memory management.
 #define OBJECT_ERR_OUT_OF_MEMORY    1 /**< Out of memory. */
 #define OBJECT_ERR_CLASS_REGISTERED 2 /**< Class already registered. */
 #define OBJECT_ERR_CLASS_NOT_FOUND  3 /**< Class could not be found. */
+
+/**
+ * A collection of entries with a count.
+ */
+typedef struct ObjectCollection_s{
+    unsigned int nrofEntries; /**< Number of entries in the collection */
+}ObjectCollection_t;
+
 /**
  * Type for a function to call when free'ing an object.
  * ptr is the pointer to the object being freed.
@@ -63,6 +71,18 @@ int ObjectDeinit(void);
 int ObjectRegisterClass(char *classname, unsigned int size, ObjectDestructor_t destructor);
 
 /**
+ * Register a new of object collection to use with the ObjectCollectionCreate function.
+ * @param classname Name of the collection being registered.
+ * @param size Size of the memory need for the object.
+ * @param destructor Function to call when the reference count reach zero for an
+ * object. This is only required if the object includes references to other 
+ * object/malloc memory that needs to be freed.
+ * @return 0 on success.
+ */
+
+int ObjectRegisterCollection(char *name, unsigned entrysize,  ObjectDestructor_t destructor);
+
+/**
  * Helper macro to register a type as an object class.
  * @param _type The type to register with the object system.
  */
@@ -85,10 +105,19 @@ int ObjectRegisterClass(char *classname, unsigned int size, ObjectDestructor_t d
 #define ObjectCreate(_classname) ObjectCreateImpl(_classname, __FILE__, __LINE__)
 
 /**
+ * Create a new collection of class \<classname\>. The initial reference count for the
+ * returned object will be 1.
+ * @param _classname Class of object to create.
+ * @param _entries The number of entries in the collection.
+ * @return A pointer to the new object or NULL.
+ */
+#define ObjectCollectionCreate(_classname, _entries) ObjectCollectionCreateImpl(_classname, _entries,__FILE__, __LINE__)
+
+/**
  * Create a new object of class \<classname\>. The initial reference count for the
  * returned object will be 1.
  *
- * @note This is the function should not be used instead the macro ObjectCreate should be used.
+ * @note This function should not be used instead the macro ObjectCreate should be used.
  *
  * @param classname Class of object to create.
  * @param file The file this function is being called from.
@@ -102,6 +131,21 @@ void *ObjectCreateImpl(char *classname, char *file, int line);
  * @param _type The new type of the object to create.
  */
 #define ObjectCreateType(_type) ObjectCreate(TOSTRING(_type))
+
+/**
+ * Create a new collection of class \<classname\>. The initial reference count for the
+ * returned object will be 1.
+ *
+ * @note This function should not be used instead the macro ObjectCollectionCreate should be used.
+ *
+ * @param classname Class of object to create.
+ * @param entries The number of entries the collection should contain.
+ * @param file The file this function is being called from.
+ * @param line The line this function is being called from.
+ * @return A pointer to the new object or NULL.
+ */
+ObjectCollection_t *ObjectCollectionCreateImpl(char *classname, unsigned int entries, char *file, int line);
+
 
 /**
  * Increment the reference count for the specified object.

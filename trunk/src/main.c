@@ -294,8 +294,8 @@ int main(int argc, char *argv[])
     INIT(DeliveryMethodManagerInit(), "delivery method manager");
     INIT(DeferredProcessingInit(), "deferred processing");
 
-    LogModule(LOG_INFO, MAIN, "%d Services available on %d Multiplexes\n", DBaseCount(SERVICES_TABLE), 
-                                                                           DBaseCount(MULTIPLEXES_TABLE));
+    LogModule(LOG_INFO, MAIN, "%d Services available on %d Multiplexes\n", ServiceCount(), 
+                                                                           MultiplexCount());
 
     /* Initialise the DVB adapter */
     DVBAdapter = DVBInit(adapterNumber, hwRestricted);
@@ -306,22 +306,30 @@ int main(int argc, char *argv[])
     }
 
 #if defined(ENABLE_DVB)
-    if (DVBAdapter->info.type == FE_QPSK)
     {
-        char *lnb;
-        if (DBaseMetadataGet(METADATA_NAME_LNB, &lnb))
+        int i;
+        DVBSupportedDeliverySys_t *supportedSystems = DVBFrontEndGetDeliverySystems(DVBAdapter);
+        for (i = 0; i < supportedSystems->nrofSystems; i ++)
         {
-            memset(&lnbInfo, 0, sizeof(lnbInfo));
-            DBaseMetadataGetInt(METADATA_NAME_LNB_LOW_FREQ, (int*)&lnbInfo.lowFrequency);
-            DBaseMetadataGetInt(METADATA_NAME_LNB_HIGH_FREQ, (int*)&lnbInfo.highFrequency);
-            DBaseMetadataGetInt(METADATA_NAME_LNB_SWITCH_FREQ, (int*)&lnbInfo.switchFrequency);
+            if ((supportedSystems->systems[i] == DELSYS_DVBS) || (supportedSystems->systems[i] == DELSYS_DVBS2))
+            {
+                char *lnb;
+                if (DBaseMetadataGet(METADATA_NAME_LNB, &lnb))
+                {
+                    memset(&lnbInfo, 0, sizeof(lnbInfo));
+                    DBaseMetadataGetInt(METADATA_NAME_LNB_LOW_FREQ, (int*)&lnbInfo.lowFrequency);
+                    DBaseMetadataGetInt(METADATA_NAME_LNB_HIGH_FREQ, (int*)&lnbInfo.highFrequency);
+                    DBaseMetadataGetInt(METADATA_NAME_LNB_SWITCH_FREQ, (int*)&lnbInfo.switchFrequency);
+                }
+                else
+                {
+                    LNBDecode(lnb, &lnbInfo);
+                    free(lnb);
+                }
+                DVBFrontEndLNBInfoSet(DVBAdapter, &lnbInfo);
+                break;
+            }
         }
-        else
-        {
-            LNBDecode(lnb, &lnbInfo);
-            free(lnb);
-        }
-        DVBFrontEndLNBInfoSet(DVBAdapter, &lnbInfo);
     }
 #endif
 
@@ -339,7 +347,7 @@ int main(int argc, char *argv[])
     {
 #if defined(ENABLE_ATSC)
         LogModule(LOG_INFO, MAIN, "Starting ATSC filters\n");
-        INIT(ATSCStandardInit(TSReader), "DVB Filters");
+        INIT(ATSCStandardInit(TSReader), "ATSC Filters");
 #endif
     }
 
@@ -586,9 +594,19 @@ ServiceFilter_t MainServiceFilterGetPrimary(void)
 bool MainIsDVB()
 {
 #if defined(ENABLE_DVB) && defined(ENABLE_ATSC)
-
-    return DVBAdapter->info.type != FE_ATSC;
-
+    int i;
+    DVBSupportedDeliverySys_t *supportedSystems = DVBFrontEndGetDeliverySystems(DVBAdapter);
+    for ( i = 0; i < supportedSystems->nrofSystems; i ++)
+    {
+        if ((supportedSystems->systems[i] == DELSYS_DVBS) ||
+            (supportedSystems->systems[i] == DELSYS_DVBC) ||
+            (supportedSystems->systems[i] == DELSYS_DVBT)
+            )
+        {
+            return TRUE;
+        }
+    }
+    return FALSE;    
 #elif defined(ENABLE_DVB)
 
     return TRUE;
@@ -604,6 +622,25 @@ bool MainIsDVB()
 #endif
 }
 
+bool MainIsATSC()
+{
+#if defined(ENABLE_DVB) && defined(ENABLE_ATSC)
+    int i;
+    DVBSupportedDeliverySys_t *supportedSystems = DVBFrontEndGetDeliverySystems(DVBAdapter);
+    for ( i = 0; i < supportedSystems->nrofSystems; i ++)
+    {
+        if (supportedSystems->systems[i] == DELSYS_ATSC)
+        {
+            return TRUE;
+        }
+    }
+    return FALSE;    
+#elif defined(ENABLE_ATSC)
+    return TRUE;
+#else    
+    return FALSE;
+#endif
+}
 /*
  * Output command line usage and help.
  */

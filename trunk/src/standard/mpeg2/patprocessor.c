@@ -144,7 +144,7 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
             if (!service)
             {
                 LogModule(LOG_DEBUG, PATPROCESSOR, "Service not found in cache while processing PAT, adding 0x%04x\n", patentry->i_number);
-                service = CacheServiceAdd(patentry->i_number);
+                service = CacheServiceAdd(patentry->i_number, patentry->i_number);
                 /* Cause a TS Structure change call back*/
                 state->tsgroup->tsReader->tsStructureChanged = TRUE;
             }

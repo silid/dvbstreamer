@@ -38,17 +38,21 @@ static dvbpsi_descriptor_t *CloneDescriptors(dvbpsi_descriptor_t *descriptors);
 static int PIDAdd(Service_t *service, PID_t *pid);
 
 /*******************************************************************************
+* Global variables                                                             *
+*******************************************************************************/
+static bool typeInited = FALSE;
+/*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
 
 PIDList_t *PIDListNew(int count)
 {
-    PIDList_t *result = ObjectAlloc(sizeof(PIDList_t) + (sizeof(PID_t) * count));
-    if (result)
+    if (!typeInited)
     {
-        result->count = count;
+        ObjectRegisterCollection(TOSTRING(PIDList_t), sizeof(PID_t), NULL);
+        typeInited = TRUE;
     }
-    return result;
+    return (PIDList_t *)ObjectCollectionCreate(TOSTRING(PIDList_t), count);
 }
 
 void PIDListFree(PIDList_t *pids)
@@ -63,7 +67,7 @@ void PIDListFree(PIDList_t *pids)
                 dvbpsi_DeleteDescriptors(pids->pids[i].descriptors);
             }
         }
-        ObjectFree(pids);
+        ObjectRefDec(pids);
     }
 }
 

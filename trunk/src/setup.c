@@ -80,7 +80,7 @@ char DataDirectory[PATH_MAX];
 
 int main(int argc, char *argv[])
 {
-    fe_type_t channelsFileType = FE_OFDM;
+    DVBDeliverySystem_e channelsFileType = DELSYS_DVBT;
     char *channelsFile = NULL;
     int adapterNumber = 0;
 #if defined(ENABLE_DVB)
@@ -120,22 +120,22 @@ int main(int argc, char *argv[])
 #if defined(ENABLE_DVB)
             case 't':
                 channelsFile = optarg;
-                channelsFileType = FE_OFDM;
+                channelsFileType = DELSYS_DVBT;
                 break;
             case 's':
                 channelsFile = optarg;
-                channelsFileType = FE_QPSK;
+                channelsFileType = DELSYS_DVBS;
                 break;
             case 'c':
                 channelsFile = optarg;
-                channelsFileType = FE_QAM;
+                channelsFileType = DELSYS_DVBC;
                 break;
 #endif
 
 #if defined(ENABLE_ATSC)
             case 'A':
                 channelsFile = optarg;
-                channelsFileType = FE_ATSC;
+                channelsFileType = DELSYS_ATSC;
                 break;
 #endif
 
@@ -210,11 +210,11 @@ int main(int argc, char *argv[])
         usage(argv[0]);
         exit(1);
     }
-    rc = DBaseTransactionBegin();
+    /*rc = DBaseTransactionBegin();
     if (rc != SQLITE_OK)
     {
         LogModule(LOG_ERROR, SETUP, "Begin Transaction failed (%d:%s)\n", rc, sqlite3_errmsg(DBaseConnectionGet()));
-    }
+    }*/
 
     LogModule(LOG_INFO, SETUP, "Importing services from %s\n", channelsFile);
     if (!parsezapfile(channelsFile, channelsFileType))
@@ -233,12 +233,13 @@ int main(int argc, char *argv[])
 #endif
 
     DBaseMetadataSetInt(METADATA_NAME_SCAN_ALL, 1);
-
-    rc = DBaseTransactionCommit();
+    rc = 0;
+    /*rc = DBaseTransactionCommit();
     if (rc != SQLITE_OK)
     {
         LogModule(LOG_ERROR, SETUP, "Begin Transaction failed (%d:%s)\n", rc, sqlite3_errmsg(DBaseConnectionGet()));
     }
+    */
     printf("%d Services available on %d Multiplexes\n", ServiceCount(), MultiplexCount());
 
     DEINIT(ServiceDeInit(), "service");

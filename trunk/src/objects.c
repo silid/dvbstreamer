@@ -52,8 +52,14 @@ Object memory management.
 /*******************************************************************************
 * Typedefs                                                                     *
 *******************************************************************************/
+typedef enum ClassType_e{
+    ClassType_Object,
+    ClassType_Collection,
+}ClassType_t;
+
 typedef struct Class_s {
     char *name;
+    ClassType_t type;
     unsigned int size;
     ObjectDestructor_t destructor;
     unsigned int allocatedCount;
@@ -74,6 +80,7 @@ typedef struct Object_s {
 * Prototypes                                                                   *
 *******************************************************************************/
 static Class_t *FindClass(char *classname);
+static int ObjectRegisterClassType(char *name, ClassType_t type, unsigned size, ObjectDestructor_t destructor);
 static void *ObjectAllocInstance(int size, Class_t *clazz);
 static void RemoveReferencedObject(Object_t *toRemove);
 
@@ -142,9 +149,35 @@ int ObjectDeinit(void)
 
 int ObjectRegisterClass(char *classname, unsigned int size, ObjectDestructor_t destructor)
 {
-    Class_t *clazz;
+    int result;
     pthread_mutex_lock(&objectMutex);
-    clazz = FindClass(classname);
+    result = ObjectRegisterClassType(classname, ClassType_Object, size, destructor);
+    if (result == OBJECT_OK)
+    {
+        LogModule(LOG_DEBUGV, OBJECT, "Registered Class \"%s\" size %d destructor? %s\n", classname, size, destructor? "Yes":"No");
+    }
+    pthread_mutex_unlock(&objectMutex);
+    return OBJECT_OK;
+}
+
+int ObjectRegisterCollection(char *name, unsigned entrysize, ObjectDestructor_t destructor)
+{
+    int result;
+    pthread_mutex_lock(&objectMutex);
+    result = ObjectRegisterClassType(name, ClassType_Collection, entrysize, destructor);
+    if (result == OBJECT_OK)
+    {
+        LogModule(LOG_DEBUGV, OBJECT, "Registered Collection \"%s\" size %d destructor? %s\n", name, entrysize, destructor? "Yes":"No");
+    }
+    pthread_mutex_unlock(&objectMutex);
+    return OBJECT_OK;
+}
+
+static int ObjectRegisterClassType(char *name, ClassType_t type, unsigned size, ObjectDestructor_t destructor)
+{
+    Class_t *clazz;
+
+    clazz = FindClass(name);
     if (clazz)
     {
         pthread_mutex_unlock(&objectMutex);
@@ -157,15 +190,15 @@ int ObjectRegisterClass(char *classname, unsigned int size, ObjectDestructor_t d
         return OBJECT_ERR_OUT_OF_MEMORY;
     }
     
-    classes[classesCount].name = strdup(classname);
+    classes[classesCount].name = strdup(name);
+    classes[classesCount].type = type;
     classes[classesCount].size = size;
     classes[classesCount].destructor = destructor;
     classes[classesCount].allocatedCount = 0;
     classesCount ++;
-    LogModule(LOG_DEBUGV, OBJECT, "Registered class \"%s\" size %d destructor? %s\n", classname, size, destructor? "Yes":"No");
-    pthread_mutex_unlock(&objectMutex);
     return OBJECT_OK;
 }
+
 
 void *ObjectCreateImpl(char *classname, char *file, int line)
 {
@@ -192,6 +225,35 @@ void *ObjectCreateImpl(char *classname, char *file, int line)
     clazz->allocatedCount ++;
     pthread_mutex_unlock(&objectMutex);
     return result;
+}
+
+ObjectCollection_t *ObjectCollectionCreateImpl(char *name, unsigned int entries, char *file, int line)
+{
+    Class_t *clazz;
+    ObjectCollection_t *result;
+    pthread_mutex_lock(&objectMutex);
+    clazz = FindClass(name);
+
+    if (clazz == NULL)
+    {
+        pthread_mutex_unlock(&objectMutex);
+        return NULL;
+    }
+
+    result = ObjectAllocInstance(sizeof(ObjectCollection_t) + (clazz->size * entries), clazz);
+    if (result != NULL)
+    {
+        result->nrofEntries = entries;
+        LogModule(LOG_DEBUGV, OBJECT, "(%p) Created collection of class \"%s\" entries %d app ptr %p (%s:%d)\n", DataToObject(result), name, entries, result, file, line);
+    }
+    else
+    {
+        LogModule(LOG_ERROR, OBJECT, "Failed to create collection of class \"%s\" entries %d\n", name, entries);
+    }
+    clazz->allocatedCount ++;
+    pthread_mutex_unlock(&objectMutex);
+    return result;
+
 }
 
 void ObjectRefIncImpl(void *ptr, char *file, int line)
@@ -256,7 +318,7 @@ bool ObjectRefDecImpl(void *ptr, char *file, int line)
             object->clazz->destructor(ptr);            
         }
 
-        if (object->clazz && (object->clazz->size != object->size))
+        if (object->clazz && (object->clazz->size != object->size) && (object->clazz->type == ClassType_Object))
         {
             LogModule(LOG_ERROR, OBJECT, "(%p) Class size != Object size! (class %u object %u)\n", object, object->clazz->size, object->size);
         }

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2006  Adam Charrett
+Copyright (C) 2010  Adam Charrett
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -64,7 +64,7 @@ enum CacheFlags
 
 enum CacheUpdateType
 {
-    CacheUpdate_Multiplex_PAT_Version_TS_id,
+    CacheUpdate_Multiplex_TS_id,
     CacheUpdate_Multiplex_Network_id,
     CacheUpdate_Service_PMT_PID,
     CacheUpdate_Service_PIDs,
@@ -87,9 +87,8 @@ typedef struct CacheUpdateMessage_s
         struct
         {
             Multiplex_t *multiplex;
-            int patVersion;
             int tsId;
-        }multiplexPATVersionTSId;
+        }multiplexTSId;
 
         struct
         {
@@ -377,11 +376,10 @@ void CacheUpdateMultiplex(Multiplex_t *multiplex, int patversion, int tsid)
         msg = ObjectCreateType(CacheUpdateMessage_t);
         if (msg)
         {
-            msg->type = CacheUpdate_Multiplex_PAT_Version_TS_id;
+            msg->type = CacheUpdate_Multiplex_TS_id;
             ObjectRefInc(multiplex);
-            msg->details.multiplexPATVersionTSId.multiplex = multiplex;
-            msg->details.multiplexPATVersionTSId.patVersion = patversion;
-            msg->details.multiplexPATVersionTSId.tsId = tsid;
+            msg->details.multiplexTSId.multiplex = multiplex;
+            msg->details.multiplexTSId.tsId = tsid;
             DeferredProcessingAddJob(CacheProcessUpdateMessage, msg);
             ObjectRefDec(msg);
         }
@@ -695,21 +693,14 @@ void CacheUpdatePIDs(Service_t *service, int pcrpid, PIDList_t *pids, int pmtver
     pthread_mutex_unlock(&cacheUpdateMutex);
 }
 
-Service_t *CacheServiceAdd(int id)
+Service_t *CacheServiceAdd(int id, int source)
 {
     CacheUpdateMessage_t *msg;
     Service_t *result = ServiceNew();
     if (result)
     {
         result->id = id;
-        if (MainIsDVB())
-        {
-            result->source = id;
-        }
-        else
-        {
-            result->source = -1;
-        }
+        result->source = source;
         result->pmtVersion = -1;
         result->pmtPid = 8192;
         if (asprintf(&result->name, "%04x", id) == -1)
@@ -866,15 +857,10 @@ static void CacheProcessUpdateMessage(void *ptr)
     DBaseTransactionBegin();
     switch(msg->type)
     {
-        case CacheUpdate_Multiplex_PAT_Version_TS_id:
-            LogModule(LOG_DEBUG, CACHE, "Updating Multiplex PAT version and TS id\n");
-            mux = msg->details.multiplexPATVersionTSId.multiplex;
-            rc =MultiplexPATVersionSet(mux, msg->details.multiplexPATVersionTSId.patVersion);
-            if (rc)
-            {
-                LogModule(LOG_ERROR, CACHE, "Failed to update Multiplex PAT version (0x%x)\n", rc);
-            }
-            rc = MultiplexTSIdSet(mux, msg->details.multiplexPATVersionTSId.tsId);
+        case CacheUpdate_Multiplex_TS_id:
+            LogModule(LOG_DEBUG, CACHE, "Updating Multiplex TS id\n");
+            mux = msg->details.multiplexTSId.multiplex;
+            rc = MultiplexTSIdSet(mux, msg->details.multiplexTSId.tsId);
             if (rc)
             {
                 LogModule(LOG_ERROR, CACHE, "Failed to update Multiplex TS id (0x%x)\n", rc);

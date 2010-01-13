@@ -39,17 +39,22 @@ static void ProcessTDT(dvbpsi_tdt_tot_t *tdt);
 static void ProcessSTT(dvbpsi_atsc_stt_t *stt);
 static long GetMonotonicTime(void);
 static void CommandDateTime(int argc, char **argv);
-
+static void DateTimeInstall(bool installed);
+static char *DateTimeEventToString(Event_t event, void *payload);
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
 static time_t lastDateTime;
 static long lastReceived = 0;
 static bool timeReceived = FALSE;
+
+static EventSource_t timeSource;
+static Event_t timeReceivedEvent;
 /*******************************************************************************
 * Plugin Setup                                                                 *
 *******************************************************************************/
 PLUGIN_FEATURES(
+    PLUGIN_FEATURE_INSTALL(DateTimeInstall),
     PLUGIN_FEATURE_TDTPROCESSOR(ProcessTDT),
     PLUGIN_FEATURE_STTPROCESSOR(ProcessSTT)
 );
@@ -80,6 +85,7 @@ static void ProcessTDT(dvbpsi_tdt_tot_t *tdt)
     lastDateTime = timegm(&tdt->t_date_time);
     lastReceived = GetMonotonicTime();
     timeReceived = TRUE;
+    EventsFireEventListeners(timeReceivedEvent, (void*)lastDateTime);
 }
 
 static void ProcessSTT(dvbpsi_atsc_stt_t *stt)
@@ -87,6 +93,7 @@ static void ProcessSTT(dvbpsi_atsc_stt_t *stt)
     lastDateTime = dvbpsi_atsc_unix_epoch_offset + stt->i_system_time -  stt->i_gps_utc_offset;
     lastReceived = GetMonotonicTime();
     timeReceived = TRUE;
+    EventsFireEventListeners(timeReceivedEvent, (void*)lastDateTime);
 }
 
 static long GetMonotonicTime(void)
@@ -116,4 +123,30 @@ static void CommandDateTime(int argc, char **argv)
     {
         CommandPrintf("No date/time has been received!\n");
     }
+}
+/*******************************************************************************
+* Local Functions                                                              *
+*******************************************************************************/
+static void DateTimeInstall(bool installed)
+{
+    if (installed)
+    {
+        timeSource = EventsRegisterSource("datetime");
+        timeReceivedEvent = EventsRegisterEvent(timeSource, "received", DateTimeEventToString);
+    }
+    else
+    {
+        EventsUnregisterSource(timeSource);
+    }
+}
+
+static char *DateTimeEventToString(Event_t event, void *payload)
+{
+    time_t t = (time_t)payload;
+    char *result = NULL;
+    asprintf(&result, "Time: %s" /* ctime adds a \n */
+                      "Seconds since epoch: %ld\n",
+                      ctime(&t),
+                      t);
+    return result;
 }
