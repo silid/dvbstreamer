@@ -16,7 +16,6 @@ pkginclude_DATA = \
     dvbadapter.h \
     main.h \
     plugin.h \
-    types.h \
     ts.h \
     logging.h \
     list.h \
