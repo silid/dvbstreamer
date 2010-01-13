@@ -152,7 +152,7 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
         
         if (!service)
         {
-            service = CacheServiceAdd(sdtservice->i_service_id);
+            service = CacheServiceAdd(sdtservice->i_service_id, sdtservice->i_service_id);
         }
         else
         {

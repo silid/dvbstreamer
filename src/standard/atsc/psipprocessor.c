@@ -191,7 +191,7 @@ static void ProcessMGT(void *arg, dvbpsi_atsc_mgt_t *newMGT)
     Multiplex_t *current = TuningCurrentMultiplexGet();
     if (current->networkId == -1)
     {
-        CacheUpdateNetworkId(current, current->freq / 1000000);
+        CacheUpdateNetworkId(current, current->uid & 0xffff);
     }
     MultiplexRefDec(current);
     LogModule(LOG_DEBUG, PSIPPROCESSOR,"New MGT Received! Version %d Protocol %d\n", newMGT->i_version, newMGT->i_protocol);
@@ -267,7 +267,7 @@ static void ProcessVCT(void *arg, dvbpsi_atsc_vct_t *newVCT)
 
             if (!service)
             {
-               service = CacheServiceAdd(channel->i_program_number);
+               service = CacheServiceAdd(channel->i_program_number, channel->i_source_id);
             }
             else
             {

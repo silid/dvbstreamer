@@ -200,8 +200,9 @@ void CacheUpdatePIDs(Service_t *service, int pcrpid, PIDList_t *pids, int pmtver
 /**
  * Add a new Service to the cache.
  * @param id The new service/program id.
+ * @param source The source Id for EPG information.
  */
-Service_t *CacheServiceAdd(int id);
+Service_t *CacheServiceAdd(int id, int source);
 
 /**
  * Update the 'seen' state of the service. 

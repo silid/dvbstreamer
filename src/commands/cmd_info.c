@@ -209,14 +209,6 @@ Command_t CommandDetailsInfo[] =
     COMMANDS_SENTINEL
 };
 
-static char *FETypesStr[] = {
-    "QPSK",
-    "QAM",
-    "OFDM",
-    "ATSC"
-};
-
-
 static time_t StartTime;
 /*******************************************************************************
 * Global functions                                                             *
@@ -436,22 +428,20 @@ static bool FilterService(Service_t *service, uint32_t filterByType, uint32_t fi
 
 static void CommandListMuxes(int argc, char **argv)
 {
+    int i;
+    MultiplexList_t *list;
     Multiplex_t *multiplex = NULL;
     bool ids = FALSE;
-    List_t *list = NULL;
-    ListIterator_t iterator;
     
     if ((argc == 1) && (strcmp(argv[0], "-id") == 0))
     {
         ids = TRUE;
     }
 
-    list = MultiplexListAll();
-    for (ListIterator_Init(iterator, list); 
-         ListIterator_MoreEntries(iterator);
-         ListIterator_Next(iterator))
+    list = MultiplexGetAll();
+    for (i = 0; i < list->nrofMultiplexes; i ++)
     {
-        multiplex = (Multiplex_t*)ListIterator_Current(iterator);
+        multiplex = (Multiplex_t*)list->multiplexes[i];
         if (ids)
         {
             CommandPrintf("%04x.%04x : %d \n", 
@@ -462,7 +452,7 @@ static void CommandListMuxes(int argc, char **argv)
             CommandPrintf("%d\n", multiplex->uid);
         }
     }
-    ObjectListFree(list);
+    ObjectRefDec(list);
 }
 
 static void CommandCurrent(int argc, char **argv)
@@ -529,13 +519,18 @@ static void CommandMuxInfo(int argc, char **argv)
     }
     if (multiplex)
     {
+        char *line;
         CommandPrintf("UID                 : %d\n", multiplex->uid);
         CommandPrintf("ID                  : %04x.%04x\n", multiplex->networkId, multiplex->tsId);
         CommandPrintf("PAT Version         : %d\n", multiplex->patVersion);
-        CommandPrintf("Tuning Parameters\n");
-        CommandPrintf("    Frequency       : %d\n", multiplex->freq);
-        CommandPrintf("    Type            : %s\n", FETypesStr[multiplex->type]);
-        
+        CommandPrintf("Tuning Parameters: \n");
+        CommandPrintf("    Type: %s\n", DVBDeliverySystemStr[multiplex->deliverySystem]);
+        line = strtok(multiplex->tuningParams, "\n");
+        while (line)
+        {
+            CommandPrintf("    %s\n", line);
+            line = strtok(NULL, "\n");
+        }
         MultiplexRefDec(multiplex);
     }
     else

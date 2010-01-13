@@ -82,67 +82,22 @@ typedef struct DVBAdapterPIDFilter_s
     uint16_t pid; /**< PID that is being filtered. */
 }DVBAdapterPIDFilter_t;
 
-typedef enum DVBTuneDeliverySys_s {
-    DELSYS_UNDEFINED,
-    DELSYS_DVBC_ANNEX_AC,
-    DELSYS_DVBC_ANNEX_B,
-    DELSYS_DVBT,
-    DELSYS_DSS,
+typedef enum DVBDeliverySystem_e {
     DELSYS_DVBS,
-    DELSYS_DVBS2,
-    DELSYS_DVBH,
-    DELSYS_ISDBT,
-    DELSYS_ISDBS,
-    DELSYS_ISDBC,
+    DELSYS_DVBC,
+    DELSYS_DVBT,
     DELSYS_ATSC,
-    DELSYS_ATSCMH,
-    DELSYS_DMBTH,
-    DELSYS_CMMB,
-    DELSYS_DAB,
-} DVBTuneDeliverySys_e; 
+    DELSYS_DVBS2,
+    DELSYS_MAX_SUPPORTED
+} DVBDeliverySystem_e; 
 
-typedef enum DVBFrontEndType_e{
-    FETYPE_DVBS,  /* only supports DVB-S delivery system*/
-    FETYPE_DVBS2, /* supports DVB-S and DVB-S2 delivery systems */
-    FETYPE_DVBT,  /* support DVB-T delivery system */
-    FETYPE_DVBC,  /* supports DVB-C Annex AC/B delivery systems */
-    FETYPE_ATSC,  /* supports ATSC delivery system */
-}DVBFrontEndType_e;
+extern char *DVBDeliverySystemStr[];
 
-/* These are the same as defined by v5 of the linuxdvb api */
-#define DVBTUNEPROP_FREQ                3 /* used for the intermediate frequency when tuning satellite muxes */
-#define DVBTUNEPROP_MODULATION          4
-#define DVBTUNEPROP_BANDWIDTH_HZ        5
-#define DVBTUNEPROP_INVERSION           6
-#define DVBTUNEPROP_DISEQC_MASTER       7
-#define DVBTUNEPROP_SYMBOL_RATE         8
-#define DVBTUNEPROP_INNER_FEC           9
-#define DVBTUNEPROP_VOLTAGE             10
-#define DVBTUNEPROP_TONE                11
-#define DVBTUNEPROP_PILOT               12
-#define DVBTUNEPROP_ROLLOFF             13 
-
-/* DVBStreamer special properties for satellites */
-#define DVBTUNEPROP_POLARISATION        0x80000001
-#define DVBTUNEPROP_SATELLITE_NUMBER    0x80000002
-
-typedef struct DVBTuneProperty_s{
-    uint32_t cmd;
-    union {
-        uint32_t data;
-        struct {
-            uint8_t data[32];
-            uint32_t len;
-        }buffer;
-    }u;
-}DVBTuneProperty_t;
-
-typedef struct DVBTuneProperties_s{
-    DVBTuneDeliverySys_e deliverySys;
-    uint32_t frequency;
-    uint32_t nrofProperties;
-    DVBTuneProperty_t *properties;
-}DVBTuneProperties_t;
+typedef struct DVBSupportedDeliverySys_s
+{
+    int nrofSystems;
+    DVBDeliverySystem_e systems[0];
+}DVBSupportedDeliverySys_t;
 
 typedef enum DVBFrontEndStatus_e {
     FESTATUS_HAS_SIGNAL = 0x01,     /**< Found something above the noise level */
@@ -155,64 +110,11 @@ typedef enum DVBFrontEndStatus_e {
 } DVBFrontEndStatus_e;           
 
 /**
- * Enum to represent the different polarisation available for satellite
- * transmission.
- */
-enum Polarisation_e
-{
-    POL_HORIZONTAL = 0,
-    POL_VERTICAL
-};
-
-/**
- * Structure used to hold the information necessary to setup DiSEqC switches 
- * to receive a specifiec satellite.
- */
-typedef struct DVBDiSEqCSettings_s
-{
-    enum Polarisation_e polarisation;/**< Polarisation of the signal */
-    unsigned long satellite_number;  /**< Satellite number for the switch */
-}DVBDiSEqCSettings_t;
-
-/**
  * Structure representing a DVB Adapter, that is a frontend, a demux and a dvr
  * device.
  * Currently only supports the first frontend/demux/dvr per adapter.
  */
-typedef struct DVBAdapter_t
-{
-    int adapter;                      /**< The adapter number ie /dev/dvb/adapter<#adapter> */
-
-    /* TODO Remove and replace with non-linuxdvb structure */
-    struct dvb_frontend_info info;    /**< Information about the front end */
-
-    char frontEndPath[30];            /**< Path to the frontend device */
-    int frontEndFd;                   /**< File descriptor for the frontend device */
-    bool frontEndLocked;              /**< Whether the frontend is currently locked onto a signal. */
-
-    /* TODO Remove and replace with tuning properties */
-    __u32 frontEndRequestedFreq;      /**< The frequency that the application requested, may be different from one used (ie DVB-S intermediate frequency) */
-    struct dvb_frontend_parameters frontEndParams; /**< The current frontend configuration parameters. These may be updated when the frontend locks. */
-    DVBDiSEqCSettings_t diseqcSettings; /**< Current DiSEqC settings for DVB-S */
-
-    DVBTuneProperties_t tuningProperties;
-    LNBInfo_t lnbInfo;                /**< LNB Information for DVB-S/S2 receivers */
-
-    char demuxPath[30];               /**< Path to the demux device */
-    bool hardwareRestricted;          /**< Whether the adapter can only stream a
-                                           portion of the transport stream */
-    int maxFilters;                   /**< Maximum number of available filters. */
-    DVBAdapterPIDFilter_t filters[DVB_MAX_PID_FILTERS];/**< File descriptor for the demux device.*/
-
-    char dvrPath[30];                 /**< Path to the dvr device */
-    int dvrFd;                        /**< File descriptor for the dvr device */
-
-    int cmdRecvFd;                    /**< File descriptor for monitor task to recieve commands */
-    int cmdSendFd;                    /**< File descriptor to send commands to monitor task. */
-    ev_io commandWatcher;
-    ev_io frontendWatcher;
-}
-DVBAdapter_t;
+typedef struct DVBAdapter_s DVBAdapter_t;
 
     
 /**
@@ -233,13 +135,29 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted);
 void DVBDispose(DVBAdapter_t *adapter);
 
 /**
+ * Retieve the supported delivery systems for the specified DVB adapter.
+ * @param adapter The adapter to retrieve the delivery systems supported from.
+ * @return Pointer to a structure containing the supported delivery systems.
+ */
+DVBSupportedDeliverySys_t *DVBFrontEndGetDeliverySystems(DVBAdapter_t *adapter);
+
+/**
  * Tune the frontend to the specified parameters.
  * @param adapter The adapter to tune.
- * @param frontend The parameters to use to tune.
- * @param diseqc DiSEqC settings, may be NULL if not a satellite frontend.
+ * @param system The delivery system to use.
+ * @param params String containing the tuning paramaters in a yaml document.
  * @return 0 on success, non-zero otherwise.
  */
-int DVBFrontEndTune(DVBAdapter_t *adapter, struct dvb_frontend_parameters *frontend, DVBDiSEqCSettings_t *diseqc);
+int DVBFrontEndTune(DVBAdapter_t *adapter, DVBDeliverySystem_e system, char *params);
+
+/**
+ * Retrieve the current tuning parameters.
+ * @param adapter The adapter to get the parameters from.
+ * @param system Pointer to store the current delivery system use in.
+ * @return A string containing a YAML document, it is the callers job to free the
+ * returned string.
+ */
+char* DVBFrontEndParametersGet(DVBAdapter_t *adapter, DVBDeliverySystem_e *system);
 
 /**
  * Set the LNB LO frequencies.
@@ -263,6 +181,32 @@ int DVBFrontEndStatus(DVBAdapter_t *adapter, DVBFrontEndStatus_e *status,
                             unsigned int *ber, unsigned int *strength, 
                             unsigned int *snr, unsigned int *ucblocks);
 
+
+/**
+ * Query the adapter to determine if the frontend is locked.
+ * @param adapter The adapter to query.
+ * @return TRUE if the frontend is locked, FALSE otherwise.
+ */
+bool DVBFrontEndIsLocked(DVBAdapter_t *adapter);
+
+/**
+ * Check whether the frontend supports the parameter and value specified.
+ * @param adapter The adapter to query.
+ * @param system The delivery system to query.
+ * @param param The name of the parameter to check.
+ * @param value The value of the parameter to check.
+ * @return TRUE if the paramater and value are supported for the delivery system and by the frontend.
+ */
+bool DVBFrontEndParameterSupported(DVBAdapter_t *adapter, DVBDeliverySystem_e system, char *param, char *value);
+
+/**
+ * Check whether the frontend supports the specified delivery system.
+ * @param adapter The adapter to query.
+ * @param system The delivery system to query.
+ * @return TRUE if the delivery system is supported, FALSE otherwise.
+ */
+bool DVBFrontEndDeliverySystemSupported(DVBAdapter_t *adapter, DVBDeliverySystem_e system);
+
 /**
  * Set the size of the circular buffer used by the demux.
  * @param adapter The adapter to set size of the buffer on.
@@ -270,6 +214,28 @@ int DVBFrontEndStatus(DVBAdapter_t *adapter, DVBFrontEndStatus_e *status,
  * @return 0 on success, non-zero otherwise.
  */
 int DVBDemuxSetBufferSize(DVBAdapter_t *adapter, unsigned long size);
+
+/**
+ * Determine whether the demux is hardware restricted to a set number of 
+ * filters and cannot return the full transport stream.
+ * @param adapter The adapter to query.
+ * @return TRUE if the demux is restricted, FALSE if the demux can return the whole TS.
+ */
+bool DVBDemuxIsHardwareRestricted(DVBAdapter_t *adapter);
+
+/**
+ * Get the maximum number of PID filters supported by the adapter.
+ * @param adapter The adapter to get the number of filters from.
+ * @return The maximum number of filters.
+ */
+int DVBDemuxGetMaxFilters(DVBAdapter_t *adapter);
+
+/**
+ * Get the number of available filters.
+* @param adapter The adapter to get the number of filters from.
+* @return The number of filters available.
+*/
+int DVBDemuxGetAvailableFilters(DVBAdapter_t *adapter);
 
 /**
  * Allocate a new PID Filter, indicating whether it is a system PID or not.
@@ -298,7 +264,7 @@ int DVBDemuxReleaseAllFilters(DVBAdapter_t *adapter);
  * Get the file descriptor for the DVR device to use in poll() etc.
  * @param adapter The adapter to get the DVR fd from. 
  */
-#define DVBDVRGetFD(adapter) (adapter)->dvrFd
+int DVBDVRGetFD(DVBAdapter_t *adapter);
 
 /** @} */
 #endif

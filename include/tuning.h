@@ -68,6 +68,23 @@ int TuningInit(void);
 int TuningDeInit(void);
 
 /**
+ * Prevent the primary service being changed.
+ * @return TRUE if the lock was set, FALSE if it was already set.
+ */
+bool TuningCurrentServiceLock(void);
+
+/**
+ * Allow the primary service to be changed.
+ */
+void TuningCurrentServiceUnlock(void);
+
+/**
+ * Determine whether the primary service lock is set.
+ * @return TRUE if the lock is set, FALSE otherwise.
+ */
+bool TuningCurrentServiceIsLocked(void);
+
+/**
  * Retrieve the current (primary) service.
  * @return The current service or NULL if no service is selected. Service should
  * be released with a call to ServiceRefDec when no longer needed.
@@ -79,8 +96,14 @@ Service_t *TuningCurrentServiceGet(void);
  * otherwise any changes to the multiplex/services will be lost.
  *
  * @param service The new service to tune to.
+ * @return TRUE if the service was changed.
  */
-void TuningCurrentServiceSet(Service_t *service);
+bool TuningCurrentServiceSet(Service_t *service);
+
+/**
+ * Force the frontend to retune to the multiplex for the current primary service.
+ */
+void TuningCurrentServiceRetune(void);
 
 /**
  * Retrieve the multiplex the frontend is currently tuned to.

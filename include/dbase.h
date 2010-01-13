@@ -86,150 +86,31 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
  * Constant for Multiplex column name
  */
 #define MULTIPLEX_UID           "uid"
-/**
- * Constant for Multiplex column name
- */
-#define MULTIPLEX_FREQ          "freq"
+
 /**
  * Constant for Multiplex column name
  */
 #define MULTIPLEX_TSID          "tsid"
+
 /**
  * Constant for Multiplex column name
  */
 #define MULTIPLEX_NETID         "netid"
+
 /**
  * Constant for Multiplex column name
  */
 #define MULTIPLEX_TYPE          "type"
+
 /**
  * Constant for Multiplex column name
  */
 #define MULTIPLEX_PATVERSION    "patversion"
 
 /**
- * Constant for OFDMParameters table name,
+ * Constant for Multiplex column name
  */
-#define OFDMPARAMS_TABLE        "OFDMParameters"
-/**
- * Constant for OFDMParameters column name.
- */
-#define OFDMPARAM_MULTIPLEXUID  "mplexuid"
-/**
- * Constant for OFDMParameters column name.
- */
-#define OFDMPARAM_FREQ          "freq"
-/**
- * Constant for OFDMParameters column name.
- */
-#define OFDMPARAM_INVERSION     "inversion"
-/**
- * Constant for OFDMParameters column name.
- */
-#define OFDMPARAM_BW            "bw"
-/**
- * Constant for OFDMParameters column name.
- */
-#define OFDMPARAM_FEC_HP        "fec_hp"
-/**
- * Constant for OFDMParameters column name.
- */
-#define OFDMPARAM_FEC_LP        "fec_lp"
-/**
- * Constant for OFDMParameters column name.
- */
-#define OFDMPARAM_QAM           "qam"
-/**
- * Constant for OFDMParameters column name.
- */
-#define OFDMPARAM_TRANSMISSIONM "transmissionm"
-/**
- * Constant for OFDMParameters column name.
- */
-#define OFDMPARAM_GUARDLIST     "guardlist"
-/**
- * Constant for OFDMParameters column name.
- */
-#define OFDMPARAM_HIERARCHINFO  "hierarchinfo"
-
-/**
- * Constant for QPSKParameters table name.
- */
-#define QPSKPARAMS_TABLE  "QPSKParameters"
-/**
- * Constant for QPSKParameters column name.
- */
-#define QPSKPARAM_MULTIPLEXUID  "mplexuid"
-/**
- * Constant for QPSKParameters column name.
- */
-#define QPSKPARAM_FREQ          "freq"
-/**
- * Constant for QPSKParameters column name.
- */
-#define QPSKPARAM_INVERSION     "inversion"
-/**
- * Constant for QPSKParameters column name.
- */
-#define QPSKPARAM_SYMBOL_RATE    "symbol_rate"
-/**
- * Constant for QPSKParameters column name.
- */
-#define QPSKPARAM_FEC_INNER      "fec_inner"
-/**
- * Constant for QPSKParameters column name.
- */
-#define QPSKPARAM_POLARISATION   "polarisation"
-/**
- * Constant for QPSKParameters column name.
- */
-#define QPSKPARAM_SATNUMBER      "satnumber"
-
-/**
- * Constant for QAMParameters table name.
- */
-#define QAMPARAMS_TABLE   "QAMParameters"
-/**
- * Constant for QAMParameters column name.
- */
-#define QAMPARAM_MULTIPLEXUID  "mplexuid"
-/**
- * Constant for QAMParameters column name.
- */
-#define QAMPARAM_FREQ           "freq"
-/**
- * Constant for QAMParameters column name.
- */
-#define QAMPARAM_INVERSION      "inversion"
-/**
- * Constant for QAMParameters column name.
- */
-#define QAMPARAM_SYMBOL_RATE    "symbol_rate"
-/**
- * Constant for QAMParameters column name.
- */
-#define QAMPARAM_FEC_INNER      "fec_inner"
-/**
- * Constant for QAMParameters column name.
- */
-#define QAMPARAM_MODULATION     "modulation"
-
-/**
- * Constant for VSBParameters table name.
- */
-#define VSBPARAMS_TABLE   "VSBParameters"
-/**
- * Constant for VSBParameters column name.
- */
-#define VSBPARAM_MULTIPLEXUID  "mplexuid"
-/**
- * Constant for VSBParameters column name.
- */
-#define VSBPARAM_FREQ           "freq"
-/**
- * Constant for VSBParameters column name.
- */
-#define VSBPARAM_MODULATION     "modulation"
+#define MULTIPLEX_TUNINGPARAMS "tuningparams"
 
 /**
  * Constant for the PIDs table name,
@@ -278,85 +159,6 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
 #define METADATA_VALUE           "value"
 
 /**
- * Constant for the EPG Events table.
- */
-#define EPGEVENTS_TABLE          "EPGEvents"
-/**
- * Constant for EPG Event column name.
- */
-#define EPGEVENT_NETID           "netid"
-/**
- * Constant for EPG Event column name.
- */
-#define EPGEVENT_TSID            "tsid"
-/**
- * Constant for EPG Event column name.
- */
-#define EPGEVENT_SERVICEID       "serviceid"
-/**
- * Constant for EPG Event column name.
- */
-#define EPGEVENT_EVENTID         "eventid"
-/**
- * Constant for EPG Event column name.
- */
-#define EPGEVENT_STARTTIME       "starttime"
-/**
- * Constant for EPG Event column name.
- */
-#define EPGEVENT_ENDTIME         "endtime"
-/**
- * Constant for EPG Event column name.
- */
-#define EPGEVENT_CA              "ca"
-
-/**
- * Constant for the EPG Ratings table.
- */
-#define EPGRATINGS_TABLE         "EPGRatings"
-/**
- * Constant for EPG Rating column name.
- */
-#define EPGRATING_ID             "id"
-/**
- * Constant for EPG Rating column name.
- */
-#define EPGRATING_EVENTUID         "eventuid"
-/**
- * Constant for EPG Rating column name.
- */
-#define EPGRATING_STANDARD        "standard"
-/**
- * Constant for EPG Rating column name.
- */
-#define EPGRATING_RATING          "rating"
-
-/**
- * Constant for the EPG Details table.
- */
-#define EPGDETAILS_TABLE         "EPGDetails"
-/**
- * Constant for EPG Detail column name.
- */
-#define EPGDETAIL_ID             "id"
-/**
- * Constant for EPG Detail column name.
- */
-#define EPGDETAIL_EVENTUID         "eventuid"
-/**
- * Constant for EPG Detail column name.
- */
-#define EPGDETAIL_LANGUAGE        "lang"
-/**
- * Constant for EPG Detail column name.
- */
-#define EPGDETAIL_NAME            "name"
-/**
- * Constant for EPG Detail column name.
- */
-#define EPGDETAIL_VALUE           "value"
-
-/**
  * Constant for Metadata property for LNB settings.
  * String defining the name of the LNB being used.
  */
@@ -381,6 +183,12 @@ Opens/Closes and setups the sqlite database for use by the rest of the applicati
  * Constant for Metadata property to scan all multiplexes on startup.
  */
 #define METADATA_NAME_SCAN_ALL "scan.all"
+
+/* This is the version of the database not the application!*/
+#define METADATA_DBASE_VERSION "dbase_version"
+
+#define DBASE_VERSION 2.0
+
 /** @} */
 
 /**
@@ -529,9 +337,11 @@ int DBaseTransactionCommit(void);
 
 /**
  * Return the number of entries in the specified table.
+ * @param table The table to count the entries in.
+ * @param where Where clause, which may be null for all entries.
  * @return Number of entries in the table.
  */
-int DBaseCount(char *table);
+int DBaseCount(char *table, char *where);
 
 /**
  * Retrieve the specified metadata property.

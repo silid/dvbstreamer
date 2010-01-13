@@ -76,7 +76,14 @@ ServiceFilter_t MainServiceFilterGetPrimary(void);
 
 /**
  * Used to determine whether DVBStreamer is using a DVB frontend.
- * @return TRUE if the frontend is a DVB frontend, FALSE if it is an ATSC frontend.
+ * @return TRUE if the frontend is a DVB frontend, FALSE if it is not.
  */
 bool MainIsDVB();
+
+/**
+ * Used to determine whether DVBStreamer is using a ATSC frontend.
+ * @return TRUE if the frontend is a ATSC frontend, FALSE if it is not.
+ */
+bool MainIsATSC();
+
 #endif

@@ -6,7 +6,7 @@ AM_CFLAGS =\
      -I$(top_srcdir)/include -Wall -Werror -D_GNU_SOURCE
 
 
-bin_PROGRAMS = dvbstreamer dvbctrl setupdvbstreamer $(fstreamer_app)
+bin_PROGRAMS = dvbstreamer dvbctrl setupdvbstreamer $(fstreamer_app) convertdvbdb
 
 common_src = \
     main.c\
@@ -40,7 +40,9 @@ common_src = \
     properties.c \
     threading/messageq.c \
     threading/deferredproc.c \
-    lnb.c
+    lnb.c \
+    yamlutils.c \
+    constants.c 
 
 if ENABLE_ATSC
 atsc_src =\
@@ -75,7 +77,7 @@ dvbstreamer_SOURCES = \
 dvbstreamer_LDFLAGS = -rdynamic -Wl,-whole-archive -Wl,dvbpsi/libdvbpsi.a -Wl,-no-whole-archive
 
 dvbstreamer_LDADD = \
-	  -lpthread -lsqlite3 -lreadline -lev @GETTIME_LIB@ @ICONV_LIB@ @READLINE_TERMCAP@ @LIBLTDL@
+	  -lpthread -lsqlite3 -lreadline -lev -lyaml @GETTIME_LIB@ @ICONV_LIB@ @READLINE_TERMCAP@ @LIBLTDL@
 
 
 if ENABLE_FSTREAMER
@@ -92,7 +94,7 @@ fdvbstreamer_SOURCES = \
 fdvbstreamer_LDFLAGS = -rdynamic -Wl,-whole-archive -Wl,dvbpsi/libdvbpsi.a -Wl,-no-whole-archive
 
 fdvbstreamer_LDADD = \
-	  -lpthread -lsqlite3 -lreadline -lev  @GETTIME_LIB@ @ICONV_LIB@ @READLINE_TERMCAP@ @LIBLTDL@
+	  -lpthread -lsqlite3 -lreadline -lev  -lyaml @GETTIME_LIB@ @ICONV_LIB@ @READLINE_TERMCAP@ @LIBLTDL@
 else
 fstreamer_app =
 endif
@@ -110,7 +112,7 @@ dvbctrl_LDADD = -lreadline @READLINE_TERMCAP@
 
 
 #
-# dvbctrl
+# setupdvbstreamer
 #
 setupdvbstreamer_SOURCES = \
     setup.c\
@@ -122,9 +124,21 @@ setupdvbstreamer_SOURCES = \
     objects.c \
     events.c \
     list.c \
-    lnb.c
+    lnb.c \
+    yamlutils.c
 
 setupdvbstreamer_LDFLAGS =
 
-setupdvbstreamer_LDADD = -lsqlite3 -lpthread
+setupdvbstreamer_LDADD = -lsqlite3 -lpthread -lyaml
+
+#
+# convertdvbdb
+#
+convertdvbdb_SOURCE = \
+	convertdvbdb.c
+
+convertdvbdb_LDFLAGS =
+
+convertdvbdb_LDADD =-lsqlite3
+
 
