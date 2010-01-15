@@ -164,14 +164,25 @@ static int DBaseCheckVersion()
         /* Check version number and upgrade tables for future releases ? */
         if (version < DBASE_VERSION)
         {
-            int pid = fork();
+            int pid;
+            char path[PATH_MAX];
+            char *filename;
+            ssize_t len;
+            /* Determine the location of file for the running process */
+            sprintf(path, "/proc/%d/exe", getpid());
+            len = readlink(path, path, sizeof(path) - 1);
+            path[len] = 0;
+            /* Change the filename to point to the conversion program */
+            filename = strrchr(path, '/');
+            strcpy(filename + 1, "convertdvbdb");
+            pid = fork();
             if (pid)
             {
                 waitpid(pid, &rc, 0);
             }
             else
             {
-                execlp("convertdvbdb", "convertdvbdb", dbaseFile, NULL);
+                execl(path, path, dbaseFile, NULL);
                 exit(1);
             }
         }
