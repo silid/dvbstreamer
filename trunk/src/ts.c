@@ -849,7 +849,7 @@ static void SectionFilterListPushSection(void *userArg, dvbpsi_handle sectionsHa
     
     dvbpsi_ReleasePSISections(sfList->sectionHandle, section);
 
-    if (ListCount(sfList->tsReader->sectionFilters))
+    if (sfList->packetFilter && ListCount(sfList->tsReader->sectionFilters))
     {
         ListRemove(sfList->tsReader->activeSectionFilters, sfList);
         ListAdd(sfList->tsReader->sectionFilters, sfList);
