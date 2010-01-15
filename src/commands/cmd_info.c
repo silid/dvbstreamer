@@ -73,6 +73,7 @@ static void CommandServiceInfo(int argc, char **argv);
 static void CommandMuxInfo(int argc, char **argv);
 static void CommandStats(int argc, char **argv);
 static void CommandFEStatus(int argc, char **argv);
+static void CommandFEParams(int argc, char **argv);
 static void CommandListProperties(int argc, char **argv);
 static void CommandGetProperty(int argc, char **argv);
 static void CommandSetProperty(int argc, char **argv);
@@ -165,6 +166,13 @@ Command_t CommandDetailsInfo[] =
         "Displays whether the front end is locked, the bit error rate and signal to noise"
         "ratio and the signal strength",
         CommandFEStatus
+    },
+    {
+        "feparams",
+        0, 0,
+        "Get current frontend parameters.",
+        "Displays the current frontend parameters as a yaml document.",
+        CommandFEParams,
     },
     {
         "lsprops",
@@ -583,6 +591,15 @@ static void CommandFEStatus(int argc, char **argv)
         (strength * 100) / 0xffff, (snr * 100) / 0xffff, ber, ucblocks);
 }
 
+static void CommandFEParams(int argc, char **argv)
+{
+    DVBAdapter_t *adapter = MainDVBAdapterGet();
+    DVBDeliverySystem_e system;
+    char *params = DVBFrontEndParametersGet(adapter,&system);
+    CommandPrintf("Delivery System: %s\n", DVBDeliverySystemStr[system]);
+    CommandPrintf("%s\n", params + 4);
+    free(params);
+}
 
 static void CommandListPids(int argc, char **argv)
 {
