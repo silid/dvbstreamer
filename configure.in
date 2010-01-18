@@ -216,7 +216,19 @@ AC_CACHE_CHECK([for variadic cpp macros],
 if test "${ac_cv_cpp_variadic_macros}" != "no"; then
     AC_DEFINE(HAVE_VARIADIC_MACROS, 1, Support for variadic macros)
 fi
-
+dnl ---------------------------------------------------------------------------
+dnl Check for FE_CAN_2G_MODULATION
+dnl ---------------------------------------------------------------------------
+AC_CACHE_CHECK([for FE_CAN_2G_MODULATION],
+    [ac_cv_fe_can_2g_modulation],
+    [AC_TRY_COMPILE(
+         [#include <linux/dvb/frontend.h>],
+         [int a = FE_CAN_2G_MODULATION;],
+         ac_cv_fe_can_2g_modulation=yes,
+         ac_cv_fe_can_2g_modulation=no)])
+if test "${ac_cv_fe_can_2g_modulation}" != "no"; then
+    AC_DEFINE(HAVE_FE_CAN_2G_MODULATION, 1, Frontend enum exists for 2G modulation)
+fi
 dnl ---------------------------------------------------------------------------
 dnl Setup package directories
 dnl ---------------------------------------------------------------------------

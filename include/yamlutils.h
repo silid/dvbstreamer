@@ -55,9 +55,17 @@ yaml_node_t *YamlUtils_MappingFind(yaml_document_t *document, yaml_node_t *node,
  * @param mapping The mapping node id to add to.
  * @param key The key string to add to the mapping.
  * @param value The string value the key should map to.
- * @param valueTag The YAML TAG for the value.
  * @return 1 on success, 0 on error.
  */
-int YamlUtils_MappingAdd(yaml_document_t *document, int mapping, const char *key, const char *value, char *valueTag);
+int YamlUtils_MappingAdd(yaml_document_t *document, int mapping, const char *key, const char *value);
+
+/**
+ * Convert the supplied document into a string, destorying the document in the process.
+ * @param document The document to convert.
+ * @param removeDocStartEnd Whether to include document start and end markers.
+ * @param outputStr Where to store the string created after converting the document.
+ * @return The number of bytes written to the string.
+ */
+int YamlUtils_DocumentToString(yaml_document_t *document, bool removeDocStartEnd, char **outputStr);
 #endif
 

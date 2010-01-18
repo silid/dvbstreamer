@@ -88,6 +88,7 @@ typedef enum DVBDeliverySystem_e {
     DELSYS_DVBT,
     DELSYS_ATSC,
     DELSYS_DVBS2,
+    DELSYS_DVBT2,
     DELSYS_MAX_SUPPORTED
 } DVBDeliverySystem_e; 
 

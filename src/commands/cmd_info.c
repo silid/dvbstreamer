@@ -597,7 +597,7 @@ static void CommandFEParams(int argc, char **argv)
     DVBDeliverySystem_e system;
     char *params = DVBFrontEndParametersGet(adapter,&system);
     CommandPrintf("Delivery System: %s\n", DVBDeliverySystemStr[system]);
-    CommandPrintf("%s\n", params + 4);
+    CommandPrintf("%s\n", params);
     free(params);
 }
 

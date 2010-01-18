@@ -350,20 +350,42 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
             DVBDispose(result);
             return NULL;
         }
-        
+        result->currentDeliverySystem = DELSYS_MAX_SUPPORTED;
         switch (result->info.type)
         {
             case FE_QPSK:
-                result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),1);
-                result->supportedDelSystems->systems[0] = DELSYS_DVBS;
+#if HAVE_FE_CAN_2G_MODULATION
+                if (result->info.caps & FE_CAN_2G_MODULATION)
+                {
+                    result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),2);
+                    result->supportedDelSystems->systems[0] = DELSYS_DVBS;
+                    result->supportedDelSystems->systems[1] = DELSYS_DVBS2;                    
+                }
+                else
+#endif
+                {
+                    result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),1);
+                    result->supportedDelSystems->systems[0] = DELSYS_DVBS;
+                }
                 break;
             case FE_QAM:
                 result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),1);
                 result->supportedDelSystems->systems[0] = DELSYS_DVBC;
                 break;
             case FE_OFDM:
-                result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),1);
-                result->supportedDelSystems->systems[0] = DELSYS_DVBT;
+#if HAVE_FE_CAN_2G_MODULATION
+                if (result->info.caps & FE_CAN_2G_MODULATION)
+                {
+                    result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),2);
+                    result->supportedDelSystems->systems[0] = DELSYS_DVBT;
+                    result->supportedDelSystems->systems[1] = DELSYS_DVBT2;                    
+                }
+                else
+#endif
+                {
+                    result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),1);
+                    result->supportedDelSystems->systems[0] = DELSYS_DVBT;
+                }
                 break;
             case FE_ATSC:
                 result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),1);
@@ -501,6 +523,7 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, DVBDeliverySystem_e system, char *par
     if (YamlUtils_Parse(params, &document))
     {
 #if (DVB_API_VERSION < 5) || defined(USE_V3)
+        adapter->currentDeliverySystem = system;
         ConvertYamlToFEParams(system, &document, &adapter->frontEndParams, &adapter->satelliteSettings);
         adapter->frontEndRequestedFreq = adapter->frontEndParams.frequency;
 #else
@@ -514,26 +537,22 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, DVBDeliverySystem_e system, char *par
 
 char* DVBFrontEndParametersGet(DVBAdapter_t *adapter, DVBDeliverySystem_e *system)
 {
-    char buffer[512];
-    size_t used;
-    yaml_emitter_t emitter;
+    char *output;
     yaml_document_t document;
     yaml_document_initialize(&document, NULL, NULL, NULL, 0, 0);
 #if (DVB_API_VERSION < 5) || defined(USE_V3)
     {
         struct dvb_frontend_parameters feparams = adapter->frontEndParams;
         feparams.frequency = adapter->frontEndRequestedFreq;
+        yaml_document_add_mapping(&document, (yaml_char_t*)YAML_MAP_TAG, YAML_ANY_MAPPING_STYLE);
         ConvertFEParamsToYaml(adapter->currentDeliverySystem, &feparams, &adapter->satelliteSettings, &document);
     }
 #else
         /* TODO Use new V5 API structures. */
 #endif
-    yaml_emitter_initialize(&emitter);
-    yaml_emitter_set_output_string(&emitter, (unsigned char *)buffer, sizeof(buffer), &used);
-    yaml_emitter_dump(&emitter, &document);
-    
     *system = adapter->currentDeliverySystem;
-    return strdup(buffer);
+    YamlUtils_DocumentToString(&document, TRUE, &output);
+    return output;
 }
 
 bool DVBFrontEndParameterSupported(DVBAdapter_t *adapter, DVBDeliverySystem_e system, char *param, char *value)
@@ -1298,36 +1317,36 @@ static void ConvertFEParamsToYaml(DVBDeliverySystem_e delSys, struct dvb_fronten
 {
     char temp[25];
     sprintf(temp, "%u", feparams->frequency);
-    YamlUtils_MappingAdd(doc, 1, TAG_FREQUENCY, temp, YAML_INT_TAG);
-    YamlUtils_MappingAdd(doc, 1, TAG_INVERSION, MapValueToString(inversionMapping, feparams->inversion, "AUTO"), YAML_STR_TAG);
+    YamlUtils_MappingAdd(doc, 1, TAG_FREQUENCY, temp);
+    YamlUtils_MappingAdd(doc, 1, TAG_INVERSION, MapValueToString(inversionMapping, feparams->inversion, "AUTO"));
     
     switch (delSys)
     {
         case DELSYS_DVBS:
-            YamlUtils_MappingAdd(doc, 1, TAG_FEC, MapValueToString(fecMapping, feparams->u.qpsk.fec_inner, "AUTO"), YAML_STR_TAG);
+            YamlUtils_MappingAdd(doc, 1, TAG_FEC, MapValueToString(fecMapping, feparams->u.qpsk.fec_inner, "AUTO"));
             sprintf(temp, "%u", feparams->u.qpsk.symbol_rate);
-            YamlUtils_MappingAdd(doc, 1, TAG_SYMBOL_RATE, temp, YAML_INT_TAG); 
-            YamlUtils_MappingAdd(doc, 1, TAG_POLARISATION, MapValueToString(polarisationMapping, satSettings->polarisation, "Horizontal"), YAML_STR_TAG);
+            YamlUtils_MappingAdd(doc, 1, TAG_SYMBOL_RATE, temp); 
+            YamlUtils_MappingAdd(doc, 1, TAG_POLARISATION, MapValueToString(polarisationMapping, satSettings->polarisation, "Horizontal"));
             sprintf(temp, "%u", satSettings->satellite_number);
-            YamlUtils_MappingAdd(doc, 1, TAG_SATELLITE_NUMBER, temp, YAML_INT_TAG); 
+            YamlUtils_MappingAdd(doc, 1, TAG_SATELLITE_NUMBER, temp); 
             break;
         case DELSYS_DVBC:
-            YamlUtils_MappingAdd(doc, 1, TAG_FEC, MapValueToString(fecMapping, feparams->u.qam.fec_inner, "AUTO"), YAML_STR_TAG);
+            YamlUtils_MappingAdd(doc, 1, TAG_FEC, MapValueToString(fecMapping, feparams->u.qam.fec_inner, "AUTO"));
             sprintf(temp, "%u", feparams->u.qam.symbol_rate);
-            YamlUtils_MappingAdd(doc, 1, TAG_SYMBOL_RATE, temp, YAML_INT_TAG); 
-            YamlUtils_MappingAdd(doc, 1, TAG_MODULATION, MapValueToString(modulationMapping, feparams->u.qam.modulation, "AUTO"), YAML_STR_TAG);
+            YamlUtils_MappingAdd(doc, 1, TAG_SYMBOL_RATE, temp); 
+            YamlUtils_MappingAdd(doc, 1, TAG_MODULATION, MapValueToString(modulationMapping, feparams->u.qam.modulation, "AUTO"));
             break;
         case DELSYS_DVBT:
-            YamlUtils_MappingAdd(doc, 1, TAG_BANDWIDTH, MapValueToString(bandwidthMapping, feparams->u.ofdm.bandwidth, "AUTO"), YAML_STR_TAG);
-            YamlUtils_MappingAdd(doc, 1, TAG_FEC_HP, MapValueToString(fecMapping, feparams->u.ofdm.code_rate_HP, "AUTO"), YAML_STR_TAG);
-            YamlUtils_MappingAdd(doc, 1, TAG_FEC_LP, MapValueToString(fecMapping, feparams->u.ofdm.code_rate_LP, "AUTO"), YAML_STR_TAG);
-            YamlUtils_MappingAdd(doc, 1, TAG_CONSTELLATION, MapValueToString(modulationMapping, feparams->u.ofdm.constellation, "AUTO"), YAML_STR_TAG);
-            YamlUtils_MappingAdd(doc, 1, TAG_GUARD_INTERVAL,MapValueToString(guardIntervalMapping, feparams->u.ofdm.guard_interval, "AUTO"), YAML_STR_TAG);
-            YamlUtils_MappingAdd(doc, 1, TAG_TRANSMISSION_MODE, MapValueToString(transmissonModeMapping, feparams->u.ofdm.transmission_mode, "AUTO"), YAML_STR_TAG);
-            YamlUtils_MappingAdd(doc, 1, TAG_HIERARCHY, MapValueToString(hierarchyMapping, feparams->u.ofdm.hierarchy_information, "AUTO"), YAML_STR_TAG);
+            YamlUtils_MappingAdd(doc, 1, TAG_BANDWIDTH, MapValueToString(bandwidthMapping, feparams->u.ofdm.bandwidth, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_FEC_HP, MapValueToString(fecMapping, feparams->u.ofdm.code_rate_HP, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_FEC_LP, MapValueToString(fecMapping, feparams->u.ofdm.code_rate_LP, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_CONSTELLATION, MapValueToString(modulationMapping, feparams->u.ofdm.constellation, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_GUARD_INTERVAL,MapValueToString(guardIntervalMapping, feparams->u.ofdm.guard_interval, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_TRANSMISSION_MODE, MapValueToString(transmissonModeMapping, feparams->u.ofdm.transmission_mode, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_HIERARCHY, MapValueToString(hierarchyMapping, feparams->u.ofdm.hierarchy_information, "AUTO"));
             break;
         case DELSYS_ATSC:
-            YamlUtils_MappingAdd(doc, 1, TAG_MODULATION, MapValueToString(modulationMapping, feparams->u.vsb.modulation, "AUTO"), YAML_STR_TAG);
+            YamlUtils_MappingAdd(doc, 1, TAG_MODULATION, MapValueToString(modulationMapping, feparams->u.vsb.modulation, "AUTO"));
             break;
         default:
             break;
