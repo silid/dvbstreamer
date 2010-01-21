@@ -27,6 +27,12 @@ the output to only include this service.
 #include "deliverymethod.h"
 /**
  * @defgroup ServiceFilter Service Filter management
+ *
+ * This module exports the following events:
+ * - servicefilter.added - Is invoked when a filter is created.
+ * - servicefilter.servicechanged - Is invoked when the service the filter is filtering is set.
+ * - servicefilter.removed - Is invoked when a filter is destroyed.
+ *    
  * @{
  */
  
@@ -37,6 +43,19 @@ the output to only include this service.
 extern char ServiceFilterGroupType[];
 
 typedef struct ServiceFilter_s *ServiceFilter_t;
+/**
+ * @internal
+ * Initialise the service filter module.
+ * @return 0 on success, anything else on error.
+ */
+int ServiceFilterInit(void);
+
+/**
+ * @internal
+ * De-initialise the service filter module.
+ * @return 0 on success, anything else on error.
+ */
+int ServiceFilterDeInit(void);
 
 /**
  * Creates a new Service Filter linked to the supplied TS Reader.

@@ -350,7 +350,7 @@ int main(int argc, char *argv[])
         INIT(ATSCStandardInit(TSReader), "ATSC Filters");
 #endif
     }
-
+    INIT(ServiceFilterInit(), "service filter");
     INIT(CommandInit(), "commands");
 
     /* Install commands */
@@ -488,6 +488,7 @@ int main(int argc, char *argv[])
     CommandUnInstallScanning();
     
     DEINIT(CommandDeInit(), "commands");
+    DEINIT(ServiceFilterDeInit(), "service filter");
     if (MainIsDVB())
     {
 #if defined(ENABLE_DVB)
