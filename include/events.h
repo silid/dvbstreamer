@@ -25,7 +25,7 @@ Events management functions
 #define _DVBSTREAMER_EVENTS_H
 
 #include "types.h"
-
+#include "yaml.h"
 /**
  * @defgroup Events Event Management
  * The Events module is used as means for any modue to register events of
@@ -67,8 +67,12 @@ typedef struct Event_s *Event_t;
 /**
  * Pointer to a function that converts an event and its payload into a human 
  * readable string.
+ * @param document YAML Document to add nodes to.
+ * @param event The event to convert.
+ * @param payload The payload for the event to convert.
+ * @return A node id to be mapped to from the event "Details" key.
  */
-typedef char *(*EventToString_t)(Event_t event, void *payload);
+typedef int (*EventToString_t)(yaml_document_t *document, Event_t event, void *payload);
 
 /**
  * Callback function that is to be executed when an event is fired.

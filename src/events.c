@@ -31,6 +31,7 @@ Event Management functions, for creating and firing events to listeners.
 #include "list.h"
 #include "events.h"
 #include "logging.h"
+#include "yamlutils.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -69,7 +70,7 @@ static void EventListenerDetailsFree(EventListenerDetails_t *details);
 static void RegisterEventListener(List_t *listenerList, EventListener_t callback, void *arg);
 static void UnRegisterEventListener(List_t *listenerList, EventListener_t callback, void *arg);
 static void FireEventListeners(List_t *listenerList, Event_t event, void *payload);
-static char* EventUnregisteredToString(Event_t event, void *payload);
+static int EventUnregisteredToString(yaml_document_t *document, Event_t event, void *payload);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -343,42 +344,31 @@ char *EventsEventToString(Event_t event, void *payload)
 {
     char *result = NULL;
     int ret;
-    if (payload && event->toString)
-    {
-        char *payloadStr = event->toString(event, payload);
-        int count;
-        int i, r;
-        for (i = 0; payloadStr[i]; i ++)
-        {
-            if (payloadStr[i] == '\n')
-            {
-                count ++;
-            }
-        }
-        result = malloc(8 + strlen(event->source->name) + strlen(event->name) + strlen(payloadStr) + (count * 4) + 1);
-        ret = sprintf(result, "Name: %s.%s\nDetails: \n    ", event->source->name, event->name);
-        r = strlen(result);    
-        for (i = 0; payloadStr[i]; i ++)
-        {
-            result[r] = payloadStr[i];
-            r ++;
-            if ((payloadStr[i] == '\n') && (payloadStr[i + 1] != 0))
-            {
-                memcpy(&result[r], "    ", 4);
-                r += 4;
-            }
-        }
-        free(payloadStr);
-    }
-    else
-    {
-        ret = asprintf(&result, "Name: %s.%s", event->source->name, event->name);
-    }
+    yaml_document_t document;
 
+    ret = asprintf(&result, "%s.%s", event->source->name, event->name);    
     if (ret == -1)
     {
         LogModule(LOG_INFO, EVENTS, "Failed to allocate memory for event description string.");
+        return NULL;
     }
+
+    yaml_document_initialize(&document, NULL, NULL, NULL, 0, 0);
+    yaml_document_add_mapping(&document, (yaml_char_t*)YAML_MAP_TAG, YAML_ANY_MAPPING_STYLE);
+    YamlUtils_MappingAdd(&document, 1, "Name", result);
+    free(result);
+    
+    if (payload && event->toString)
+    {
+        int valueId = event->toString(&document, event, payload);
+        if (valueId)
+        {
+            char *key = "Details";
+            int keyId = yaml_document_add_scalar(&document, (yaml_char_t*)YAML_STR_TAG, (yaml_char_t*)key, strlen(key), YAML_ANY_SCALAR_STYLE);
+            yaml_document_append_mapping_pair(&document, 1, keyId, valueId);
+        }
+    }
+    YamlUtils_DocumentToString(&document, TRUE, &result);
     return result;
 }
 
@@ -447,7 +437,13 @@ static void FireEventListeners(List_t *listenerList, Event_t event, void *payloa
     }
 }
 
-static char* EventUnregisteredToString(Event_t event, void *payload)
+static int EventUnregisteredToString(yaml_document_t *document, Event_t event, void *payload)
 {
-    return EventsEventToString((Event_t)payload, NULL);
+    Event_t unregEvent = payload;
+    int node;
+    char *eventName;
+    asprintf(&eventName, "%s.%s", unregEvent->source->name, unregEvent->name);
+    node = yaml_document_add_scalar(document, (yaml_char_t*)YAML_DEFAULT_SCALAR_TAG, (yaml_char_t*)eventName, strlen(eventName), YAML_ANY_SCALAR_STYLE);
+    free(eventName);
+    return node;
 }

@@ -395,7 +395,7 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator);
  * Use as the toString parameter when registering an event where the payload will
  * be a service object.
  */
-char *ServiceEventToString(Event_t event,void * payload);
+int ServiceEventToString(yaml_document_t *document, Event_t event,void * payload);
 
 /** @} */
 #endif

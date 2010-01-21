@@ -28,6 +28,7 @@ Example plugin to print out the date/time from the TDT.
 
 #include "logging.h"
 #include "plugin.h"
+#include "yamlutils.h"
 #include "dvbpsi/datetime.h"
 #include "dvbpsi/tdttot.h"
 #include "dvbpsi/atsc/stt.h"
@@ -40,7 +41,7 @@ static void ProcessSTT(dvbpsi_atsc_stt_t *stt);
 static long GetMonotonicTime(void);
 static void CommandDateTime(int argc, char **argv);
 static void DateTimeInstall(bool installed);
-static char *DateTimeEventToString(Event_t event, void *payload);
+static int DateTimeEventToString(yaml_document_t *document, Event_t event, void *payload);
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
@@ -140,13 +141,19 @@ static void DateTimeInstall(bool installed)
     }
 }
 
-static char *DateTimeEventToString(Event_t event, void *payload)
+static int DateTimeEventToString(yaml_document_t *document, Event_t event, void *payload)
 {
     time_t t = (time_t)payload;
-    char *result = NULL;
-    asprintf(&result, "Time: %s" /* ctime adds a \n */
-                      "Seconds since epoch: %ld\n",
-                      ctime(&t),
-                      t);
-    return result;
+    int mappingId;
+    char secondsStr[20];
+    char timeStr[256];
+    struct tm timeTm;
+
+    mappingId = yaml_document_add_mapping(document, (yaml_char_t*)YAML_MAP_TAG, YAML_ANY_MAPPING_STYLE);
+    asctime_r(localtime_r(&t, &timeTm), timeStr);
+    timeStr[strlen(timeStr)-1] = 0;
+    sprintf(secondsStr, "%ld", t);
+    YamlUtils_MappingAdd(document, mappingId, "Time", timeStr);
+    YamlUtils_MappingAdd(document, mappingId, "Seconds since epoch", secondsStr);
+    return mappingId;
 }
