@@ -29,6 +29,7 @@ Manage services and PIDs.
 #include "services.h"
 #include "logging.h"
 #include "events.h"
+#include "yamlutils.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -747,16 +748,15 @@ static void ServiceListDestructor(void * arg)
 }
 
 
-char *ServiceEventToString(Event_t event, void * payload)
+int ServiceEventToString(yaml_document_t *document, Event_t event, void * payload)
 {
-    char *result=NULL;
     Service_t *service = payload;
-    if (asprintf(&result, "Service ID: %04x.%04x.%04x\n"
-                          "ServiceName %s",
-                          service->networkId, service->tsId, service->id, service->name) == -1)
-    {
-        LogModule(LOG_INFO, SERVICES, "Failed to allocate memory for service event description string.\n");
-    }
-    return result;
+    char idStr[16];
+    int mappingId = yaml_document_add_mapping(document, (yaml_char_t*)YAML_MAP_TAG, YAML_ANY_MAPPING_STYLE);
+
+    sprintf(idStr, "%04x.%04x.%04x", service->networkId, service->tsId, service->id);
+    YamlUtils_MappingAdd(document, mappingId, "Service ID", idStr);
+    YamlUtils_MappingAdd(document, mappingId, "Service Name", service->name);
+    return mappingId;
 }
 

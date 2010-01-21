@@ -94,7 +94,7 @@ static int DVBOpenStreamFile(int adapter, uint32_t freq, int *fd, unsigned long 
 static void DVBFrontEndMonitorSend(DVBAdapter_t *adapter, char cmd);
 static void DVBCommandCallback(struct ev_loop *loop, ev_io *w, int revents);
 static void DVBFilterPackets(struct ev_loop *loop, ev_timer *w, int revents);
-static char *DVBEventToString(Event_t event, void *payload);
+static int DVBEventToString(yaml_document_t *document, Event_t event, void *payload);
 
 static int DVBPropertyActiveGet(void *userArg, PropertyValue_t *value);
 static int DVBPropertyActiveSet(void *userArg, PropertyValue_t *value);
@@ -252,7 +252,7 @@ void DVBDispose(DVBAdapter_t *adapter)
 
     PropertiesRemoveAllProperties(propertyParent);
 
-    ObjectFree(adapter);
+    ObjectRefDec(adapter);
 }
 
 DVBSupportedDeliverySys_t *DVBFrontEndGetDeliverySystems(DVBAdapter_t *adapter)
@@ -664,15 +664,14 @@ static int DVBOpenStreamFile(int adapter, uint32_t freq, int *fd, unsigned long 
     return result;
 }
 
-static char *DVBEventToString(Event_t event, void *payload)
+static int DVBEventToString(yaml_document_t *document, Event_t event, void *payload)
 {
-    char *result = NULL;
     DVBAdapter_t *adapter = payload;
-    if (asprintf(&result, "Adapter: %d", adapter->adapter) == -1)
-    {
-        LogModule(LOG_ERROR, FILEADAPTER, "Failed to allocate memory for event description when converting event to string\n");
-    }
-    return result;
+    char adapterStr[4];
+    int mappingId = yaml_document_add_mapping(document, (yaml_char_t*)YAML_MAP_TAG, YAML_ANY_MAPPING_STYLE);
+    sprintf(adapterStr, "%d", adapter->adapter);
+    YamlUtils_MappingAdd(document, mappingId, "Adapter", adapterStr);
+    return mappingId;
 }
 
 static int DVBPropertyActiveGet(void *userArg, PropertyValue_t *value)

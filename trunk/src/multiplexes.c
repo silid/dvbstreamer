@@ -28,7 +28,7 @@ Manage multiplexes and tuning parameters.
 #include "multiplexes.h"
 #include "services.h"
 #include "logging.h"
-
+#include "yamlutils.h"
 /*******************************************************************************
 * Defines                                                                      *
 *******************************************************************************/
@@ -272,17 +272,17 @@ int MultiplexNetworkIdSet(Multiplex_t *multiplex, int netid)
     return rc;
 }
 
-char *MultiplexEventToString(Event_t event,void * payload)
+int MultiplexEventToString(yaml_document_t *document, Event_t event,void * payload)
 {
-    char *result=NULL;
     Multiplex_t *mux = payload;
-    if (asprintf(&result, "Multiplex UID: %d\n"
-                          "Multiplex ID: %04x.%04x", 
-                          mux->uid, mux->networkId, mux->tsId) == -1)
-    {
-        LogModule(LOG_INFO, MULTIPLEXES, "Failed to allocate memory for multiplex changed event description string.\n");
-    }
-    return result;
+    char idStr[10];
+    int mappingId = yaml_document_add_mapping(document, (yaml_char_t*)YAML_MAP_TAG, YAML_ANY_MAPPING_STYLE);
+
+    sprintf(idStr, "%d", mux->uid);
+    YamlUtils_MappingAdd(document, mappingId, "Multiplex UID", idStr);
+    sprintf(idStr, "%04x.%04x", mux->networkId, mux->tsId);
+    YamlUtils_MappingAdd(document, mappingId, "Multiplex ID", idStr);
+    return mappingId;
 }
 
 /*******************************************************************************

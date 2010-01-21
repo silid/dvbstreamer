@@ -347,9 +347,10 @@ static void DeferredInformListeners(void * arg)
                 PropertyValue_t value;
                 PropertiesGet("adapter.number", &value);
                 strftime(timeStr, sizeof(timeStr)-1, "%F %T", localtm);
-                outputLineLen = asprintf(&outputLine, "Time: %s.%ld\n"
+                outputLineLen = asprintf(&outputLine, "---\n"
+                                                      "Time: %s.%ld\n"
                                                       "Adapter: %d\n"
-                                                      "%s\n",
+                                                      "%s...\n",
                     timeStr, eventDesc->at.tv_usec, value.u.integer,
                     eventDesc->description);
             }

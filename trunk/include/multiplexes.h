@@ -216,6 +216,6 @@ int MultiplexNetworkIdSet(Multiplex_t *multiplex, int netid);
  * Use as the toString parameter when registering an event where the payload will
  * be a multiplex object.
  */
-char *MultiplexEventToString(Event_t event,void * payload);
+int MultiplexEventToString(yaml_document_t *document, Event_t event,void * payload);
 /** @} */
 #endif
