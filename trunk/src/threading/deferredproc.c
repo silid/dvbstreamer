@@ -50,7 +50,7 @@ static void *DeferredProcessingThread(void* arg);
 * Global variables                                                             *
 *******************************************************************************/
 static const char DEFERREDPROC[] = "DeferredProc";
-static MessageQ_t jobQ;
+static MessageQ_t jobQ = NULL;
 static pthread_t processingThread;
 
 
@@ -75,17 +75,21 @@ void DeferredProcessingDeinit(void)
     /* Destory thread and queue */
     MessageQDestroy(jobQ);
     pthread_detach(processingThread);
+    jobQ = NULL;
 }
 
 void DeferredProcessingAddJob(DeferredProcessor_t processor, void *arg)
 {
-    DeferredJob_t *job = ObjectCreateType(DeferredJob_t);
-    LogModule(LOG_DEBUGV, DEFERREDPROC, "Adding job %p (processor:%p, arg:%p)\n", job, processor, arg);
-    job->processor = processor;
-    job->arg = arg;
-    ObjectRefInc(arg);
-    MessageQSend(jobQ, job);
-    ObjectRefDec(job);
+    if (jobQ)
+    {
+        DeferredJob_t *job = ObjectCreateType(DeferredJob_t);
+        LogModule(LOG_DEBUGV, DEFERREDPROC, "Adding job %p (processor:%p, arg:%p)\n", job, processor, arg);
+        job->processor = processor;
+        job->arg = arg;
+        ObjectRefInc(arg);
+        MessageQSend(jobQ, job);
+        ObjectRefDec(job);
+    }
 }
 
 
