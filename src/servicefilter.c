@@ -44,6 +44,7 @@ the output to only include this service.
 #include "properties.h"
 #include "servicefilter.h"
 #include "events.h"
+#include "yamlutils.h"
 
 /*******************************************************************************
 * Defines                                                                      *
@@ -102,6 +103,8 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t filter);
 static void ServiceFilterInitPacket(TSPacket_t *packet, dvbpsi_psi_section_t* section, char *sectionname);
 static void ServiceFilterAllocateFilters(ServiceFilter_t state);
 
+static int ServiceFilterEventToString(yaml_document_t *document, Event_t event, void *payload);
+    
 static int ServiceFilterPropertyServiceGet(void *userArg, PropertyValue_t *value);
 static int ServiceFilterPropertyAVSOnlyGet(void *userArg, PropertyValue_t *value);
 static int ServiceFilterPropertyAVSOnlySet(void *userArg, PropertyValue_t *value);
@@ -113,18 +116,40 @@ char ServiceFilterGroupType[] = "Service Filter";
 static char SERVICEFILTER[] = "ServiceFilter";
 static List_t *ServiceFilterList;
 
+static EventSource_t eventSource;
+static Event_t filterAddedEvent;
+static Event_t filterRemovedEvent;
+static Event_t serviceChangedEvent;
+
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
+int ServiceFilterInit(void)
+{
+    ServiceFilterList = ListCreate();
+    ObjectRegisterClass("ServiceFilter_t", sizeof(struct ServiceFilter_s), NULL);
+    eventSource = EventsRegisterSource("servicefilter");
+    filterAddedEvent = EventsRegisterEvent(eventSource, "added", ServiceFilterEventToString);
+    filterRemovedEvent = EventsRegisterEvent(eventSource, "removed", ServiceFilterEventToString);
+    serviceChangedEvent = EventsRegisterEvent(eventSource, "servicechanged", ServiceFilterEventToString);
+    return 0;
+}
+
+int ServiceFilterDeInit(void)
+{
+    EventsUnregisterEvent(filterAddedEvent);
+    EventsUnregisterEvent(filterRemovedEvent);
+    EventsUnregisterEvent(serviceChangedEvent);
+    EventsUnregisterSource(eventSource);
+    ListFree(ServiceFilterList, NULL);
+    return 0;
+}
+
 ServiceFilter_t ServiceFilterCreate(TSReader_t *reader, char* name)
 {
     ServiceFilter_t result;
     Event_t cachePIDSUpdatedEvent;
-    if (ServiceFilterList == NULL)
-    {
-        ServiceFilterList = ListCreate();
-    }
-    ObjectRegisterClass("ServiceFilter_t", sizeof(struct ServiceFilter_s), NULL);
+
     result = ObjectCreateType(ServiceFilter_t);
     if (result)
     {
@@ -141,6 +166,7 @@ ServiceFilter_t ServiceFilterCreate(TSReader_t *reader, char* name)
         cachePIDSUpdatedEvent = EventsFindEvent("cache.pidsupdated");
         EventsRegisterEventListener(cachePIDSUpdatedEvent, ServiceFilterPIDSUpdatedListener, result);
         ListAdd(ServiceFilterList, result);
+        EventsFireEventListeners(filterAddedEvent, result);
     }
     return result;
 }
@@ -148,8 +174,10 @@ ServiceFilter_t ServiceFilterCreate(TSReader_t *reader, char* name)
 void ServiceFilterDestroy(ServiceFilter_t filter)
 {
     Event_t cachePIDSUpdatedEvent;
-    cachePIDSUpdatedEvent = EventsFindEvent("cache.pidsupdated");
-    
+
+    EventsFireEventListeners(filterRemovedEvent, filter);    
+
+    cachePIDSUpdatedEvent = EventsFindEvent("cache.pidsupdated");    
     EventsUnregisterEventListener(cachePIDSUpdatedEvent, ServiceFilterPIDSUpdatedListener, filter);
     
     PropertiesRemoveAllProperties(filter->propertyPath);
@@ -168,11 +196,6 @@ void ServiceFilterDestroy(ServiceFilter_t filter)
     free(filter->name);
     ObjectRefDec(filter);
 
-    if (ListCount(ServiceFilterList) == 0)
-    {
-        ListFree(ServiceFilterList, NULL);
-        ServiceFilterList = NULL;
-    }
 }
 
 void ServiceFilterDestroyAll(TSReader_t *reader)
@@ -242,6 +265,7 @@ void ServiceFilterServiceSet(ServiceFilter_t filter, Service_t *service)
     {
         filter->multiplex = NULL;
     }
+    EventsFireEventListeners(serviceChangedEvent, filter); 
 }
 
 char *ServiceFilterNameGet(ServiceFilter_t filter)
@@ -597,3 +621,23 @@ static int ServiceFilterPropertyAVSOnlySet(void *userArg, PropertyValue_t *value
     return 0;
 }
 
+static int ServiceFilterEventToString(yaml_document_t *document, Event_t event, void *payload)
+{
+    ServiceFilter_t filter = payload;
+    int mappingId = yaml_document_add_mapping(document, (yaml_char_t*)YAML_MAP_TAG, YAML_ANY_MAPPING_STYLE);    
+    YamlUtils_MappingAdd(document, mappingId, "Filter Name", filter->name);
+    if (event == serviceChangedEvent)
+    {
+        char serviceId[16] = "";
+        char *serviceName = "";
+        Service_t *service = ServiceFilterServiceGet(filter);
+        if (service)
+        {
+            sprintf(serviceId, "%04x.%04x.%04x", service->networkId, service->tsId, service->id);
+            serviceName = service->name;
+        }
+        YamlUtils_MappingAdd(document, mappingId, "Service Name", serviceName);
+        YamlUtils_MappingAdd(document, mappingId, "Service ID", serviceId);
+    }
+    return mappingId;
+}
