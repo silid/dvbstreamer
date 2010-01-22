@@ -13,6 +13,7 @@ plugins_LTLIBRARIES = \
 	manualfilters.la \
 	sicapture.la \
 	eventsdispatcher.la \
+	dsmcc.la \
 	$(atsc_plugins) \
 	$(dvb_plugins)
 
@@ -101,3 +102,8 @@ eventsdispatcher_la_LDFLAGS = -module -no-undefined -avoid-version
 #   sectionfilters.c
 
 #sectionfilters_la_LDFLAGS = -module -no-undefined -avoid-version
+
+dsmcc_la_SOURCES = \
+    dsmcc.c
+
+dsmcc_la_LDFLAGS = -module -no-undefined -avoid-version
