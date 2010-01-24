@@ -133,7 +133,7 @@ void FileOutputSendPacket(DeliveryMethodInstance_t *this, TSPacket_t *packet)
 void FileOutputSendBlock(DeliveryMethodInstance_t *this, void *block, unsigned long blockLen)
 {
     struct FileOutputInstance_t *instance = (struct FileOutputInstance_t*)this;
-    if (fwrite(block, blockLen, 1, instance->fp) != blockLen)
+    if (fwrite(block, 1, blockLen, instance->fp) != blockLen)
     {
         LogModule(LOG_INFO, FILEOUTPUT, "Failed to write entire block to file!\n");
     }
