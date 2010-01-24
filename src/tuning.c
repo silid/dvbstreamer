@@ -173,7 +173,10 @@ void TuningCurrentServiceRetune(void)
 {
     Multiplex_t *multiplex;
     TSReader_t *reader = MainTSReaderGet();
-
+    if (CurrentService == NULL)
+    {
+        return;
+    }
     LogModule(LOG_DEBUGV, TUNING, "Disabling filters\n");
     TSReaderEnable(reader, FALSE);
 
