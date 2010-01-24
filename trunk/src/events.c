@@ -358,7 +358,7 @@ char *EventsEventToString(Event_t event, void *payload)
     YamlUtils_MappingAdd(&document, 1, "Name", result);
     free(result);
     
-    if (payload && event->toString)
+    if (event->toString)
     {
         int valueId = event->toString(&document, event, payload);
         if (valueId)

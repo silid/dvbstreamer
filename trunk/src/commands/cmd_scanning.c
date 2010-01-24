@@ -194,6 +194,7 @@ static void ScanListReset(void);
 static void ScanListAddEntry(DVBDeliverySystem_e delSys, Multiplex_t *mux, TuningParamDocs_t *docs);
 static ScanEntry_t *ScanListNextEntry(void);
 
+static int ScanEventToString(yaml_document_t *document, Event_t event, void *payload);
 
 
 /*******************************************************************************
@@ -320,16 +321,16 @@ void CommandInstallScanning(void)
     ObjectRegisterCollection(TOSTRING(MuxFrequencies_t), sizeof(MuxFrequency_t), NULL);
 
     scanEventSource = EventsRegisterSource("scan");
-    scanStartEvent = EventsRegisterEvent(scanEventSource, "started", NULL); /* TODO Add ToString func */
+    scanStartEvent = EventsRegisterEvent(scanEventSource, "started", ScanEventToString); /* TODO Add ToString func */
     scanEndEvent = EventsRegisterEvent(scanEventSource, "finished", NULL); /* TODO Add ToString func */    
     scanCanceledEvent = EventsRegisterEvent(scanEventSource, "cancel", NULL); /* TODO Add ToString func */    
-    scanTryingMuxEvent = EventsRegisterEvent(scanEventSource, "trying", NULL); /* TODO Add ToString func */    
+    scanTryingMuxEvent = EventsRegisterEvent(scanEventSource, "trying", ScanEventToString); /* TODO Add ToString func */    
     scanMuxAddedEvent = EventsRegisterEvent(scanEventSource, "found", NULL); /* TODO Add ToString func */    
     
     loop = DispatchersGetInput();
     ev_async_init(&scanStartAsync, ScanStartStopWatcher);
     ev_timer_init(&timeoutTimer, TimeoutWatcher, 1.0, 1.0);
-
+    ev_async_start(loop, &scanStartAsync);
 #if defined(ENABLE_DVB)
     if (MainIsDVB())
     {
@@ -359,7 +360,7 @@ void CommandInstallScanning(void)
         PropertyType_Boolean, &removeFailedFreqs, SIMPLEPROPERTY_RW);
 
     PropertiesAddSimpleProperty(propertyParent, "locktimeout", "Number of seconds to wait for the frontent to lock.",
-        PropertyType_Int, &tablesTimeout, SIMPLEPROPERTY_RW);
+        PropertyType_Int, &lockTimeout, SIMPLEPROPERTY_RW);
     PropertiesAddSimpleProperty(propertyParent, "tablestimeout", "Number of seconds to wait for the required tables.",
         PropertyType_Int, &tablesTimeout, SIMPLEPROPERTY_RW);
     
@@ -390,6 +391,9 @@ void CommandInstallScanning(void)
 
 void CommandUnInstallScanning(void)
 {
+    struct ev_loop *loop = DispatchersGetInput();
+    ev_async_stop(loop, &scanStartAsync);
+    
     CommandUnRegisterCommands(CommandDetailsScanning);
     PropertiesRemoveAllProperties(propertyParent);
     scanning = FALSE;
@@ -620,7 +624,6 @@ static void ScanFullDVBT(void)
         for (channel = 5; (channel <= 12) && !cancelScan; channel++)
         {
             frequency = 142500000 + (channel * 7000000);
-            CommandPrintf("%d %u\n", channelCount + 1, frequency);
             channelCount ++;
             for (offsetIndex = 0; offsetIndex < 3; offsetIndex ++)
             {
@@ -668,7 +671,6 @@ static void ScanFullDVBT(void)
         for (channel = 21; (channel <= 69) && !cancelScan; channel++)
         {
             frequency = 306000000 + (channel * 8000000);
-            CommandPrintf("%d %u\n", channelCount + 1, frequency);
             channelCount ++;
             for (offsetIndex = 0; offsetIndex < 3; offsetIndex ++)
             {
@@ -1550,6 +1552,7 @@ static void ProcessTransponderList(void)
 static void ScanStart(enum ScanType_e type)
 {
     scanType = type;
+    cancelScan = FALSE;
     ev_async_send(DispatchersGetInput(), &scanStartAsync);
 }
 
@@ -1590,19 +1593,21 @@ static void ScanStateMachine(enum ScanEvent_e event)
     enum ScanEvent_e nextEvent;
     DVBDeliverySystem_e delSys;
     char *tuningParams;
-    
+    LogModule(LOG_INFOV, SCANNING, "ScanStateMachine: event = %d", event);
     for (; event!= ScanEvent_NoEvent; event = nextEvent)
     {
         nextEvent = ScanEvent_NoEvent;
-        
+        previousScanState = currentScanState;
         switch (currentScanState)
         {
             case ScanState_Init:
                 if (event == ScanEvent_StateEntered)
                 {
+                    EventsFireEventListeners(scanStartEvent,NULL);
                     ev_timer_start(DispatchersGetInput(), &timeoutTimer); 
                     currentService = TuningCurrentServiceGet();
                     TuningCurrentServiceLock();
+                    toScan.current = toScan.start;
                     currentScanState = ScanState_NextMux;
                 }
                 break;
@@ -1610,11 +1615,21 @@ static void ScanStateMachine(enum ScanEvent_e event)
                 switch (event)
                 {
                     case ScanEvent_StateEntered:
-                        timeout = lockTimeout;
-                        currentEntry = ScanListNextEntry();
+                        
+                        EventsFireEventListeners(scanTryingMuxEvent,NULL);
                         currentTuningParams = -1;
+                        currentEntry = ScanListNextEntry();
+                        if (currentEntry)
+                        {
+                            nextEvent = ScanEvent_NextTuningParams;
+                        }
+                        else
+                        {
+                            currentScanState = ScanState_Stopping;
+                        }
                         break;
                     case ScanEvent_NextTuningParams:
+                        timeout = lockTimeout;
                         currentTuningParams ++;
                         tuningParams = NULL;
                         if (currentEntry->mux)
@@ -1640,6 +1655,10 @@ static void ScanStateMachine(enum ScanEvent_e event)
                             TSReaderEnable(tsReader, FALSE);
                             DVBFrontEndTune(adapter, delSys, tuningParams);
                         }
+                        else
+                        {
+                            nextEvent = ScanEvent_StateEntered;
+                        }
                         break;
                         
                     case ScanEvent_FELocked:
@@ -1650,6 +1669,7 @@ static void ScanStateMachine(enum ScanEvent_e event)
                             char *tuningParams = DVBFrontEndParametersGet(adapter,  &delSys);
                             MultiplexAdd(delSys, tuningParams, &currentEntry->mux);
                             free(tuningParams);
+                            EventsFireEventListeners(scanMuxAddedEvent,NULL);
                         }
                         TuningCurrentMultiplexSet(currentEntry->mux);
                         currentScanState = ScanState_WaitingForTables;
@@ -1752,6 +1772,7 @@ static void ScanStateMachine(enum ScanEvent_e event)
                         ObjectListFree(transponderList);
                         transponderList = NULL;
                     }
+                    currentScanState = ScanState_Stopped;
                 }   
                 break;
             case ScanState_Stopped:
@@ -1769,8 +1790,10 @@ static void ScanStateMachine(enum ScanEvent_e event)
             
         if (currentScanState != previousScanState)
         {
+            LogModule(LOG_INFOV,SCANNING,"Previous State (%d) != Current State(%d)", previousScanState, currentScanState);
             nextEvent = ScanEvent_StateEntered;
         }
+        LogModule(LOG_INFOV,SCANNING, "State %d Next Event = %d", currentScanState, nextEvent);
     }
     
 }
@@ -1797,14 +1820,18 @@ static void ScanListAddEntry(DVBDeliverySystem_e delSys, Multiplex_t *mux, Tunin
     entry->system = delSys;
     entry->mux = mux;
     entry->params = docs;
-    entry->next = toScan.end;
-    toScan.end = entry;
-    toScan.count ++;
     if (toScan.start == NULL)
     {
         toScan.start = entry;
         toScan.current = entry;
     }
+    else
+    {
+        toScan.end->next = entry;
+    }
+    toScan.end = entry;
+    toScan.count ++;
+
 }
 
 static ScanEntry_t *ScanListNextEntry(void)
@@ -1856,4 +1883,21 @@ static void TuningParamDocsDestructor(void *ptr)
     }    
 }
 
+static int ScanEventToString(yaml_document_t *document, Event_t event, void *payload)
+{
+    char temp[5];
+    int mappingId = yaml_document_add_mapping(document, (yaml_char_t*)YAML_MAP_TAG, YAML_ANY_MAPPING_STYLE);
+    //if (event == scanStartEvent)
+    {
+        sprintf(temp, "%d", toScan.count);
+        YamlUtils_MappingAdd(document, mappingId, "Total transponders", temp);
+    }
+    //if (event == scanTryingMuxEvent)
+    {
+        sprintf(temp, "%d", toScan.pos);
+        YamlUtils_MappingAdd(document, mappingId, "Transponder", temp);
+    }
+    LogModule(LOG_INFO,SCANNING,"Total %d Current %d", toScan.count, toScan.pos);
+    return mappingId;
+}
 
