@@ -195,7 +195,7 @@ static void ScanListAddEntry(DVBDeliverySystem_e delSys, Multiplex_t *mux, Tunin
 static ScanEntry_t *ScanListNextEntry(void);
 
 static int ScanEventToString(yaml_document_t *document, Event_t event, void *payload);
-
+static int ScanningInProgressGet(void *userArg, PropertyValue_t *value);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -234,7 +234,6 @@ Command_t CommandDetailsScanning[] =
 static char SCANNING[]="Scanning";
 static char propertyParent[] = "commands.scan";
 
-static bool scanning = FALSE;
 static bool cancelScan = FALSE;
 static Service_t *currentService;
 
@@ -258,12 +257,9 @@ static char* rollOffTable[] = {"0.35", "0.25", "0.20", ""};
 static ScanList_t toScan = {NULL, NULL, NULL, 0, 0};
 
 static List_t *transponderList = NULL;
-static bool waitingForFELocked= FALSE;
-static bool FELocked = FALSE;
 static int PMTCount = 0;
 static struct PMTReceived_t *PMTsReceived = NULL;
 static pthread_mutex_t scanningmutex = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t scanningcond = PTHREAD_COND_INITIALIZER;
 
 static int lockTimeout = 30;
 static int tablesTimeout = 15;
@@ -292,11 +288,11 @@ int deliverySystemRanges[] = {
      0, /* DELSYS_DVBS2 */    
 };
 
-enum ScanType_e scanType = ScanType_List;
-enum ScanState_e currentScanState = ScanState_Stopped, previousScanState = ScanState_Stopped;
+static enum ScanType_e scanType = ScanType_List;
+static enum ScanState_e currentScanState = ScanState_Stopped, previousScanState = ScanState_Stopped;
 
-ev_async scanStartAsync;
-ev_timer timeoutTimer;
+static ev_async scanStartAsync;
+static ev_timer timeoutTimer;
 
 static EventSource_t scanEventSource;
 static Event_t scanStartEvent;
@@ -354,7 +350,9 @@ void CommandInstallScanning(void)
     feLockedEvent = EventsFindEvent("DVBAdapter.Locked");
     EventsRegisterEventListener(feLockedEvent, FELockedEventListener, NULL);
 
-    PropertiesAddSimpleProperty(propertyParent, "inprogress","Whether an scan is currently in progress", PropertyType_Boolean, &scanning ,SIMPLEPROPERTY_R);
+    PropertiesAddProperty(propertyParent, "inprogress","Whether an scan is currently in progress", PropertyType_Boolean, NULL , ScanningInProgressGet, NULL);
+    PropertiesAddSimpleProperty(propertyParent, "state", "Get the current state id of the scanning state machine.",
+        PropertyType_Int, &currentScanState, SIMPLEPROPERTY_R);
     
     PropertiesAddSimpleProperty(propertyParent, "removefailed", "Whether frequencies currently in the database that fail to lock should be removed.",
         PropertyType_Boolean, &removeFailedFreqs, SIMPLEPROPERTY_RW);
@@ -396,7 +394,7 @@ void CommandUnInstallScanning(void)
     
     CommandUnRegisterCommands(CommandDetailsScanning);
     PropertiesRemoveAllProperties(propertyParent);
-    scanning = FALSE;
+    EventsUnregisterEventListener(EventsFindEvent("DVBAdapter.Locked"),FELockedEventListener, NULL);
     EventsUnregisterEventListener(EventsFindEvent("mpeg2.pat"),PATEventListener, NULL);
     EventsUnregisterEventListener(EventsFindEvent("mpeg2.pmt"),PMTEventListener, NULL);
 #if defined(ENABLE_DVB)
@@ -429,7 +427,7 @@ static void CommandScan(int argc, char **argv)
     
     CommandCheckAuthenticated();
     pthread_mutex_lock(&scanningmutex);
-    if (scanning)
+    if (currentScanState != ScanState_Stopped)
     {
         CommandError(COMMAND_ERROR_GENERIC,"Scan in progress!");
     }
@@ -507,27 +505,19 @@ static void ScanCurrentMultiplexes(void)
 {
     int i;
     MultiplexList_t *list;
-    pthread_mutex_lock(&scanningmutex);
-    if (scanning)
+    list = MultiplexGetAll();
+    if (list)
     {
-        CommandError(COMMAND_ERROR_GENERIC,"Scan in progress!");
-    }
-    else
-    {
-        list = MultiplexGetAll();
-        if (list)
+        for (i = 0; (i < list->nrofMultiplexes) && !ExitProgram; i ++)
         {
-            for (i = 0; (i < list->nrofMultiplexes) && !ExitProgram; i ++)
-            {
-                ScanListAddEntry(list->multiplexes[i]->deliverySystem, list->multiplexes[i], NULL);
-                ObjectRefInc(list->multiplexes[i]);
-            }
-            ObjectRefDec(list);
+            ScanListAddEntry(list->multiplexes[i]->deliverySystem, list->multiplexes[i], NULL);
+            ObjectRefInc(list->multiplexes[i]);
         }
+        ObjectRefDec(list);
     }
-    pthread_mutex_unlock(&scanningmutex);
     ScanStart(ScanType_List);
 }
+
 #if defined(ENABLE_DVB)
 static void ScanFullDVBT(void)
 {
@@ -1103,40 +1093,6 @@ static void ScanNetwork(char *initialdata)
             ScanListAddEntry(delSys, NULL, docs);
         }
         ScanStart(ScanType_Network);
-#if 0        
-             if (ListCount(transponderList) > 0)
-
-            {
-                CommandPrintf("Scanning %d frequencies\n", ListCount(transponderList));
-                for (ListIterator_Init(iterator, transponderList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
-                {
-                    TransponderEntry_t *entry = (TransponderEntry_t*)ListIterator_Current(iterator);
-                    mux = MultiplexFindId(entry->netId, entry->tsId);
-                    feparams = entry->feparams;
-                    CommandPrintf("%d %u\n", channelCount + 1, feparams.frequency);
-                    if (mux)
-                    {
-                        CommandPrintf(" Skipped - already found %04x:%04x\n", entry->netId, entry->tsId);
-                        MultiplexRefDec(mux);
-                    }
-                    else
-                    {
-                        if (feType == QPSK)
-                        {
-                            mux = MultiplexFindDVBSMultiplex(feparams.frequency, &entry->diseqc);
-                        }
-                        else
-                        {
-                            mux = MultiplexFindFrequencyRange(feparams.frequency, muxFindRange);
-                        }
-                        TuneFrequency(feType, &feparams, &diseqcSettings, mux, TRUE);
-                    }
-                    channelCount ++;
-                }
-            }
-        }
-        ListFree(transponderList, free);
-#endif        
     }
     else
     {
@@ -1431,13 +1387,9 @@ static void VCTEventListener(void *arg, Event_t event, void *payload)
 
 static void FELockedEventListener(void *arg, Event_t event, void *payload)
 {
-    if (waitingForFELocked)
+    if (currentScanState == ScanState_NextMux)
     {
         ScanStateMachine(ScanEvent_FELocked);
-        FELocked = TRUE;
-        pthread_mutex_lock(&scanningmutex);
-        pthread_cond_signal(&scanningcond);
-        pthread_mutex_unlock(&scanningmutex);
     }
 }
 
@@ -1679,6 +1631,10 @@ static void ScanStateMachine(enum ScanEvent_e event)
                         if (timeout <= 0)
                         {
                             nextEvent = ScanEvent_NextTuningParams;
+                            if (removeFailedFreqs && currentEntry->mux)
+                            {
+                                MultiplexDelete(currentEntry->mux);
+                            }
                         }
                         break;
                     default:
@@ -1899,5 +1855,12 @@ static int ScanEventToString(yaml_document_t *document, Event_t event, void *pay
     }
     LogModule(LOG_INFO,SCANNING,"Total %d Current %d", toScan.count, toScan.pos);
     return mappingId;
+}
+
+static int ScanningInProgressGet(void *userArg, PropertyValue_t *value)
+{
+    value->type = PropertyType_Boolean;
+    value->u.boolean = (currentScanState != ScanState_Stopped);
+    return 0;
 }
 

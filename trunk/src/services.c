@@ -751,12 +751,16 @@ static void ServiceListDestructor(void * arg)
 int ServiceEventToString(yaml_document_t *document, Event_t event, void * payload)
 {
     Service_t *service = payload;
-    char idStr[16];
+    char idStr[16] = {0};
+    char *name = idStr;
     int mappingId = yaml_document_add_mapping(document, (yaml_char_t*)YAML_MAP_TAG, YAML_ANY_MAPPING_STYLE);
-
-    sprintf(idStr, "%04x.%04x.%04x", service->networkId, service->tsId, service->id);
+    if (service)
+    {
+        sprintf(idStr, "%04x.%04x.%04x", service->networkId, service->tsId, service->id);
+        name = service->name;
+    }
     YamlUtils_MappingAdd(document, mappingId, "Service ID", idStr);
-    YamlUtils_MappingAdd(document, mappingId, "Service Name", service->name);
+    YamlUtils_MappingAdd(document, mappingId, "Service Name", name);
     return mappingId;
 }
 
