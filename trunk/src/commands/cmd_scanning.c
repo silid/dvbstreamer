@@ -937,7 +937,7 @@ static void ScanNetwork(char *initialdata)
     char params[256];
     char *polarisation = NULL;
     char *inversion;
-    DVBDeliverySystem_e delSys;
+    DVBDeliverySystem_e delSys = DELSYS_MAX_SUPPORTED;
     unsigned int frequency;
     MultiplexList_t *muxList = MultiplexGetAll();
     MuxFrequencies_t *muxFreqList = ParseMuxListFrequencies(muxList);
@@ -1189,7 +1189,7 @@ static void NITEventListener(void *arg, Event_t event, void *payload)
     char tparams[256];
     char sparams[256];    
     char *polarisation = NULL;
-    DVBDeliverySystem_e delSys;
+    DVBDeliverySystem_e delSys = DELSYS_MAX_SUPPORTED;
     tparams[0] = 0;
     sparams[0] = 0;
     
