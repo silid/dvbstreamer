@@ -33,7 +33,6 @@ Object memory management.
 /*******************************************************************************
 * Defines                                                                      *
 *******************************************************************************/
-#define MAX_CLASSES 50
 
 //#define USE_MALLOC_FOR_ALLOC
 
@@ -63,6 +62,7 @@ typedef struct Class_s {
     unsigned int size;
     ObjectDestructor_t destructor;
     unsigned int allocatedCount;
+    struct Class_s *next;
 }Class_t;
 
 typedef struct Object_s {
@@ -89,7 +89,7 @@ static void RemoveReferencedObject(Object_t *toRemove);
 * Global variables                                                             *
 *******************************************************************************/
 static char OBJECT[] = "Object";
-static Class_t classes[MAX_CLASSES];
+static Class_t *classes = NULL;
 static unsigned int classesCount = 0;
 static Object_t *referencedObjects = NULL;
 
@@ -100,7 +100,7 @@ static pthread_mutex_t objectMutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 *******************************************************************************/
 int ObjectInit(void)
 {
-    memset(classes, 0, sizeof(classes));
+    classes = NULL;
     classesCount = 0;
     referencedObjects = NULL;
 
@@ -132,14 +132,17 @@ int ObjectDeinit(void)
 
     if (classesCount > 0)
     {
-        unsigned int i;
-        LogModule(LOG_DEBUG, OBJECT, "Registered Classes:\n");
+        Class_t *clazz, *next = NULL;
+        LogModule(LOG_DEBUG, OBJECT, "%u Registered Classes:\n", classesCount);
         LogModule(LOG_DEBUG, OBJECT, "\tClass Name                       | Size       | Count      |Destructor?\n");
         LogModule(LOG_DEBUG, OBJECT, "\t---------------------------------|------------|------------|------------\n");
-        for (i = 0; i < classesCount; i ++)
+        for (clazz = classes; clazz; clazz = next)
         {
             LogModule(LOG_DEBUG, OBJECT, "\t%-32s | %10d | %10d | %s\n", 
-                classes[i].name, classes[i].size, classes[i].allocatedCount,classes[i].destructor ? "Yes":"No");
+                clazz->name, clazz->size, clazz->allocatedCount, clazz->destructor ? "Yes":"No");
+            next = clazz->next;
+            free(clazz->name);
+            free(clazz);
         }
     }
     pthread_mutex_destroy(&objectMutex);
@@ -157,7 +160,8 @@ int ObjectRegisterClass(char *classname, unsigned int size, ObjectDestructor_t d
         LogModule(LOG_DEBUGV, OBJECT, "Registered Class \"%s\" size %d destructor? %s\n", classname, size, destructor? "Yes":"No");
     }
     pthread_mutex_unlock(&objectMutex);
-    return OBJECT_OK;
+    return result;
+    
 }
 
 int ObjectRegisterCollection(char *name, unsigned entrysize, ObjectDestructor_t destructor)
@@ -170,7 +174,7 @@ int ObjectRegisterCollection(char *name, unsigned entrysize, ObjectDestructor_t 
         LogModule(LOG_DEBUGV, OBJECT, "Registered Collection \"%s\" size %d destructor? %s\n", name, entrysize, destructor? "Yes":"No");
     }
     pthread_mutex_unlock(&objectMutex);
-    return OBJECT_OK;
+    return result;
 }
 
 static int ObjectRegisterClassType(char *name, ClassType_t type, unsigned size, ObjectDestructor_t destructor)
@@ -180,21 +184,23 @@ static int ObjectRegisterClassType(char *name, ClassType_t type, unsigned size, 
     clazz = FindClass(name);
     if (clazz)
     {
-        pthread_mutex_unlock(&objectMutex);
         return OBJECT_ERR_CLASS_REGISTERED;
     }
-    
-    if (classesCount >= MAX_CLASSES)
+    clazz = malloc(sizeof(Class_t));
+    if (clazz == NULL)
     {
-        pthread_mutex_unlock(&objectMutex);
+        LogModule(LOG_ERROR, OBJECT, "No space to register class %s", name);
         return OBJECT_ERR_OUT_OF_MEMORY;
     }
     
-    classes[classesCount].name = strdup(name);
-    classes[classesCount].type = type;
-    classes[classesCount].size = size;
-    classes[classesCount].destructor = destructor;
-    classes[classesCount].allocatedCount = 0;
+    
+    clazz->name = strdup(name);
+    clazz->type = type;
+    clazz->size = size;
+    clazz->destructor = destructor;
+    clazz->allocatedCount = 0;
+    clazz->next = classes;
+    classes = clazz;
     classesCount ++;
     return OBJECT_OK;
 }
@@ -444,12 +450,12 @@ int ObjectRefCount(void *ptr)
 *******************************************************************************/
 static Class_t *FindClass(char *classname)
 {
-    unsigned i;
-    for (i = 0; i < classesCount;i ++)
+    Class_t *clazz;
+    for (clazz = classes; clazz;clazz = clazz->next)
      {
-        if (strcmp(classname, classes[i].name) == 0)
+        if (strcmp(classname, clazz->name) == 0)
         {
-            return &classes[i];
+            return clazz;
         }
      }
      return NULL;
