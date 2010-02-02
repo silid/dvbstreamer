@@ -486,7 +486,6 @@ static void CommandScan(int argc, char **argv)
             if (multiplex)
             {
                 CommandPrintf("Scanning %d\n", multiplex->uid);
-                ScanListReset();
                 ScanListAddEntry(multiplex->deliverySystem, multiplex, NULL);
                 ScanStart(ScanType_List);
             }
@@ -1728,6 +1727,7 @@ static void ScanStateMachine(enum ScanEvent_e event)
                         ObjectListFree(transponderList);
                         transponderList = NULL;
                     }
+                    ScanListReset();
                     currentScanState = ScanState_Stopped;
                 }   
                 break;
