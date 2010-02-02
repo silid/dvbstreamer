@@ -225,13 +225,16 @@ void EventsUnregisterEventListener(Event_t event, EventListener_t listener, void
  * (if supplied when the event was created).
  * @param event The event to convert.
  * @param payload The payload of the event.
- * @return A string containing "\<SourceName\>.\<EventName\>" if no toString 
- * function was supplied when the event was created, or 
- * "\<SourceName\>.\<EventName\> \<toString output\>" if a toString function was
- * supplied.
+ * @return A YAML document describing the event.
  */
 char *EventsEventToString(Event_t event, void *payload);
 
+/**
+ * This function returns the name ("\<SourceName\>.\<EventName\>") of the specified event.
+ * @param event The event to convert.
+ * @return A string containing the name of the event.
+ */
+char *EventsEventName(Event_t event);
 /** @} */
 #endif
 

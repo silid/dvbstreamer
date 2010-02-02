@@ -340,6 +340,13 @@ void EventsUnregisterEventListener(Event_t event, EventListener_t listener, void
    pthread_mutex_unlock(&eventsMutex);
 }
 
+char *EventsEventName(Event_t event)
+{
+    char *result = NULL;
+    asprintf(&result, "%s.%s", event->source->name, event->name);
+    return result;
+}
+
 char *EventsEventToString(Event_t event, void *payload)
 {
     char *result = NULL;
