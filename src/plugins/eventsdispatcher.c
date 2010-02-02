@@ -45,6 +45,7 @@ Plugin to allow access to internal event information.
 *******************************************************************************/
 typedef struct EventDescription_s {
     struct timeval at;
+    char *eventName;
     char *description;
 }EventDescription_t;
 
@@ -293,8 +294,10 @@ static void CommandListListenEvents(int argc, char **argv)
 static void EventCallback(void *arg, Event_t event, void *payload)
 {
     char *desc = EventsEventToString(event, payload);
+    char *eventName = EventsEventName(event);
     EventDescription_t *eventDesc = ObjectCreateType(EventDescription_t);
     gettimeofday(&eventDesc->at, NULL);
+    eventDesc->eventName = eventName;
     eventDesc->description = desc;
     DeferredProcessingAddJob(DeferredInformListeners, eventDesc);
     ObjectRefDec(eventDesc);
@@ -330,7 +333,7 @@ static void DeferredInformListeners(void * arg)
                  ListIterator_Next(eventFilterIterator))
             {
                 char *eventFilter = (char *)ListIterator_Current(eventFilterIterator);
-                if (strncmp(eventFilter, eventDesc->description, strlen(eventFilter)) == 0)
+                if (strncmp(eventFilter, eventDesc->eventName, strlen(eventFilter)) == 0)
                 {
                     inform = TRUE;
                     break;
@@ -368,6 +371,7 @@ static void DeferredInformListeners(void * arg)
 static void EventDescriptionDestructor(void *arg)
 {
     EventDescription_t *desc = arg;
+    free(desc->eventName);
     free(desc->description);
 }
 
