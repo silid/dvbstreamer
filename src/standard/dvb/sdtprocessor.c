@@ -90,7 +90,7 @@ SDTProcessor_t SDTProcessorCreate(TSReader_t *reader)
     SDTProcessor_t state = NULL;
     if (sdtEvent == NULL)
     {
-        sdtEvent = EventsRegisterEvent(DVBEventSource, "sdt", NULL);
+        sdtEvent = EventsRegisterEvent(DVBEventSource, "SDT", NULL);
     }
     ObjectRegisterClass("SDTProcessor_t", sizeof(struct SDTProcessor_s), NULL);
     state = ObjectCreateType(SDTProcessor_t);

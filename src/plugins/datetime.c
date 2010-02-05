@@ -132,8 +132,8 @@ static void DateTimeInstall(bool installed)
 {
     if (installed)
     {
-        timeSource = EventsRegisterSource("datetime");
-        timeReceivedEvent = EventsRegisterEvent(timeSource, "received", DateTimeEventToString);
+        timeSource = EventsRegisterSource("DateTime");
+        timeReceivedEvent = EventsRegisterEvent(timeSource, "Received", DateTimeEventToString);
     }
     else
     {

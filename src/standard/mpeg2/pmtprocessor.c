@@ -80,7 +80,7 @@ PMTProcessor_t PMTProcessorCreate(TSReader_t *reader)
     PMTProcessor_t state;
     if (pmtEvent == NULL)
     {
-        pmtEvent = EventsRegisterEvent(MPEG2EventSource, "pmt", NULL);
+        pmtEvent = EventsRegisterEvent(MPEG2EventSource, "PMT", NULL);
     }
     ObjectRegisterClass("PMTProcessor_t", sizeof(struct PMTProcessor_s), NULL);
     state = ObjectCreateType(PMTProcessor_t);

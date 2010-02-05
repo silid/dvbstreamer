@@ -47,7 +47,7 @@ int ATSCStandardInit(TSReader_t *reader)
 {
     if (ATSCEventSource == NULL)
     {
-        ATSCEventSource = EventsRegisterSource("atsc");
+        ATSCEventSource = EventsRegisterSource(ATSCFilterType);
     }
 
     if (ATSCMultipleStringsInit())

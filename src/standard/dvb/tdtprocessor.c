@@ -75,7 +75,7 @@ TDTProcessor_t TDTProcessorCreate(TSReader_t *reader)
     TDTProcessor_t state;
     if (tdtEvent == NULL)
     {
-        tdtEvent = EventsRegisterEvent(DVBEventSource, "tdt", NULL);
+        tdtEvent = EventsRegisterEvent(DVBEventSource, "TDT", NULL);
     }
     ObjectRegisterClass("TDTProcessor_t", sizeof(struct TDTProcessor_s), NULL);
     state = ObjectCreateType(TDTProcessor_t);
