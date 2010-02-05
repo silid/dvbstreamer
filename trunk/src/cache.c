@@ -195,8 +195,8 @@ int CacheInit()
     pthread_mutexattr_destroy(&mutexAttr);
 
 
-    eventSource = EventsRegisterSource("cache");
-    pidsUpdatedEvent = EventsRegisterEvent(eventSource, "pidsupdated", NULL);
+    eventSource = EventsRegisterSource("Cache");
+    pidsUpdatedEvent = EventsRegisterEvent(eventSource, "PIDsUpdated", NULL);
     
     ObjectRegisterType(CacheUpdateMessage_t);
     return 0;

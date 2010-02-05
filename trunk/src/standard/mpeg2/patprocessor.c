@@ -69,7 +69,7 @@ PATProcessor_t PATProcessorCreate(TSReader_t *reader)
     PATProcessor_t state;
     if (patEvent == NULL)
     {
-        patEvent = EventsRegisterEvent(MPEG2EventSource, "pat", NULL);
+        patEvent = EventsRegisterEvent(MPEG2EventSource, "PAT", NULL);
     }
     
     ObjectRegisterClass("PATProcessor_t", sizeof(struct PATProcessor_s), NULL);

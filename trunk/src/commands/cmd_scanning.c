@@ -316,12 +316,12 @@ void CommandInstallScanning(void)
     ObjectRegisterCollection(TOSTRING(TuningParamDocs_t),sizeof(char *),TuningParamDocsDestructor);
     ObjectRegisterCollection(TOSTRING(MuxFrequencies_t), sizeof(MuxFrequency_t), NULL);
 
-    scanEventSource = EventsRegisterSource("scan");
-    scanStartEvent = EventsRegisterEvent(scanEventSource, "started", ScanEventToString); /* TODO Add ToString func */
-    scanEndEvent = EventsRegisterEvent(scanEventSource, "finished", NULL); /* TODO Add ToString func */    
-    scanCanceledEvent = EventsRegisterEvent(scanEventSource, "cancel", NULL); /* TODO Add ToString func */    
-    scanTryingMuxEvent = EventsRegisterEvent(scanEventSource, "trying", ScanEventToString); /* TODO Add ToString func */    
-    scanMuxAddedEvent = EventsRegisterEvent(scanEventSource, "found", NULL); /* TODO Add ToString func */    
+    scanEventSource = EventsRegisterSource("Scan");
+    scanStartEvent = EventsRegisterEvent(scanEventSource, "Started", ScanEventToString); /* TODO Add ToString func */
+    scanEndEvent = EventsRegisterEvent(scanEventSource, "Finished", NULL); /* TODO Add ToString func */    
+    scanCanceledEvent = EventsRegisterEvent(scanEventSource, "Cancel", NULL); /* TODO Add ToString func */    
+    scanTryingMuxEvent = EventsRegisterEvent(scanEventSource, "Trying", ScanEventToString); /* TODO Add ToString func */    
+    scanMuxAddedEvent = EventsRegisterEvent(scanEventSource, "Found", NULL); /* TODO Add ToString func */    
     
     loop = DispatchersGetInput();
     ev_async_init(&scanStartAsync, ScanStartStopWatcher);
@@ -330,8 +330,8 @@ void CommandInstallScanning(void)
 #if defined(ENABLE_DVB)
     if (MainIsDVB())
     {
-        EventsRegisterEventListener(EventsFindEvent("dvb.sdt"),SDTEventListener,NULL);
-        EventsRegisterEventListener(EventsFindEvent("dvb.nit"),NITEventListener, NULL);
+        EventsRegisterEventListener(EventsFindEvent("DVB.SDT"),SDTEventListener,NULL);
+        EventsRegisterEventListener(EventsFindEvent("DVB.NIT"),NITEventListener, NULL);
 
     }
 #endif    
@@ -339,12 +339,12 @@ void CommandInstallScanning(void)
 #if defined(ENABLE_ATSC)
     if (MainIsATSC())
     {
-        EventsRegisterEventListener(EventsFindEvent("atsc.vct"),VCTEventListener, NULL);        
+        EventsRegisterEventListener(EventsFindEvent("ATSC.VCT"),VCTEventListener, NULL);        
     }
 #endif
 
-    EventsRegisterEventListener(EventsFindEvent("mpeg2.pat"),PATEventListener, NULL);
-    EventsRegisterEventListener(EventsFindEvent("mpeg2.pmt"),PMTEventListener, NULL);
+    EventsRegisterEventListener(EventsFindEvent("MPEG2.PAT"),PATEventListener, NULL);
+    EventsRegisterEventListener(EventsFindEvent("MPEG2.PMT"),PMTEventListener, NULL);
 
     LogModule(LOG_DEBUG,SCANNING,"Finding fe locked event.\n");
     feLockedEvent = EventsFindEvent("DVBAdapter.Locked");
@@ -395,20 +395,20 @@ void CommandUnInstallScanning(void)
     CommandUnRegisterCommands(CommandDetailsScanning);
     PropertiesRemoveAllProperties(propertyParent);
     EventsUnregisterEventListener(EventsFindEvent("DVBAdapter.Locked"),FELockedEventListener, NULL);
-    EventsUnregisterEventListener(EventsFindEvent("mpeg2.pat"),PATEventListener, NULL);
-    EventsUnregisterEventListener(EventsFindEvent("mpeg2.pmt"),PMTEventListener, NULL);
+    EventsUnregisterEventListener(EventsFindEvent("MPEG2.PAT"),PATEventListener, NULL);
+    EventsUnregisterEventListener(EventsFindEvent("MPEG2.PMT"),PMTEventListener, NULL);
 #if defined(ENABLE_DVB)
     if (MainIsDVB())
     {
-        EventsUnregisterEventListener(EventsFindEvent("dvb.sdt"),SDTEventListener, NULL);
-        EventsUnregisterEventListener(EventsFindEvent("dvb.nit"),NITEventListener, NULL);
+        EventsUnregisterEventListener(EventsFindEvent("DVB.SDT"),SDTEventListener, NULL);
+        EventsUnregisterEventListener(EventsFindEvent("DVB.NIT"),NITEventListener, NULL);
     }
 #endif
 
 #if defined(ENABLE_ATSC)
     if (MainIsATSC())
     {
-        EventsUnregisterEventListener(EventsFindEvent("atsc.vct"),VCTEventListener, NULL);
+        EventsUnregisterEventListener(EventsFindEvent("ATSC.VCT"),VCTEventListener, NULL);
     }
 #endif
 

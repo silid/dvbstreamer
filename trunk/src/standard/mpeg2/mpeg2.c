@@ -51,7 +51,7 @@ int MPEG2StandardInit(TSReader_t *reader)
 {
     if (MPEG2EventSource == NULL)
     {
-        MPEG2EventSource = EventsRegisterSource("mpeg2");
+        MPEG2EventSource = EventsRegisterSource(MPEG2FilterType);
     }
     patProcessor = PATProcessorCreate(reader);
     if (patProcessor == NULL)

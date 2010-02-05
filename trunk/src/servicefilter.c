@@ -128,10 +128,10 @@ int ServiceFilterInit(void)
 {
     ServiceFilterList = ListCreate();
     ObjectRegisterClass("ServiceFilter_t", sizeof(struct ServiceFilter_s), NULL);
-    eventSource = EventsRegisterSource("servicefilter");
-    filterAddedEvent = EventsRegisterEvent(eventSource, "added", ServiceFilterEventToString);
-    filterRemovedEvent = EventsRegisterEvent(eventSource, "removed", ServiceFilterEventToString);
-    serviceChangedEvent = EventsRegisterEvent(eventSource, "servicechanged", ServiceFilterEventToString);
+    eventSource = EventsRegisterSource("ServiceFilter");
+    filterAddedEvent = EventsRegisterEvent(eventSource, "Added", ServiceFilterEventToString);
+    filterRemovedEvent = EventsRegisterEvent(eventSource, "Removed", ServiceFilterEventToString);
+    serviceChangedEvent = EventsRegisterEvent(eventSource, "ServiceChanged", ServiceFilterEventToString);
     return 0;
 }
 
@@ -163,7 +163,7 @@ ServiceFilter_t ServiceFilterCreate(TSReader_t *reader, char* name)
         PropertiesAddProperty(result->propertyPath, "avsonly", "Whether only the first Audio/Video/Subtitle streams should be filtered.", 
             PropertyType_Boolean, result, ServiceFilterPropertyAVSOnlyGet, ServiceFilterPropertyAVSOnlySet);
 
-        cachePIDSUpdatedEvent = EventsFindEvent("cache.pidsupdated");
+        cachePIDSUpdatedEvent = EventsFindEvent("Cache.PIDsUpdated");
         EventsRegisterEventListener(cachePIDSUpdatedEvent, ServiceFilterPIDSUpdatedListener, result);
         ListAdd(ServiceFilterList, result);
         EventsFireEventListeners(filterAddedEvent, result);
@@ -177,7 +177,7 @@ void ServiceFilterDestroy(ServiceFilter_t filter)
 
     EventsFireEventListeners(filterRemovedEvent, filter);    
 
-    cachePIDSUpdatedEvent = EventsFindEvent("cache.pidsupdated");    
+    cachePIDSUpdatedEvent = EventsFindEvent("Cache.PIDsUpdated");    
     EventsUnregisterEventListener(cachePIDSUpdatedEvent, ServiceFilterPIDSUpdatedListener, filter);
     
     PropertiesRemoveAllProperties(filter->propertyPath);

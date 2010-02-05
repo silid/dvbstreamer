@@ -68,7 +68,7 @@ NITProcessor_t NITProcessorCreate(TSReader_t *reader)
     NITProcessor_t result;
     if (nitEvent == NULL)
     {
-        nitEvent = EventsRegisterEvent(DVBEventSource, "nit", NULL);
+        nitEvent = EventsRegisterEvent(DVBEventSource, "NIT", NULL);
     }
     ObjectRegisterClass("NITProcessor_t", sizeof(struct NITProcessor_s), NULL);
     result = ObjectCreateType(NITProcessor_t);

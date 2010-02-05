@@ -107,9 +107,9 @@ PSIPProcessor_t PSIPProcessorCreate(TSReader_t *reader)
     initCount ++;
     if (mgtEvent == NULL)
     {
-        mgtEvent = EventsRegisterEvent(ATSCEventSource, "mgt", NULL);
-        sttEvent = EventsRegisterEvent(ATSCEventSource, "stt", NULL);
-        vctEvent = EventsRegisterEvent(ATSCEventSource, "vct", NULL);
+        mgtEvent = EventsRegisterEvent(ATSCEventSource, "MGT", NULL);
+        sttEvent = EventsRegisterEvent(ATSCEventSource, "STT", NULL);
+        vctEvent = EventsRegisterEvent(ATSCEventSource, "VCT", NULL);
     }
     ObjectRegisterClass("PSIPProcessor_t", sizeof(struct PSIPProcessor_s), NULL);
 
