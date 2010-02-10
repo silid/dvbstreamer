@@ -235,16 +235,22 @@ EventSource_t EventsFindSource(const char *name)
 
 void EventsRegisterSourceListener(EventSource_t source, EventListener_t listener, void *arg)
 {
-    pthread_mutex_lock(&eventsMutex);
-    RegisterEventListener(source->listeners, listener, arg);
-    pthread_mutex_unlock(&eventsMutex);
+    if (source)
+    {
+        pthread_mutex_lock(&eventsMutex);
+        RegisterEventListener(source->listeners, listener, arg);
+        pthread_mutex_unlock(&eventsMutex);
+    }
 }
 
 void EventsUnregisterSourceListener(EventSource_t source, EventListener_t listener, void *arg)
 {
-   pthread_mutex_lock(&eventsMutex);
-   UnRegisterEventListener(source->listeners, listener, arg);
-   pthread_mutex_unlock(&eventsMutex);
+    if (source)
+    {
+        pthread_mutex_lock(&eventsMutex);
+        UnRegisterEventListener(source->listeners, listener, arg);
+        pthread_mutex_unlock(&eventsMutex);
+    }
 }
 
 Event_t EventsRegisterEvent(EventSource_t source, char *name, EventToString_t toString)
@@ -328,16 +334,22 @@ void EventsFireEventListeners(Event_t event, void *payload)
 
 void EventsRegisterEventListener(Event_t event, EventListener_t listener, void *arg)
 {
-   pthread_mutex_lock(&eventsMutex);
-   RegisterEventListener(event->listeners, listener, arg);
-   pthread_mutex_unlock(&eventsMutex);
+    if (event)
+    {
+        pthread_mutex_lock(&eventsMutex);
+        RegisterEventListener(event->listeners, listener, arg);
+        pthread_mutex_unlock(&eventsMutex);
+    }
 }
 
 void EventsUnregisterEventListener(Event_t event, EventListener_t listener, void *arg)
 {
-   pthread_mutex_lock(&eventsMutex);
-   UnRegisterEventListener(event->listeners, listener, arg);
-   pthread_mutex_unlock(&eventsMutex);
+    if (event)
+    {
+        pthread_mutex_lock(&eventsMutex);
+        UnRegisterEventListener(event->listeners, listener, arg);
+        pthread_mutex_unlock(&eventsMutex);
+    }
 }
 
 char *EventsEventName(Event_t event)
