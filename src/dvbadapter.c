@@ -20,6 +20,7 @@ dvbadapter.c
 Opens/Closes and setups dvb adapter for use in the rest of the application.
 
 */
+#include "config.h"
 #include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -353,6 +354,7 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
             return NULL;
         }
         result->currentDeliverySystem = DELSYS_MAX_SUPPORTED;
+        LogModule(LOG_INFO, DVBADAPTER, "Caps 0x%08x", result->info.caps);
         switch (result->info.type)
         {
             case FE_QPSK:
