@@ -267,6 +267,7 @@ static int DBaseCreateTables(void)
 int DBaseMetadataGet(char *name, char **value)
 {
     STATEMENT_INIT;
+    int result = 1;
     STATEMENT_PREPAREVA("SELECT " METADATA_VALUE " "
                         "FROM " METADATA_TABLE " "
                         "WHERE " METADATA_NAME "='%q';", name);
@@ -274,10 +275,13 @@ int DBaseMetadataGet(char *name, char **value)
 
     STATEMENT_STEP();
     RETURN_RC_ON_ERROR;
-    
-    *value = strdup(STATEMENT_COLUMN_TEXT(0));
+    if (rc == SQLITE_ROW)
+    {
+        *value = strdup(STATEMENT_COLUMN_TEXT(0));
+        result = 0;
+    }
     STATEMENT_FINALIZE();
-    return rc;
+    return result;
 }
 
 int DBaseMetadataSet(char *name, char *value)
@@ -298,6 +302,7 @@ int DBaseMetadataSet(char *name, char *value)
 int DBaseMetadataGetInt(char *name, int *value)
 {
     STATEMENT_INIT;
+    int result = 1;
     STATEMENT_PREPAREVA("SELECT " METADATA_VALUE " "
                         "FROM " METADATA_TABLE " "
                         "WHERE " METADATA_NAME "='%q';", name);
@@ -305,10 +310,13 @@ int DBaseMetadataGetInt(char *name, int *value)
 
     STATEMENT_STEP();
     RETURN_RC_ON_ERROR;
-    
-    *value = STATEMENT_COLUMN_INT(0);
+    if (rc == SQLITE_ROW)
+    {
+        *value = STATEMENT_COLUMN_INT(0);
+        result = 0;
+    }
     STATEMENT_FINALIZE();
-    return rc;
+    return result;
 }
 int DBaseMetadataSetInt(char *name, int value)
 {
@@ -327,6 +335,7 @@ int DBaseMetadataSetInt(char *name, int value)
 int DBaseMetadataGetDouble(char *name, double *value)
 {
     STATEMENT_INIT;
+    int result = 1;
     STATEMENT_PREPAREVA("SELECT " METADATA_VALUE " "
                         "FROM " METADATA_TABLE " "
                         "WHERE " METADATA_NAME "='%q';", name);
@@ -334,9 +343,13 @@ int DBaseMetadataGetDouble(char *name, double *value)
 
     STATEMENT_STEP();
     RETURN_RC_ON_ERROR;
-    *value = STATEMENT_COLUMN_DOUBLE(0);
+    if (rc == SQLITE_ROW)
+    {
+        *value = STATEMENT_COLUMN_DOUBLE(0);
+        result = 0;
+    }
     STATEMENT_FINALIZE();
-    return rc;
+    return result;
 }
 
 int DBaseMetadataSetDouble(char *name, double value)
