@@ -50,7 +50,7 @@ int DVBStandardInit(TSReader_t *reader)
 {
     if (DVBEventSource == NULL)
     {
-        DVBEventSource = EventsRegisterSource("dvb");
+        DVBEventSource = EventsRegisterSource(DVBFilterType);
     }
     if (MPEG2StandardInit(reader))
     {

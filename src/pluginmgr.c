@@ -258,11 +258,11 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
                     break;     
                 case PLUGIN_FEATURE_TYPE_PATPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed PAT processor.\n", pluginInterface->name);
-                    EventsRegisterListenerByName("mpeg2.pat", TableEventCallback, (void*)feature->details.patCB);
+                    EventsRegisterListenerByName("MPEG2.PAT", TableEventCallback, (void*)feature->details.patCB);
                     break;
                 case PLUGIN_FEATURE_TYPE_PMTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed PMT processor.\n", pluginInterface->name);
-                    EventsRegisterListenerByName("mpeg2.pmt", TableEventCallback, (void*)feature->details.pmtCB);                    
+                    EventsRegisterListenerByName("MPEG2.PMT", TableEventCallback, (void*)feature->details.pmtCB);                    
                     break;
                 case PLUGIN_FEATURE_TYPE_DELIVERYMETHOD:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed Delivery method.\n", pluginInterface->name);
@@ -271,29 +271,29 @@ static void PluginManagerInstallPlugin(Plugin_t *pluginInterface)
 #if defined(ENABLE_DVB)
                 case PLUGIN_FEATURE_TYPE_SDTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed SDT processor.\n", pluginInterface->name);
-                    EventsRegisterListenerByName("dvb.sdt", TableEventCallback, (void*)feature->details.sdtCB);
+                    EventsRegisterListenerByName("DVB.SDT", TableEventCallback, (void*)feature->details.sdtCB);
                     break;
                 case PLUGIN_FEATURE_TYPE_NITPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed NIT processor.\n", pluginInterface->name);
-                    EventsRegisterListenerByName("dvb.nit", TableEventCallback, (void*)feature->details.nitCB);
+                    EventsRegisterListenerByName("DVB.NIT", TableEventCallback, (void*)feature->details.nitCB);
                     break;
                 case PLUGIN_FEATURE_TYPE_TDTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed TDT processor.\n", pluginInterface->name);
-                    EventsRegisterListenerByName("dvb.tdt", TableEventCallback, (void*)feature->details.tdtCB);
+                    EventsRegisterListenerByName("DVB.TDT", TableEventCallback, (void*)feature->details.tdtCB);
                     break;
 #endif
 #if defined(ENABLE_ATSC)
                 case PLUGIN_FEATURE_TYPE_MGTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed MGT processor.\n", pluginInterface->name);
-                    EventsRegisterListenerByName("atsc.mgt", TableEventCallback, (void*)feature->details.mgtCB);
+                    EventsRegisterListenerByName("ATSC.MGT", TableEventCallback, (void*)feature->details.mgtCB);
                     break;
                 case PLUGIN_FEATURE_TYPE_STTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed STT processor.\n", pluginInterface->name);
-                    EventsRegisterListenerByName("atsc.stt", TableEventCallback, (void*)feature->details.sttCB);
+                    EventsRegisterListenerByName("ATSC.STT", TableEventCallback, (void*)feature->details.sttCB);
                     break;
                 case PLUGIN_FEATURE_TYPE_VCTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Installed VCT processor.\n", pluginInterface->name);
-                    EventsRegisterListenerByName("atsc.vct", TableEventCallback, (void*)feature->details.vctCB);
+                    EventsRegisterListenerByName("ATSC.VCT", TableEventCallback, (void*)feature->details.vctCB);
                     break;
 #endif
                 case PLUGIN_FEATURE_TYPE_INSTALL:
@@ -326,11 +326,11 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface)
                     break;     
                 case PLUGIN_FEATURE_TYPE_PATPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled PAT processor.\n", pluginInterface->name);
-                    EventsUnregisterListenerByName("mpeg2.pat", TableEventCallback, (void*)feature->details.patCB);
+                    EventsUnregisterListenerByName("MPEG2.PAT", TableEventCallback, (void*)feature->details.patCB);
                     break;
                 case PLUGIN_FEATURE_TYPE_PMTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled PMT processor.\n", pluginInterface->name);
-                    EventsUnregisterListenerByName("mpeg2.pmt", TableEventCallback,(void*)feature->details.pmtCB);                    
+                    EventsUnregisterListenerByName("MPEG2.PMT", TableEventCallback,(void*)feature->details.pmtCB);                    
                     break;
                 case PLUGIN_FEATURE_TYPE_DELIVERYMETHOD:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled Delivery method.\n", pluginInterface->name);
@@ -339,29 +339,29 @@ static void PluginManagerUninstallPlugin(Plugin_t *pluginInterface)
 #if defined(ENABLE_DVB)
                 case PLUGIN_FEATURE_TYPE_SDTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled SDT processor.\n", pluginInterface->name);
-                    EventsUnregisterListenerByName("dvb.sdt", TableEventCallback, (void*)feature->details.sdtCB);
+                    EventsUnregisterListenerByName("DVB.SDT", TableEventCallback, (void*)feature->details.sdtCB);
                     break;
                 case PLUGIN_FEATURE_TYPE_NITPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled NIT processor.\n", pluginInterface->name);
-                    EventsUnregisterListenerByName("dvb.nit", TableEventCallback, (void*)feature->details.nitCB);
+                    EventsUnregisterListenerByName("DVB.NIT", TableEventCallback, (void*)feature->details.nitCB);
                     break;
                 case PLUGIN_FEATURE_TYPE_TDTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled TDT processor.\n", pluginInterface->name);
-                    EventsUnregisterListenerByName("dvb.tdt", TableEventCallback, (void*)feature->details.tdtCB);
+                    EventsUnregisterListenerByName("DVB.TDT", TableEventCallback, (void*)feature->details.tdtCB);
                     break;
 #endif
 #if defined(ENABLE_ATSC)
                 case PLUGIN_FEATURE_TYPE_MGTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled MGT processor.\n", pluginInterface->name);
-                    EventsUnregisterListenerByName("atsc.mgt", TableEventCallback, (void*)feature->details.mgtCB);
+                    EventsUnregisterListenerByName("ATSC.MGT", TableEventCallback, (void*)feature->details.mgtCB);
                     break;
                 case PLUGIN_FEATURE_TYPE_STTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled STT processor.\n", pluginInterface->name);
-                    EventsUnregisterListenerByName("atsc.stt", TableEventCallback, (void*)feature->details.sttCB);
+                    EventsUnregisterListenerByName("ATSC.STT", TableEventCallback, (void*)feature->details.sttCB);
                     break;
                 case PLUGIN_FEATURE_TYPE_VCTPROCESSOR:
                     LogModule(LOG_DEBUGV, PLUGINMANAGER,"plugin %s: Uninstalled VCT processor.\n", pluginInterface->name);
-                    EventsUnregisterListenerByName("atsc.vct", TableEventCallback, (void*)feature->details.vctCB);
+                    EventsUnregisterListenerByName("ATSC.VCT", TableEventCallback, (void*)feature->details.vctCB);
                     break;
 #endif
                 case PLUGIN_FEATURE_TYPE_INSTALL:
