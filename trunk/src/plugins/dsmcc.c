@@ -292,8 +292,8 @@ static void HandleTuningMultiplexChanged(void *arg, Event_t event, void *payload
             DSMCCPID_t *pid = ListIterator_Current(pidIterator);
             if (session->service->multiplexUID == mux->uid)
             {
-                dsmccPID->sectionFilter = dvbpsi_AttachSections(DSMCCSectionCallback, dsmccPID);
-                TSFilterGroupAddSectionFilter(session->filterGroup, pid, DSMCC_FILTER_PRIORITY, dsmccPID->sectionFilter);
+                pid->sectionFilter = dvbpsi_AttachSections(DSMCCSectionCallback, pid);
+                TSFilterGroupAddSectionFilter(session->filterGroup, pid->pid, DSMCC_FILTER_PRIORITY, pid->sectionFilter);
 
             }
             else
@@ -312,13 +312,16 @@ static void HandleTuningMultiplexChanged(void *arg, Event_t event, void *payload
 
 static void EnableSession(DSMCCSession_t *session)
 {
+    Service_t *service;
     if (session->downloadSession)
     {
         ObjectRefDec(session->downloadSession);
     }
+    service = ServiceFilterServiceGet(session->filter);
+    session->downloadSession = DownloadSessionGet(service);
 }
 
-static DSMCCDownloadSession_t *GetDownloadSession(Service_t *service)
+static DSMCCDownloadSession_t *DownloadSessionGet(Service_t *service)
 {
     ListIterator_t iterator;    
     DSMCCDownloadSession_t *session;
@@ -413,6 +416,6 @@ static void DownloadSessionPIDRemove(DSMCCDownloadSession_t *session, uint16_t p
 
 static void DSMCCSectionCallback(void *p_cb_data, dvbpsi_handle h_dvbpsi, dvbpsi_psi_section_t* p_section)
 {
-    DSMCCPID_t *dsmccPID = p_cb_data;
+    /*DSMCCPID_t *dsmccPID = p_cb_data;*/
     
 }
