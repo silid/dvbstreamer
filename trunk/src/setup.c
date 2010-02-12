@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
     while (TRUE)
     {
         int c;
-        c = getopt(argc, argv, "vVdro:a:t:s:c:A:l:hL:");
+        c = getopt(argc, argv, "vVdro:a:t:s:S:c:A:l:hL:");
         if (c == -1)
         {
             break;
@@ -125,6 +125,10 @@ int main(int argc, char *argv[])
             case 's':
                 channelsFile = optarg;
                 channelsFileType = DELSYS_DVBS;
+                break;
+            case 'S':
+                channelsFile = optarg;
+                channelsFileType = DELSYS_DVBS2;
                 break;
             case 'c':
                 channelsFile = optarg;
@@ -192,7 +196,7 @@ int main(int argc, char *argv[])
 
 
 #if defined(ENABLE_DVB)
-    if ((channelsFileType == FE_QPSK) && (lnbInfo.lowFrequency == 0))
+    if (((channelsFileType == DELSYS_DVBS) || (channelsFileType == DELSYS_DVBS2)) && (lnbInfo.lowFrequency == 0))
     {
         fprintf(stderr, "No LNB information provide for DVB-S channels.conf file!\n");
         exit(1);
@@ -210,11 +214,11 @@ int main(int argc, char *argv[])
         usage(argv[0]);
         exit(1);
     }
-    /*rc = DBaseTransactionBegin();
+    rc = DBaseTransactionBegin();
     if (rc != SQLITE_OK)
     {
         LogModule(LOG_ERROR, SETUP, "Begin Transaction failed (%d:%s)\n", rc, sqlite3_errmsg(DBaseConnectionGet()));
-    }*/
+    }
 
     LogModule(LOG_INFO, SETUP, "Importing services from %s\n", channelsFile);
     if (!parsezapfile(channelsFile, channelsFileType))
@@ -223,7 +227,7 @@ int main(int argc, char *argv[])
     }
 
 #if defined(ENABLE_DVB)
-    if (channelsFileType == FE_QPSK)
+    if ((channelsFileType == DELSYS_DVBS) || (channelsFileType == DELSYS_DVBS2))
     {
         /* Write out LNB settings. */
         DBaseMetadataSetInt(METADATA_NAME_LNB_LOW_FREQ, lnbInfo.lowFrequency * 1000);
@@ -234,12 +238,12 @@ int main(int argc, char *argv[])
 
     DBaseMetadataSetInt(METADATA_NAME_SCAN_ALL, 1);
     rc = 0;
-    /*rc = DBaseTransactionCommit();
+    rc = DBaseTransactionCommit();
     if (rc != SQLITE_OK)
     {
         LogModule(LOG_ERROR, SETUP, "Begin Transaction failed (%d:%s)\n", rc, sqlite3_errmsg(DBaseConnectionGet()));
     }
-    */
+
     printf("%d Services available on %d Multiplexes\n", ServiceCount(), MultiplexCount());
 
     DEINIT(ServiceDeInit(), "service");
@@ -271,6 +275,8 @@ static void usage(char *appname)
             "\n"
             "      -s <file>     : Satellite channels.conf file to import services and \n"
             "                      multiplexes from.(DVB-S)\n"
+            "      -S <file>     : DVB-S/S2 Satellite  channels.conf file to import services and \n"
+            "                      multiplexes from. NOTE: File must be in VDR format!"
             "      -l <LNB Type> : (DVB-S Only) Set LNB type being used\n"
             "                      (Use -l help to print types) or \n"
             "      -l <low>,<high>,<switch> Specify LO frequencies in MHz\n"
