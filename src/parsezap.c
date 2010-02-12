@@ -27,6 +27,8 @@ Majority of the parsing code taken from the xine input_dvb plugin code.
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
+#include <errno.h>
 #include "multiplexes.h"
 #include "services.h"
 #include "logging.h"
@@ -42,6 +44,12 @@ typedef struct
     char *value;
 }
 Param;
+
+typedef struct
+{
+    int value;
+    char *text;
+}VDRParam;
 
 /*******************************************************************************
 * Prototypes                                                                   *
@@ -87,6 +95,23 @@ static const Param fec_list [] =
         { NULL, 0 }
     };
 
+static const VDRParam vdr_fec_list[] =
+    {
+        {  0, "NONE"},
+        { 12, "1/2" },
+        { 23, "2/3" },
+        { 34, "3/4" },
+        { 35, "3/5" },
+        { 45, "4/5" },
+        { 56, "5/6" },
+        { 67, "6/7" },
+        { 78, "7/8" },
+        { 89, "8/9" },
+        {910, "9/10" },
+        {999, "AUTO" },
+        {0, NULL}
+    };
+    
 static const Param guard_list [] =
     {
         {"GUARD_INTERVAL_1_16", "1/16" },
@@ -123,6 +148,20 @@ static const Param modulation_list [] =
         { NULL, 0 }
     };
 
+static const VDRParam vdr_modulation_list[] = 
+    {
+        { 16, "16QAM"},
+        { 32, "32QAM"},
+        { 64, "64QAM"},
+        {128, "128QAM"},
+        {256, "256QAM"},
+        {  2, "QPSK"},
+        {  5, "8PSK"},
+        {  6, "16APSK"},
+        { 998, "AUTO"},
+        {   0, NULL}
+    };
+
 static const Param transmissionmode_list [] =
     {
         { "TRANSMISSION_MODE_2K", "2000" },
@@ -130,6 +169,15 @@ static const Param transmissionmode_list [] =
         { "TRANSMISSION_MODE_AUTO", "AUTO" },
         { NULL, 0 }
     };
+
+static const VDRParam vdr_rolloff_list[] = 
+    {
+        {20, "0.20"},
+        {25, "0.25"},            
+        {35, "0.35"},
+        { 0, NULL}
+    };
+    
 static const char PARSEZAP[] = "ParseZap";
 
 /*******************************************************************************
@@ -140,19 +188,27 @@ int parsezapfile(char *path, DVBDeliverySystem_e delSys)
     FILE      *f;
     char       str[255];
     int        result;
-
+    int        line = 0;
+    
     f = fopen(path, "rb");
     if (!f)
     {
         LogModule(LOG_ERROR, PARSEZAP, "Failed to open dvb channel file '%s'\n", path);
         return 0;
     }
-
+    
     while ( fgets (str, sizeof(str), f))
     {
         result = parsezapline(str, delSys);
+        if (result == -1)
+        {
+            fprintf(stderr, "Syntax error at line %d\n", line + 1);
+            break;
+        }
+        line ++;
     }
-
+    
+    fclose(f);
     return 1;
 }
 
@@ -167,6 +223,33 @@ static char * find_param(const Param *list, const char *name)
         list++;
     }
     return list->value;;
+}
+
+static char *find_vdr_param(const VDRParam *list, char *field, char **next)
+{
+    char fieldChar;
+    fieldChar = *field;
+    field ++; /* Skip field character */
+    if (*field)
+    {
+        int value;
+        errno = 0;
+        value = strtol(field, next, 10);
+
+        if ((errno == 0) && (field != *next))
+        {
+            int i;
+            for (i = 0; list[i].text; i ++)
+            {
+                if (list[i].value == value)
+                {
+                    return list[i].text;
+                }
+            }
+        }
+    }
+    fprintf(stderr, "Invalid value for parameter '%C'\n", fieldChar);
+    return NULL;
 }
 
 static int findMultiplex(DVBDeliverySystem_e delSys, char *freq, char *polarisation, char *satelliteNumber, Multiplex_t **mux)
@@ -192,6 +275,7 @@ static int findMultiplex(DVBDeliverySystem_e delSys, char *freq, char *polarisat
             {
                 if ((delSys == DELSYS_DVBS) || (delSys == DELSYS_DVBS2))
                 {
+
                     node = YamlUtils_MappingFind(&document, root, "Polarisation");
                     if (node && (node->type == YAML_SCALAR_NODE) && (strcmp((char*)node->data.scalar.value, polarisation) == 0))
                     {
@@ -222,9 +306,12 @@ static int findMultiplex(DVBDeliverySystem_e delSys, char *freq, char *polarisat
 static int parsezapline(char * str, DVBDeliverySystem_e delSys)
 {
     /*
-        try to extract channel data from a string in the following format
+        try to extract channel data from a string in the following format        
         (DVBS) QPSK: <channel name>:<frequency>:<polarisation>:<sat_no>:
                         <sym_rate>:<vpid>:<apid>:<service id>
+        (DVBS2) VDR Foramt: <channel name>:
+                        <frequency>:<polarization[coderate][delivery][modulation][rolloff]>:
+                        <sat_no>:<symbolrate>:<vpids>:<apids>:<tpid>:<ca>:<service_id>:<net id>:<ts id>:<radio id>
         (DVBC) QAM:  <channel name>:<frequency>:<inversion>:<sym_rate>:<fec>:
                         <qam>:<vpid>:<apid>:<service id>
         (DVBT) OFDM: <channel name>:<frequency>:<inversion>:<bw>:<fec_hp>:
@@ -263,7 +350,8 @@ static int parsezapline(char * str, DVBDeliverySystem_e delSys)
     int id;
     int source;
     Multiplex_t *mux;
-
+    DVBDeliverySystem_e muxDelSys = delSys;
+    
     tmp = str;
     params[0] = 0;
 #define NEXTFIELD() if(!(field = strsep(&tmp, ":")))return -1
@@ -297,11 +385,122 @@ static int parsezapline(char * str, DVBDeliverySystem_e delSys)
             NEXTFIELD();
             strncpy(satelliteNumber, field, sizeof(satelliteNumber) - 1);
             satelliteNumber[sizeof(satelliteNumber) - 1] = 0;
-            PARAMADD("Satellite: %lu\n",  strtoul(field, NULL, 0));
+            PARAMADD("Satellite Number: %lu\n",  strtoul(field, NULL, 0));
             /* symbol rate */
             NEXTFIELD();
             PARAMADD("Symbol Rate: %lu\n", strtoul(field, NULL, 0) * 1000);
             PARAMADD("FEC: AUTO\n");
+        break;
+        case DELSYS_DVBS2:
+            muxDelSys = DELSYS_MAX_SUPPORTED;
+            SETFREQ(freq * 1000);
+            PARAMADD("Inversion: AUTO\n");
+            /* find out the polarisation */
+            NEXTFIELD();
+            {
+                char *fec = NULL;
+                char *modulation = NULL;
+                char *rolloff = NULL;
+                while (field && *field) 
+                {
+                    switch (toupper(*field)) 
+                    {
+                    case 'C':
+                        fec = find_vdr_param(vdr_fec_list, field, &field);
+                        break;
+
+                    case 'H':
+                        polarisation  = "Horizontal";
+                        field++;
+                        break;
+
+                    case 'I':/* ignore */
+                        strtol(field + 1, &field, 10);
+                        break;
+
+                    case 'L':
+                        polarisation  = "Left";
+                        field++;
+                        break;
+
+                    case 'M':
+                        modulation = find_vdr_param(vdr_modulation_list, field, &field);
+                        break;
+
+                    case 'Z':
+                    case 'O':
+                        rolloff = find_vdr_param(vdr_rolloff_list, field, &field);
+                        break;
+
+                    case 'R':
+                        polarisation  = "Right";
+                        field++;
+                        break;
+
+                    case 'S':
+                        if (strtol(field + 1, &field, 10) == 1)
+                        {
+                            muxDelSys = DELSYS_DVBS2;
+                        }
+                        else
+                        {
+                            muxDelSys = DELSYS_DVBS;
+                        }
+                        break;
+
+                    case 'V':
+                        polarisation  = "Vertical";
+                        field++;
+                        break;
+                    default:
+                        return -1;
+
+                    }
+
+                }
+
+                /* default values for empty parameters */
+
+                if (fec == NULL)
+                {
+                    fec = "AUTO";
+                }
+
+                if (modulation == NULL)
+                {
+                    modulation = "QPSK";
+                }
+
+                if (muxDelSys == DELSYS_MAX_SUPPORTED)
+                {
+                    muxDelSys =  DELSYS_DVBS;
+                }
+
+                if (rolloff == NULL)
+                {
+                    rolloff = "0.35";
+                }
+
+                if (polarisation == NULL)
+                {
+                    polarisation = "Vertical";
+                }
+                    
+
+                PARAMADD("Modulation: %s\n", modulation);
+                PARAMADD("Polarisation: %s\n", polarisation); 
+                PARAMADD("FEC: %s\n", fec);
+                PARAMADD("Roll-off: %s\n", rolloff);
+                PARAMADD("Pilot: AUTO\n");
+            }
+            /* satellite number - ignored not a number but a position */
+            NEXTFIELD();
+            PARAMADD("Satellite Number: 0\n");
+            strcpy(satelliteNumber, "0");
+            /* symbol rate */
+            NEXTFIELD();
+            PARAMADD("Symbol Rate: %lu\n", strtoul(field, NULL, 0) * 1000);
+
         break;
         case DELSYS_DVBC:
             SETFREQ(freq);
@@ -372,16 +571,24 @@ static int parsezapline(char * str, DVBDeliverySystem_e delSys)
             break;
     }
 
-    if (findMultiplex(delSys, frequency, polarisation, satelliteNumber, &mux))
+    if (findMultiplex(muxDelSys, frequency, polarisation, satelliteNumber, &mux))
     {
         LogModule(LOG_DEBUGV, PARSEZAP, "Adding frequency %d (delivery system %d)\n", freq, delSys);
-        MultiplexAdd(delSys, params, &mux);
+        MultiplexAdd(muxDelSys, params, &mux);
     }
 
     /* Video PID - not used */
     NEXTFIELD();
     /* Audio PID - not used */
     NEXTFIELD();
+
+    if (delSys == DELSYS_DVBS2)
+    {
+        /* skip vdr fields */
+        NEXTFIELD();
+        NEXTFIELD();        
+    }
+    
     /* service ID */
     NEXTFIELD();
     id = strtoul(field, NULL, 0);
