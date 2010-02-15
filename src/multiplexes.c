@@ -152,8 +152,8 @@ Multiplex_t *MultiplexGetNext(MultiplexEnumerator_t enumerator)
         Multiplex_t *multiplex;
         multiplex = MultiplexNew();
         multiplex->uid = STATEMENT_COLUMN_INT(0);
-        multiplex->tsId = STATEMENT_COLUMN_INT(1);
-        multiplex->networkId = STATEMENT_COLUMN_INT(2);
+        multiplex->tsId = STATEMENT_COLUMN_INT(1) & 0xffff;
+        multiplex->networkId = STATEMENT_COLUMN_INT(2) & 0xffff;
         multiplex->deliverySystem = STATEMENT_COLUMN_INT(3);
         multiplex->patVersion = -1;
         tmp = STATEMENT_COLUMN_TEXT(4);
@@ -275,12 +275,12 @@ int MultiplexNetworkIdSet(Multiplex_t *multiplex, int netid)
 int MultiplexEventToString(yaml_document_t *document, Event_t event,void * payload)
 {
     Multiplex_t *mux = payload;
-    char idStr[10];
+    char idStr[16];
     int mappingId = yaml_document_add_mapping(document, (yaml_char_t*)YAML_MAP_TAG, YAML_ANY_MAPPING_STYLE);
 
     sprintf(idStr, "%d", mux->uid);
     YamlUtils_MappingAdd(document, mappingId, "Multiplex UID", idStr);
-    sprintf(idStr, "%04x.%04x", mux->networkId, mux->tsId);
+    sprintf(idStr, "%04x.%04x", mux->networkId & 0xffff, mux->tsId & 0xffff);
     YamlUtils_MappingAdd(document, mappingId, "Multiplex ID", idStr);
     return mappingId;
 }
