@@ -397,7 +397,7 @@ bool TSFilterGroupAddPacketFilter(TSFilterGroup_t *group, uint16_t pid, TSPacket
 
     if (pid > TSREADER_PID_ALL)
     {
-        LogModule(LOG_ERROR, TSREADER, "Invalid PID %u supplied to %s", pid, __func__);
+        LogModule(LOG_WARNING, TSREADER, "Invalid PID %u supplied to %s", pid, __func__);
         return FALSE;
     }
     

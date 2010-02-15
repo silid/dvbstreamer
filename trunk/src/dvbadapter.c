@@ -194,6 +194,8 @@ static const char TAG_TRANSMISSION_MODE[]= "Transmission Mode";
 static const char TAG_HIERARCHY[]        = "Hierarchy";
 static const char TAG_POLARISATION[]     = "Polarisation";
 static const char TAG_SATELLITE_NUMBER[] = "Satellite Number";
+static const char TAG_ROLL_OFF[]         = "Roll Off";
+static const char TAG_PILOT[]            = "Pilot";
 
 static StringToParamMapping_t modulationMapping[] = {
     {"QPSK", QPSK},
@@ -282,6 +284,22 @@ static StringToParamMapping_t polarisationMapping[] = {
     STRINGTOPARAMMAPPING_SENTINEL
 };
 
+#if  DVB_API_VERSION >= 5   
+static StringToParamMapping_t rollOffMapping[] = {
+    {"0.20", ROLLOFF_20},
+    {"0.25", ROLLOFF_25},
+    {"0.35", ROLLOFF_35},
+    {"AUTO", ROLLOFF_AUTO},
+    STRINGTOPARAMMAPPING_SENTINEL
+};
+
+static StringToParamMapping_t pilotMapping[] = {
+    {"ON", PILOT_ON},
+    {"OFF", PILOT_OFF},        
+    {"AUTO", PILOT_AUTO},
+    STRINGTOPARAMMAPPING_SENTINEL
+};
+#endif
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
@@ -728,11 +746,21 @@ static int DVBFrontEndSatelliteSetup(DVBAdapter_t *adapter)
     struct dvb_diseqc_master_cmd cmd =
        {{0xe0, 0x10, 0x38, 0xf0, 0x00, 0x00}, 4};
 
+#define CHECK_IFREQ(_freq) \
+    do{\
+        if (((_freq) < adapter->info.frequency_min) || ((_freq) > adapter->info.frequency_max))\
+        {\
+            LogModule(LOG_ERROR, DVBADAPTER, "IFreq (%lu) outside of adapters range (%lu ... %lu), wrong LNB settings?", (_freq),  adapter->info.frequency_min,  adapter->info.frequency_max); \
+        }\
+    }\
+    while(0)
+
 #if (DVB_API_VERSION < 5) || defined(USE_V3)
     adapter->frontEndParams->frequency = LNBTransponderToIntermediateFreq(&adapter->lnbInfo, adapter->frontEndParams->frequency, &tone);
+    CHECK_IFREQ(adapter->frontEndParams->frequency);
 #else
-
     adapter->frontEndPropertyArray[1].u.data = LNBTransponderToIntermediateFreq(&adapter->lnbInfo, adapter->frontEndPropertyArray[1].u.data, &tone);
+    CHECK_IFREQ(adapter->frontEndPropertyArray[1].u.data);
 #endif
 
 
@@ -1431,6 +1459,15 @@ static void ConvertYamlToDTVProperties(DVBDeliverySystem_e delSys, yaml_document
             adapter->satelliteSettings.polarisation = MapYamlNode(doc, TAG_POLARISATION, polarisationMapping, POL_HORIZONTAL);
             adapter->satelliteSettings.satellite_number = ConvertYamlNode(doc, TAG_SATELLITE_NUMBER,  ConvertStringToUInt32, 0);
             break;
+        case DELSYS_DVBS2:
+            ADD_U32_PROPERTY(DTV_MODULATION, MapYamlNode(doc, TAG_MODULATION, modulationMapping, QPSK));
+            ADD_U32_PROPERTY(DTV_INNER_FEC, MapYamlNode(doc, TAG_FEC, fecMapping, FEC_AUTO));
+            ADD_U32_PROPERTY(DTV_SYMBOL_RATE,ConvertYamlNode(doc, TAG_SYMBOL_RATE, ConvertStringToUInt32, 0));
+            ADD_U32_PROPERTY(DTV_PILOT, MapYamlNode(doc, TAG_PILOT, pilotMapping, PILOT_AUTO));
+            ADD_U32_PROPERTY(DTV_ROLLOFF, MapYamlNode(doc, TAG_ROLL_OFF, rollOffMapping, ROLLOFF_AUTO));
+            adapter->satelliteSettings.polarisation = MapYamlNode(doc, TAG_POLARISATION, polarisationMapping, POL_HORIZONTAL);
+            adapter->satelliteSettings.satellite_number = ConvertYamlNode(doc, TAG_SATELLITE_NUMBER,  ConvertStringToUInt32, 0);
+            break;
         case DELSYS_DVBC:
             ADD_U32_PROPERTY(DTV_INNER_FEC, MapYamlNode(doc, TAG_FEC, fecMapping, FEC_AUTO));
             ADD_U32_PROPERTY(DTV_SYMBOL_RATE,ConvertYamlNode(doc, TAG_SYMBOL_RATE, ConvertStringToUInt32, 0));
@@ -1468,6 +1505,17 @@ static void ConvertDTVPropertiesToYaml(DVBDeliverySystem_e delSys, struct dtv_pr
             YamlUtils_MappingAdd(doc, 1, TAG_FEC, MapValueToString(fecMapping, feparams->props[3].u.data, "AUTO"));
             sprintf(temp, "%u", feparams->props[4].u.data);
             YamlUtils_MappingAdd(doc, 1, TAG_SYMBOL_RATE, temp); 
+            YamlUtils_MappingAdd(doc, 1, TAG_POLARISATION, MapValueToString(polarisationMapping, satSettings->polarisation, "Horizontal"));
+            sprintf(temp, "%u", satSettings->satellite_number);
+            YamlUtils_MappingAdd(doc, 1, TAG_SATELLITE_NUMBER, temp); 
+            break;
+        case DELSYS_DVBS2:
+            YamlUtils_MappingAdd(doc, 1, TAG_MODULATION, MapValueToString(modulationMapping, feparams->props[3].u.data, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_FEC, MapValueToString(fecMapping, feparams->props[4].u.data, "AUTO"));
+            sprintf(temp, "%u", feparams->props[5].u.data);
+            YamlUtils_MappingAdd(doc, 1, TAG_SYMBOL_RATE, temp); 
+            YamlUtils_MappingAdd(doc, 1, TAG_PILOT,MapValueToString(pilotMapping, feparams->props[6].u.data, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_ROLL_OFF,MapValueToString(rollOffMapping, feparams->props[7].u.data, "AUTO"));
             YamlUtils_MappingAdd(doc, 1, TAG_POLARISATION, MapValueToString(polarisationMapping, satSettings->polarisation, "Horizontal"));
             sprintf(temp, "%u", satSettings->satellite_number);
             YamlUtils_MappingAdd(doc, 1, TAG_SATELLITE_NUMBER, temp); 

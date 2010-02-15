@@ -487,11 +487,14 @@ static int parsezapline(char * str, DVBDeliverySystem_e delSys)
                 }
                     
 
-                PARAMADD("Modulation: %s\n", modulation);
                 PARAMADD("Polarisation: %s\n", polarisation); 
                 PARAMADD("FEC: %s\n", fec);
-                PARAMADD("Roll-off: %s\n", rolloff);
-                PARAMADD("Pilot: AUTO\n");
+                if (muxDelSys == DELSYS_DVBS2)
+                {
+                    PARAMADD("Modulation: %s\n", modulation);
+                    PARAMADD("Roll Off: %s\n", rolloff);
+                    PARAMADD("Pilot: AUTO\n");
+                }
             }
             /* satellite number - ignored not a number but a position */
             NEXTFIELD();
