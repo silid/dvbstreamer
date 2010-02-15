@@ -1,7 +1,5 @@
 ## Process this file with automake to produce Makefile.in
 
-INCLUDES = @INCLTDL@
-
 AM_CFLAGS =\
      -I$(top_srcdir)/include -Wall -Werror -D_GNU_SOURCE
 
@@ -77,7 +75,7 @@ dvbstreamer_SOURCES = \
 dvbstreamer_LDFLAGS = -rdynamic -Wl,-whole-archive -Wl,dvbpsi/libdvbpsi.a -Wl,-no-whole-archive
 
 dvbstreamer_LDADD = \
-	  -lpthread -lsqlite3 -lreadline -lev -lyaml @GETTIME_LIB@ @ICONV_LIB@ @READLINE_TERMCAP@ @LIBLTDL@
+	  -lpthread -lsqlite3 -lreadline -lev -lyaml @GETTIME_LIB@ @ICONV_LIB@ @READLINE_TERMCAP@ -lltdl
 
 
 if ENABLE_FSTREAMER
@@ -94,7 +92,7 @@ fdvbstreamer_SOURCES = \
 fdvbstreamer_LDFLAGS = -rdynamic -Wl,-whole-archive -Wl,dvbpsi/libdvbpsi.a -Wl,-no-whole-archive
 
 fdvbstreamer_LDADD = \
-	  -lpthread -lsqlite3 -lreadline -lev  -lyaml @GETTIME_LIB@ @ICONV_LIB@ @READLINE_TERMCAP@ @LIBLTDL@
+	  -lpthread -lsqlite3 -lreadline -lev  -lyaml @GETTIME_LIB@ @ICONV_LIB@ @READLINE_TERMCAP@ -lltdl
 else
 fstreamer_app =
 endif

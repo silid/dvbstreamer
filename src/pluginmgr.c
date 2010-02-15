@@ -22,9 +22,9 @@ Plugin Manager functions.
 */
 #include <stdlib.h>
 #include <string.h>
+#include <ltdl.h>
 
 #include "config.h"
-#include "ltdl.h"
 #include "list.h"
 #include "deliverymethod.h"
 #include "pluginmgr.h"
