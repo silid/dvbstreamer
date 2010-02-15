@@ -26,7 +26,6 @@ AC_DEFINE_UNQUOTED(DVBSTREAMER_VERSION, ((DVBSTREAMER_MAJOR<<24) | (DVBSTREAMER_
 SPEC_VERSION=$DVBSTREAMER_MAJOR.$DVBSTREAMER_MINOR.$DVBSTREAMER_MICRO
 AM_INIT_AUTOMAKE("dvbstreamer", $SPEC_VERSION)
 
-AC_CONFIG_SUBDIRS(libltdl)
 AM_CONFIG_HEADER(config.h)
 
 AC_ISC_POSIX
@@ -43,11 +42,8 @@ CFLAGS="$CFLAGS -fno-strict-aliasing"
 dnl ---------------------------------------------------------------------------
 dnl Libltdl setup
 dnl ---------------------------------------------------------------------------
-AC_LIBTOOL_DLOPEN
-AC_LIBLTDL_CONVENIENCE
-AC_PROG_LIBTOOL
-AC_SUBST(INCLTDL)
-AC_SUBST(LIBLTDL)
+LT_PREREQ([2.2.6])
+LT_INIT([dlopen win32-dll disable-static])
 
 dnl ---------------------------------------------------------------------------
 dnl Work out the libdir name (copied from xine-lib configure.ac)

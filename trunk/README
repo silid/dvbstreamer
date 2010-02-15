@@ -9,52 +9,62 @@ PCR PID.
 Requirements
 ------------
 DVBStreamer requires the following libraries:
-sqlite3 (http://www.sqlite.org/)
-readline 
+ 
+ - sqlite3 (>= 3.3)
+ - readline 
+ - libltdl (>= 2.2.6b)
+ - libyaml 
 
-(libdvbpsi is no longer need as this has been included in DVBStreamer since 0.7)
 
 Installation
 ------------
 
-Before building dvbstreamer you will need the latest version of the following packages:
-sqlite3     3.3.x
-readline
-
-Now download and extract the latest source from the sourceforge download page
-
-Once you've done that the next thing to do is run configure to setup the makefile, to do this enter the following at the command prompt (add any options you would normal add when building using configure)
+After installing the dependancies and extracting the source run configure to 
+setup the makefile. To do this enter the following at the command prompt (add 
+any options you would normal add when building using configure).
 
 ./configure
 
-When configure has finished and created all the make files its just a matter of running make to build the application
+When configure has finished and created all the makefiles its just a matter of 
+running make to build the application.
 
 make
 
-Once make has finished doing its thing the next step is installing dvbstreamer to you chosen location. You will probably want to do this step as root
+Once make has finished doing its thing the next step is installing dvbstreamer 
+to you chosen location. You will probably want to do this step as root.
 
 make install
 
 Setup
 -----
-Before you can actually start to use dvbstreamer you need to initialise it's database of service to do this you'll need a channels.conf file produces by the linuxtv.org utility scan. Go here if you need help with scan.
+Before you can actually start to use dvbstreamer you need to initialise it's 
+database of service to do this you'll need a channels.conf file produces by the 
+linuxtv.org utility scan. Go here if you need help with scan.
 
-When you have a channels.conf file you then need to run setupdvbstreamer with the file you've just created.
-To setup dvbstreamer to use a terrestrial tuner on adapter 0 use the following command:
+When you have a channels.conf file you then need to run setupdvbstreamer with 
+the file you've just created.
+
+To setup dvbstreamer to use a terrestrial tuner on adapter 0 use the following 
+command:
 
 setupdvbstreamer -t channels.conf
 
-To setup dvbstreamer to use a satellite tuner on adapter 0 use the following command:
+To setup dvbstreamer to use a satellite tuner on adapter 0 use the following 
+command:
 
 setupdvbstreamer -s channels.conf
 
-To setup dvbstreamer to use a cable tuner on adapter 0 use the following command:
+To setup dvbstreamer to use a cable tuner on adapter 0 use the following 
+command:
 
 setupdvbstreamer -c channels.conf
         
-If you are setting up an adapter other than 0 add the -a <adapter number> option to the commands above.
+If you are setting up an adapter other than 0 add the -a <adapter number> option
+to the commands above.
 
-If you have 2 or more cards of the same type in your system you can link the first cards database to the second cards database by simply creating a hard link in the dvbstreamer directory in your home directory ~/.dvbstreamer
+If you have 2 or more cards of the same type in your system you can link the 
+first cards database to the second cards database by simply creating a hard link
+in the dvbstreamer directory in your home directory ~/.dvbstreamer
 
 for example to use the same database for card 1 and 2 you would do the following
 
@@ -63,40 +73,50 @@ ln ~/.dvbstreamer/adapter1.db ~/.dvbstreamer/adapter2.db
 
 Running
 --------
-  Starting DVBStreamer
+  * Starting DVBStreamer
 
-  Using a Startup file
+  * Using a Startup file
 
-  MRLs
+  * MRLs
 
 Starting DVBStreamer
 --------------------
-To start dvbstreamer you need to specify an IP address and a UDP port where the selected service will be streamed to. You can also optionally specify which adapter to use using the -a option.
+To start dvbstreamer you need to specify an IP address and a UDP port where the 
+selected service will be streamed to. You can also optionally specify which 
+adapter to use using the -a option.
 
-For example to start dvbstreamer using adapter 2 and send the selected service to 192.168.1.1 and UDP port 1234 you would use the following command
+For example to start dvbstreamer using adapter 2 and send the selected service 
+to 192.168.1.1 and UDP port 1234 you would use the following command
 
 dvbstreamer -a 2 -o udp://192.168.1.1:1234
 
-To select a service to stream use the select command (see the Commands section for more information).
+To select a service to stream use the select command (see the Commands section 
+for more information).
 
 For example:
 
-select BBC ONE
+select "BBC ONE"
 
-Will tune to the multiplex that contains BBC ONE and stream all the packets belonging to that service to 192.168.1.1:1234 over udp.
+Will tune to the multiplex that contains BBC ONE and stream all the packets 
+belonging to that service to 192.168.1.1:1234 over udp.
 
-The stats command can be used to verify that packets are being processed and set to the selected output destination.
+The stats command can be used to verify that packets are being processed and set
+to the selected output destination.
 
 For information on other commands see the Commands section.
 
 Start up files
 --------------
 
-Start up files can be useful for doing things that you always want to be setup before you get to the dvbstreamer prompt. For example you may always want the TDT and EIT tables redirected to a specific UDP port on your local computer.
+Start up files can be useful for doing things that you always want to be setup 
+before you get to the dvbstreamer prompt. For example you may always want the 
+TDT and EIT tables redirected to a specific UDP port on your local computer.
 
-To use a startup file simple add the -f option on the command line specifying the file to read.
+To use a startup file simple add the -f option on the command line specifying 
+the file to read.
 
-For example to use the file eitredirect to redirect EIT tables to port 1235 on your local computer you would use the following:
+For example to use the file eitredirect to redirect EIT tables to port 1235 on 
+your local computer you would use the following:
 
 dvbstreamer -o udp://localhost:1234 -f eitredirect
 
@@ -106,14 +126,18 @@ And in eitredirect you would have
 addmf eitoutput udp://localhost:1235
 addmfpid eitoutput 0x12
 
-Its as simple as that, you can use all the commands that you can use on the dvbstreamer prompt.
+Its as simple as that, you can use all the commands that you can use on the 
+dvbstreamer prompt.
 
 MRLs (Media Resource Locator)
 -----------------------------
 
-These are in the form <transport>://<details> and are used to specified how and where to send the output of a service filter or a manual output.
+These are in the form <transport>://<details> and are used to specified how and 
+where to send the output of a service filter or a manual output.
 
-The following MRLs are currently supported (although this list can be extended by plugins):
+The following MRLs are currently supported (although this list can be extended 
+by plugins):
+
 Transport Usage           Description
 -------------------------------------
 udp       udp://host:port Packets are sent via UDP (7 TS packets per UDP packet) 
@@ -149,9 +173,11 @@ Exit the program, can be used in the startup file to stop further processing.
 
 lsservices
 ----------
-Usage:  lsservies [mux | <multiplex frequency>]
+Usage:  lsservices [mux | <multiplex uid>]
 
-Lists all the services currently in the database if no multiplex is specified or if "mux" is specified only the services available of the current mux or if a frequency is specified only the services available on that multiplex.
+Lists all the services currently in the database if no multiplex is specified or
+if "mux" is specified only the services available of the current mux or if a 
+uid is specified only the services available on that multiplex.
 
 lsmuxes
 -------
@@ -163,7 +189,8 @@ select
 ------
 Usage:  select <service name>
 
-Sets the specified service as the service to be streamed to the primary output, this may mean tuning to a different multiplex.
+Sets the specified service as the service to be streamed to the primary output, 
+this may mean tuning to a different multiplex.
 
 current
 -------
@@ -174,7 +201,9 @@ Back serviceinfo
 
 Usage:  serviceinfo <service name>
 
-Displays running status, conditional access status and whether EPG information is present for the specified service. Note only services in the current multiplex can be queried.
+Displays running status, conditional access status and whether EPG information 
+is present for the specified service. Note only services in the current 
+multiplex can be queried.
 
 pids
 ----
@@ -186,7 +215,8 @@ stats
 -----
 Usage:  stats
 
-Display the number of packets processed for the PSI/SI filters and the number of packets filtered for each service filter and manual output.
+Display the number of packets processed for the PSI/SI filters and the number of
+packets filtered for each service filter and manual output.
 
 addsf
 -----
@@ -204,7 +234,8 @@ lssfs
 -----
 Usage:  lssfs
 
-List all secondary service filters their names, destinations and currently selected service.
+List all secondary service filters their names, destinations and currently 
+selected service.
 
 setsf
 -----
@@ -216,19 +247,23 @@ setsfmrl
 --------
 Usage:  setsfmrl <output name> <mrl>
 
-Change the destination for packets sent to this service filters output. If the MRL cannot be parsed no change will be made to the service filter.
+Change the destination for packets sent to this service filters output. If the 
+MRL cannot be parsed no change will be made to the service filter.
 
 setsfavsonly
 ------------
 Usage:  setsfavsonly <output name> on|off
 
-Enabling AVS Only cause the PMT to be rewritten to only include the first video stream, normal audio stream and the subtitles stream only for the specified service output.
+Enabling AVS Only cause the PMT to be rewritten to only include the first video 
+stream, normal audio stream and the subtitles stream only for the specified 
+service output.
 
 festatus
 --------
 Usage:  festatus
 
-Displays whether the front end is locked, the bit error rate and signal to noise ratio and the signal strength
+Displays whether the front end is locked, the bit error rate and signal to noise
+ratio and the signal strength
 
 scan
 ----
@@ -267,7 +302,8 @@ Plugins can:
 - Add new PID filters (for example to extract EPG data)
 - Detect when the service/multiplex is changed.
 
-The commands lsplugins and plugininfo can be used to inspected the loaded plugins.
+The commands lsplugins and plugininfo can be used to inspected the loaded 
+plugins.
 
 Documentation for the interfaces into DVBStreamer can be generated using the
 doxygen and the doxygen.config file in the base directory of dvbstreamer.
@@ -296,11 +332,14 @@ Paul Kelly       - Patch to make festatus command work on DVB-S
 Louis Croisez    - Help finding critical MRL bug and other testing.
 Chris Allison    - Patch to add Series/Content ids to xmltv output.
 Marcel Ritter    - Bug fix
-A C G Mennucc - Several bug fixes/patches.
+A C G Mennucc    - Several bug fixes/patches.
 Tom Albers       - Test stream and testing of patch for support of extended 
                    event descriptors.
+Samuli Suominen  - Patch to remove use of in-tree libltdl and use the system copy
+instead.
 
-VideoLan libdvbpsi Team for the excellent libdvbpsi. (http://www.videolan.org/developers/libdvbpsi.html)
+VideoLan libdvbpsi Team for the excellent libdvbpsi. 
+(http://www.videolan.org/developers/libdvbpsi.html)
 
 History
 -------

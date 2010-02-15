@@ -15,6 +15,7 @@
 * Added [2629610] epgtoxmltv patch to output seriesid and programid in UK EPG
 * Add support for extended event descriptors in EITs. (Test stream supplied by Tom Albers)
 * Complete rewrite of the packet/section filtering code improving readability and performance.
+* Remove libltdl from the packaged source. (see bug 2951692)
 
 1.0
 ---
