@@ -759,8 +759,8 @@ static int DVBFrontEndSatelliteSetup(DVBAdapter_t *adapter)
     adapter->frontEndParams->frequency = LNBTransponderToIntermediateFreq(&adapter->lnbInfo, adapter->frontEndParams->frequency, &tone);
     CHECK_IFREQ(adapter->frontEndParams->frequency);
 #else
-    adapter->frontEndPropertyArray[1].u.data = LNBTransponderToIntermediateFreq(&adapter->lnbInfo, adapter->frontEndPropertyArray[1].u.data, &tone);
-    CHECK_IFREQ(adapter->frontEndPropertyArray[1].u.data);
+    adapter->frontEndPropertyArray[2].u.data = LNBTransponderToIntermediateFreq(&adapter->lnbInfo, adapter->frontEndPropertyArray[2].u.data, &tone);
+    CHECK_IFREQ(adapter->frontEndPropertyArray[2].u.data);
 #endif
 
 
@@ -771,7 +771,8 @@ static int DVBFrontEndSatelliteSetup(DVBAdapter_t *adapter)
    {
       return -1;
    }
-
+   usleep(15000);
+   
    if (ioctl(adapter->frontEndFd, FE_SET_VOLTAGE, adapter->satelliteSettings.polarisation ? SEC_VOLTAGE_13 : SEC_VOLTAGE_18) < 0)
    {
       return -1;
@@ -789,10 +790,13 @@ static int DVBFrontEndSatelliteSetup(DVBAdapter_t *adapter)
       return -1;
    }
    usleep(15000);
+   
    if (ioctl(adapter->frontEndFd, FE_SET_TONE, tone ? SEC_TONE_ON : SEC_TONE_OFF) < 0)
    {
       return -1;
    }
+   usleep(15000);
+   
    return 0;
 }
 
@@ -1161,7 +1165,7 @@ static void DVBCommandCallback(struct ev_loop *loop, ev_io *w, int revents)
 #if (DVB_API_VERSION < 5) || defined(USE_V3)
             adapter->frontEndParams.frequency = adapter->frontEndRequestedFreq;
 #else
-            adapter->frontEndPropertyArray[1].u.data = adapter->frontEndRequestedFreq;
+            adapter->frontEndPropertyArray[2].u.data = adapter->frontEndRequestedFreq;
 #endif
             LogModule(LOG_DEBUG, DVBADAPTER, "Tuning to %d", adapter->frontEndRequestedFreq);
 
@@ -1448,18 +1452,21 @@ static void ConvertYamlToDTVProperties(DVBDeliverySystem_e delSys, yaml_document
         }while(0)
         
     ADD_U32_PROPERTY(DTV_CLEAR,0);
+    ADD_U32_PROPERTY(DTV_DELIVERY_SYSTEM, 0); /* Set this in the switch statement below */
     adapter->frontEndRequestedFreq = ConvertYamlNode(doc, TAG_FREQUENCY,  ConvertStringToUInt32, 0);
     ADD_U32_PROPERTY(DTV_FREQUENCY, adapter->frontEndRequestedFreq);
     ADD_U32_PROPERTY(DTV_INVERSION, MapYamlNode(doc, TAG_INVERSION, inversionMapping, INVERSION_AUTO));
     switch (delSys)
     {
         case DELSYS_DVBS:
+            properties[1].u.data = SYS_DVBS;
             ADD_U32_PROPERTY(DTV_INNER_FEC, MapYamlNode(doc, TAG_FEC, fecMapping, FEC_AUTO));
             ADD_U32_PROPERTY(DTV_SYMBOL_RATE,ConvertYamlNode(doc, TAG_SYMBOL_RATE, ConvertStringToUInt32, 0));
             adapter->satelliteSettings.polarisation = MapYamlNode(doc, TAG_POLARISATION, polarisationMapping, POL_HORIZONTAL);
             adapter->satelliteSettings.satellite_number = ConvertYamlNode(doc, TAG_SATELLITE_NUMBER,  ConvertStringToUInt32, 0);
             break;
         case DELSYS_DVBS2:
+            properties[1].u.data = SYS_DVBS2;
             ADD_U32_PROPERTY(DTV_MODULATION, MapYamlNode(doc, TAG_MODULATION, modulationMapping, QPSK));
             ADD_U32_PROPERTY(DTV_INNER_FEC, MapYamlNode(doc, TAG_FEC, fecMapping, FEC_AUTO));
             ADD_U32_PROPERTY(DTV_SYMBOL_RATE,ConvertYamlNode(doc, TAG_SYMBOL_RATE, ConvertStringToUInt32, 0));
@@ -1469,11 +1476,13 @@ static void ConvertYamlToDTVProperties(DVBDeliverySystem_e delSys, yaml_document
             adapter->satelliteSettings.satellite_number = ConvertYamlNode(doc, TAG_SATELLITE_NUMBER,  ConvertStringToUInt32, 0);
             break;
         case DELSYS_DVBC:
+            properties[1].u.data = SYS_DVBC_ANNEX_AC;
             ADD_U32_PROPERTY(DTV_INNER_FEC, MapYamlNode(doc, TAG_FEC, fecMapping, FEC_AUTO));
             ADD_U32_PROPERTY(DTV_SYMBOL_RATE,ConvertYamlNode(doc, TAG_SYMBOL_RATE, ConvertStringToUInt32, 0));
             ADD_U32_PROPERTY(DTV_MODULATION, MapYamlNode(doc, TAG_MODULATION, modulationMapping, QAM_AUTO));
             break;
         case DELSYS_DVBT:
+            properties[1].u.data = SYS_DVBT;            
             ADD_U32_PROPERTY(DTV_BANDWIDTH_HZ,ConvertYamlNode(doc, TAG_BANDWIDTH, ConvertStringToBandwith, 0));
             ADD_U32_PROPERTY(DTV_CODE_RATE_HP, MapYamlNode(doc, TAG_FEC_HP, fecMapping, FEC_AUTO));
             ADD_U32_PROPERTY(DTV_CODE_RATE_LP, MapYamlNode(doc, TAG_FEC_LP, fecMapping, FEC_AUTO));
@@ -1483,6 +1492,7 @@ static void ConvertYamlToDTVProperties(DVBDeliverySystem_e delSys, yaml_document
             ADD_U32_PROPERTY(DTV_HIERARCHY, MapYamlNode(doc, TAG_HIERARCHY, hierarchyMapping, HIERARCHY_AUTO));
             break;
         case DELSYS_ATSC:
+            properties[1].u.data = SYS_ATSC;
             ADD_U32_PROPERTY(DTV_MODULATION, MapYamlNode(doc, TAG_MODULATION, modulationMapping, QAM_AUTO));
             break;
         default:
@@ -1495,49 +1505,49 @@ static void ConvertYamlToDTVProperties(DVBDeliverySystem_e delSys, yaml_document
 static void ConvertDTVPropertiesToYaml(DVBDeliverySystem_e delSys, struct dtv_properties *feparams, DVBSatelliteSettings_t *satSettings, yaml_document_t *doc)
 {
     char temp[25];
-    sprintf(temp, "%u", feparams->props[1].u.data);
+    sprintf(temp, "%u", feparams->props[2].u.data);
     YamlUtils_MappingAdd(doc, 1, TAG_FREQUENCY, temp);
-    YamlUtils_MappingAdd(doc, 1, TAG_INVERSION, MapValueToString(inversionMapping, feparams->props[2].u.data, "AUTO"));
+    YamlUtils_MappingAdd(doc, 1, TAG_INVERSION, MapValueToString(inversionMapping, feparams->props[3].u.data, "AUTO"));
     
     switch (delSys)
     {
         case DELSYS_DVBS:
-            YamlUtils_MappingAdd(doc, 1, TAG_FEC, MapValueToString(fecMapping, feparams->props[3].u.data, "AUTO"));
-            sprintf(temp, "%u", feparams->props[4].u.data);
+            YamlUtils_MappingAdd(doc, 1, TAG_FEC, MapValueToString(fecMapping, feparams->props[4].u.data, "AUTO"));
+            sprintf(temp, "%u", feparams->props[5].u.data);
             YamlUtils_MappingAdd(doc, 1, TAG_SYMBOL_RATE, temp); 
             YamlUtils_MappingAdd(doc, 1, TAG_POLARISATION, MapValueToString(polarisationMapping, satSettings->polarisation, "Horizontal"));
             sprintf(temp, "%u", satSettings->satellite_number);
             YamlUtils_MappingAdd(doc, 1, TAG_SATELLITE_NUMBER, temp); 
             break;
         case DELSYS_DVBS2:
-            YamlUtils_MappingAdd(doc, 1, TAG_MODULATION, MapValueToString(modulationMapping, feparams->props[3].u.data, "AUTO"));
-            YamlUtils_MappingAdd(doc, 1, TAG_FEC, MapValueToString(fecMapping, feparams->props[4].u.data, "AUTO"));
-            sprintf(temp, "%u", feparams->props[5].u.data);
+            YamlUtils_MappingAdd(doc, 1, TAG_MODULATION, MapValueToString(modulationMapping, feparams->props[4].u.data, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_FEC, MapValueToString(fecMapping, feparams->props[5].u.data, "AUTO"));
+            sprintf(temp, "%u", feparams->props[6].u.data);
             YamlUtils_MappingAdd(doc, 1, TAG_SYMBOL_RATE, temp); 
-            YamlUtils_MappingAdd(doc, 1, TAG_PILOT,MapValueToString(pilotMapping, feparams->props[6].u.data, "AUTO"));
-            YamlUtils_MappingAdd(doc, 1, TAG_ROLL_OFF,MapValueToString(rollOffMapping, feparams->props[7].u.data, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_PILOT,MapValueToString(pilotMapping, feparams->props[7].u.data, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_ROLL_OFF,MapValueToString(rollOffMapping, feparams->props[8].u.data, "AUTO"));
             YamlUtils_MappingAdd(doc, 1, TAG_POLARISATION, MapValueToString(polarisationMapping, satSettings->polarisation, "Horizontal"));
             sprintf(temp, "%u", satSettings->satellite_number);
             YamlUtils_MappingAdd(doc, 1, TAG_SATELLITE_NUMBER, temp); 
             break;
         case DELSYS_DVBC:
-            YamlUtils_MappingAdd(doc, 1, TAG_FEC, MapValueToString(fecMapping, feparams->props[3].u.data, "AUTO"));
-            sprintf(temp, "%u", feparams->props[4].u.data);
+            YamlUtils_MappingAdd(doc, 1, TAG_FEC, MapValueToString(fecMapping, feparams->props[4].u.data, "AUTO"));
+            sprintf(temp, "%u", feparams->props[5].u.data);
             YamlUtils_MappingAdd(doc, 1, TAG_SYMBOL_RATE, temp); 
-            YamlUtils_MappingAdd(doc, 1, TAG_MODULATION, MapValueToString(modulationMapping, feparams->props[5].u.data, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_MODULATION, MapValueToString(modulationMapping, feparams->props[6].u.data, "AUTO"));
             break;
         case DELSYS_DVBT:
-            sprintf(temp,"%u", feparams->props[3].u.data);
+            sprintf(temp,"%u", feparams->props[4].u.data);
             YamlUtils_MappingAdd(doc, 1, TAG_BANDWIDTH, temp);
-            YamlUtils_MappingAdd(doc, 1, TAG_FEC_HP, MapValueToString(fecMapping, feparams->props[4].u.data, "AUTO"));
-            YamlUtils_MappingAdd(doc, 1, TAG_FEC_LP, MapValueToString(fecMapping, feparams->props[5].u.data, "AUTO"));
-            YamlUtils_MappingAdd(doc, 1, TAG_CONSTELLATION, MapValueToString(modulationMapping, feparams->props[6].u.data, "AUTO"));
-            YamlUtils_MappingAdd(doc, 1, TAG_GUARD_INTERVAL,MapValueToString(guardIntervalMapping, feparams->props[7].u.data, "AUTO"));
-            YamlUtils_MappingAdd(doc, 1, TAG_TRANSMISSION_MODE, MapValueToString(transmissonModeMapping, feparams->props[8].u.data, "AUTO"));
-            YamlUtils_MappingAdd(doc, 1, TAG_HIERARCHY, MapValueToString(hierarchyMapping, feparams->props[9].u.data, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_FEC_HP, MapValueToString(fecMapping, feparams->props[5].u.data, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_FEC_LP, MapValueToString(fecMapping, feparams->props[6].u.data, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_CONSTELLATION, MapValueToString(modulationMapping, feparams->props[7].u.data, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_GUARD_INTERVAL,MapValueToString(guardIntervalMapping, feparams->props[8].u.data, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_TRANSMISSION_MODE, MapValueToString(transmissonModeMapping, feparams->props[9].u.data, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_HIERARCHY, MapValueToString(hierarchyMapping, feparams->props[10].u.data, "AUTO"));
             break;
         case DELSYS_ATSC:
-            YamlUtils_MappingAdd(doc, 1, TAG_MODULATION, MapValueToString(modulationMapping, feparams->props[3].u.data, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_MODULATION, MapValueToString(modulationMapping, feparams->props[4].u.data, "AUTO"));
             break;
         default:
             break;
