@@ -633,7 +633,7 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
 
         service = ServiceNew();
         service->multiplexUID = STATEMENT_COLUMN_INT( 0);
-        service->id = STATEMENT_COLUMN_INT( 1);
+        service->id = STATEMENT_COLUMN_INT( 1) & 0xffff;
         service->source = STATEMENT_COLUMN_INT( 2);
         service->conditionalAccess = STATEMENT_COLUMN_INT(3) ? TRUE:FALSE;
         service->type = STATEMENT_COLUMN_INT( 4);
@@ -643,8 +643,8 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
             service->name = strdup(name);
         }
         service->pmtVersion = STATEMENT_COLUMN_INT( 6);
-        service->pmtPid = STATEMENT_COLUMN_INT( 7);
-        service->pcrPid = STATEMENT_COLUMN_INT( 8);
+        service->pmtPid = STATEMENT_COLUMN_INT( 7) & 0xffff;
+        service->pcrPid = STATEMENT_COLUMN_INT( 8) & 0xffff;
         name = STATEMENT_COLUMN_TEXT( 9);
         if (name)
         {
@@ -655,8 +655,8 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
         {
             service->defaultAuthority= strdup(name);
         }
-        service->networkId = STATEMENT_COLUMN_INT(11);
-        service->tsId =  STATEMENT_COLUMN_INT(12);
+        service->networkId = STATEMENT_COLUMN_INT(11) & 0xffff;
+        service->tsId =  STATEMENT_COLUMN_INT(12) & 0xffff;
         return service;
     }
 
@@ -751,12 +751,12 @@ static void ServiceListDestructor(void * arg)
 int ServiceEventToString(yaml_document_t *document, Event_t event, void * payload)
 {
     Service_t *service = payload;
-    char idStr[16] = {0};
+    char idStr[20] = {0};
     char *name = idStr;
     int mappingId = yaml_document_add_mapping(document, (yaml_char_t*)YAML_MAP_TAG, YAML_ANY_MAPPING_STYLE);
     if (service)
     {
-        sprintf(idStr, "%04x.%04x.%04x", service->networkId, service->tsId, service->id);
+        sprintf(idStr, "%04x.%04x.%04x", service->networkId & 0xffff, service->tsId & 0xffff, service->id & 0xffff);
         name = service->name;
     }
     YamlUtils_MappingAdd(document, mappingId, "Service ID", idStr);
