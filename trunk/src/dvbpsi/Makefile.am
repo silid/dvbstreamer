@@ -63,6 +63,7 @@ dvb_descriptors_src = \
 	descriptors/dr_59.c \
 	descriptors/dr_5a.c \
 	descriptors/dr_62.c \
+	descriptors/dr_66.c \
 	descriptors/dr_69.c \
 	descriptors/dr_73.c \
 	descriptors/dr_76.c
