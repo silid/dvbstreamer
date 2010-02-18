@@ -55,7 +55,45 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 #define DVB_CMD_FE_ACTIVE_TOGGLE  1
 
 /* Use LinuxDVB Version 3 API */
-//#define USE_V3 1
+/*
+#undef DVB_API_VERSION
+#define DVB_API_VERSION 3
+*/
+
+#if DVB_API_VERSION >= 5
+#define PROP_IDX_DELSYS    0
+#define PROP_IDX_FREQ      1
+#define PROP_IDX_INVERSION 2
+
+#define PROP_IDX_DVBS_FEC         3
+#define PROP_IDX_DVBS_SYMBOL_RATE 4
+#define PROP_COUNT_DVBS           5
+
+#define PROP_IDX_DVBS2_FEC         3
+#define PROP_IDX_DVBS2_SYMBOL_RATE 4
+#define PROP_IDX_DVBS2_MODULATION  5
+#define PROP_IDX_DVBS2_PILOT       6
+#define PROP_IDX_DVBS2_ROLL_OFF    7
+#define PROP_COUNT_DVBS2           8
+
+#define PROP_IDX_DVBC_FEC          3
+#define PROP_IDX_DVBC_SYMBOL_RATE  4
+#define PROP_IDX_DVBC_MODULATION   5
+#define PROP_COUNT_DVBC            6
+
+#define PROP_IDX_DVBT_BANDWIDTH         3
+#define PROP_IDX_DVBT_CODE_RATE_HP      4
+#define PROP_IDX_DVBT_CODE_RATE_LP      5
+#define PROP_IDX_DVBT_MODULATION        6
+#define PROP_IDX_DVBT_GUARD_INTERVAL    7
+#define PROP_IDX_DVBT_TRANSMISSION_MODE 8
+#define PROP_IDX_DVBT_HIERARCHY         9
+#define PROP_COUNT_DVBT                10
+
+#define PROP_IDX_ATSC_MODULATION  3
+#define PROP_COUNT_ATSC           4
+
+#endif
 
 /*******************************************************************************
 * Typedefs                                                                     *
@@ -96,7 +134,7 @@ struct DVBAdapter_s
     DVBDeliverySystem_e currentDeliverySystem;
     __u32 frontEndRequestedFreq;      /**< The frequency that the application requested, may be different from one used (ie DVB-S intermediate frequency) */
 
-#if (DVB_API_VERSION < 5) || defined(USE_V3)
+#if (DVB_API_VERSION < 5)
     struct dvb_frontend_parameters frontEndParams; /**< The current frontend configuration parameters. These may be updated when the frontend locks. */
 #else
     struct dtv_property frontEndPropertyArray[DTV_IOCTL_MAX_MSGS];
@@ -157,7 +195,7 @@ static uint32_t ConvertStringToUInt32(const char *str, uint32_t defaultValue);
 static uint32_t ConvertYamlNode(yaml_document_t * document, const char *key, 
                         uint32_t (*convert)(const char *, uint32_t), uint32_t defaultValue);
 
-#if (DVB_API_VERSION < 5) || defined(USE_V3)
+#if (DVB_API_VERSION < 5)
 static void ConvertYamlToFEParams(DVBDeliverySystem_e delSys, yaml_document_t *doc, struct dvb_frontend_parameters *feparams, DVBSatelliteSettings_t *satSettings);
 static void ConvertFEParamsToYaml(DVBDeliverySystem_e delSys, struct dvb_frontend_parameters *feparams, DVBSatelliteSettings_t *satSettings, yaml_document_t *doc);
 #else 
@@ -248,7 +286,7 @@ static StringToParamMapping_t transmissonModeMapping[] = {
     STRINGTOPARAMMAPPING_SENTINEL
 };
 
-#if (DVB_API_VERSION < 5) || defined(USE_V3)
+#if (DVB_API_VERSION < 5)
 static StringToParamMapping_t bandwidthMapping[] = {
     {"8Mhz", BANDWIDTH_8_MHZ}, {"8000000", BANDWIDTH_8_MHZ}, {"8Mhz", BANDWIDTH_8_MHZ},
     {"7Mhz", BANDWIDTH_7_MHZ}, {"7000000", BANDWIDTH_7_MHZ},
@@ -299,6 +337,16 @@ static StringToParamMapping_t pilotMapping[] = {
     {"AUTO", PILOT_AUTO},
     STRINGTOPARAMMAPPING_SENTINEL
 };
+
+static struct dtv_property ClearFrontEndPropertyArray[1] = {
+    {.cmd = DTV_CLEAR}
+};
+
+static struct dtv_properties ClearFrontEndProperties = {
+    .num = 1,
+    .props = ClearFrontEndPropertyArray
+};
+
 #endif
 /*******************************************************************************
 * Global functions                                                             *
@@ -458,7 +506,9 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
         }
 
         result->hardwareRestricted = hwRestricted;
-        /* Stream the entire TS to the DVR device */
+#if DVB_API_VERSION >= 5
+        result->frontEndProperties.props = result->frontEndPropertyArray;
+#endif
         if (hwRestricted)
         {
             LogModule(LOG_INFO, DVBADAPTER, "Running in hardware restricted mode!\n");
@@ -546,7 +596,7 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, DVBDeliverySystem_e system, char *par
     {
         adapter->currentDeliverySystem = system;
 
-#if (DVB_API_VERSION < 5) || defined(USE_V3)
+#if (DVB_API_VERSION < 5)
         ConvertYamlToFEParams(system, &document, &adapter->frontEndParams, &adapter->satelliteSettings);
         adapter->frontEndRequestedFreq = adapter->frontEndParams.frequency;
 #else
@@ -565,7 +615,7 @@ char* DVBFrontEndParametersGet(DVBAdapter_t *adapter, DVBDeliverySystem_e *syste
     yaml_document_initialize(&document, NULL, NULL, NULL, 0, 0);
     yaml_document_add_mapping(&document, (yaml_char_t*)YAML_MAP_TAG, YAML_ANY_MAPPING_STYLE);
 
-#if (DVB_API_VERSION < 5) || defined(USE_V3)
+#if (DVB_API_VERSION < 5)
     {
         struct dvb_frontend_parameters feparams = adapter->frontEndParams;
         feparams.frequency = adapter->frontEndRequestedFreq;
@@ -578,7 +628,7 @@ char* DVBFrontEndParametersGet(DVBAdapter_t *adapter, DVBDeliverySystem_e *syste
         properties.props = props;
         properties.num = adapter->frontEndProperties.num;
         memcpy(props, &adapter->frontEndPropertyArray, sizeof(struct dtv_property) * properties.num);
-        props[1].u.data = adapter->frontEndRequestedFreq;
+        props[PROP_IDX_FREQ].u.data = adapter->frontEndRequestedFreq;
         ConvertDTVPropertiesToYaml(adapter->currentDeliverySystem, &properties, &adapter->satelliteSettings, &document);
     }
 #endif
@@ -755,12 +805,12 @@ static int DVBFrontEndSatelliteSetup(DVBAdapter_t *adapter)
     }\
     while(0)
 
-#if (DVB_API_VERSION < 5) || defined(USE_V3)
+#if (DVB_API_VERSION < 5)
     adapter->frontEndParams->frequency = LNBTransponderToIntermediateFreq(&adapter->lnbInfo, adapter->frontEndParams->frequency, &tone);
     CHECK_IFREQ(adapter->frontEndParams->frequency);
 #else
-    adapter->frontEndPropertyArray[2].u.data = LNBTransponderToIntermediateFreq(&adapter->lnbInfo, adapter->frontEndPropertyArray[2].u.data, &tone);
-    CHECK_IFREQ(adapter->frontEndPropertyArray[2].u.data);
+    adapter->frontEndPropertyArray[PROP_IDX_FREQ].u.data = LNBTransponderToIntermediateFreq(&adapter->lnbInfo, adapter->frontEndPropertyArray[PROP_IDX_FREQ].u.data, &tone);
+    CHECK_IFREQ(adapter->frontEndPropertyArray[PROP_IDX_FREQ].u.data);
 #endif
 
 
@@ -1162,10 +1212,15 @@ static void DVBCommandCallback(struct ev_loop *loop, ev_io *w, int revents)
 
         if (retune)
         {
-#if (DVB_API_VERSION < 5) || defined(USE_V3)
+#if (DVB_API_VERSION < 5)
             adapter->frontEndParams.frequency = adapter->frontEndRequestedFreq;
 #else
-            adapter->frontEndPropertyArray[2].u.data = adapter->frontEndRequestedFreq;
+            adapter->frontEndPropertyArray[PROP_IDX_FREQ].u.data = adapter->frontEndRequestedFreq;
+
+            if (ioctl(adapter->frontEndFd, FE_SET_PROPERTY, &ClearFrontEndProperties) < 0)
+            {
+                LogModule(LOG_ERROR, DVBADAPTER, "Clear FE_SET_PROPERTY: %s\n", strerror(errno));
+            }            
 #endif
             LogModule(LOG_DEBUG, DVBADAPTER, "Tuning to %d", adapter->frontEndRequestedFreq);
 
@@ -1173,16 +1228,16 @@ static void DVBCommandCallback(struct ev_loop *loop, ev_io *w, int revents)
             {
                 DVBFrontEndSatelliteSetup(adapter);
             }
-#if (DVB_API_VERSION < 5) || defined(USE_V3)
+#if (DVB_API_VERSION < 5)
 
             if (ioctl(adapter->frontEndFd, FE_SET_FRONTEND, &adapter->frontEndParams) < 0)
             {
-                LogModule(LOG_ERROR, DVBADAPTER, "setfront front: %s\n", strerror(errno));
+                LogModule(LOG_ERROR, DVBADAPTER, "FE_SET_FRONTEND: %s\n", strerror(errno));
             }
 #else
             if (ioctl(adapter->frontEndFd, FE_SET_PROPERTY, &adapter->frontEndProperties) < 0)
             {
-                LogModule(LOG_ERROR, DVBADAPTER, "setfront front: %s\n", strerror(errno));
+                LogModule(LOG_ERROR, DVBADAPTER, "Tune FE_SET_PROPERTY: %s\n", strerror(errno));
             }
 #endif
         }
@@ -1213,10 +1268,16 @@ static void DVBFrontendCallback(struct ev_loop *loop, ev_io *w, int revents)
             if (adapter->frontEndLocked)
             {
                 DVBDemuxStartAllFilters(adapter);
-#if (DVB_API_VERSION < 5) || defined(USE_V3)
+#if (DVB_API_VERSION < 5)
                 adapter->frontEndParams = event.parameters;
 #else
-                ioctl(adapter->frontEndFd, FE_GET_PROPERTY, &adapter->frontEndProperties);
+                adapter->frontEndProperties.num --; /* Remove the tune command at the end of the array */
+                errno = 0;
+                if (ioctl(adapter->frontEndFd, FE_GET_PROPERTY, &adapter->frontEndProperties))
+                {
+                    LogModule(LOG_ERROR, DVBADAPTER, "FE_GET_PROPERTY: %s\n", strerror(errno));
+                }
+                adapter->frontEndProperties.num ++; /* Put back the tune command at the end of the array */
 #endif
                 EventsFireEventListeners(lockedEvent, adapter);
 
@@ -1339,7 +1400,7 @@ static uint32_t ConvertYamlNode(yaml_document_t * document, const char *key,
 
 }
 
-#if (DVB_API_VERSION < 5) || defined(USE_V3)
+#if (DVB_API_VERSION < 5)
 
 static void ConvertYamlToFEParams(DVBDeliverySystem_e delSys, yaml_document_t *doc, struct dvb_frontend_parameters *feparams, DVBSatelliteSettings_t *satSettings)
 {
@@ -1440,114 +1501,131 @@ static uint32_t ConvertStringToBandwith(const char *str, uint32_t defaultValue)
 
 static void ConvertYamlToDTVProperties(DVBDeliverySystem_e delSys, yaml_document_t *doc, DVBAdapter_t *adapter)
 {
-    struct dtv_property *properties = adapter->frontEndPropertyArray;
-    int propIndex = 0;
+#define SET_U32_PROPERTY(_idx, _cmd, _value) \
+    do{\
+        adapter->frontEndPropertyArray[_idx].cmd = _cmd;\
+        adapter->frontEndPropertyArray[_idx].u.data = _value;\
+    }while(0)
     
-    adapter->frontEndProperties.props = properties; 
-#define ADD_U32_PROPERTY(_cmd, _value) \
-        do{ \
-        properties[propIndex].cmd = _cmd;\
-        properties[propIndex].u.data = _value;\
-        propIndex ++;\
-        }while(0)
-        
-    ADD_U32_PROPERTY(DTV_CLEAR,0);
-    ADD_U32_PROPERTY(DTV_DELIVERY_SYSTEM, 0); /* Set this in the switch statement below */
+
     adapter->frontEndRequestedFreq = ConvertYamlNode(doc, TAG_FREQUENCY,  ConvertStringToUInt32, 0);
-    ADD_U32_PROPERTY(DTV_FREQUENCY, adapter->frontEndRequestedFreq);
-    ADD_U32_PROPERTY(DTV_INVERSION, MapYamlNode(doc, TAG_INVERSION, inversionMapping, INVERSION_AUTO));
+    SET_U32_PROPERTY(PROP_IDX_FREQ, DTV_FREQUENCY, adapter->frontEndRequestedFreq);
+    SET_U32_PROPERTY(PROP_IDX_INVERSION, DTV_INVERSION, MapYamlNode(doc, TAG_INVERSION, inversionMapping, INVERSION_AUTO));
     switch (delSys)
     {
         case DELSYS_DVBS:
-            properties[1].u.data = SYS_DVBS;
-            ADD_U32_PROPERTY(DTV_INNER_FEC, MapYamlNode(doc, TAG_FEC, fecMapping, FEC_AUTO));
-            ADD_U32_PROPERTY(DTV_SYMBOL_RATE,ConvertYamlNode(doc, TAG_SYMBOL_RATE, ConvertStringToUInt32, 0));
+            SET_U32_PROPERTY(PROP_IDX_DELSYS, DTV_DELIVERY_SYSTEM, SYS_DVBS);
+            SET_U32_PROPERTY(PROP_IDX_DVBS_FEC, DTV_INNER_FEC, MapYamlNode(doc, TAG_FEC, fecMapping, FEC_AUTO));
+            SET_U32_PROPERTY(PROP_IDX_DVBS_SYMBOL_RATE, DTV_SYMBOL_RATE, ConvertYamlNode(doc, TAG_SYMBOL_RATE, ConvertStringToUInt32, 0));
+            adapter->frontEndProperties.num = PROP_COUNT_DVBS;
             adapter->satelliteSettings.polarisation = MapYamlNode(doc, TAG_POLARISATION, polarisationMapping, POL_HORIZONTAL);
             adapter->satelliteSettings.satellite_number = ConvertYamlNode(doc, TAG_SATELLITE_NUMBER,  ConvertStringToUInt32, 0);
             break;
         case DELSYS_DVBS2:
-            properties[1].u.data = SYS_DVBS2;
-            ADD_U32_PROPERTY(DTV_MODULATION, MapYamlNode(doc, TAG_MODULATION, modulationMapping, QPSK));
-            ADD_U32_PROPERTY(DTV_INNER_FEC, MapYamlNode(doc, TAG_FEC, fecMapping, FEC_AUTO));
-            ADD_U32_PROPERTY(DTV_SYMBOL_RATE,ConvertYamlNode(doc, TAG_SYMBOL_RATE, ConvertStringToUInt32, 0));
-            ADD_U32_PROPERTY(DTV_PILOT, MapYamlNode(doc, TAG_PILOT, pilotMapping, PILOT_AUTO));
-            ADD_U32_PROPERTY(DTV_ROLLOFF, MapYamlNode(doc, TAG_ROLL_OFF, rollOffMapping, ROLLOFF_AUTO));
+            SET_U32_PROPERTY(PROP_IDX_DELSYS, DTV_DELIVERY_SYSTEM, SYS_DVBS2);
+            SET_U32_PROPERTY(PROP_IDX_DVBS2_MODULATION, DTV_MODULATION, MapYamlNode(doc, TAG_MODULATION, modulationMapping, QPSK));
+            SET_U32_PROPERTY(PROP_IDX_DVBS2_FEC, DTV_INNER_FEC, MapYamlNode(doc, TAG_FEC, fecMapping, FEC_AUTO));
+            SET_U32_PROPERTY(PROP_IDX_DVBS2_SYMBOL_RATE, DTV_SYMBOL_RATE,ConvertYamlNode(doc, TAG_SYMBOL_RATE, ConvertStringToUInt32, 0));
+            SET_U32_PROPERTY(PROP_IDX_DVBS2_PILOT, DTV_PILOT, MapYamlNode(doc, TAG_PILOT, pilotMapping, PILOT_AUTO));
+            SET_U32_PROPERTY(PROP_IDX_DVBS2_ROLL_OFF, DTV_ROLLOFF, MapYamlNode(doc, TAG_ROLL_OFF, rollOffMapping, ROLLOFF_AUTO));
+            adapter->frontEndProperties.num = PROP_COUNT_DVBS2;
             adapter->satelliteSettings.polarisation = MapYamlNode(doc, TAG_POLARISATION, polarisationMapping, POL_HORIZONTAL);
             adapter->satelliteSettings.satellite_number = ConvertYamlNode(doc, TAG_SATELLITE_NUMBER,  ConvertStringToUInt32, 0);
             break;
         case DELSYS_DVBC:
-            properties[1].u.data = SYS_DVBC_ANNEX_AC;
-            ADD_U32_PROPERTY(DTV_INNER_FEC, MapYamlNode(doc, TAG_FEC, fecMapping, FEC_AUTO));
-            ADD_U32_PROPERTY(DTV_SYMBOL_RATE,ConvertYamlNode(doc, TAG_SYMBOL_RATE, ConvertStringToUInt32, 0));
-            ADD_U32_PROPERTY(DTV_MODULATION, MapYamlNode(doc, TAG_MODULATION, modulationMapping, QAM_AUTO));
+            SET_U32_PROPERTY(PROP_IDX_DELSYS, DTV_DELIVERY_SYSTEM, SYS_DVBC_ANNEX_AC);
+            SET_U32_PROPERTY(PROP_IDX_DVBC_FEC, DTV_INNER_FEC, MapYamlNode(doc, TAG_FEC, fecMapping, FEC_AUTO));
+            SET_U32_PROPERTY(PROP_IDX_DVBC_SYMBOL_RATE, DTV_SYMBOL_RATE,ConvertYamlNode(doc, TAG_SYMBOL_RATE, ConvertStringToUInt32, 0));
+            SET_U32_PROPERTY(PROP_IDX_DVBC_MODULATION, DTV_MODULATION, MapYamlNode(doc, TAG_MODULATION, modulationMapping, QAM_AUTO));
+            adapter->frontEndProperties.num = PROP_COUNT_DVBC;
             break;
         case DELSYS_DVBT:
-            properties[1].u.data = SYS_DVBT;            
-            ADD_U32_PROPERTY(DTV_BANDWIDTH_HZ,ConvertYamlNode(doc, TAG_BANDWIDTH, ConvertStringToBandwith, 0));
-            ADD_U32_PROPERTY(DTV_CODE_RATE_HP, MapYamlNode(doc, TAG_FEC_HP, fecMapping, FEC_AUTO));
-            ADD_U32_PROPERTY(DTV_CODE_RATE_LP, MapYamlNode(doc, TAG_FEC_LP, fecMapping, FEC_AUTO));
-            ADD_U32_PROPERTY(DTV_MODULATION, MapYamlNode(doc, TAG_CONSTELLATION, modulationMapping, QAM_AUTO));
-            ADD_U32_PROPERTY(DTV_GUARD_INTERVAL, MapYamlNode(doc,TAG_GUARD_INTERVAL, guardIntervalMapping, GUARD_INTERVAL_AUTO));
-            ADD_U32_PROPERTY(DTV_TRANSMISSION_MODE, MapYamlNode(doc, TAG_TRANSMISSION_MODE, transmissonModeMapping, TRANSMISSION_MODE_AUTO));
-            ADD_U32_PROPERTY(DTV_HIERARCHY, MapYamlNode(doc, TAG_HIERARCHY, hierarchyMapping, HIERARCHY_AUTO));
+            SET_U32_PROPERTY(PROP_IDX_DELSYS, DTV_DELIVERY_SYSTEM, SYS_DVBT);
+            SET_U32_PROPERTY(PROP_IDX_DVBT_BANDWIDTH, DTV_BANDWIDTH_HZ,ConvertYamlNode(doc, TAG_BANDWIDTH, ConvertStringToBandwith, 0));
+            SET_U32_PROPERTY(PROP_IDX_DVBT_CODE_RATE_HP, DTV_CODE_RATE_HP, MapYamlNode(doc, TAG_FEC_HP, fecMapping, FEC_AUTO));
+            SET_U32_PROPERTY(PROP_IDX_DVBT_CODE_RATE_LP, DTV_CODE_RATE_LP, MapYamlNode(doc, TAG_FEC_LP, fecMapping, FEC_AUTO));
+            SET_U32_PROPERTY(PROP_IDX_DVBT_MODULATION, DTV_MODULATION, MapYamlNode(doc, TAG_CONSTELLATION, modulationMapping, QAM_AUTO));
+            SET_U32_PROPERTY(PROP_IDX_DVBT_GUARD_INTERVAL, DTV_GUARD_INTERVAL, MapYamlNode(doc,TAG_GUARD_INTERVAL, guardIntervalMapping, GUARD_INTERVAL_AUTO));
+            SET_U32_PROPERTY(PROP_IDX_DVBT_TRANSMISSION_MODE, DTV_TRANSMISSION_MODE, MapYamlNode(doc, TAG_TRANSMISSION_MODE, transmissonModeMapping, TRANSMISSION_MODE_AUTO));
+            SET_U32_PROPERTY(PROP_IDX_DVBT_HIERARCHY, DTV_HIERARCHY, MapYamlNode(doc, TAG_HIERARCHY, hierarchyMapping, HIERARCHY_AUTO));
+            adapter->frontEndProperties.num = PROP_COUNT_DVBT;
             break;
         case DELSYS_ATSC:
-            properties[1].u.data = SYS_ATSC;
-            ADD_U32_PROPERTY(DTV_MODULATION, MapYamlNode(doc, TAG_MODULATION, modulationMapping, QAM_AUTO));
+            SET_U32_PROPERTY(PROP_IDX_DELSYS, DTV_DELIVERY_SYSTEM, SYS_ATSC);
+            SET_U32_PROPERTY(PROP_IDX_ATSC_MODULATION, DTV_MODULATION, MapYamlNode(doc, TAG_MODULATION, modulationMapping, QAM_AUTO));
+            adapter->frontEndProperties.num = PROP_COUNT_ATSC;
             break;
         default:
             break;
     }
-    ADD_U32_PROPERTY(DTV_TUNE,0);
-    adapter->frontEndProperties.num = propIndex;
+    adapter->frontEndPropertyArray[adapter->frontEndProperties.num].cmd = DTV_TUNE;
+    adapter->frontEndProperties.num ++;
 }
+
 
 static void ConvertDTVPropertiesToYaml(DVBDeliverySystem_e delSys, struct dtv_properties *feparams, DVBSatelliteSettings_t *satSettings, yaml_document_t *doc)
 {
     char temp[25];
-    sprintf(temp, "%u", feparams->props[2].u.data);
+#define GET_U32_PROP(_idx)  feparams->props[_idx].u.data
+    sprintf(temp, "%u", GET_U32_PROP(PROP_IDX_FREQ));
     YamlUtils_MappingAdd(doc, 1, TAG_FREQUENCY, temp);
-    YamlUtils_MappingAdd(doc, 1, TAG_INVERSION, MapValueToString(inversionMapping, feparams->props[3].u.data, "AUTO"));
+    YamlUtils_MappingAdd(doc, 1, TAG_INVERSION, MapValueToString(inversionMapping, GET_U32_PROP(PROP_IDX_INVERSION), "AUTO"));
     
     switch (delSys)
     {
         case DELSYS_DVBS:
-            YamlUtils_MappingAdd(doc, 1, TAG_FEC, MapValueToString(fecMapping, feparams->props[4].u.data, "AUTO"));
-            sprintf(temp, "%u", feparams->props[5].u.data);
+            YamlUtils_MappingAdd(doc, 1, TAG_FEC, 
+                MapValueToString(fecMapping, GET_U32_PROP(PROP_IDX_DVBS_FEC), "AUTO"));
+            sprintf(temp, "%u", GET_U32_PROP(PROP_IDX_DVBS_SYMBOL_RATE));
             YamlUtils_MappingAdd(doc, 1, TAG_SYMBOL_RATE, temp); 
-            YamlUtils_MappingAdd(doc, 1, TAG_POLARISATION, MapValueToString(polarisationMapping, satSettings->polarisation, "Horizontal"));
+            YamlUtils_MappingAdd(doc, 1, TAG_POLARISATION, 
+                MapValueToString(polarisationMapping, satSettings->polarisation, "Horizontal"));
             sprintf(temp, "%u", satSettings->satellite_number);
             YamlUtils_MappingAdd(doc, 1, TAG_SATELLITE_NUMBER, temp); 
             break;
         case DELSYS_DVBS2:
-            YamlUtils_MappingAdd(doc, 1, TAG_MODULATION, MapValueToString(modulationMapping, feparams->props[4].u.data, "AUTO"));
-            YamlUtils_MappingAdd(doc, 1, TAG_FEC, MapValueToString(fecMapping, feparams->props[5].u.data, "AUTO"));
-            sprintf(temp, "%u", feparams->props[6].u.data);
+            YamlUtils_MappingAdd(doc, 1, TAG_MODULATION, 
+                MapValueToString(modulationMapping, GET_U32_PROP(PROP_IDX_DVBS2_MODULATION), "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_FEC, 
+                MapValueToString(fecMapping, GET_U32_PROP(PROP_IDX_DVBS2_FEC), "AUTO"));
+            sprintf(temp, "%u", GET_U32_PROP(PROP_IDX_DVBS2_SYMBOL_RATE));
             YamlUtils_MappingAdd(doc, 1, TAG_SYMBOL_RATE, temp); 
-            YamlUtils_MappingAdd(doc, 1, TAG_PILOT,MapValueToString(pilotMapping, feparams->props[7].u.data, "AUTO"));
-            YamlUtils_MappingAdd(doc, 1, TAG_ROLL_OFF,MapValueToString(rollOffMapping, feparams->props[8].u.data, "AUTO"));
-            YamlUtils_MappingAdd(doc, 1, TAG_POLARISATION, MapValueToString(polarisationMapping, satSettings->polarisation, "Horizontal"));
+            YamlUtils_MappingAdd(doc, 1, TAG_PILOT,
+                MapValueToString(pilotMapping, GET_U32_PROP(PROP_IDX_DVBS2_PILOT), "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_ROLL_OFF,
+                MapValueToString(rollOffMapping, GET_U32_PROP(PROP_IDX_DVBS2_ROLL_OFF), "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_POLARISATION, 
+                MapValueToString(polarisationMapping, satSettings->polarisation, "Horizontal"));
             sprintf(temp, "%u", satSettings->satellite_number);
             YamlUtils_MappingAdd(doc, 1, TAG_SATELLITE_NUMBER, temp); 
             break;
         case DELSYS_DVBC:
-            YamlUtils_MappingAdd(doc, 1, TAG_FEC, MapValueToString(fecMapping, feparams->props[4].u.data, "AUTO"));
-            sprintf(temp, "%u", feparams->props[5].u.data);
+            YamlUtils_MappingAdd(doc, 1, TAG_FEC, 
+                MapValueToString(fecMapping, GET_U32_PROP(PROP_IDX_DVBC_FEC), "AUTO"));
+            sprintf(temp, "%u", GET_U32_PROP(PROP_IDX_DVBC_SYMBOL_RATE));
             YamlUtils_MappingAdd(doc, 1, TAG_SYMBOL_RATE, temp); 
-            YamlUtils_MappingAdd(doc, 1, TAG_MODULATION, MapValueToString(modulationMapping, feparams->props[6].u.data, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_MODULATION, 
+                MapValueToString(modulationMapping, GET_U32_PROP(PROP_IDX_DVBC_MODULATION), "AUTO"));
             break;
         case DELSYS_DVBT:
-            sprintf(temp,"%u", feparams->props[4].u.data);
+            sprintf(temp,"%u", GET_U32_PROP(PROP_IDX_DVBT_BANDWIDTH));
             YamlUtils_MappingAdd(doc, 1, TAG_BANDWIDTH, temp);
-            YamlUtils_MappingAdd(doc, 1, TAG_FEC_HP, MapValueToString(fecMapping, feparams->props[5].u.data, "AUTO"));
-            YamlUtils_MappingAdd(doc, 1, TAG_FEC_LP, MapValueToString(fecMapping, feparams->props[6].u.data, "AUTO"));
-            YamlUtils_MappingAdd(doc, 1, TAG_CONSTELLATION, MapValueToString(modulationMapping, feparams->props[7].u.data, "AUTO"));
-            YamlUtils_MappingAdd(doc, 1, TAG_GUARD_INTERVAL,MapValueToString(guardIntervalMapping, feparams->props[8].u.data, "AUTO"));
-            YamlUtils_MappingAdd(doc, 1, TAG_TRANSMISSION_MODE, MapValueToString(transmissonModeMapping, feparams->props[9].u.data, "AUTO"));
-            YamlUtils_MappingAdd(doc, 1, TAG_HIERARCHY, MapValueToString(hierarchyMapping, feparams->props[10].u.data, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_FEC_HP, 
+                MapValueToString(fecMapping, GET_U32_PROP(PROP_IDX_DVBT_CODE_RATE_HP), "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_FEC_LP, 
+                MapValueToString(fecMapping, GET_U32_PROP(PROP_IDX_DVBT_CODE_RATE_LP), "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_CONSTELLATION, 
+                MapValueToString(modulationMapping, GET_U32_PROP(PROP_IDX_DVBT_MODULATION), "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_GUARD_INTERVAL,
+                MapValueToString(guardIntervalMapping, GET_U32_PROP(PROP_IDX_DVBT_GUARD_INTERVAL), "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_TRANSMISSION_MODE, 
+                MapValueToString(transmissonModeMapping, GET_U32_PROP(PROP_IDX_DVBT_TRANSMISSION_MODE), "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_HIERARCHY, 
+                MapValueToString(hierarchyMapping, GET_U32_PROP(PROP_IDX_DVBT_HIERARCHY), "AUTO"));
             break;
         case DELSYS_ATSC:
-            YamlUtils_MappingAdd(doc, 1, TAG_MODULATION, MapValueToString(modulationMapping, feparams->props[4].u.data, "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_MODULATION, 
+                MapValueToString(modulationMapping, GET_U32_PROP(PROP_IDX_ATSC_MODULATION), "AUTO"));
             break;
         default:
             break;
