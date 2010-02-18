@@ -261,8 +261,8 @@ static int PMTCount = 0;
 static struct PMTReceived_t *PMTsReceived = NULL;
 static pthread_mutex_t scanningmutex = PTHREAD_MUTEX_INITIALIZER;
 
-static int lockTimeout = 30;
-static int tablesTimeout = 15;
+static int lockTimeout = 60;
+static int tablesTimeout = 60;
 static bool removeFailedFreqs = TRUE;
 
 #if defined(ENABLE_DVB)
@@ -1728,6 +1728,7 @@ static void ScanStateMachine(enum ScanEvent_e event)
                         transponderList = NULL;
                     }
                     ScanListReset();
+                    ev_timer_stop(DispatchersGetInput(), &timeoutTimer);
                     currentScanState = ScanState_Stopped;
                 }   
                 break;
