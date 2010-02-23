@@ -21,6 +21,8 @@ dvbpsi_DATA = \
 	dr_0d.h \
 	dr_0e.h \
 	dr_0f.h \
+	dr_13.h \
+	dr_14.h \
 	dr_42.h \
 	dr_43.h \
 	dr_47.h \

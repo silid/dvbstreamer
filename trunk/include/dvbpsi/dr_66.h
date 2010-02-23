@@ -30,7 +30,7 @@ Decode Frequency List Descriptor.
  * \struct dvbpsi_data_broadcast_id_dr_s
  * \brief Data Broadcast id Descriptor
  *
- * This structure is used to store a decoded Frequency List descriptor.
+ * This structure is used to store a decoded Data Broadcast id descriptor.
  */
 /*!
  * \typedef struct dvbpsi_data_broadcast_id_dr_s dvbpsi_data_broadcast_id_dr_t
