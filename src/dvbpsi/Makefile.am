@@ -1,7 +1,6 @@
 AM_CFLAGS =\
      -I$(top_srcdir)/include \
-     -I$(top_srcdir)/include/dvbpsi \
-     -Wall -Werror
+     -I$(top_srcdir)/include/dvbpsi
 
 noinst_LIBRARIES = libdvbpsi.a
 
@@ -48,6 +47,8 @@ mpeg2_descriptors_src = \
 	descriptors/dr_0d.c \
 	descriptors/dr_0e.c \
 	descriptors/dr_0f.c \
+	descriptors/dr_13.c \
+	descriptors/dr_14.c \
 	descriptors/dr_83.c
 
 dvb_descriptors_src = \
