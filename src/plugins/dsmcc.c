@@ -28,6 +28,8 @@ Plugin to download DSM-CC data.
 #include <ctype.h>
 #include <pthread.h>
 #include "dvbpsi/dvbpsi.h"
+#include "dvbpsi/descriptor.h"
+#include "dvbpsi/dr.h"
 #include "dvbpsi/sections.h"
 #include "plugin.h"
 #include "main.h"
@@ -37,20 +39,29 @@ Plugin to download DSM-CC data.
 #include "ts.h"
 #include "tuning.h"
 #include "events.h"
-
+#include "pids.h"
+#include "cache.h"
+#include "libdsmcc/libdsmcc.h"
 
 /*******************************************************************************
 * Defines                                                                      *
 *******************************************************************************/
 #define DSMCC_FILTER_PRIORITY 5
+#define INVALID_PID 0xffff
 
+#define TAG_CAROUSEL_ID_DESCRIPTOR     0x13
+#define TAG_ASSOCIATION_TAG_DESCRIPTOR 0x14
 /*******************************************************************************
 * Typedefs                                                                     *
 *******************************************************************************/
+struct DSMCCDownloadSession_s;
+
 typedef struct DSMCCPID_s
 {
     uint16_t pid;
+    uint16_t tag;
     dvbpsi_handle sectionFilter;
+    struct DSMCCDownloadSession_s *session;
 }DSMCCPID_t;
 
 typedef struct DSMCCDownloadSession_s
@@ -58,6 +69,7 @@ typedef struct DSMCCDownloadSession_s
     Service_t *service;
     List_t *pids;
     TSFilterGroup_t *filterGroup;
+    struct dsmcc_status status;
 }DSMCCDownloadSession_t;
 
 typedef struct DSMCCSession_s
@@ -86,8 +98,6 @@ static void DSMCCPIDDestructor(void *arg);
 
 static DSMCCDownloadSession_t *DownloadSessionGet(Service_t *service);
 
-static void DownloadSessionPIDAdd(DSMCCDownloadSession_t *session, uint16_t pid);
-static void DownloadSessionPIDRemove(DSMCCDownloadSession_t *session, uint16_t pid);    
 static void DSMCCSectionCallback(void *p_cb_data, dvbpsi_handle h_dvbpsi, dvbpsi_psi_section_t* p_section);
 
 /*******************************************************************************
@@ -367,11 +377,38 @@ static void DSMCCPIDDestructor(void *arg)
     }
 }
 
-static void DownloadSessionPIDAdd(DSMCCDownloadSession_t *session, uint16_t pid)
+static uint16_t AssociationTagToPID(Service_t *service, uint16_t tag)
+{
+    int i;
+    PIDList_t *pids = CachePIDsGet(service);
+    if (pids == NULL)
+    {
+        return INVALID_PID;
+    }
+    for (i = 0; i < pids->count; i ++)
+    {
+        dvbpsi_descriptor_t *desc;
+        for (desc = pids->pids[i].descriptors; desc; desc = desc->p_next)
+        {
+            if (desc->i_tag == TAG_ASSOCIATION_TAG_DESCRIPTOR)
+            {
+                dvbpsi_association_tag_dr_t *assoc_tag_dr = dvbpsi_DecodeAssociationTagDr(desc);
+                if (assoc_tag_dr && (assoc_tag_dr->i_tag == tag))
+                {
+                    return pids->pids[i].pid;
+                }
+            }
+        }
+    }
+    return INVALID_PID;
+}
+
+void DownloadSessionPIDAddTag(DSMCCDownloadSession_t *session, uint16_t tag)
 {
     ListIterator_t iterator;
     Multiplex_t *mux;
     DSMCCPID_t *dsmccPID;
+    uint16_t pid = AssociationTagToPID(session->service, tag);
     
     ListIterator_ForEach(iterator, session->pids)
     {
@@ -394,11 +431,12 @@ static void DownloadSessionPIDAdd(DSMCCDownloadSession_t *session, uint16_t pid)
     }
     ObjectRefDec(mux);
 }
-
-static void DownloadSessionPIDRemove(DSMCCDownloadSession_t *session, uint16_t pid)
+/*
+static void DownloadSessionPIDRemoveTag(DSMCCDownloadSession_t *session, uint16_t tag)
 {
     ListIterator_t iterator;
     DSMCCPID_t *dsmccPID;
+    uint16_t pid = AssociationTagToPID(session->service, tag);
     
     ListIterator_ForEach(iterator, session->pids)
     {
@@ -413,9 +451,10 @@ static void DownloadSessionPIDRemove(DSMCCDownloadSession_t *session, uint16_t p
     }
 }
 
-
+*/
 static void DSMCCSectionCallback(void *p_cb_data, dvbpsi_handle h_dvbpsi, dvbpsi_psi_section_t* p_section)
 {
-    /*DSMCCPID_t *dsmccPID = p_cb_data;*/
+    DSMCCPID_t *dsmccPID = p_cb_data;
+    dsmcc_process_section(&dsmccPID->session->status, p_section->p_data, p_section->i_length, dsmccPID->pid);
     
 }

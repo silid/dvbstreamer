@@ -667,6 +667,19 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
     return NULL;
 }
 
+char *ServiceGetIDStr(Service_t *service, char *buffer)
+{
+    if (buffer == NULL)
+    {
+        buffer = malloc(SERVICE_ID_STRING_LENGTH);
+    }
+    if (buffer)
+    {
+        sprintf(buffer, "%04x.%04x.%04x", service->networkId & 0xffff, service->tsId & 0xffff, service->id & 0xffff);
+        return buffer;
+    }
+    return NULL;
+}
 /*******************************************************************************
 * Local Functions                                                              *
 *******************************************************************************/

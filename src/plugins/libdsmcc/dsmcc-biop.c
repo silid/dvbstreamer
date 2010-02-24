@@ -40,7 +40,7 @@ dsmcc_biop_process_msg_hdr(struct biop_message *bm, struct cache_module_data *ca
 // fprintf(bd_fd, "Hdr -> Checking magic\n");
 
 
-    if (Data[0] !='B' || Data[1] !='I' || Data[2] !='O' || Data[3] !='P')
+    if (Data[0] != 'B' || Data[1] != 'I' || Data[2] != 'O' || Data[3] != 'P')
     {
         return -2;
     }
@@ -48,56 +48,56 @@ dsmcc_biop_process_msg_hdr(struct biop_message *bm, struct cache_module_data *ca
 // fprintf(bd_fd, "Hdr -> Magic OK!\n");
 // fflush(bd_fd);
 
-    off+=4;/* skip magic */
+    off += 4;/* skip magic */
 
     hdr->version_major = Data[off++];
 // fprintf(bd_fd, "Hdr -> Version Major = %d\n", hdr->version_major);
     hdr->version_minor = Data[off++];
 
-    off+=2; /* skip byte order & message type */
+    off += 2; /* skip byte order & message type */
 
 // fprintf(bd_fd, "Hdr -> Version Minor = %d\n", hdr->version_minor);
     hdr->message_size  = (Data[off] << 24) | (Data[off+1] << 16) |
                          (Data[off+2] << 8)  | Data[off+3];
 
-    off+=4;
+    off += 4;
 // fprintf(bd_fd, "Hdr -> Message Size = %d\n", hdr->message_size);
     hdr->objkey_len = Data[off++];
 // fprintf(bd_fd, "Hdr -> ObjKey Len = %d\n", hdr->objkey_len);
     hdr->objkey = (char *)malloc(hdr->objkey_len);
 
-    memcpy(hdr->objkey, Data+off, hdr->objkey_len);
+    memcpy(hdr->objkey, Data + off, hdr->objkey_len);
 
 // fprintf(bd_fd, "Hdr -> ObjKey = %c%c%c%c\n", hdr->objkey[0], hdr->objkey[1], hdr->objkey[2], hdr->objkey[3]);
 
-    off+= hdr->objkey_len;
+    off += hdr->objkey_len;
 
     hdr->objkind_len = (Data[off] << 24) | (Data[off+1] << 16) |
                        (Data[off+2] << 8) | Data[off+3];
 
-    off+=4;
+    off += 4;
 
 // fprintf(bd_fd, "Hdr -> ObjKind Len = %ld\n", hdr->objkind_len);
     hdr->objkind = (char *)malloc(hdr->objkind_len);
 
-    memcpy(hdr->objkind, Data+off, hdr->objkind_len);
+    memcpy(hdr->objkind, Data + off, hdr->objkind_len);
 
 // fprintf(bd_fd, "Hdr -> ObjKind Data = %s\n", hdr->objkind);
 
-    off+= hdr->objkind_len;
+    off += hdr->objkind_len;
 
     hdr->objinfo_len = Data[off] << 8 | Data[off+1];
 
-    off+=2;
+    off += 2;
 // fprintf(bd_fd, "Hdr -> ObjInfo Len = %d\n", hdr->objkey_len);
 
     hdr->objinfo = (char *)malloc(hdr->objinfo_len);
 
-    memcpy(hdr->objinfo, Data+off, hdr->objinfo_len);
+    memcpy(hdr->objinfo, Data + off, hdr->objinfo_len);
 
 // fprintf(bd_fd, "Hdr -> ObjInfo = %c%c%c\n", hdr->objinfo[0], hdr->objinfo[1], hdr->objinfo[2]);
 
-    off+= hdr->objinfo_len;
+    off += hdr->objinfo_len;
 
     cachep->curp += off;
 
@@ -115,9 +115,9 @@ dsmcc_biop_process_name_comp(struct biop_name_comp *comp, unsigned char *Data)
 
     comp->id = (char *)malloc(comp->id_len);
 
-    memcpy(comp->id, Data+off, comp->id_len);
+    memcpy(comp->id, Data + off, comp->id_len);
 
-    off+=comp->id_len;
+    off += comp->id_len;
 
     comp->kind_len = Data[off++];
 
@@ -125,9 +125,9 @@ dsmcc_biop_process_name_comp(struct biop_name_comp *comp, unsigned char *Data)
 
     comp->kind = (char *)malloc(comp->kind_len);
 
-    memcpy(comp->kind, Data+off, comp->kind_len);
+    memcpy(comp->kind, Data + off, comp->kind_len);
 
-    off+= comp->kind_len;
+    off += comp->kind_len;
 
 // fprintf(bd_fd, "Dir -> Binding -> Name -> Comp -> Kind = %s\n", comp->kind);
 
@@ -150,7 +150,7 @@ dsmcc_biop_process_name(struct biop_name *name, unsigned char *Data)
 
     for (i = 0; i < name->comp_count; i++)
     {
-        ret = dsmcc_biop_process_name_comp(&name->comps[i], Data+off);
+        ret = dsmcc_biop_process_name_comp(&name->comps[i], Data + off);
         if (ret > 0)
         {
             off += ret;
@@ -179,7 +179,7 @@ dsmcc_biop_process_binding(struct biop_binding *bind, unsigned char *Data)
     bind->binding_type = Data[off++];
 // fprintf(bd_fd, "Dir -> Binding ->  Type = %d\n", bind->binding_type);
 
-    ret = dsmcc_biop_process_ior(&bind->ior, Data+off);
+    ret = dsmcc_biop_process_ior(&bind->ior, Data + off);
     if (ret > 0)
     {
         off += ret;
@@ -190,12 +190,12 @@ dsmcc_biop_process_binding(struct biop_binding *bind, unsigned char *Data)
     bind->objinfo_len = (Data[off] << 8) | Data[off+1];
 
 // fprintf(bd_fd, "Dir -> Binding ->  ObjInfo Len = %d\n", bind->objinfo_len);
-    off+=2;
+    off += 2;
 
-    if (bind->objinfo_len>0)
+    if (bind->objinfo_len > 0)
     {
         bind->objinfo = (char *)malloc(bind->objinfo_len);
-        memcpy(bind->objinfo, Data+off, bind->objinfo_len);
+        memcpy(bind->objinfo, Data + off, bind->objinfo_len);
     }
     else
     {
@@ -204,12 +204,12 @@ dsmcc_biop_process_binding(struct biop_binding *bind, unsigned char *Data)
 
 // fprintf(bd_fd, "Dir -> Binding ->  ObjInfo = %s\n", bind->objinfo);
 
-    off+= bind->objinfo_len;
+    off += bind->objinfo_len;
 
     return off;
 }
 
-int dsmcc_biop_process_srg(struct biop_message *bm,struct cache_module_data *cachep, struct cache *filecache)
+int dsmcc_biop_process_srg(struct biop_message *bm, struct cache_module_data *cachep, struct cache *filecache)
 {
     unsigned int i;
     int off = 0, ret;
@@ -222,16 +222,16 @@ int dsmcc_biop_process_srg(struct biop_message *bm,struct cache_module_data *cac
 
 // fprintf(bd_fd, "Gateway -> MsgBody Len = %ld\n", bm->body.srg.msgbody_len);
 
-    off+=4;
+    off += 4;
 
     bm->body.srg.bindings_count = Data[off] << 8 | Data[off+1];
 
 // fprintf(bd_fd, "Gateway -> Bindings Count = %d\n", bm->body.srg.bindings_count);
-    off+=2;
+    off += 2;
 
     for (i = 0; i < bm->body.srg.bindings_count; i++)
     {
-        ret = dsmcc_biop_process_binding(&bm->body.srg.binding, Data+off);
+        ret = dsmcc_biop_process_binding(&bm->body.srg.binding, Data + off);
         if (ret > 0)
         {
             off += ret;
@@ -240,11 +240,11 @@ int dsmcc_biop_process_srg(struct biop_message *bm,struct cache_module_data *cac
             { /* TODO error */ }
         if (!strcmp("dir", bm->body.srg.binding.name.comps[0].kind))
         {
-            dsmcc_cache_dir_info(filecache, 0,0,NULL,&bm->body.srg.binding);
+            dsmcc_cache_dir_info(filecache, 0, 0, NULL, &bm->body.srg.binding);
         }
-        else if (!strcmp("fil",bm->body.srg.binding.name.comps[0].kind))
+        else if (!strcmp("fil", bm->body.srg.binding.name.comps[0].kind))
         {
-            dsmcc_cache_file_info(filecache, 0,0,NULL,&bm->body.srg.binding);
+            dsmcc_cache_file_info(filecache, 0, 0, NULL, &bm->body.srg.binding);
         }
         dsmcc_biop_free_binding(&bm->body.srg.binding);
     }
@@ -294,23 +294,23 @@ void dsmcc_biop_process_dir(struct biop_message *bm, struct cache_module_data *c
                                (Data[off+2] << 8) | Data[off+3];
 
 // fprintf(bd_fd, "Dir -> MsgBody Len = %ld\n", bm->body.dir.msgbody_len);
-    off+=4;
+    off += 4;
 
     bm->body.dir.bindings_count = Data[off] << 8 | Data[off+1];
 
 // fprintf(bd_fd, "Dir -> Bindings Count = %d\n", bm->body.dir.bindings_count);
-    off+=2;
+    off += 2;
 
     for (i = 0; i < bm->body.dir.bindings_count; i++)
     {
-        ret = dsmcc_biop_process_binding(&bm->body.dir.binding, Data+off);
+        ret = dsmcc_biop_process_binding(&bm->body.dir.binding, Data + off);
         if (ret > 0)
         {
-            off+= ret;
+            off += ret;
         }
         else
             { /* TODO error */ }
-        if (!strcmp("dir",bm->body.dir.binding.name.comps[0].kind))
+        if (!strcmp("dir", bm->body.dir.binding.name.comps[0].kind))
         {
             dsmcc_cache_dir_info(filecache, cachep->module_id, bm->hdr.objkey_len,
                                  bm->hdr.objkey, &bm->body.dir.binding);
@@ -329,10 +329,10 @@ void dsmcc_biop_process_dir(struct biop_message *bm, struct cache_module_data *c
 }
 
 void
-dsmcc_biop_process_file(struct biop_message *bm,struct cache_module_data *cachep, struct cache *filecache)
+dsmcc_biop_process_file(struct biop_message *bm, struct cache_module_data *cachep, struct cache *filecache)
 {
     int off = 0;
-    unsigned char *Data = cachep->data+cachep->curp;
+    unsigned char *Data = cachep->data + cachep->curp;
 
     /* skip service contect count */
 
@@ -341,14 +341,14 @@ dsmcc_biop_process_file(struct biop_message *bm,struct cache_module_data *cachep
     bm->body.file.msgbody_len = (Data[off] << 24) | (Data[off+1] << 16) |
                                 (Data[off+2] << 8) | Data[off+3];
 
-    off+=4;
+    off += 4;
 
 // fprintf(bd_fd, "File -> MsgBody Len = %ld\n",bm->body.file.msgbody_len);
 
     bm->body.file.content_len = (Data[off] << 24) | (Data[off+1] << 16) |
                                 (Data[off+2] << 8)  | Data[off+3];
 
-    off+=4;
+    off += 4;
 
 // fprintf(bd_fd, "File -> Content Len = %ld\n", bm->body.file.content_len);
 
@@ -367,11 +367,10 @@ dsmcc_biop_process_data(struct cache *filecache, struct cache_module_data *cache
     struct descriptor *desc;
     int ret;
     unsigned int len;
-    static int i = 0;
 
 // bd_fd = fopen("/tmp/biop_data", "a");
 
-    for (desc = cachep->descriptors; desc != NULL; desc=desc->next)
+    for (desc = cachep->descriptors; desc != NULL; desc = desc->next)
     {
         if (desc->tag == 0x09)
         {
@@ -477,8 +476,8 @@ dsmcc_biop_process_module_info(struct biop_module_info *modinfo, unsigned char *
 
 // biop_fd = fopen("/tmp/biop2.debug", "a");
 
-    modinfo->mod_timeout = (Data[0] << 24 ) | (Data[1] << 16) |
-                           (Data[2] << 8 )  | Data[3];
+    modinfo->mod_timeout = (Data[0] << 24) | (Data[1] << 16) |
+                           (Data[2] << 8)  | Data[3];
 
 // fprintf(biop_fd, "Module Info -> Mod Timeout = %ld\n", modinfo->mod_timeout);
 
@@ -499,7 +498,7 @@ dsmcc_biop_process_module_info(struct biop_module_info *modinfo, unsigned char *
     off = 13;
 
     /* only 1 allowed TODO - may not be first though ? */
-    ret = dsmcc_biop_process_tap(&modinfo->tap, Data+off);
+    ret = dsmcc_biop_process_tap(&modinfo->tap, Data + off);
     if (ret > 0)
     {
         off += ret;
@@ -514,7 +513,7 @@ dsmcc_biop_process_module_info(struct biop_module_info *modinfo, unsigned char *
     if (modinfo->userinfo_len > 0)
     {
         modinfo->descriptors =
-            dsmcc_desc_process(Data+off,modinfo->userinfo_len,&off);
+            dsmcc_desc_process(Data + off, modinfo->userinfo_len, &off);
     }
     else
     {
@@ -530,27 +529,27 @@ dsmcc_biop_process_module_info(struct biop_module_info *modinfo, unsigned char *
 int
 dsmcc_biop_process_tap(struct biop_tap *tap, unsigned char *Data)
 {
-    int off=0;
+    int off = 0;
 
     tap->id = (Data[0] << 8) | Data[1];
 // fprintf(biop_fd, "Tap -> ID = %X\n",tap->id);
-    off+=2;
+    off += 2;
     tap->use = (Data[off] << 8) | Data[off+1];
 // fprintf(biop_fd, "Tap -> Use = %X\n",tap->use);
-    off+=2;
+    off += 2;
     tap->assoc_tag = (Data[off] << 8) | Data[off+1];
 // syslog(LOG_ERR, ("Tap for stream %X", tap->assoc_tag);
 
 // fprintf(biop_fd, "Tap -> Assoc = %X\n",tap->assoc_tag);
-    off+=2;
+    off += 2;
     tap->selector_len = Data[off++];
 // fprintf(biop_fd, "Tap -> Selector Length= %d\n",tap->selector_len);
 
     tap->selector_data = (char *)malloc(tap->selector_len);
 
-    memcpy(tap->selector_data, Data+off, tap->selector_len);
+    memcpy(tap->selector_data, Data + off, tap->selector_len);
 
-    off+=tap->selector_len;
+    off += tap->selector_len;
 
     return off;
 }
@@ -563,7 +562,7 @@ dsmcc_biop_process_binder(struct biop_dsm_connbinder *binder, unsigned char *Dat
     binder->component_tag = (Data[0] << 24) | (Data[1] << 16) |
                             (Data[2] << 8)  | Data[3];
 
-    off+=4;
+    off += 4;
 
 // fprintf(biop_fd, "Binder -> Component_tag = %lX\n", binder->component_tag);
 
@@ -577,7 +576,7 @@ dsmcc_biop_process_binder(struct biop_dsm_connbinder *binder, unsigned char *Dat
 
     /* UKProfile - only first tap read */
 
-    ret = dsmcc_biop_process_tap(&binder->tap, Data+off);
+    ret = dsmcc_biop_process_tap(&binder->tap, Data + off);
     if (ret > 0)
     {
         off += ret;
@@ -598,7 +597,7 @@ dsmcc_biop_process_object(struct biop_obj_location *loc, unsigned char *Data)
 
 // fprintf(biop_fd, "Object -> Component_tag = %lX\n",loc->component_tag);
 
-    off+=4;
+    off += 4;
 
     loc->component_data_len = Data[off++];
 
@@ -609,13 +608,13 @@ dsmcc_biop_process_object(struct biop_obj_location *loc, unsigned char *Data)
 
 // fprintf(biop_fd, "Object -> Carousel id = %ld\n",loc->carousel_id);
 
-    off+=4;
+    off += 4;
 
     loc->module_id = (Data[off] << 8) | Data[off+1];
 
 // fprintf(biop_fd, "Object -> Module id = %d\n",loc->module_id);
 
-    off+=2;
+    off += 2;
 
     loc->version_major = Data[off++];
     loc->version_minor = Data[off++];
@@ -628,9 +627,9 @@ dsmcc_biop_process_object(struct biop_obj_location *loc, unsigned char *Data)
 
     loc->objkey = (char *)malloc(loc->objkey_len);
 
-    memcpy(loc->objkey, Data+off, loc->objkey_len);
+    memcpy(loc->objkey, Data + off, loc->objkey_len);
 
-    off+=loc->objkey_len;
+    off += loc->objkey_len;
 
     return off;
 }
@@ -653,17 +652,17 @@ dsmcc_biop_process_body(struct biop_profile_body *body, unsigned char *Data)
 
 // fprintf(biop_fd, "Body -> Data Length = %ld\n", body->data_len);
 
-    off+=4;
+    off += 4;
 
     /* skip bit order */
 
-    off+=1;
+    off += 1;
 
     body->lite_components_count = Data[off++];
 
 // fprintf(biop_fd, "Body -> Lite Components Count= %x\n", body->lite_components_count);
 
-    ret = dsmcc_biop_process_object(&body->obj_loc, Data+off);
+    ret = dsmcc_biop_process_object(&body->obj_loc, Data + off);
     if (ret > 0)
     {
         off += ret;
@@ -671,7 +670,7 @@ dsmcc_biop_process_body(struct biop_profile_body *body, unsigned char *Data)
     else
         { /* TODO error */ }
 
-    ret = dsmcc_biop_process_binder(&body->dsm_conn, Data+off);
+    ret = dsmcc_biop_process_binder(&body->dsm_conn, Data + off);
     if (ret > 0)
     {
         off += ret;
@@ -699,30 +698,30 @@ dsmcc_biop_process_ior(struct biop_ior *ior, unsigned char *Data)
 
     ior->type_id = (char *)malloc(ior->type_id_len);
 
-    off+=4;
+    off += 4;
 
-    memcpy(ior->type_id, Data+off, ior->type_id_len);
+    memcpy(ior->type_id, Data + off, ior->type_id_len);
 
-    off+=ior->type_id_len;
+    off += ior->type_id_len;
 
     ior->tagged_profiles_count = (Data[off] << 24) | (Data[off+1] << 16) |
                                  (Data[off+2] << 8) | (Data[off+3]);
 
 // fprintf(biop_fd,"Tagged Profiles Count= %ld\n", ior->tagged_profiles_count);
 
-    off+=4;
+    off += 4;
 
     ior->profile_id_tag = (Data[off] << 24) | (Data[off+1] << 16) |
                           (Data[off+2] << 8)  | Data[off+3];
 
 // fprintf(biop_fd, "Profile Id Tag= %lX\n", ior->profile_id_tag);
-    off+=4;
+    off += 4;
 
 // fprintf(biop_fd, "Profile Id Tag last= %lX\n", (ior->profile_id_tag & 0xFF));
 
     if ((ior->profile_id_tag & 0xFF) == 0x06)
     {
-        ret = dsmcc_biop_process_body(&ior->body.full, Data+off);
+        ret = dsmcc_biop_process_body(&ior->body.full, Data + off);
         if (ret > 0)
         {
             off += ret;
@@ -732,7 +731,7 @@ dsmcc_biop_process_ior(struct biop_ior *ior, unsigned char *Data)
     }
     else if ((ior->profile_id_tag & 0xFF) == 0x05)
     {
-        ret = dsmcc_biop_process_lite(&ior->body.lite, Data+off);
+        ret = dsmcc_biop_process_lite(&ior->body.lite, Data + off);
         if (ret > 0)
         {
             off += ret;

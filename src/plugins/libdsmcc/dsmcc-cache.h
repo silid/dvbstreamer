@@ -84,7 +84,7 @@ void dsmcc_cache_unknown_dir_info(struct cache *, struct cache_dir *);
 
 void dsmcc_cache_unknown_file_info(struct cache *, struct cache_file *);
 
-struct cache_file * dsmcc_cache_file_find_data(struct cache *, unsigned long,unsigned short,unsigned int,char *);
+struct cache_file * dsmcc_cache_file_find_data(struct cache *, unsigned long, unsigned short, unsigned int, char *);
 
 void dsmcc_cache_free_dir(struct cache_dir *);
 
@@ -92,7 +92,7 @@ void dsmcc_cache_init(struct cache *, const char *, FILE *);
 
 void dsmcc_cache_free(struct cache *);
 
-struct cache_dir * dsmcc_cache_dir_find(struct cache *,unsigned long carousel_id, unsigned short module_id, unsigned int key_len, char *key);
+struct cache_dir * dsmcc_cache_dir_find(struct cache *, unsigned long carousel_id, unsigned short module_id, unsigned int key_len, char *key);
 
 struct cache_file * dsmcc_cache_file_find(struct cache *, unsigned long carousel_id, unsigned short module_id, unsigned int key_len, char *key);
 
@@ -100,7 +100,7 @@ void dsmcc_cache_dir_info(struct cache *, unsigned short, unsigned int, char *, 
 
 void dsmcc_cache_file(struct cache *, struct biop_message *, struct cache_module_data *);
 
-void dsmcc_cache_file_info(struct cache *, unsigned short,unsigned int,char *,struct biop_binding *);
+void dsmcc_cache_file_info(struct cache *, unsigned short, unsigned int, char *, struct biop_binding *);
 void dsmcc_cache_write_dir(struct cache *, struct cache_dir *);
 
 void dsmcc_cache_attach_dir(struct cache *, struct cache_dir *, struct cache_dir *);

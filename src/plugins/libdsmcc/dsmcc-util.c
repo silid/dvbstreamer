@@ -53,12 +53,12 @@ static unsigned long crc_table[256] =
     0xbcb4666d, 0xb8757bda, 0xb5365d03, 0xb1f740b4
 };
 
-unsigned long dsmcc_crc32 (unsigned char *data, int len)
+unsigned long dsmcc_crc32(unsigned char *data, int len)
 {
     register int i;
     unsigned long crc = 0xffffffff;
 
-    for (i=0; i<len; i++)
+    for (i = 0; i < len; i++)
         crc = (crc << 8) ^ crc_table[((crc >> 24) ^ *data++) & 0xff];
 
     return crc;
