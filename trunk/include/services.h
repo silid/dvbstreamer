@@ -361,6 +361,16 @@ void ServiceEnumeratorDestroy(ServiceEnumerator_t enumerator);
  */
 Service_t *ServiceGetNext(ServiceEnumerator_t enumerator);
 
+#define SERVICE_ID_STRING_LENGTH (4 + 1 + 4 + 1 + 4 + 1)
+/**
+ * Retreive a string containing the NetID.TSID.ServiceId.
+ * @param service The service to return the id string for.
+ * @param buffer The buffer to store the string in (size must be >=SERVICE_ID_STRING_LENGTH) or 
+ * NULL to allocate a buffer of size SERVICE_ID_STRING_LENGTH.
+ * @return Pointer to the buffer containing the string or NULL.
+ */
+char * ServiceGetIDStr(Service_t * service, char * buffer);
+    
 /**
  * Create a new service object.
  */

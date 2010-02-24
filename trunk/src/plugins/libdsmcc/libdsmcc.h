@@ -7,22 +7,11 @@ extern "C"
 #endif
 #include "dsmcc-receiver.h"
 #include "dsmcc-carousel.h"
-
     struct stream
     {
         int pid;
         unsigned int assoc_tag;
         struct stream *next, *prev;;
-    };
-
-    struct pid_buffer
-    {
-        int pid;
-        unsigned char data[8380]; /* 1024*8 + 188 */
-        int pointer_field;
-        int in_section;
-        int cont;
-        struct pid_buffer *next;
     };
 
     struct dsmcc_status
@@ -33,29 +22,15 @@ extern "C"
         enum cachestate { EMPTY, LISTINGS, FILLING, FULL } state;
         enum running { NOTRUNNING, RUNNINGSOON, PAUSED, RUNNING } runstate;
 
-        char *channel_name;
-
-        /* must check to see if any new streams to subscribe to after calling
-           receive each time (new stream info comes from within dsmcc */
-
-        struct stream *newstreams;
-
-        /* Currently subscribed streams (should be private but need to
-           access ... */
-
-        struct stream *streams;
+        void *private;
 
         /* Private Information (ish) */
 
         struct obj_carousel carousels[MAXCAROUSELS];
 
-        struct pid_buffer *buffers;
 
         FILE *debug_fd;
     };
-
-    struct dsmcc_status *dsmcc_init(struct dsmcc_status * status);
-    void dsmcc_free(struct dsmcc_status *status);
 
 #ifdef __cplusplus
 }

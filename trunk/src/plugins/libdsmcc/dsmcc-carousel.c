@@ -22,19 +22,19 @@ void dsmcc_objcar_free(struct obj_carousel *obj)
         if (obj->gate->profile.type_id_len > 0)
             free(obj->gate->profile.type_id);
 
-        if (obj->gate->profile.body.full.obj_loc.objkey_len>0)
+        if (obj->gate->profile.body.full.obj_loc.objkey_len > 0)
             free(obj->gate->profile.body.full.obj_loc.objkey);
 
-        if (obj->gate->profile.body.full.dsm_conn.taps_count>0)
+        if (obj->gate->profile.body.full.dsm_conn.taps_count > 0)
         {
-            if (obj->gate->profile.body.full.dsm_conn.tap.selector_len>0)
+            if (obj->gate->profile.body.full.dsm_conn.tap.selector_len > 0)
                 free(obj->gate->profile.body.full.dsm_conn.tap.selector_data);
         }
     }
 
     /* Free stream info */
     str = obj->streams;
-    while (str!=NULL)
+    while (str != NULL)
     {
         strnext = str->next;
         free(str);
@@ -45,7 +45,7 @@ void dsmcc_objcar_free(struct obj_carousel *obj)
 
     /* Free cache info */
     cachep = obj->cache;
-    while (cachep!=NULL)
+    while (cachep != NULL)
     {
         cachepnext = cachep->next;
         if (cachep->data != NULL)  /* should be empty */

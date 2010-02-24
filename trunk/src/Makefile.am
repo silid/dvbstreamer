@@ -1,7 +1,7 @@
 ## Process this file with automake to produce Makefile.in
 
 AM_CFLAGS =\
-     -I$(top_srcdir)/include -Wall -Werror -D_GNU_SOURCE
+     -I$(top_srcdir)/include  -D_GNU_SOURCE
 
 
 bin_PROGRAMS = dvbstreamer dvbctrl setupdvbstreamer $(fstreamer_app) convertdvbdb

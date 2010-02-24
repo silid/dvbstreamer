@@ -1,6 +1,6 @@
 /*
 Copyright (C) 2010  Adam Charrett
-based on libdsmcc by Richard Palmer 
+based on libdsmcc by Richard Palmer
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -34,7 +34,7 @@ dsmcc-receiver.c
 #include "libdsmcc.h"
 
 
-void dsmcc_init(struct dsmcc_status *status)
+void dsmcc_init(struct dsmcc_status *status, const char *channel)
 {
     int i;
 
@@ -42,11 +42,7 @@ void dsmcc_init(struct dsmcc_status *status)
     status->rec_dirs = status->total_dirs = 0;
     status->gzip_size = status->total_size = 0;
 
-    status->newstreams = status->streams = NULL;
-
-    status->streams = NULL;
-
-    for (i=0;i<MAXCAROUSELS;i++)
+    for (i = 0;i < MAXCAROUSELS;i++)
     {
         status->carousels[i].streams = NULL;
         status->carousels[i].cache = NULL;
@@ -59,34 +55,16 @@ void dsmcc_init(struct dsmcc_status *status)
 
 void dsmcc_free(struct dsmcc_status *status)
 {
-    struct stream *str, *strnext;
-
     /* Free any carousel data and cached data.
      * TODO - actually cache on disk the cache data
      * TODO - more terrible memory madness, this all needs improving
      */
-
-    /* Free any unattached streams */
-
-    if (status->streams != NULL)
-    {
-        /* Free stream info */
-        str = status->streams;
-        while (str!=NULL)
-        {
-            strnext = str->next;
-            free(str);
-            str = strnext;
-        }
-    }
-
-    status->streams = NULL;
-
 }
 
-void dsmcc_add_stream(struct dsmcc_status *status, int tag)
+void dsmcc_add_stream(struct dsmcc_status *status, uint16_t tag)
 {
-
+    void DownloadSessionPIDAddTag(void *, uint16_t);
+    DownloadSessionPIDAddTag(status->private, tag);
 }
 
 int dsmcc_process_section_header(struct dsmcc_section *section, unsigned char *Data, int Length)
@@ -166,14 +144,14 @@ int dsmcc_process_section_gateway(struct dsmcc_status *status, unsigned char *Da
 {
     int off = 0, ret, i;
     struct obj_carousel *car;
-    struct stream *str, *s;
+    struct stream *str;
 
     /* Find which object carousel this pid's data belongs to */
 
-    for (i=0;i<MAXCAROUSELS;i++)
+    for (i = 0;i < MAXCAROUSELS;i++)
     {
         car = &status->carousels[i];
-        for (str=car->streams;str!=NULL;str=str->next)
+        for (str = car->streams;str != NULL;str = str->next)
         {
             if (str->pid == pid)
             {
@@ -217,7 +195,7 @@ int dsmcc_process_section_gateway(struct dsmcc_status *status, unsigned char *Da
     off = 22;
     car->gate->data_len = (Data[off] << 8) | Data[off+1];
 
-    off+=2;
+    off += 2;
 //        fprintf(dsi_debug, "Data Length: %d\n", car->gate->data_len);
 
     /* does not even exist ?
@@ -229,7 +207,7 @@ int dsmcc_process_section_gateway(struct dsmcc_status *status, unsigned char *Da
     /* TODO - process groups ( if ever exist ? ) */
 
 //      fprintf(dsi_debug, "Processing BiopBody...\n");
-    ret = dsmcc_biop_process_ior(&car->gate->profile, Data+DSMCC_BIOP_OFFSET);
+    ret = dsmcc_biop_process_ior(&car->gate->profile, Data + DSMCC_BIOP_OFFSET);
     if (ret > 0)
     {
         off += ret;
@@ -254,14 +232,14 @@ int dsmcc_process_section_gateway(struct dsmcc_status *status, unsigned char *Da
 
     /* skip taps and context */
 
-    off+=2;
+    off += 2;
 
     /* TODO process descriptors */
     car->gate->user_data_len = Data[off++];
     if (car->gate->user_data_len > 0)
     {
         car->gate->user_data = (unsigned char *)malloc(car->gate->data_len);
-        memcpy(car->gate->user_data, Data+off, car->gate->data_len);
+        memcpy(car->gate->user_data, Data + off, car->gate->data_len);
     }
 
     /*        fprintf(dsi_debug, "BiopBody - Data Length %ld\n",
@@ -278,12 +256,12 @@ int dsmcc_process_section_info(struct dsmcc_status *status, struct dsmcc_section
 {
     struct dsmcc_dii *dii = &section->msg.dii;
     struct obj_carousel *car = NULL;
-    int off=0, i, ret;
+    int off = 0, i, ret;
 
     dii->download_id = (Data[0] << 24) | (Data[1] << 16) |
                        (Data[2] << 8)  | (Data[3]) ;
 
-    for (i=0;i<MAXCAROUSELS;i++)
+    for (i = 0;i < MAXCAROUSELS;i++)
     {
         car = &status->carousels[i];
         if (car->id == dii->download_id)
@@ -305,29 +283,29 @@ int dsmcc_process_section_info(struct dsmcc_status *status, struct dsmcc_section
 
 //      fprintf(dsi_debug, "Info -> Download ID = %lX\n", dii->download_id);
 
-    off+=4;
+    off += 4;
     dii->block_size = Data[off] << 8 | Data[off+1];
 //      fprintf(dsi_debug, "Info -> Block Size = %d\n", dii->block_size);
-    off+=2;
+    off += 2;
 
-    off+=6; /* not used fields */
+    off += 6; /* not used fields */
 
     dii->tc_download_scenario = (Data[off] << 24) | (Data[off+1] << 16) |
-                                (Data[off+2] << 8)| Data[off+3];
+                                (Data[off+2] << 8) | Data[off+3];
     /*
             fprintf(dsi_debug, "Info -> tc download scenario = %ld\n",
           dii->tc_download_scenario);
     */
-    off+=4;
+    off += 4;
 
     /* skip unused compatibility descriptor len */
 
-    off+=2;
+    off += 2;
 
     dii->number_modules = (Data[off] << 8) | Data[off+1];
 
 //      fprintf(dsi_debug, "Info -> number modules = %d\n",dii->number_modules);
-    off+=2;
+    off += 2;
 
     dii->modules = (struct dsmcc_module_info*)
                    malloc(sizeof(struct dsmcc_module_info) * dii->number_modules);
@@ -335,12 +313,12 @@ int dsmcc_process_section_info(struct dsmcc_status *status, struct dsmcc_section
     for (i = 0; i < dii->number_modules; i++)
     {
         dii->modules[i].module_id = (Data[off] << 8) | Data[off+1];
-        off+=2;
+        off += 2;
         dii->modules[i].module_size = (Data[off] << 24) |
                                       (Data[off+1] << 16) |
                                       (Data[off+2] << 8) |
                                       Data[off+3];
-        off+=4;
+        off += 4;
         dii->modules[i].module_version = Data[off++];
         dii->modules[i].module_info_len = Data[off++];
 
@@ -349,7 +327,7 @@ int dsmcc_process_section_info(struct dsmcc_status *status, struct dsmcc_section
             fprintf(status->debug_fd, "[libdsmcc] Module %d -> Size = %ld Version = %d\n", dii->modules[i].module_id, dii->modules[i].module_size, dii->modules[i].module_version);
         }
         ret = dsmcc_biop_process_module_info(&dii->modules[i].modinfo,
-                                             Data+off);
+                                             Data + off);
 
         if (ret > 0)
         {
@@ -392,19 +370,19 @@ void dsmcc_process_section_indication(struct dsmcc_status *status, unsigned char
     struct dsmcc_section section;
     int ret;
 
-    ret = dsmcc_process_section_header(&section, Data+DSMCC_SECTION_OFFSET, Length);
+    ret = dsmcc_process_section_header(&section, Data + DSMCC_SECTION_OFFSET, Length);
 
     if (ret != 0)
     {
-        syslog(LOG_ERR, "Indication Section Header error");
+        fprintf(status->debug_fd, "[libdsmcc] Indication Section Header error");
         return;
     }
 
-    ret = dsmcc_process_msg_header(&section, Data+DSMCC_MSGHDR_OFFSET);
+    ret = dsmcc_process_msg_header(&section, Data + DSMCC_MSGHDR_OFFSET);
 
     if (ret != 0)
     {
-        syslog(LOG_ERR, "Indication Msg Header error");
+        fprintf(status->debug_fd, "[libdsmcc] Indication Msg Header error");
         return;
     }
 
@@ -414,7 +392,7 @@ void dsmcc_process_section_indication(struct dsmcc_status *status, unsigned char
         {
             fprintf(status->debug_fd, "[libdsmcc] Server Gateway\n");
         }
-        dsmcc_process_section_gateway(status, Data+DSMCC_DSI_OFFSET, Length, pid);
+        dsmcc_process_section_gateway(status, Data + DSMCC_DSI_OFFSET, Length, pid);
     }
     else if (section.hdr.info.message_id == 0x1002)
     {
@@ -422,7 +400,7 @@ void dsmcc_process_section_indication(struct dsmcc_status *status, unsigned char
         {
             fprintf(status->debug_fd, "[libdsmcc] Module Info\n");
         }
-        dsmcc_process_section_info(status, &section, Data+DSMCC_DII_OFFSET, Length);
+        dsmcc_process_section_info(status, &section, Data + DSMCC_DII_OFFSET, Length);
     }
     else
     {
@@ -438,7 +416,6 @@ void dsmcc_add_module_info(struct dsmcc_status *status, struct dsmcc_section *se
     struct cache_module_data *cachep = car->cache;
     struct descriptor *desc, *last;
     struct dsmcc_dii *dii = &section->msg.dii;
-    struct stream *str, *s;
 
     /* loop through modules and add to cache list if no module with
      * same id or a different version. */
@@ -446,13 +423,13 @@ void dsmcc_add_module_info(struct dsmcc_status *status, struct dsmcc_section *se
     for (i = 0; i < dii->number_modules; i++)
     {
         found = 0;
-        for (;cachep!=NULL;cachep=cachep->next)
+        for (;cachep != NULL;cachep = cachep->next)
         {
             if (cachep->carousel_id == dii->download_id &&
                     cachep->module_id == dii->modules[i].module_id)
             {
                 /* already known */
-                if (cachep->version==dii->modules[i].module_version)
+                if (cachep->version == dii->modules[i].module_version)
                 {
 //   fprintf(dsi_debug, "AddModuleInfo -> Already Know Module %d\n", dii->modules[i].module_id);
                     if (status->debug_fd != NULL)
@@ -486,15 +463,15 @@ void dsmcc_add_module_info(struct dsmcc_status *status, struct dsmcc_section *se
                     if (cachep->prev != NULL)
                     {
                         cachep->prev->next = cachep->next;
-                        if (cachep->next!=NULL)
+                        if (cachep->next != NULL)
                         {
-                            cachep->next->prev=cachep->prev;
+                            cachep->next->prev = cachep->prev;
                         }
                     }
                     else
                     {
                         car->cache = cachep->next;
-                        if (cachep->next!=NULL)
+                        if (cachep->next != NULL)
                         {
                             cachep->next->prev = NULL;
                         }
@@ -513,8 +490,8 @@ void dsmcc_add_module_info(struct dsmcc_status *status, struct dsmcc_section *se
             }
             if (car->cache != NULL)
             {
-                for (cachep=car->cache;
-                        cachep->next!=NULL;cachep=cachep->next)
+                for (cachep = car->cache;
+                        cachep->next != NULL;cachep = cachep->next)
                 {
                     ;
                 }
@@ -537,8 +514,8 @@ void dsmcc_add_module_info(struct dsmcc_status *status, struct dsmcc_section *se
             num_blocks = cachep->size / dii->block_size;
             if ((cachep->size % dii->block_size) != 0)
                 num_blocks++;
-            cachep->bstatus=(char*)malloc(((num_blocks/8)+1)*sizeof(char));
-            bzero(cachep->bstatus, (num_blocks/8)+1);
+            cachep->bstatus = (char*)malloc(((num_blocks / 8) + 1) * sizeof(char));
+            bzero(cachep->bstatus, (num_blocks / 8) + 1);
             /*  syslog(LOG_ERR, "Allocated %d bytes to store status for module %d",
                 (num_blocks/8)+1, cachep->module_id);
              */
@@ -617,7 +594,7 @@ int dsmcc_process_section_block(struct dsmcc_status *status, struct dsmcc_sectio
         fprintf(status->debug_fd, "[libdsmcc] Data Block ModID %d Pos %d Version %d\n", ddb->module_id, ddb->block_number, ddb->module_version);
     }
 
-    dsmcc_add_module_data(status, section, Data+6);
+    dsmcc_add_module_data(status, section, Data + 6);
 
     return 0;
 }
@@ -630,13 +607,13 @@ void dsmcc_process_section_data(struct dsmcc_status *status, unsigned char *Data
     section = (struct dsmcc_section *)malloc(sizeof(struct dsmcc_section));
 
 // fprintf(dsi_debug, "Reading section header\n");
-    dsmcc_process_section_header(section, Data+DSMCC_SECTION_OFFSET, Length);
+    dsmcc_process_section_header(section, Data + DSMCC_SECTION_OFFSET, Length);
 
 // fprintf(dsi_debug, "Reading data header\n");
-    dsmcc_process_data_header(section, Data+DSMCC_DATAHDR_OFFSET,Length);
+    dsmcc_process_data_header(section, Data + DSMCC_DATAHDR_OFFSET, Length);
 
 // fprintf(dsi_debug, "Reading data \n");
-    dsmcc_process_section_block(status, section, Data+DSMCC_DDB_OFFSET,Length);
+    dsmcc_process_section_block(status, section, Data + DSMCC_DDB_OFFSET, Length);
 
     free(section);
 }
@@ -655,7 +632,7 @@ void dsmcc_add_module_data(struct dsmcc_status *status, struct dsmcc_section *se
 
     /* Scan through known modules and append data */
 
-    for (i=0;i<MAXCAROUSELS;i++)
+    for (i = 0;i < MAXCAROUSELS;i++)
     {
         car = &status->carousels[i];
         if (car->id == section->hdr.data.download_id)
@@ -716,24 +693,24 @@ void dsmcc_add_module_data(struct dsmcc_status *status, struct dsmcc_section *se
              */
             if (BLOCK_GOT(cachep->bstatus, ddb->block_number) == 0)
             {
-                if ((cachep->blocks==NULL)||(cachep->blocks->block_number>ddb->block_number))
+                if ((cachep->blocks == NULL) || (cachep->blocks->block_number > ddb->block_number))
                 {
-                    nb=cachep->blocks; /* NULL or previous first in list */
-                    cachep->blocks=(struct dsmcc_ddb*)malloc(sizeof(struct dsmcc_ddb));
-                    lb=cachep->blocks;
+                    nb = cachep->blocks; /* NULL or previous first in list */
+                    cachep->blocks = (struct dsmcc_ddb*)malloc(sizeof(struct dsmcc_ddb));
+                    lb = cachep->blocks;
                 }
                 else
                 {
-                    for (pb=lb=cachep->blocks;
-                            (lb!=NULL) && (lb->block_number < ddb->block_number);
-                            pb=lb,lb=lb->next)
+                    for (pb = lb = cachep->blocks;
+                            (lb != NULL) && (lb->block_number < ddb->block_number);
+                            pb = lb, lb = lb->next)
                     {
                         ;
                     }
 
                     nb = pb->next;
                     pb->next = (struct dsmcc_ddb*)malloc(sizeof(struct dsmcc_ddb));
-                    lb=pb->next;
+                    lb = pb->next;
                 }
 
                 lb->module_id = ddb->module_id;
@@ -750,7 +727,7 @@ void dsmcc_add_module_data(struct dsmcc_status *status, struct dsmcc_section *se
 
         if (status->debug_fd != NULL)
         {
-            fprintf(status->debug_fd, "[libdsmcc] Module %d Current Size %d Total Size %d\n", cachep->module_id, cachep->curp, cachep->size);
+            fprintf(status->debug_fd, "[libdsmcc] Module %d Current Size %lu Total Size %lu\n", cachep->module_id, cachep->curp, cachep->size);
         }
 
         if (cachep->curp >= cachep->size)
@@ -762,23 +739,23 @@ void dsmcc_add_module_data(struct dsmcc_status *status, struct dsmcc_section *se
             /* Re-assemble the blocks into the complete module */
             cachep->data = (unsigned char*)malloc(cachep->size);
             cachep->curp = 0;
-            pb=lb=cachep->blocks;
-            while (lb!=NULL)
+            pb = lb = cachep->blocks;
+            while (lb != NULL)
             {
-                memcpy(cachep->data+cachep->curp,lb->blockdata,lb->len);
+                memcpy(cachep->data + cachep->curp, lb->blockdata, lb->len);
                 cachep->curp += lb->len;
 
-                pb=lb;
-                lb=lb->next;
+                pb = lb;
+                lb = lb->next;
 
-                if (pb->blockdata!=NULL)
+                if (pb->blockdata != NULL)
                     free(pb->blockdata);
                 free(pb);
             }
             cachep->blocks = NULL;
 
             /* Uncompress.... TODO - scan for compressed descriptor */
-            for (desc=cachep->descriptors;desc !=NULL; desc=desc->next)
+            for (desc = cachep->descriptors;desc != NULL; desc = desc->next)
             {
                 if (desc && (desc->tag == 0x09))
                 {
@@ -789,14 +766,14 @@ void dsmcc_add_module_data(struct dsmcc_status *status, struct dsmcc_section *se
             {
 //            syslog(LOG_ERR, "Uncompressing...(%lu bytes compressed - %lu bytes memory", cachep->curp, desc->data.compressed.original_size);
 
-                data_len=desc->data.compressed.original_size+1;
-                data = (unsigned char *)malloc(data_len+1);
+                data_len = desc->data.compressed.original_size + 1;
+                data = (unsigned char *)malloc(data_len + 1);
 //     syslog(LOG_ERR, "Compress data memory %p - %p (%ld bytes)", cachep->data, cachep->data+cachep->size, cachep->size);
 //     syslog(LOG_ERR, "Uncompress data memory %p - %p (%ld bytes)", data, data+data_len, data_len);
 
 //     fprintf(dsi_debug, "(set %lu ", data_len);
 //     syslog(LOG_ERR, "(set %lu", data_len);
-                ret = uncompress(data, &data_len, cachep->data,cachep->size);
+                ret = uncompress(data, &data_len, cachep->data, cachep->size);
 //     syslog(LOG_ERR, "expected %lu real %lu ret %d)", cachep->size, data_len, ret);
 
                 if (ret == Z_DATA_ERROR)
@@ -810,7 +787,7 @@ void dsmcc_add_module_data(struct dsmcc_status *status, struct dsmcc_section *se
                         free(data);
                     }
                     cachep->curp = 0;
-                    if (cachep->data!=NULL)
+                    if (cachep->data != NULL)
                     {
                         free(cachep->data);
                         cachep->data = NULL;
@@ -828,7 +805,7 @@ void dsmcc_add_module_data(struct dsmcc_status *status, struct dsmcc_section *se
                         free(data);
                     }
                     cachep->curp = 0;
-                    if (cachep->data!=NULL)
+                    if (cachep->data != NULL)
                     {
                         free(cachep->data);
                         cachep->data = NULL;
@@ -846,14 +823,14 @@ void dsmcc_add_module_data(struct dsmcc_status *status, struct dsmcc_section *se
                         free(data);
                     }
                     cachep->curp = 0;
-                    if (cachep->data!=NULL)
+                    if (cachep->data != NULL)
                     {
                         free(cachep->data);
                         cachep->data = NULL;
                     }
                     return;
                 }
-                if (cachep->data!=NULL)
+                if (cachep->data != NULL)
                 {
                     free(cachep->data);
                 }
@@ -886,19 +863,16 @@ void dsmcc_process_section_desc(unsigned char *Data, int Length)
     struct dsmcc_section section;
     int ret;
 
-    ret = dsmcc_process_section_header(&section, Data+DSMCC_SECTION_OFFSET, Length);
+    ret = dsmcc_process_section_header(&section, Data + DSMCC_SECTION_OFFSET, Length);
 
     /* TODO */
 
 }
 
-void dsmcc_process_section(struct dsmcc_status *status,unsigned char *Data,int Length,int pid)
+void dsmcc_process_section(struct dsmcc_status *status, unsigned char *Data, int Length, int pid)
 {
     unsigned long crc32_decode;
     unsigned short section_len;
-    int full_cache = 1;
-    int i;
-    unsigned int result;
 
     /* Check CRC before trying to parse */
 
@@ -911,7 +885,7 @@ void dsmcc_process_section(struct dsmcc_status *status,unsigned char *Data,int L
 
     if (crc32_decode != 0)
     {
-        syslog(LOG_ERR, "Corrupt CRC for section, dropping");
+        fprintf(status->debug_fd, "[libdsmcc] Corrupt CRC for section, dropping");
         if (status->debug_fd != NULL)
         {
             FILE *crcfd;

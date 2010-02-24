@@ -2,7 +2,7 @@
 # Plugins
 #
 AM_CFLAGS =\
-     -I$(top_srcdir)/include  -Wall -Werror -D_GNU_SOURCE -fno-strict-aliasing
+     -I$(top_srcdir)/include -D_GNU_SOURCE -fno-strict-aliasing
 
 pluginsdir = @DVBSTREAMER_PLUGINDIR@
 
@@ -104,6 +104,12 @@ eventsdispatcher_la_LDFLAGS = -module -no-undefined -avoid-version
 #sectionfilters_la_LDFLAGS = -module -no-undefined -avoid-version
 
 dsmcc_la_SOURCES = \
-    dsmcc.c
+    dsmcc.c \
+    libdsmcc/dsmcc-biop.c \
+    libdsmcc/dsmcc-cache.c \
+    libdsmcc/dsmcc-carousel.c \
+    libdsmcc/dsmcc-descriptor.c \
+    libdsmcc/dsmcc-receiver.c \
+    libdsmcc/dsmcc-util.c
 
 dsmcc_la_LDFLAGS = -module -no-undefined -avoid-version

@@ -216,9 +216,9 @@ struct dsmcc_dsi
 
 
 int dsmcc_biop_process_ior(struct biop_ior *, unsigned char *);
-int dsmcc_biop_process_name(struct biop_name *,unsigned char *);
-int dsmcc_biop_process_name_comp(struct biop_name_comp*,unsigned char *);
-int dsmcc_biop_process_binding(struct biop_binding*,unsigned char *Data);
+int dsmcc_biop_process_name(struct biop_name *, unsigned char *);
+int dsmcc_biop_process_name_comp(struct biop_name_comp*, unsigned char *);
+int dsmcc_biop_process_binding(struct biop_binding*, unsigned char *Data);
 int dsmcc_biop_process_module_info(struct biop_module_info *, unsigned char *Data);
 void dsmcc_biop_process_data(struct cache *cache, struct cache_module_data *cachep);
 
@@ -229,7 +229,7 @@ int dsmcc_biop_process_msg_hdr(struct biop_message *, struct cache_module_data *
 int dsmcc_biop_process_tap(struct biop_tap *, unsigned char *);
 int dsmcc_biop_process_binder(struct biop_dsm_connbinder*, unsigned char*);
 int dsmcc_biop_process_object(struct biop_obj_location*, unsigned char*);
-int dsmcc_biop_process_body(struct biop_profile_body *,unsigned char *);
+int dsmcc_biop_process_body(struct biop_profile_body *, unsigned char *);
 int dsmcc_biop_process_lite(struct biop_profile_lite *, unsigned char *);
 void dsmcc_biop_free_binding(struct biop_binding *);
 

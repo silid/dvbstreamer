@@ -39,7 +39,7 @@ dsmcc_desc_process_info(unsigned char *Data, struct descriptor *desc)
 
     info->text = (char *)malloc(desc->len - 3);
 
-    memcpy(info->text, Data+3, desc->len - 3);
+    memcpy(info->text, Data + 3, desc->len - 3);
 }
 
 void
@@ -86,7 +86,7 @@ dsmcc_desc_process_dltime(unsigned char *Data, struct descriptor *desc)
     struct descriptor_dltime *dltime = &desc->data.dltime;
 
     dltime->download_time = (Data[0] << 24) | (Data[1] << 16) |
-                            (Data[2] << 8 ) | Data[3];
+                            (Data[2] << 8) | Data[3];
 
 // fprintf(desc_fd, "Info -> Module -> Descriptor -> Download -> Time = %ld\n", dltime->download_time);
 
@@ -102,7 +102,7 @@ dsmcc_desc_process_grouplink(unsigned char *Data, struct descriptor *desc)
 // fprintf(desc_fd, "Info -> Module -> Descriptor -> Grouplink -> Position = %d\n", grouplink->position);
 
     grouplink->group_id = (Data[1] << 24) | (Data[2] << 16) |
-                          (Data[3] << 8 ) | Data[4];
+                          (Data[3] << 8) | Data[4];
 
 // fprintf(desc_fd, "Info -> Module -> Descriptor -> Grouplink -> Group Id = %ld\n", grouplink->group_id);
 
@@ -142,7 +142,7 @@ struct descriptor *
             dsmcc_desc_process_one(unsigned char *Data, int *offset)
 {
     struct descriptor *desc;
-    int off=0;
+    int off = 0;
 
     desc = malloc(sizeof(struct descriptor));
     desc->tag = Data[0];
@@ -160,31 +160,31 @@ struct descriptor *
     switch (desc->tag)
     {
         case 0x01:
-            dsmcc_desc_process_type(Data+2, desc);
+            dsmcc_desc_process_type(Data + 2, desc);
             break;
         case 0x02:
-            dsmcc_desc_process_name(Data+2, desc);
+            dsmcc_desc_process_name(Data + 2, desc);
             break;
         case 0x03:
-            dsmcc_desc_process_info(Data+2, desc);
+            dsmcc_desc_process_info(Data + 2, desc);
             break;
         case 0x04:
-            dsmcc_desc_process_modlink(Data+2, desc);
+            dsmcc_desc_process_modlink(Data + 2, desc);
             break;
         case 0x05:
-            dsmcc_desc_process_crc32(Data+2, desc);
+            dsmcc_desc_process_crc32(Data + 2, desc);
             break;
         case 0x06:
-            dsmcc_desc_process_location(Data+2, desc);
+            dsmcc_desc_process_location(Data + 2, desc);
             break;
         case 0x07:
-            dsmcc_desc_process_dltime(Data+2, desc);
+            dsmcc_desc_process_dltime(Data + 2, desc);
             break;
         case 0x08:
-            dsmcc_desc_process_grouplink(Data+2, desc);
+            dsmcc_desc_process_grouplink(Data + 2, desc);
             break;
         case 0x09:
-            dsmcc_desc_process_compressed(Data+2, desc);
+            dsmcc_desc_process_compressed(Data + 2, desc);
             break;
             /*
             case 0x0A: Subgroup Association
@@ -199,7 +199,7 @@ struct descriptor *
             */
     }
 
-    off+= desc->len;
+    off += desc->len;
 
     *offset += off;
 
@@ -218,7 +218,7 @@ struct descriptor *
     while (data_len > index)
     {
 //  fprintf(desc_fd, "Data_len %d Index %d\n", data_len, index);
-        desc = dsmcc_desc_process_one(Data+index, &index);
+        desc = dsmcc_desc_process_one(Data + index, &index);
         if (list == NULL)
         {
             list = desc;
@@ -226,7 +226,7 @@ struct descriptor *
         }
         else
         {
-            for (l=list;l->next!=NULL;l=l->next)
+            for (l = list;l->next != NULL;l = l->next)
             {
                 ;
             }

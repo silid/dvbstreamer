@@ -1,6 +1,6 @@
 #ifndef DSMCC_RECEIVER_H
 #define DSMCC_RECEIVER_H
-
+#include <stdint.h>
 #include "dsmcc-carousel.h"
 #include "dsmcc-biop.h"
 
@@ -156,13 +156,13 @@ struct dsmcc_section
 
 void dsmcc_init(struct dsmcc_status *, const char *channel);
 void dsmcc_free(struct dsmcc_status *);
-void dsmcc_add_stream(struct dsmcc_status *, struct stream *);
+void dsmcc_add_stream(struct dsmcc_status *, uint16_t tag);
 
 void dsmcc_add_module_info(struct dsmcc_status *, struct dsmcc_section *, struct obj_carousel *);
 void dsmcc_add_module_data(struct dsmcc_status *, struct dsmcc_section *, unsigned char *);
 
 int dsmcc_process_section_gateway(struct dsmcc_status *, unsigned char *, int, int);
-int dsmcc_process_section_info(struct dsmcc_status *, struct dsmcc_section *,unsigned char *, int);
+int dsmcc_process_section_info(struct dsmcc_status *, struct dsmcc_section *, unsigned char *, int);
 int dsmcc_process_section_block(struct dsmcc_status *, struct dsmcc_section *, unsigned char *, int);
 
 int dsmcc_process_section_header(struct dsmcc_section *, unsigned char *, int);
