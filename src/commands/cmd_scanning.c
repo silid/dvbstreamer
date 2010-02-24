@@ -261,7 +261,10 @@ static int PMTCount = 0;
 static struct PMTReceived_t *PMTsReceived = NULL;
 static pthread_mutex_t scanningmutex = PTHREAD_MUTEX_INITIALIZER;
 
-static int lockTimeout = 60;
+/* Property variables */
+static int lockTimeoutT = 30;
+static int lockTimeoutS = 60;
+static int lockTimeoutC = 60;
 static int tablesTimeout = 60;
 static bool removeFailedFreqs = TRUE;
 
@@ -353,12 +356,22 @@ void CommandInstallScanning(void)
     PropertiesAddProperty(propertyParent, "inprogress","Whether an scan is currently in progress", PropertyType_Boolean, NULL , ScanningInProgressGet, NULL);
     PropertiesAddSimpleProperty(propertyParent, "state", "Get the current state id of the scanning state machine.",
         PropertyType_Int, &currentScanState, SIMPLEPROPERTY_R);
+
+    PropertiesAddSimpleProperty(propertyParent, "position", "Get the current position within the list of frequencies to scan.",
+        PropertyType_Int, &toScan.pos, SIMPLEPROPERTY_R);    
+    PropertiesAddSimpleProperty(propertyParent, "total", "Get the total number of frequencies to scan.",
+        PropertyType_Int, &toScan.count, SIMPLEPROPERTY_R);    
     
     PropertiesAddSimpleProperty(propertyParent, "removefailed", "Whether frequencies currently in the database that fail to lock should be removed.",
         PropertyType_Boolean, &removeFailedFreqs, SIMPLEPROPERTY_RW);
 
-    PropertiesAddSimpleProperty(propertyParent, "locktimeout", "Number of seconds to wait for the frontent to lock.",
-        PropertyType_Int, &lockTimeout, SIMPLEPROPERTY_RW);
+    sprintf(propertyName, "%s.locktimeout", propertyParent);
+    PropertiesAddSimpleProperty(propertyName, "terrestrial", "Number of seconds to wait for the frontent to lock (DVB-T and ATSC).",
+        PropertyType_Int, &lockTimeoutT, SIMPLEPROPERTY_RW);
+    PropertiesAddSimpleProperty(propertyName, "satellite", "Number of seconds to wait for the frontent to lock (DVB-S/S2).",
+        PropertyType_Int, &lockTimeoutS, SIMPLEPROPERTY_RW);
+    PropertiesAddSimpleProperty(propertyName, "satellite", "Number of seconds to wait for the frontent to lock (DVB-C).",
+        PropertyType_Int, &lockTimeoutC, SIMPLEPROPERTY_RW);
     PropertiesAddSimpleProperty(propertyParent, "tablestimeout", "Number of seconds to wait for the required tables.",
         PropertyType_Int, &tablesTimeout, SIMPLEPROPERTY_RW);
     
@@ -1580,7 +1593,7 @@ static void ScanStateMachine(enum ScanEvent_e event)
                         }
                         break;
                     case ScanEvent_NextTuningParams:
-                        timeout = lockTimeout;
+                        
                         currentTuningParams ++;
                         tuningParams = NULL;
                         if (currentEntry->mux)
@@ -1598,6 +1611,21 @@ static void ScanStateMachine(enum ScanEvent_e event)
                                 delSys = currentEntry->system;
                                 tuningParams = currentEntry->params->docs[currentTuningParams];
                             }
+                        }
+                        switch(delSys)
+                        {
+                            case DELSYS_DVBT:
+                            case DELSYS_ATSC:
+                                timeout = lockTimeoutT;
+                                break;
+                            case DELSYS_DVBC:
+                                timeout = lockTimeoutC;
+                                break;
+                            case DELSYS_DVBS:
+                            case DELSYS_DVBS2:
+                            default:
+                                timeout = lockTimeoutS;
+                                break;
                         }
                         if (tuningParams)
                         {
@@ -1736,6 +1764,10 @@ static void ScanStateMachine(enum ScanEvent_e event)
                 if (event == ScanEvent_StateEntered)
                 {
                     EventsFireEventListeners(scanEndEvent, NULL);
+                }
+                else if (event == ScanEvent_Cancel)
+                {
+                    event = ScanEvent_NoEvent;
                 }
                 break;
         }
