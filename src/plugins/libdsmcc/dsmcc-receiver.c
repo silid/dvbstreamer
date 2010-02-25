@@ -61,10 +61,13 @@ void dsmcc_free(struct dsmcc_status *status)
      */
 }
 
-void dsmcc_add_stream(struct dsmcc_status *status, uint16_t tag)
+void dsmcc_add_stream(struct dsmcc_status *status, uint32_t carouselId, uint16_t tag)
 {
-    void DownloadSessionPIDAddTag(void *, uint16_t);
-    DownloadSessionPIDAddTag(status->private, tag);
+    struct stream_request *stream = malloc(sizeof(struct stream_request));
+    stream->assoc_tag = tag;
+    stream->carouselId = carouselId;
+    stream->next = status->newstreams;
+    status->newstreams = stream;
 }
 
 int dsmcc_process_section_header(struct dsmcc_section *section, unsigned char *Data, int Length)
@@ -228,7 +231,7 @@ int dsmcc_process_section_gateway(struct dsmcc_status *status, unsigned char *Da
         fprintf(status->debug_fd, "[libdsmcc] Gateway Module %d on carousel %ld\n", car->gate->profile.body.full.obj_loc.module_id, car->id);
     }
 
-    dsmcc_add_stream(status, car->gate->profile.body.full.dsm_conn.tap.assoc_tag);
+    dsmcc_add_stream(status, car->gate->profile.body.full.obj_loc.carousel_id, car->gate->profile.body.full.dsm_conn.tap.assoc_tag);
 
     /* skip taps and context */
 
@@ -523,7 +526,7 @@ void dsmcc_add_module_info(struct dsmcc_status *status, struct dsmcc_section *se
             cachep->next = NULL;
             cachep->blocks = NULL;
             cachep->tag = dii->modules[i].modinfo.tap.assoc_tag;
-            dsmcc_add_stream(status, cachep->tag);
+            dsmcc_add_stream(status, cachep->carousel_id, cachep->tag);
             /* Steal the descriptors  TODO this is very bad... */
             cachep->descriptors = dii->modules[i].modinfo.descriptors;
             dii->modules[i].modinfo.descriptors = NULL;
