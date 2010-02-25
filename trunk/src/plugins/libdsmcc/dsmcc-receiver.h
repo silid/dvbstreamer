@@ -156,7 +156,7 @@ struct dsmcc_section
 
 void dsmcc_init(struct dsmcc_status *, const char *channel);
 void dsmcc_free(struct dsmcc_status *);
-void dsmcc_add_stream(struct dsmcc_status *, uint16_t tag);
+void dsmcc_add_stream(struct dsmcc_status *, uint32_t carouselId, uint16_t tag);
 
 void dsmcc_add_module_info(struct dsmcc_status *, struct dsmcc_section *, struct obj_carousel *);
 void dsmcc_add_module_data(struct dsmcc_status *, struct dsmcc_section *, unsigned char *);

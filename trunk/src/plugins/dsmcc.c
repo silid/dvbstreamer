@@ -51,6 +51,8 @@ Plugin to download DSM-CC data.
 
 #define TAG_CAROUSEL_ID_DESCRIPTOR     0x13
 #define TAG_ASSOCIATION_TAG_DESCRIPTOR 0x14
+#define TAG_STREAM_ID_DESCRIPTOR       0x52
+
 /*******************************************************************************
 * Typedefs                                                                     *
 *******************************************************************************/
@@ -89,6 +91,7 @@ static void CommandDSMCCInfo(int argc, char **argv);
 static void HandleServiceFilterRemoved(void *arg, Event_t event, void *payload);
 static void HandleServiceFilterChanged(void *arg, Event_t event, void *payload);
 static void HandleTuningMultiplexChanged(void *arg, Event_t event, void *payload);
+static void HandleCachePIDsUpdatedChanged(void *arg, Event_t event, void *payload);
 
 static void EnableSession(DSMCCSession_t *session);
 
@@ -97,6 +100,7 @@ static void DownloadSessionDestructor(void *arg);
 static void DSMCCPIDDestructor(void *arg);
 
 static DSMCCDownloadSession_t *DownloadSessionGet(Service_t *service);
+static void DownloadSessionProcessPIDs(DSMCCDownloadSession_t *session);
 
 static void DSMCCSectionCallback(void *p_cb_data, dvbpsi_handle h_dvbpsi, dvbpsi_psi_section_t* p_section);
 
@@ -161,6 +165,7 @@ static void Install(bool installed)
     Event_t removedEvent= EventsFindEvent("ServiceFilter.Removed");
     Event_t changedEvent= EventsFindEvent("ServiceFilter.ServiceChanged");
     Event_t muxChangedEvent = EventsFindEvent("Tuning.MultiplexChanged");
+    Event_t cachePidsUpdatedEvent = EventsFindEvent("Cache.PIDsUpdated");
     if (installed)
     {
         ObjectRegisterTypeDestructor(DSMCCSession_t, SessionDestructor);
@@ -171,12 +176,14 @@ static void Install(bool installed)
         EventsRegisterEventListener(removedEvent, HandleServiceFilterRemoved, NULL);
         EventsRegisterEventListener(changedEvent, HandleServiceFilterChanged, NULL);        
         EventsRegisterEventListener(muxChangedEvent, HandleTuningMultiplexChanged, NULL);        
+        EventsRegisterEventListener(cachePidsUpdatedEvent, HandleCachePIDsUpdatedChanged, NULL);                
     }
     else
     {
         EventsUnregisterEventListener(removedEvent, HandleServiceFilterRemoved, NULL);
         EventsUnregisterEventListener(changedEvent, HandleServiceFilterChanged, NULL);   
         EventsUnregisterEventListener(muxChangedEvent, HandleTuningMultiplexChanged, NULL);        
+        EventsUnregisterEventListener(cachePidsUpdatedEvent, HandleCachePIDsUpdatedChanged, NULL);                
         ObjectListFree(sessions);
     }
 }
@@ -320,6 +327,24 @@ static void HandleTuningMultiplexChanged(void *arg, Event_t event, void *payload
     pthread_mutex_unlock(&sessionMutex);                
 }
 
+static void HandleCachePIDsUpdatedChanged(void *arg, Event_t event, void *payload)
+{
+    ListIterator_t iterator;
+    pthread_mutex_lock(&sessionMutex);            
+    ListIterator_ForEach(iterator, downloadSessions)
+    {
+        DSMCCDownloadSession_t *session = ListIterator_Current(iterator);        
+        if (session->service == payload)
+        {
+            /*
+            DownloadSessionProcessPIDs(session);
+            */
+        }
+            
+    }
+    pthread_mutex_unlock(&sessionMutex); 
+}
+
 static void EnableSession(DSMCCSession_t *session)
 {
     Service_t *service;
@@ -349,6 +374,7 @@ static DSMCCDownloadSession_t *DownloadSessionGet(Service_t *service)
     session->service = service;
     ServiceRefInc(service);
     ListAdd(downloadSessions, session);
+    DownloadSessionProcessPIDs(session);
     return session;
 }
 
@@ -377,6 +403,27 @@ static void DSMCCPIDDestructor(void *arg)
     }
 }
 
+
+static void DownloadSessionProcessPIDs(DSMCCDownloadSession_t *session)
+{
+    PIDList_t *pids = CachePIDsGet(session->service);
+    if (pids != NULL)
+    {
+        int i;
+        for (i = 0; i < pids->count; i ++)
+        {
+            dvbpsi_descriptor_t *desc;
+            for (desc = pids->pids[i].descriptors; desc; desc = desc->p_next)
+            {
+                switch (desc->i_tag)
+                {
+                }
+            }
+        }
+
+    }    
+}
+
 static uint16_t AssociationTagToPID(Service_t *service, uint16_t tag)
 {
     int i;
@@ -398,39 +445,49 @@ static uint16_t AssociationTagToPID(Service_t *service, uint16_t tag)
                     return pids->pids[i].pid;
                 }
             }
+            if (desc->i_tag == TAG_STREAM_ID_DESCRIPTOR)
+            {
+                dvbpsi_stream_identifier_dr_t *stream_id_dr = dvbpsi_DecodeStreamIdentifierDr(desc);
+                if (stream_id_dr && (stream_id_dr->i_component_tag == tag))
+                {
+                    return pids->pids[i].pid;
+                }
+            }
         }
     }
     return INVALID_PID;
 }
 
-void DownloadSessionPIDAddTag(DSMCCDownloadSession_t *session, uint16_t tag)
+bool DownloadSessionPIDAddTag(DSMCCDownloadSession_t *session, struct stream_request *req)
 {
     ListIterator_t iterator;
     Multiplex_t *mux;
     DSMCCPID_t *dsmccPID;
-    uint16_t pid = AssociationTagToPID(session->service, tag);
+    req->pid = AssociationTagToPID(session->service, req->assoc_tag);
     
     ListIterator_ForEach(iterator, session->pids)
     {
         dsmccPID = ListIterator_Current(iterator);
-        if (dsmccPID->pid == pid)
+        if (dsmccPID->pid == req->pid)
         {
             /* Already filtering this PID */
-            return;
+            return FALSE;
         }
     }
     dsmccPID = ObjectCreateType(DSMCCPID_t);
-    dsmccPID->pid = pid;
+    dsmccPID->pid = req->pid;
     ListAdd(session->pids, dsmccPID);
     
     mux = TuningCurrentMultiplexGet();
     if (mux->uid == session->service->multiplexUID)
     {
         dsmccPID->sectionFilter = dvbpsi_AttachSections(DSMCCSectionCallback, dsmccPID);
-        TSFilterGroupAddSectionFilter(session->filterGroup, pid, DSMCC_FILTER_PRIORITY, dsmccPID->sectionFilter);
+        TSFilterGroupAddSectionFilter(session->filterGroup, req->pid, DSMCC_FILTER_PRIORITY, dsmccPID->sectionFilter);
     }
     ObjectRefDec(mux);
+    return TRUE;
 }
+
 /*
 static void DownloadSessionPIDRemoveTag(DSMCCDownloadSession_t *session, uint16_t tag)
 {
@@ -455,6 +512,32 @@ static void DownloadSessionPIDRemoveTag(DSMCCDownloadSession_t *session, uint16_
 static void DSMCCSectionCallback(void *p_cb_data, dvbpsi_handle h_dvbpsi, dvbpsi_psi_section_t* p_section)
 {
     DSMCCPID_t *dsmccPID = p_cb_data;
-    dsmcc_process_section(&dsmccPID->session->status, p_section->p_data, p_section->i_length, dsmccPID->pid);
-    
+    DSMCCDownloadSession_t *session = dsmccPID->session;
+    dsmcc_process_section(&session->status, p_section->p_data, p_section->i_length, dsmccPID->pid);
+    /* Process new required streams */
+    if (session->status.newstreams != NULL)
+    {
+        struct stream_request *streamreq, *nextstream;
+        for (streamreq = session->status.newstreams; streamreq; streamreq = nextstream)
+        {
+            if (DownloadSessionPIDAddTag(session, streamreq))
+            {
+                int i;
+                for (i = 0; i < MAXCAROUSELS; i++)
+                {
+                    if (streamreq->carouselId == session->status.carousels[i].id)
+                    {
+                        struct stream *stream = malloc(sizeof(struct stream));
+                        stream->pid = streamreq->pid;
+                        stream->next = session->status.carousels[i].streams;
+                        session->status.carousels[i].streams = stream;
+                        break;
+                    }
+                }
+            }
+            nextstream = streamreq->next;
+            free(streamreq);
+        }
+        session->status.newstreams = NULL;
+    }
 }
