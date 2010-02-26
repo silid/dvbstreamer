@@ -406,6 +406,7 @@ static void DownloadSessionDestructor(void *arg)
     DSMCCDownloadSession_t *session = arg;
     TSFilterGroupDestroy(session->filterGroup);
     ServiceRefDec(session->service);
+    dsmcc_free(&session->status);
     ObjectListFree(session->pids);
     ListRemove(downloadSessions, arg);
 }
@@ -462,6 +463,25 @@ static void DownloadSessionProcessPIDs(DSMCCDownloadSession_t *session)
                                 }
                             }
                             break;
+                         case TAG_ASSOCIATION_TAG_DESCRIPTOR:
+                            {
+                                dvbpsi_association_tag_dr_t *assoc_tag_dr = dvbpsi_DecodeAssociationTagDr(desc);
+                                if (assoc_tag_dr)
+                                {
+                                    printf("\t\tAssociation Tag = %u\n", assoc_tag_dr->i_tag);
+                                }
+                            }
+                            break;
+                         case TAG_STREAM_ID_DESCRIPTOR:
+                            {
+                                dvbpsi_stream_identifier_dr_t *stream_id_dr = dvbpsi_DecodeStreamIdentifierDr(desc);
+                                if (stream_id_dr)
+                                {
+                                    printf("\t\tStream identifiter = %u\n", stream_id_dr->i_component_tag);
+                                }
+                                    
+                            }
+                            break;
                     }
                 }
                 if (dataBroadcastId)
@@ -504,7 +524,7 @@ static uint16_t AssociationTagToPID(Service_t *service, uint16_t tag)
                 dvbpsi_stream_identifier_dr_t *stream_id_dr = dvbpsi_DecodeStreamIdentifierDr(desc);
                 if (stream_id_dr && (stream_id_dr->i_component_tag == tag))
                 {
-                        CachePIDsRelease();
+                    CachePIDsRelease();
                     return pids->pids[i].pid;
                 }
             }

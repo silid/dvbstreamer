@@ -37,7 +37,9 @@ dsmcc-receiver.c
 void dsmcc_init(struct dsmcc_status *status, const char *channel)
 {
     int i;
-
+    char debugfile[4096];
+    sprintf(debugfile,"/tmp/cache/%s.log", channel);
+    status->debug_fd = fopen(debugfile, "w");
     status->rec_files = status->total_files = 0;
     status->rec_dirs = status->total_dirs = 0;
     status->gzip_size = status->total_size = 0;
@@ -58,11 +60,13 @@ void dsmcc_free(struct dsmcc_status *status)
      * TODO - actually cache on disk the cache data
      * TODO - more terrible memory madness, this all needs improving
      */
+     fclose(status->debug_fd);
 }
 
 void dsmcc_add_stream(struct dsmcc_status *status, uint32_t carouselId, uint16_t tag)
 {
     struct stream_request *stream = malloc(sizeof(struct stream_request));
+    printf("Adding stream carouselId %u tag %u\n", carouselId, tag);
     stream->assoc_tag = tag;
     stream->carouselId = carouselId;
     stream->next = status->newstreams;
@@ -516,6 +520,7 @@ void dsmcc_add_module_info(struct dsmcc_status *status, struct dsmcc_section *se
             cachep->data = NULL;
             cachep->next = NULL;
             cachep->blocks = NULL;
+            printf("Taps count %u\n", dii->modules[i].modinfo.taps_count);
             cachep->tag = dii->modules[i].modinfo.tap.assoc_tag;
             dsmcc_add_stream(status, cachep->carousel_id, cachep->tag);
             /* Steal the descriptors  TODO this is very bad... */
@@ -865,6 +870,7 @@ void dsmcc_process_section_desc(unsigned char *Data, int Length)
 
 void dsmcc_process_section(struct dsmcc_status *status, unsigned char *Data, int Length, uint32_t carouselId)
 {
+#if 0    
     unsigned long crc32_decode;
     unsigned short section_len;
 
@@ -894,7 +900,11 @@ void dsmcc_process_section(struct dsmcc_status *status, unsigned char *Data, int
         }
         return;
     }
-
+#endif
+    if (status->debug_fd != NULL)
+    {
+        fprintf(status->debug_fd, "[libdsmcc] Section 0x%02x length %u\n", Data[0], Length);
+    }
     switch (Data[0])
     {
         case DSMCC_SECTION_INDICATION:
@@ -920,6 +930,10 @@ void dsmcc_process_section(struct dsmcc_status *status, unsigned char *Data, int
             break;
         default:
             break;
+    }
+    if (status->debug_fd != NULL)
+    {
+        fprintf(status->debug_fd, "[libdsmcc] Section Processed\n");
     }
 
 // fclose(dsi_debug);
