@@ -49,9 +49,10 @@ Plugin to download DSM-CC data.
 #define DSMCC_FILTER_PRIORITY 5
 #define INVALID_PID 0xffff
 
-#define TAG_CAROUSEL_ID_DESCRIPTOR     0x13
-#define TAG_ASSOCIATION_TAG_DESCRIPTOR 0x14
-#define TAG_STREAM_ID_DESCRIPTOR       0x52
+#define TAG_CAROUSEL_ID_DESCRIPTOR       0x13
+#define TAG_ASSOCIATION_TAG_DESCRIPTOR   0x14
+#define TAG_STREAM_ID_DESCRIPTOR         0x52
+#define TAG_DATA_BROADCAST_ID_DESCRIPTOR 0x66
 
 /*******************************************************************************
 * Typedefs                                                                     *
@@ -62,6 +63,7 @@ typedef struct DSMCCPID_s
 {
     uint16_t pid;
     uint16_t tag;
+    uint32_t carouselId;
     dvbpsi_handle sectionFilter;
     struct DSMCCDownloadSession_s *session;
 }DSMCCPID_t;
@@ -101,6 +103,7 @@ static void DSMCCPIDDestructor(void *arg);
 
 static DSMCCDownloadSession_t *DownloadSessionGet(Service_t *service);
 static void DownloadSessionProcessPIDs(DSMCCDownloadSession_t *session);
+bool DownloadSessionPIDAdd(DSMCCDownloadSession_t *session, uint16_t pid, uint32_t carouselId);
 
 static void DSMCCSectionCallback(void *p_cb_data, dvbpsi_handle h_dvbpsi, dvbpsi_psi_section_t* p_section);
 
@@ -285,9 +288,7 @@ static void HandleServiceFilterChanged(void *arg, Event_t event, void *payload)
         if (session->filter == filter)
         {
             LogModule(LOG_DEBUG, DSMCC, "Re-enabling DSMCC session for service filter %s", ServiceFilterNameGet(filter));
-            pthread_mutex_lock(&sessionMutex);
             EnableSession(session);
-            pthread_mutex_unlock(&sessionMutex);
             break;
         }
     }
@@ -296,7 +297,7 @@ static void HandleServiceFilterChanged(void *arg, Event_t event, void *payload)
 
 static void HandleTuningMultiplexChanged(void *arg, Event_t event, void *payload)
 {
-    Multiplex_t *mux = arg;
+    Multiplex_t *mux = payload;
     ListIterator_t iterator, pidIterator;
     pthread_mutex_lock(&sessionMutex);            
     ListIterator_ForEach(iterator, downloadSessions)
@@ -353,11 +354,19 @@ static void EnableSession(DSMCCSession_t *session)
         ObjectRefDec(session->downloadSession);
     }
     service = ServiceFilterServiceGet(session->filter);
-    session->downloadSession = DownloadSessionGet(service);
+    if (service)
+    {
+        session->downloadSession = DownloadSessionGet(service);
+    }
+    else
+    {
+        session->downloadSession = NULL;
+    }
 }
 
 static DSMCCDownloadSession_t *DownloadSessionGet(Service_t *service)
 {
+    char idStr[SERVICE_ID_STRING_LENGTH];
     ListIterator_t iterator;    
     DSMCCDownloadSession_t *session;
     
@@ -372,9 +381,14 @@ static DSMCCDownloadSession_t *DownloadSessionGet(Service_t *service)
 
     session = ObjectCreateType(DSMCCDownloadSession_t);
     session->service = service;
-    ServiceRefInc(service);
+    session->pids = ListCreate();
+    
+    ServiceRefInc(service);  
+    session->filterGroup = TSReaderCreateFilterGroup(MainTSReaderGet(), service->name, "DSMCC", NULL, NULL);
     ListAdd(downloadSessions, session);
     DownloadSessionProcessPIDs(session);
+    ServiceGetIDStr(service, idStr);
+    dsmcc_init(&session->status, idStr);
     return session;
 }
 
@@ -390,7 +404,9 @@ static void SessionDestructor(void *arg)
 static void DownloadSessionDestructor(void *arg)
 {
     DSMCCDownloadSession_t *session = arg;
+    TSFilterGroupDestroy(session->filterGroup);
     ServiceRefDec(session->service);
+    ObjectListFree(session->pids);
     ListRemove(downloadSessions, arg);
 }
 
@@ -410,17 +426,54 @@ static void DownloadSessionProcessPIDs(DSMCCDownloadSession_t *session)
     if (pids != NULL)
     {
         int i;
+        int carouselIndex = 0;
+        
+        printf("Processing PIDS...\n");
         for (i = 0; i < pids->count; i ++)
         {
-            dvbpsi_descriptor_t *desc;
-            for (desc = pids->pids[i].descriptors; desc; desc = desc->p_next)
+            printf("%2d : %u %x\n", i , pids->pids[i].pid, pids->pids[i].type); 
+            if ((pids->pids[i].type == 0x0b) || (pids->pids[i].type == 0x18))
             {
-                switch (desc->i_tag)
+                dvbpsi_descriptor_t *desc;
+                uint32_t carouselId = 0;
+                uint32_t dataBroadcastId = 0;
+                for (desc = pids->pids[i].descriptors; desc; desc = desc->p_next)
                 {
+                    printf("\t0x%02x %u\n", desc->i_tag, desc->i_length & 0xff);
+                    switch (desc->i_tag)
+                    {
+                        case TAG_CAROUSEL_ID_DESCRIPTOR:
+                            {
+                                dvbpsi_carousel_id_dr_t *carousel_id_dr = dvbpsi_DecodeCarouselIdDr(desc);
+                                if (carousel_id_dr)
+                                {
+                                    printf("\t\tCarousel Id = %d\n", carousel_id_dr->i_carousel_id);
+                                    carouselId = carousel_id_dr->i_carousel_id;
+                                }
+                            }
+                            break;
+                        case TAG_DATA_BROADCAST_ID_DESCRIPTOR:
+                            {
+                                dvbpsi_data_broadcast_id_dr_t *data_bcast_id = dvbpsi_DecodeDataBroadcastIdDr(desc);
+                                if (data_bcast_id)
+                                {
+                                    printf("\t\tData Broadcast id = %d\n", data_bcast_id->i_data_broadcast_id);
+                                    dataBroadcastId = data_bcast_id->i_data_broadcast_id;
+                                }
+                            }
+                            break;
+                    }
+                }
+                if (dataBroadcastId)
+                {
+                    session->status.carousels[carouselIndex].id = carouselId;
+                    
+                    DownloadSessionPIDAdd(session, pids->pids[i].pid, carouselId);
                 }
             }
         }
-
+        printf("PIDs Processed.\n");
+        CachePIDsRelease();
     }    
 }
 
@@ -442,6 +495,7 @@ static uint16_t AssociationTagToPID(Service_t *service, uint16_t tag)
                 dvbpsi_association_tag_dr_t *assoc_tag_dr = dvbpsi_DecodeAssociationTagDr(desc);
                 if (assoc_tag_dr && (assoc_tag_dr->i_tag == tag))
                 {
+                    CachePIDsRelease();
                     return pids->pids[i].pid;
                 }
             }
@@ -450,94 +504,65 @@ static uint16_t AssociationTagToPID(Service_t *service, uint16_t tag)
                 dvbpsi_stream_identifier_dr_t *stream_id_dr = dvbpsi_DecodeStreamIdentifierDr(desc);
                 if (stream_id_dr && (stream_id_dr->i_component_tag == tag))
                 {
+                        CachePIDsRelease();
                     return pids->pids[i].pid;
                 }
             }
         }
     }
+    CachePIDsRelease();    
     return INVALID_PID;
 }
 
-bool DownloadSessionPIDAddTag(DSMCCDownloadSession_t *session, struct stream_request *req)
+bool DownloadSessionPIDAdd(DSMCCDownloadSession_t *session, uint16_t pid, uint32_t carouselId)
 {
     ListIterator_t iterator;
     Multiplex_t *mux;
     DSMCCPID_t *dsmccPID;
-    req->pid = AssociationTagToPID(session->service, req->assoc_tag);
-    
-    ListIterator_ForEach(iterator, session->pids)
-    {
-        dsmccPID = ListIterator_Current(iterator);
-        if (dsmccPID->pid == req->pid)
-        {
-            /* Already filtering this PID */
-            return FALSE;
-        }
-    }
-    dsmccPID = ObjectCreateType(DSMCCPID_t);
-    dsmccPID->pid = req->pid;
-    ListAdd(session->pids, dsmccPID);
-    
-    mux = TuningCurrentMultiplexGet();
-    if (mux->uid == session->service->multiplexUID)
-    {
-        dsmccPID->sectionFilter = dvbpsi_AttachSections(DSMCCSectionCallback, dsmccPID);
-        TSFilterGroupAddSectionFilter(session->filterGroup, req->pid, DSMCC_FILTER_PRIORITY, dsmccPID->sectionFilter);
-    }
-    ObjectRefDec(mux);
-    return TRUE;
-}
 
-/*
-static void DownloadSessionPIDRemoveTag(DSMCCDownloadSession_t *session, uint16_t tag)
-{
-    ListIterator_t iterator;
-    DSMCCPID_t *dsmccPID;
-    uint16_t pid = AssociationTagToPID(session->service, tag);
     
     ListIterator_ForEach(iterator, session->pids)
     {
         dsmccPID = ListIterator_Current(iterator);
         if (dsmccPID->pid == pid)
         {
-            ListRemoveCurrent(&iterator);
-            ObjectRefDec(dsmccPID);
-            TSFilterGroupRemoveSectionFilter(session->filterGroup, pid);
-            break;
+            /* Already filtering this PID */
+            return FALSE;
         }
     }
+    dsmccPID = ObjectCreateType(DSMCCPID_t);
+    dsmccPID->pid = pid;
+    dsmccPID->carouselId = carouselId;
+    dsmccPID->session = session;
+    ListAdd(session->pids, dsmccPID);
+    
+    mux = TuningCurrentMultiplexGet();
+    if (mux->uid == session->service->multiplexUID)
+    {
+        dsmccPID->sectionFilter = dvbpsi_AttachSections(DSMCCSectionCallback, dsmccPID);
+        TSFilterGroupAddSectionFilter(session->filterGroup, pid, DSMCC_FILTER_PRIORITY, dsmccPID->sectionFilter);
+    }
+    ObjectRefDec(mux);
+    return TRUE;
 }
 
-*/
 static void DSMCCSectionCallback(void *p_cb_data, dvbpsi_handle h_dvbpsi, dvbpsi_psi_section_t* p_section)
 {
     DSMCCPID_t *dsmccPID = p_cb_data;
     DSMCCDownloadSession_t *session = dsmccPID->session;
-    dsmcc_process_section(&session->status, p_section->p_data, p_section->i_length, dsmccPID->pid);
+    dsmcc_process_section(&session->status, p_section->p_data, p_section->i_length, dsmccPID->carouselId);
     /* Process new required streams */
     if (session->status.newstreams != NULL)
     {
         struct stream_request *streamreq, *nextstream;
         for (streamreq = session->status.newstreams; streamreq; streamreq = nextstream)
         {
-            if (DownloadSessionPIDAddTag(session, streamreq))
-            {
-                int i;
-                for (i = 0; i < MAXCAROUSELS; i++)
-                {
-                    if (streamreq->carouselId == session->status.carousels[i].id)
-                    {
-                        struct stream *stream = malloc(sizeof(struct stream));
-                        stream->pid = streamreq->pid;
-                        stream->next = session->status.carousels[i].streams;
-                        session->status.carousels[i].streams = stream;
-                        break;
-                    }
-                }
-            }
+            uint16_t pid = AssociationTagToPID(session->service, streamreq->assoc_tag);            
+            DownloadSessionPIDAdd(session, pid, streamreq->carouselId);
             nextstream = streamreq->next;
             free(streamreq);
         }
         session->status.newstreams = NULL;
     }
 }
+

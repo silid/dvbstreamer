@@ -15,13 +15,13 @@ You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 
-dr_62.h
+dr_66.h
 
-Decode Frequency List Descriptor.
+Decode Data Broadcast id Descriptor.
 
 */
-#ifndef _DR_62_H
-#define _DR_62_H
+#ifndef _DR_66_H
+#define _DR_66_H
 
 /*****************************************************************************
  * dvbpsi_data_broadcast_id_dr_s

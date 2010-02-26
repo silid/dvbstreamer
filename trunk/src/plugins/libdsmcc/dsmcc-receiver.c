@@ -44,7 +44,6 @@ void dsmcc_init(struct dsmcc_status *status, const char *channel)
 
     for (i = 0;i < MAXCAROUSELS;i++)
     {
-        status->carousels[i].streams = NULL;
         status->carousels[i].cache = NULL;
         status->carousels[i].filecache = malloc(sizeof(struct cache));
         status->carousels[i].gate = NULL;
@@ -143,25 +142,17 @@ int dsmcc_process_msg_header(struct dsmcc_section *section, unsigned char *Data)
     return 0;
 }
 
-int dsmcc_process_section_gateway(struct dsmcc_status *status, unsigned char *Data, int Length, int pid)
+int dsmcc_process_section_gateway(struct dsmcc_status *status, unsigned char *Data, int Length, uint32_t carouselId)
 {
     int off = 0, ret, i;
     struct obj_carousel *car;
-    struct stream *str;
 
     /* Find which object carousel this pid's data belongs to */
 
     for (i = 0;i < MAXCAROUSELS;i++)
     {
         car = &status->carousels[i];
-        for (str = car->streams;str != NULL;str = str->next)
-        {
-            if (str->pid == pid)
-            {
-                break;
-            }
-        }
-        if (str != NULL)
+        if (car->id == carouselId)
         {
             if (car->gate != NULL)  /* TODO check gate version not changed */
             {
@@ -177,7 +168,7 @@ int dsmcc_process_section_gateway(struct dsmcc_status *status, unsigned char *Da
 //     syslog(LOG_ERR, ("Setting gateway for pid %d", pid);
     if (status->debug_fd != NULL)
     {
-        fprintf(status->debug_fd, "[libdsmcc] Setting gateway for pid %d\n", pid);
+        fprintf(status->debug_fd, "[libdsmcc] Setting gateway for carouselId %u\n", carouselId);
     }
 
     if (car == NULL)
@@ -368,7 +359,7 @@ int dsmcc_process_section_info(struct dsmcc_status *status, struct dsmcc_section
     return 0;
 }
 
-void dsmcc_process_section_indication(struct dsmcc_status *status, unsigned char *Data, int Length, int pid)
+void dsmcc_process_section_indication(struct dsmcc_status *status, unsigned char *Data, int Length, uint32_t carouselId)
 {
     struct dsmcc_section section;
     int ret;
@@ -395,7 +386,7 @@ void dsmcc_process_section_indication(struct dsmcc_status *status, unsigned char
         {
             fprintf(status->debug_fd, "[libdsmcc] Server Gateway\n");
         }
-        dsmcc_process_section_gateway(status, Data + DSMCC_DSI_OFFSET, Length, pid);
+        dsmcc_process_section_gateway(status, Data + DSMCC_DSI_OFFSET, Length, carouselId);
     }
     else if (section.hdr.info.message_id == 0x1002)
     {
@@ -637,9 +628,9 @@ void dsmcc_add_module_data(struct dsmcc_status *status, struct dsmcc_section *se
 
     for (i = 0;i < MAXCAROUSELS;i++)
     {
-        car = &status->carousels[i];
-        if (car->id == section->hdr.data.download_id)
+        if (status->carousels[i].id == section->hdr.data.download_id)
         {
+            car = &status->carousels[i];            
             break;
         }
     }
@@ -872,7 +863,7 @@ void dsmcc_process_section_desc(unsigned char *Data, int Length)
 
 }
 
-void dsmcc_process_section(struct dsmcc_status *status, unsigned char *Data, int Length, int pid)
+void dsmcc_process_section(struct dsmcc_status *status, unsigned char *Data, int Length, uint32_t carouselId)
 {
     unsigned long crc32_decode;
     unsigned short section_len;
@@ -888,15 +879,18 @@ void dsmcc_process_section(struct dsmcc_status *status, unsigned char *Data, int
 
     if (crc32_decode != 0)
     {
-        fprintf(status->debug_fd, "[libdsmcc] Corrupt CRC for section, dropping");
-        if (status->debug_fd != NULL)
+        if (status->debug_fd)
         {
-            FILE *crcfd;
-            fprintf(status->debug_fd, "[libdsmcc] Dropping corrupt section (Got %lX\n", crc32_decode);
-            fprintf(status->debug_fd, "[libdsmcc] Written packet to crc-error.ts\n");
-            crcfd = fopen("crc-error.ts", "w");
-            fwrite(Data, 1, Length, crcfd);
-            fclose(crcfd);
+            fprintf(status->debug_fd, "[libdsmcc] Corrupt CRC for section, dropping");
+            if (status->debug_fd != NULL)
+            {
+                FILE *crcfd;
+                fprintf(status->debug_fd, "[libdsmcc] Dropping corrupt section (Got %lX\n", crc32_decode);
+                fprintf(status->debug_fd, "[libdsmcc] Written packet to crc-error.ts\n");
+                crcfd = fopen("crc-error.ts", "w");
+                fwrite(Data, 1, Length, crcfd);
+                fclose(crcfd);
+            }
         }
         return;
     }
@@ -908,7 +902,7 @@ void dsmcc_process_section(struct dsmcc_status *status, unsigned char *Data, int
             {
                 fprintf(status->debug_fd, "[libdsmcc] Server/Info Section\n");
             }
-            dsmcc_process_section_indication(status, Data, Length, pid);
+            dsmcc_process_section_indication(status, Data, Length, carouselId);
             break;
         case DSMCC_SECTION_DATA:
             if (status->debug_fd != NULL)

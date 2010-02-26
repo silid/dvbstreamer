@@ -9,7 +9,6 @@ struct obj_carousel
     struct cache_module_data *cache;
 
     struct dsmcc_dsi *gate;
-    struct stream *streams;
 
     unsigned long id;
 };

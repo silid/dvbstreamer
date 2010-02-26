@@ -161,7 +161,7 @@ void dsmcc_add_stream(struct dsmcc_status *, uint32_t carouselId, uint16_t tag);
 void dsmcc_add_module_info(struct dsmcc_status *, struct dsmcc_section *, struct obj_carousel *);
 void dsmcc_add_module_data(struct dsmcc_status *, struct dsmcc_section *, unsigned char *);
 
-int dsmcc_process_section_gateway(struct dsmcc_status *, unsigned char *, int, int);
+int dsmcc_process_section_gateway(struct dsmcc_status *, unsigned char *, int, uint32_t);
 int dsmcc_process_section_info(struct dsmcc_status *, struct dsmcc_section *, unsigned char *, int);
 int dsmcc_process_section_block(struct dsmcc_status *, struct dsmcc_section *, unsigned char *, int);
 
@@ -172,8 +172,8 @@ int dsmcc_process_data_header(struct dsmcc_section *, unsigned char *, int);
 
 void dsmcc_process_section_desc(unsigned char *Data, int Length);
 void dsmcc_process_section_data(struct dsmcc_status *, unsigned char *Data, int Length);
-void dsmcc_process_section_indication(struct dsmcc_status *, unsigned char *Data, int pid, int Length);
-void dsmcc_process_section(struct dsmcc_status *, unsigned char *Data, int pid, int Length);
+void dsmcc_process_section_indication(struct dsmcc_status *, unsigned char *Data, int Length, uint32_t carouselId);
+void dsmcc_process_section(struct dsmcc_status *, unsigned char *Data,  int Length, uint32_t carouselId);
 
 
 #endif
