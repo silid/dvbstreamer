@@ -33,7 +33,7 @@ Manage PIDs.
 *******************************************************************************/
 
 static void *RollUpDescriptors(dvbpsi_descriptor_t *descriptors, int *datasize);
-static dvbpsi_descriptor_t *UnRollDescriptors(char *descriptors, int size);
+static dvbpsi_descriptor_t *UnRollDescriptors(uint8_t *descriptors, int size);
 static dvbpsi_descriptor_t *CloneDescriptors(dvbpsi_descriptor_t *descriptors);
 static int PIDAdd(Service_t *service, PID_t *pid);
 
@@ -134,7 +134,7 @@ PIDList_t *PIDListGet(Service_t *service)
                         result->pids[i].type = STATEMENT_COLUMN_INT( 1);
                         result->pids[i].subType = STATEMENT_COLUMN_INT( 2);
                         result->pids[i].pmtVersion = STATEMENT_COLUMN_INT( 3);
-                        result->pids[i].descriptors = UnRollDescriptors((char *)sqlite3_column_blob(stmt, 4),sqlite3_column_bytes(stmt, 4));
+                        result->pids[i].descriptors = UnRollDescriptors((uint8_t *)sqlite3_column_blob(stmt, 4),sqlite3_column_bytes(stmt, 4));
                     }
                     else
                     {
@@ -203,7 +203,6 @@ static int PIDAdd(Service_t *service, PID_t *pid)
                         service->multiplexUID, service->id,
                         pid->pid, pid->type, pid->subType, service->pmtVersion);
     RETURN_RC_ON_ERROR;
-
     descriptorblob = RollUpDescriptors(pid->descriptors, &size);
     sqlite3_bind_blob(stmt, 1, descriptorblob, size, free);
 
@@ -214,7 +213,7 @@ static int PIDAdd(Service_t *service, PID_t *pid)
 
 static void *RollUpDescriptors(dvbpsi_descriptor_t *descriptors, int *datasize)
 {
-    char *result;
+    uint8_t *result;
     int size = 0;
     int pos = 0;
     dvbpsi_descriptor_t *current = descriptors;
@@ -234,7 +233,7 @@ static void *RollUpDescriptors(dvbpsi_descriptor_t *descriptors, int *datasize)
     result = malloc(size);
     if (!result)
     {
-        LogModule(LOG_ERROR, "pids", "Failed to allocate memory to roll up descriptors! (size %d)\n", size );
+        LogModule(LOG_ERROR, "PIDS", "Failed to allocate memory to roll up descriptors! (size %d)\n", size );
         *datasize = 0;
         return NULL;
     }
@@ -244,7 +243,7 @@ static void *RollUpDescriptors(dvbpsi_descriptor_t *descriptors, int *datasize)
     {
         result[pos    ] = current->i_tag;
         result[pos + 1] = current->i_length;
-        memcpy(result + 2, current->p_data, current->i_length);
+        memcpy(&result[pos + 2], current->p_data, current->i_length);
         pos += current->i_length + 2;
         current = current->p_next;
     }
@@ -252,10 +251,10 @@ static void *RollUpDescriptors(dvbpsi_descriptor_t *descriptors, int *datasize)
     return result;
 }
 
-static dvbpsi_descriptor_t *UnRollDescriptors(char *descriptors, int size)
+static dvbpsi_descriptor_t *UnRollDescriptors(uint8_t *descriptors, int size)
 {
     dvbpsi_descriptor_t *result = NULL;
-    dvbpsi_descriptor_t *current = NULL;
+    dvbpsi_descriptor_t *current = NULL, *prev=NULL;
     int pos;
 
     if (size == 0)
@@ -265,18 +264,16 @@ static dvbpsi_descriptor_t *UnRollDescriptors(char *descriptors, int size)
 
     for (pos = 0; pos < size; pos += 2 + current->i_length)
     {
-        if (current)
+        current = dvbpsi_NewDescriptor(descriptors[pos], descriptors[pos + 1], &descriptors[pos + 2]);
+        if (result)
         {
-            current->p_next = calloc(1, sizeof(dvbpsi_descriptor_t));
-            current = current->p_next;
+            prev->p_next = current;
+            prev = current;
         }
         else
         {
-            current = calloc(1, sizeof(dvbpsi_descriptor_t));
-            result = current;
+            prev = result = current;
         }
-        current->i_tag    = descriptors[pos];
-        current->i_length = descriptors[pos + 1];
     }
 
     return result;

@@ -112,4 +112,5 @@ dsmcc_la_SOURCES = \
     libdsmcc/dsmcc-receiver.c \
     libdsmcc/dsmcc-util.c
 
+dsmcc_la_LIBADD = -lz
 dsmcc_la_LDFLAGS = -module -no-undefined -avoid-version

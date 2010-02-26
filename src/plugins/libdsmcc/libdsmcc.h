@@ -8,17 +8,10 @@ extern "C"
 #include <stdint.h>
 #include "dsmcc-receiver.h"
 #include "dsmcc-carousel.h"
-    struct stream
-    {
-        uint16_t pid;
-        struct stream *next;
-    };
-
     struct stream_request
     {
         uint32_t carouselId;
         uint16_t assoc_tag;
-        uint16_t pid;
         struct stream_request *next;
     };
 

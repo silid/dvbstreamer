@@ -172,17 +172,24 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
 
         for (i = 0; i < count; i ++)
         {
-            LogModule(LOG_DEBUGV, PMTPROCESSOR, "    0x%04x %d\n", esentry->i_pid, esentry->i_type);
+            LogModule(LOG_DEBUGV, PMTPROCESSOR, "    %u %d\n", esentry->i_pid, esentry->i_type);
             pids->pids[i].pid = esentry->i_pid;
             pids->pids[i].type = esentry->i_type;
             pids->pids[i].descriptors = esentry->p_first_descriptor;
-
+            {
+                dvbpsi_descriptor_t *desc = esentry->p_first_descriptor;
+                while(desc)
+                {
+                    LogModule(LOG_DEBUGV, PMTPROCESSOR, "        Descriptor 0x%02x %u\n", desc->i_tag, desc->i_length);
+                    desc = desc->p_next;
+                }                
+            }
             if ((esentry->i_type == 3) || (esentry->i_type == 4))
             {
                 dvbpsi_descriptor_t *desc = esentry->p_first_descriptor;
                 while(desc)
                 {
-                    LogModule(LOG_DEBUGV, PMTPROCESSOR, "        Descriptor %d\n", desc->i_tag);
+                    LogModule(LOG_DEBUGV, PMTPROCESSOR, "        Descriptor 0x%02x\n", desc->i_tag);
                     if (desc->i_tag == 10) /* ISO 639 Language Descriptor */
                     {
                         dvbpsi_iso639_dr_t *iso639 = dvbpsi_DecodeISO639Dr(desc);

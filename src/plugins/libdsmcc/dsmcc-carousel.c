@@ -8,7 +8,6 @@
 
 void dsmcc_objcar_free(struct obj_carousel *obj)
 {
-    struct stream *str, *strnext;
     struct cache_module_data *cachep, *cachepnext;
     struct descriptor *desc, *last;
 
@@ -31,17 +30,6 @@ void dsmcc_objcar_free(struct obj_carousel *obj)
                 free(obj->gate->profile.body.full.dsm_conn.tap.selector_data);
         }
     }
-
-    /* Free stream info */
-    str = obj->streams;
-    while (str != NULL)
-    {
-        strnext = str->next;
-        free(str);
-        str = strnext;
-    }
-
-    obj->streams = NULL;
 
     /* Free cache info */
     cachep = obj->cache;
