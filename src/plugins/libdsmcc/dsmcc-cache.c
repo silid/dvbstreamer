@@ -6,10 +6,7 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include "dsmcc-cache.h"
-#include "dsmcc-biop.h"
-#include "dsmcc-receiver.h"
-#include "dsmcc-descriptor.h"
+#include "libdsmcc.h"
 // #include <mpatrol.h>
 
 FILE *cache_fd = NULL;

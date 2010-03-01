@@ -1,12 +1,15 @@
 #ifndef DSMCC_RECEIVER_H
 #define DSMCC_RECEIVER_H
 #include <stdint.h>
+
+struct dsmcc_status;
+
+
 #include "dsmcc-carousel.h"
 #include "dsmcc-biop.h"
 
 #define MAXCAROUSELS 16
 
-struct dsmcc_status;
 
 #define DSMCC_SYNC_BYTE  0x47
 #define DSMCC_TRANSPORT_ERROR 0x80
