@@ -386,9 +386,11 @@ static DSMCCDownloadSession_t *DownloadSessionGet(Service_t *service)
     ServiceRefInc(service);  
     session->filterGroup = TSReaderCreateFilterGroup(MainTSReaderGet(), service->name, "DSMCC", NULL, NULL);
     ListAdd(downloadSessions, session);
-    DownloadSessionProcessPIDs(session);
     ServiceGetIDStr(service, idStr);
     dsmcc_init(&session->status, idStr);
+    DownloadSessionProcessPIDs(session);
+
+
     return session;
 }
 
@@ -486,6 +488,7 @@ static void DownloadSessionProcessPIDs(DSMCCDownloadSession_t *session)
                 }
                 if (dataBroadcastId)
                 {
+                    printf("Add pid %u for carousel id %u (index %d)\n",  pids->pids[i].pid, carouselId, carouselIndex);
                     session->status.carousels[carouselIndex].id = carouselId;
                     
                     DownloadSessionPIDAdd(session, pids->pids[i].pid, carouselId);

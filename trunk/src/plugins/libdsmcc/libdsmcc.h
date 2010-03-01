@@ -35,7 +35,7 @@ extern "C"
 
         FILE *debug_fd;
     };
-
+extern char LIBDSMCC[];
 #ifdef __cplusplus
 }
 #endif

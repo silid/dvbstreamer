@@ -220,10 +220,10 @@ int dsmcc_biop_process_name(struct biop_name *, unsigned char *);
 int dsmcc_biop_process_name_comp(struct biop_name_comp*, unsigned char *);
 int dsmcc_biop_process_binding(struct biop_binding*, unsigned char *Data);
 int dsmcc_biop_process_module_info(struct biop_module_info *, unsigned char *Data);
-void dsmcc_biop_process_data(struct cache *cache, struct cache_module_data *cachep);
+void dsmcc_biop_process_data(struct dsmcc_status *status, struct cache *cache, struct cache_module_data *cachep);
 
-int dsmcc_biop_process_srg(struct biop_message *, struct cache_module_data *cachep, struct cache *cache);
-void dsmcc_biop_process_dir(struct biop_message *, struct cache_module_data *cachep, struct cache *cache);
+int dsmcc_biop_process_srg(struct dsmcc_status *status, struct biop_message *, struct cache_module_data *cachep, struct cache *cache);
+void dsmcc_biop_process_dir(struct dsmcc_status *status, struct biop_message *, struct cache_module_data *cachep, struct cache *cache);
 void dsmcc_biop_process_file(struct biop_message *, struct cache_module_data *cachep, struct cache *cache);
 int dsmcc_biop_process_msg_hdr(struct biop_message *, struct cache_module_data *cachep);
 int dsmcc_biop_process_tap(struct biop_tap *, unsigned char *);

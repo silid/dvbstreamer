@@ -5,13 +5,8 @@
 #ifdef USE_MPATROL
 #include <mpatrol.h>
 #endif
-
-#include <syslog.h>
-
-#include "dsmcc-biop.h"
-#include "dsmcc-descriptor.h"
-#include "dsmcc-receiver.h"
-#include "dsmcc-cache.h"
+#include "logging.h"
+#include "libdsmcc.h"
 
 // FILE *biop_fd;
 // FILE *bd_fd;
@@ -209,7 +204,7 @@ dsmcc_biop_process_binding(struct biop_binding *bind, unsigned char *Data)
     return off;
 }
 
-int dsmcc_biop_process_srg(struct biop_message *bm, struct cache_module_data *cachep, struct cache *filecache)
+int dsmcc_biop_process_srg(struct dsmcc_status *status, struct biop_message *bm, struct cache_module_data *cachep, struct cache *filecache)
 {
     unsigned int i;
     int off = 0, ret;
@@ -220,13 +215,13 @@ int dsmcc_biop_process_srg(struct biop_message *bm, struct cache_module_data *ca
     bm->body.srg.msgbody_len = (Data[off] << 24) | (Data[off+1] << 16) |
                                (Data[off+2] << 8) | Data[off+3];
 
-// fprintf(bd_fd, "Gateway -> MsgBody Len = %ld\n", bm->body.srg.msgbody_len);
+    LogModule(LOG_DEBUG, LIBDSMCC, "Gateway -> MsgBody Len = %ld\n", bm->body.srg.msgbody_len);
 
     off += 4;
 
     bm->body.srg.bindings_count = Data[off] << 8 | Data[off+1];
 
-// fprintf(bd_fd, "Gateway -> Bindings Count = %d\n", bm->body.srg.bindings_count);
+    LogModule(LOG_DEBUG, LIBDSMCC, "Gateway -> Bindings Count = %d\n", bm->body.srg.bindings_count);
     off += 2;
 
     for (i = 0; i < bm->body.srg.bindings_count; i++)
@@ -241,6 +236,8 @@ int dsmcc_biop_process_srg(struct biop_message *bm, struct cache_module_data *ca
         if (!strcmp("dir", bm->body.srg.binding.name.comps[0].kind))
         {
             dsmcc_cache_dir_info(filecache, 0, 0, NULL, &bm->body.srg.binding);
+            dsmcc_add_stream(status, bm->body.dir.binding.ior.body.full.obj_loc.carousel_id, 
+                    bm->body.dir.binding.ior.body.full.dsm_conn.tap.assoc_tag);
         }
         else if (!strcmp("fil", bm->body.srg.binding.name.comps[0].kind))
         {
@@ -282,7 +279,7 @@ dsmcc_biop_free_binding(struct biop_binding *binding)
         free(binding->objinfo);
 }
 
-void dsmcc_biop_process_dir(struct biop_message *bm, struct cache_module_data *cachep, struct cache *filecache)
+void dsmcc_biop_process_dir(struct dsmcc_status *status, struct biop_message *bm, struct cache_module_data *cachep, struct cache *filecache)
 {
     unsigned int i;
     int off = 0, ret;
@@ -293,12 +290,12 @@ void dsmcc_biop_process_dir(struct biop_message *bm, struct cache_module_data *c
     bm->body.dir.msgbody_len = (Data[off] << 24) | (Data[off+1] << 16) |
                                (Data[off+2] << 8) | Data[off+3];
 
-// fprintf(bd_fd, "Dir -> MsgBody Len = %ld\n", bm->body.dir.msgbody_len);
+    LogModule(LOG_DEBUG, LIBDSMCC, "Dir -> MsgBody Len = %ld\n", bm->body.dir.msgbody_len);
     off += 4;
 
     bm->body.dir.bindings_count = Data[off] << 8 | Data[off+1];
 
-// fprintf(bd_fd, "Dir -> Bindings Count = %d\n", bm->body.dir.bindings_count);
+    LogModule(LOG_DEBUG, LIBDSMCC, "Dir -> Bindings Count = %d\n", bm->body.dir.bindings_count);
     off += 2;
 
     for (i = 0; i < bm->body.dir.bindings_count; i++)
@@ -314,6 +311,8 @@ void dsmcc_biop_process_dir(struct biop_message *bm, struct cache_module_data *c
         {
             dsmcc_cache_dir_info(filecache, cachep->module_id, bm->hdr.objkey_len,
                                  bm->hdr.objkey, &bm->body.dir.binding);
+            dsmcc_add_stream(status, bm->body.dir.binding.ior.body.full.obj_loc.carousel_id, 
+                    bm->body.dir.binding.ior.body.full.dsm_conn.tap.assoc_tag);            
         }
         else if (!strcmp("fil", bm->body.dir.binding.name.comps[0].kind))
         {
@@ -361,14 +360,12 @@ dsmcc_biop_process_file(struct biop_message *bm, struct cache_module_data *cache
 }
 
 void
-dsmcc_biop_process_data(struct cache *filecache, struct cache_module_data *cachep)
+dsmcc_biop_process_data(struct dsmcc_status *status, struct cache *filecache, struct cache_module_data *cachep)
 {
     struct biop_message bm;
     struct descriptor *desc;
     int ret;
     unsigned int len;
-
-// bd_fd = fopen("/tmp/biop_data", "a");
 
     for (desc = cachep->descriptors; desc != NULL; desc = desc->next)
     {
@@ -389,27 +386,22 @@ dsmcc_biop_process_data(struct cache *filecache, struct cache_module_data *cache
 
     cachep->curp = 0;
 
-    if (filecache->debug_fd != NULL)
-    {
-        fprintf(filecache->debug_fd, "[libbiop] Module size (uncompressed) = %d\n", len);
-    }
-// fprintf(bd_fd, "Full Length - %d\n", len);
+    LogModule(LOG_DEBUG, LIBDSMCC, "[libbiop] Module size (uncompressed) = %d\n", len);
+
+    LogModule(LOG_DEBUG, LIBDSMCC, "Full Length - %d\n", len);
 
     /* Replace off with cachep->curp.... */
     while (cachep->curp < len)
     {
-//  fprintf(bd_fd, "Current %ld / Full %d\n", cachep->curp, len);
+        LogModule(LOG_DEBUG, LIBDSMCC, "Current %ld / Full %d\n", cachep->curp, len);
 
-//  fprintf(bd_fd, "Processing header\n");
+        LogModule(LOG_DEBUG, LIBDSMCC, "Processing header\n");
         /* Parse header */
         ret = dsmcc_biop_process_msg_hdr(&bm, cachep);
         if (ret < 0)
         {
-            if (filecache->debug_fd != NULL)
-            {
-                fprintf(filecache->debug_fd, "[libbiop] Invalid biop header, dropping rest of module\n");
-                /* not valid, skip rest of data */
-            }
+            LogModule(LOG_DEBUG, LIBDSMCC, "[libbiop] Invalid biop header, dropping rest of module\n");
+            /* not valid, skip rest of data */
             break;
         }
 
@@ -417,47 +409,35 @@ dsmcc_biop_process_data(struct cache *filecache, struct cache_module_data *cache
 
         if (strcmp(bm.hdr.objkind, "fil") == 0)
         {
-            if (filecache->debug_fd != NULL)
-            {
-                fprintf(filecache->debug_fd, "[libbiop] Processing file\n");
-            }
+            LogModule(LOG_DEBUG, LIBDSMCC, "[libbiop] Processing file\n");
             dsmcc_biop_process_file(&bm, cachep, filecache);
         }
         else if (strcmp(bm.hdr.objkind, "dir") == 0)
         {
-            if (filecache->debug_fd != NULL)
-            {
-                fprintf(filecache->debug_fd, "[libbiop] Processing directory\n");
-            }
-            dsmcc_biop_process_dir(&bm, cachep, filecache);
+            LogModule(LOG_DEBUG, LIBDSMCC, "[libbiop] Processing directory\n");
+            dsmcc_biop_process_dir(status, &bm, cachep, filecache);
+
+
         }
         else if (strcmp(bm.hdr.objkind, "srg") == 0)
         {
-            if (filecache->debug_fd != NULL)
-            {
-                fprintf(filecache->debug_fd, "[libbiop] Processing gateway\n");
-            }
-            dsmcc_biop_process_srg(&bm, cachep, filecache);
+            LogModule(LOG_DEBUG, LIBDSMCC, "[libbiop] Processing gateway\n");
+            dsmcc_biop_process_srg(status, &bm, cachep, filecache);
         }
         else if (strcmp(bm.hdr.objkind, "str") == 0)
         {
-            if (filecache->debug_fd != NULL)
-            {
-                fprintf(filecache->debug_fd, "[libbiop] Processing stream (todo)\n");
-            }
+            LogModule(LOG_DEBUG, LIBDSMCC, "[libbiop] Processing stream (todo)\n");
             /*dsmcc_biop_process_stream(&bm, cachep); */
         }
         else if (strcmp(bm.hdr.objkind, "ste") == 0)
         {
-            if (filecache->debug_fd != NULL)
-            {
-                fprintf(filecache->debug_fd, "[libbiop] Processing events (todo)\n");
-            }
+            LogModule(LOG_DEBUG, LIBDSMCC, "[libbiop] Processing events (todo)\n");
             /*dsmcc_biop_process_event(&bm, cachep); */
         }
         else
         {
             /* Error */
+            LogModule(LOG_DEBUG, LIBDSMCC, "[libbiop] Unknown type %s", bm.hdr.objkind);
         }
 
         free(bm.hdr.objkey);
@@ -638,7 +618,7 @@ dsmcc_biop_process_object(struct biop_obj_location *loc, unsigned char *Data)
 int
 dsmcc_biop_process_lite(struct biop_profile_lite *lite, unsigned char *Data)
 {
-    syslog(LOG_ERR, "BiopLite - Not Implemented Yet");
+    LogModule(LOG_ERROR, LIBDSMCC, "BiopLite - Not Implemented Yet");
     return 0;
 }
 
