@@ -688,7 +688,15 @@ static char *GetStreamTypeString(int type)
         case 0x12 : result ="ISO/IEC 14496-1 SL-packetized stream or FlexMux stream carried in PES packets"; break;
         case 0x13 : result ="ISO/IEC 14496-1 SL-packetized stream or FlexMux stream carried in ISO/IEC14496_sections."; break;
         case 0x14 : result ="ISO/IEC 13818-6 Synchronized Download Protocol"; break;
-        case 0x15 ... 0x7F : result ="ITU-T Rec. H.222.0 | ISO/IEC 13818-1 Reserved"; break;
+        case 0x15 : result ="Metadata carried in PES packets"; break;
+        case 0x16 : result ="Metadata carried in metadata_sections"; break;
+        case 0x17 : result ="Metadata carried in ISO/IEC 13818-6 Data Carousel"; break;
+        case 0x18 : result ="Metadata carried in ISO/IEC 13818-6 Object Carousel"; break;
+        case 0x19 : result ="Metadata carried in ISO/IEC 13818-6 Synchronized Download Protocol"; break;
+        case 0x1A : result ="IPMP stream (defined in ISO/IEC 13818-11, MPEG-2 IPMP)"; break;
+        case 0x1B : result ="AVC video stream as defined in ITU-T Rec. H.264 | ISO/IEC 14496-10 Video"; break;       
+        case 0x1C ... 0x7E : result ="ITU-T Rec. H.222.0 | ISO/IEC 13818-1 Reserved"; break;
+        case 0x7F : result ="IPMP stream"; break;
         case 0x80 ... 0xFF : result ="User Private"; break;
         default:
             break;
