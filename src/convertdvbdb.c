@@ -395,6 +395,10 @@ static int convert0_6(void)
     rc = sqlite3_exec(connection, "DROP TABLE " QPSKPARAMS_TABLE ";", NULL, NULL, NULL);
     rc = sqlite3_exec(connection, "DROP TABLE " QAMPARAMS_TABLE ";", NULL, NULL, NULL);
     rc = sqlite3_exec(connection, "DROP TABLE " VSBPARAMS_TABLE ";", NULL, NULL, NULL);
+
+    /* Remove all descriptors, bug in 1.x means these are invalid. */
+    rc = sqlite3_exec(connection, "UPDATE " PIDS_TABLE " SET " PID_DESCRIPTORS "=NULL;", NULL, NULL, NULL);
+    
     return rc;    
 }
 
