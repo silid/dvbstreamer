@@ -33,7 +33,6 @@ extern "C"
         struct obj_carousel carousels[MAXCAROUSELS];
 
 
-        FILE *debug_fd;
     };
 extern char LIBDSMCC[];
 #ifdef __cplusplus

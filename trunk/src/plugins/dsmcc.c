@@ -425,22 +425,22 @@ static void DSMCCPIDDestructor(void *arg)
 
 static void DownloadSessionProcessPIDs(DSMCCDownloadSession_t *session)
 {
-    PIDList_t *pids = CachePIDsGet(session->service);
-    if (pids != NULL)
+    ProgramInfo_t *info= CacheProgramInfoGet(session->service);
+    if (info != NULL)
     {
         int i;
         int carouselIndex = 0;
         
         printf("Processing PIDS...\n");
-        for (i = 0; i < pids->count; i ++)
+        for (i = 0; i < info->streamInfoList->nrofStreams; i ++)
         {
-            printf("%2d : %u %x\n", i , pids->pids[i].pid, pids->pids[i].type); 
-            if ((pids->pids[i].type == 0x0b) || (pids->pids[i].type == 0x18))
+            printf("%2d : %u %x\n", i , info->streamInfoList->streams[i].pid, info->streamInfoList->streams[i].type); 
+            if ((info->streamInfoList->streams[i].type == 0x0b) || (info->streamInfoList->streams[i].type == 0x18))
             {
                 dvbpsi_descriptor_t *desc;
                 uint32_t carouselId = 0;
                 uint32_t dataBroadcastId = 0;
-                for (desc = pids->pids[i].descriptors; desc; desc = desc->p_next)
+                for (desc = info->streamInfoList->streams[i].descriptors; desc; desc = desc->p_next)
                 {
                     printf("\t0x%02x %u\n", desc->i_tag, desc->i_length & 0xff);
                     switch (desc->i_tag)
@@ -488,38 +488,38 @@ static void DownloadSessionProcessPIDs(DSMCCDownloadSession_t *session)
                 }
                 if (dataBroadcastId)
                 {
-                    printf("Add pid %u for carousel id %u (index %d)\n",  pids->pids[i].pid, carouselId, carouselIndex);
+                    printf("Add pid %u for carousel id %u (index %d)\n",  info->streamInfoList->streams[i].pid, carouselId, carouselIndex);
                     session->status.carousels[carouselIndex].id = carouselId;
                     
-                    DownloadSessionPIDAdd(session, pids->pids[i].pid, carouselId);
+                    DownloadSessionPIDAdd(session, info->streamInfoList->streams[i].pid, carouselId);
                 }
             }
         }
         printf("PIDs Processed.\n");
-        CachePIDsRelease();
+        ObjectRefDec(info);
     }    
 }
 
 static uint16_t AssociationTagToPID(Service_t *service, uint16_t tag)
 {
     int i;
-    PIDList_t *pids = CachePIDsGet(service);
-    if (pids == NULL)
+    ProgramInfo_t *info = CacheProgramInfoGet(service);
+    if (info == NULL)
     {
         return INVALID_PID;
     }
-    for (i = 0; i < pids->count; i ++)
+    for (i = 0; i < info->streamInfoList->nrofStreams; i ++)
     {
         dvbpsi_descriptor_t *desc;
-        for (desc = pids->pids[i].descriptors; desc; desc = desc->p_next)
+        for (desc = info->streamInfoList->streams[i].descriptors; desc; desc = desc->p_next)
         {
             if (desc->i_tag == TAG_ASSOCIATION_TAG_DESCRIPTOR)
             {
                 dvbpsi_association_tag_dr_t *assoc_tag_dr = dvbpsi_DecodeAssociationTagDr(desc);
                 if (assoc_tag_dr && (assoc_tag_dr->i_tag == tag))
                 {
-                    CachePIDsRelease();
-                    return pids->pids[i].pid;
+                    ObjectRefDec(info);
+                    return info->streamInfoList->streams[i].pid;
                 }
             }
             if (desc->i_tag == TAG_STREAM_ID_DESCRIPTOR)
@@ -527,13 +527,13 @@ static uint16_t AssociationTagToPID(Service_t *service, uint16_t tag)
                 dvbpsi_stream_identifier_dr_t *stream_id_dr = dvbpsi_DecodeStreamIdentifierDr(desc);
                 if (stream_id_dr && (stream_id_dr->i_component_tag == tag))
                 {
-                    CachePIDsRelease();
-                    return pids->pids[i].pid;
+                    ObjectRefDec(info);
+                    return info->streamInfoList->streams[i].pid;
                 }
             }
         }
     }
-    CachePIDsRelease();    
+    ObjectRefDec(info);
     return INVALID_PID;
 }
 
@@ -587,5 +587,6 @@ static void DSMCCSectionCallback(void *p_cb_data, dvbpsi_handle h_dvbpsi, dvbpsi
         }
         session->status.newstreams = NULL;
     }
+    dvbpsi_ReleasePSISections(h_dvbpsi, p_section);
 }
 

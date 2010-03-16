@@ -1,19 +1,18 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <syslog.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include "logging.h"
 #include "libdsmcc.h"
 // #include <mpatrol.h>
 
-FILE *cache_fd = NULL;
 /* TODO This should be stored in obj_carousel structure  */
 
 void
-dsmcc_cache_init(struct cache *filecache, const char *channel_name, FILE *debug_fd)
+dsmcc_cache_init(struct cache *filecache, const char *channel_name)
 {
 
     /* TODO - load cache from disk into obj_carousel */
@@ -41,7 +40,6 @@ dsmcc_cache_init(struct cache *filecache, const char *channel_name, FILE *debug_
 
     filecache->files = NULL;
 
-    filecache->debug_fd = debug_fd;
 }
 
 void
@@ -345,18 +343,12 @@ dsmcc_cache_attach_file(struct cache *filecache, struct cache_dir *root, struct 
         if (file->prev != NULL)
         {
             file->prev->next = file->next;
-            if (filecache->debug_fd != NULL)
-            {
-                fprintf(filecache->debug_fd, "[libcache] Set filecache prev to next file\n");
-            }
+            LogModule(LOG_DEBUG, LIBDSMCC, "[libcache] Set filecache prev to next file\n");
         }
         else
         {
             filecache->file_cache = file->next;
-            if (filecache->debug_fd != NULL)
-            {
-                fprintf(filecache->debug_fd, "[libcache] Set filecache to next file\n");
-            }
+            LogModule(LOG_DEBUG, LIBDSMCC,  "[libcache] Set filecache to next file\n");
         }
 
         if (file->next != NULL)
@@ -372,18 +364,12 @@ dsmcc_cache_attach_file(struct cache *filecache, struct cache_dir *root, struct 
         if (file->prev != NULL)
         {
             file->prev->next = file->next;
-            if (filecache->debug_fd != NULL)
-            {
-                fprintf(filecache->debug_fd, "[libcache] Set filecache (not start) prev to next file\n");
-            }
+            LogModule(LOG_DEBUG, LIBDSMCC, "[libcache] Set filecache (not start) prev to next file\n");
         }
         else
         {
             filecache->file_cache = file->next;
-            if (filecache->debug_fd != NULL)
-            {
-                fprintf(filecache->debug_fd, "[libcache] Set filecache (not start) to next file\n");
-            }
+            LogModule(LOG_DEBUG, LIBDSMCC, "[libcache] Set filecache (not start) to next file\n");
         }
 
         if (file->next != NULL)
@@ -560,10 +546,7 @@ dsmcc_cache_dir_info(struct cache *filecache, unsigned short module_id, unsigned
 
     dir->parent = dsmcc_cache_dir_find(filecache, dir->carousel_id, module_id, objkey_len, objkey);
 
-    if (filecache->debug_fd != NULL)
-    {
-        fprintf(filecache->debug_fd, "[libcache] Caching dir %s (with parent %d/%d/%c%c%c%c\n", dir->name, dir->p_module_id, dir->p_key_len, dir->p_key[0], dir->p_key[1], dir->p_key[2], dir->p_key[3]);
-    }
+    LogModule(LOG_DEBUG, LIBDSMCC, "[libcache] Caching dir %s (with parent %d/%d/%c%c%c%c\n", dir->name, dir->p_module_id, dir->p_key_len, dir->p_key[0], dir->p_key[1], dir->p_key[2], dir->p_key[3]);
 
     if (dir->parent == NULL)
     {
@@ -579,33 +562,30 @@ dsmcc_cache_dir_info(struct cache *filecache, unsigned short module_id, unsigned
             {
                 ;
             }
-//   fprintf(cache_fd,"Added to Unknown list not empty\n");
+            LogModule(LOG_DEBUG, LIBDSMCC, "Added to Unknown list not empty\n");
             last->next = dir;
             dir->prev = last;
         }
     }
     else
     {
-        if (filecache->debug_fd != NULL)
-        {
-            fprintf(filecache->debug_fd, "[libcache] Caching dir %s under parent %s\n", dir->name, dir->parent->name);
-        }
+        LogModule(LOG_DEBUG, LIBDSMCC, "[libcache] Caching dir %s under parent %s\n", dir->name, dir->parent->name);
         /* Create under parent directory */
         if (dir->parent->sub == NULL)
         {
-//   fprintf(cache_fd,"Parent has no subdirs\n");
+            LogModule(LOG_DEBUG, LIBDSMCC, "Parent has no subdirs\n");
             dir->parent->sub = dir;
         }
         else
         {
-//   fprintf(cache_fd,"Parent has other subdirs\n");
+            LogModule(LOG_DEBUG, LIBDSMCC, "Parent has other subdirs\n");
             for (last = dir->parent->sub;last->next != NULL;last = last->next)
             {
                 ;
             }
             last->next = dir;
             dir->prev = last;
-//   fprintf(cache_fd,"Added to Parent has other subdirs\n");
+            LogModule(LOG_DEBUG, LIBDSMCC, "Added to Parent has other subdirs\n");
         }
     }
 
@@ -621,10 +601,7 @@ dsmcc_cache_dir_info(struct cache *filecache, unsigned short module_id, unsigned
                 (file->p_module_id == dir->module_id) &&
                 dsmcc_cache_key_cmp(file->p_key, dir->key, file->p_key_len, dir->key_len))
         {
-            if (filecache->debug_fd != NULL)
-            {
-                fprintf(filecache->debug_fd, "[libcache] Attaching previously arrived file %s to newly created directory %s\n", file->filename, dir->name);
-            }
+            LogModule(LOG_DEBUG, LIBDSMCC, "[libcache] Attaching previously arrived file %s to newly created directory %s\n", file->filename, dir->name);
             dsmcc_cache_attach_file(filecache, dir, file);
         }
     }
@@ -662,10 +639,7 @@ dsmcc_cache_write_dir(struct cache *filecache, struct cache_dir *dir)
 
     sprintf(dirbuf, "%s/%s/%s", "/tmp/cache/", filecache->name, dir->dirpath);
 
-    if (filecache->debug_fd != NULL)
-    {
-        fprintf(filecache->debug_fd, "[libcache] Writing directory %s to filesystem\n", dir->dirpath);
-    }
+    LogModule(LOG_DEBUG, LIBDSMCC, "[libcache] Writing directory %s to filesystem\n", dir->dirpath);
 
     mkdir(dirbuf, 0755);
 
@@ -675,10 +649,7 @@ dsmcc_cache_write_dir(struct cache *filecache, struct cache_dir *dir)
     {
         if (file->data != NULL)
         {
-            if (filecache->debug_fd != NULL)
-            {
-                fprintf(filecache->debug_fd, "[libcache] Writing out file %s under new dir %s\n", file->filename, dir->dirpath);
-            }
+            LogModule(LOG_DEBUG, LIBDSMCC, "[libcache] Writing out file %s under new dir %s\n", file->filename, dir->dirpath);
             dsmcc_cache_write_file(filecache, file);
         }
     }
@@ -704,10 +675,7 @@ dsmcc_cache_file(struct cache *filecache, struct biop_message *bm, struct cache_
 
     if (file == NULL)
     {
-        if (filecache->debug_fd != NULL)
-        {
-            fprintf(filecache->debug_fd, "[libcache] Unknown file %ld/%d/%d/%c%c%c, caching data\n", cachep->carousel_id, cachep->module_id, bm->hdr.objkey_len, bm->hdr.objkey[0], bm->hdr.objkey[1], bm->hdr.objkey[2]);
-        }
+        LogModule(LOG_DEBUG, LIBDSMCC, "[libcache] Unknown file %ld/%d/%d/%c%c%c, caching data\n", cachep->carousel_id, cachep->module_id, bm->hdr.objkey_len, bm->hdr.objkey[0], bm->hdr.objkey[1], bm->hdr.objkey[2]);
         /* Not known yet. Save data */
 
         file = (struct cache_file *)malloc(sizeof(struct cache_file));
@@ -745,10 +713,8 @@ dsmcc_cache_file(struct cache *filecache, struct biop_message *bm, struct cache_
     else
     {
         /* Save data. Save file if wanted  (TODO check versions ) */
-        if (filecache->debug_fd != NULL)
-        {
-            fprintf(filecache->debug_fd, "[libcache] Data for file %s\n", file->filename);
-        }
+        LogModule(LOG_DEBUG, LIBDSMCC, "[libcache] Data for file %s\n", file->filename);
+        
         if (file->data == NULL)
         {
             file->data_len = bm->body.file.content_len;
@@ -760,10 +726,7 @@ dsmcc_cache_file(struct cache *filecache, struct biop_message *bm, struct cache_
         }
         else
         {
-            if (filecache->debug_fd != NULL)
-            {
-                fprintf(filecache->debug_fd, "[libcache] Data for file %s had already arrived\n", file->filename);
-            }
+            LogModule(LOG_DEBUG, LIBDSMCC, "[libcache] Data for file %s had already arrived\n", file->filename);
         }
     }
 }
@@ -780,10 +743,8 @@ dsmcc_cache_write_file(struct cache *filecache, struct cache_file *file)
 
     if ((file->parent != NULL) && (file->parent->dirpath != NULL))
     {
-        if (filecache->debug_fd != NULL)
-        {
-            fprintf(filecache->debug_fd, "[libcache] Writing file %s/%s (%d bytes)\n", file->parent->dirpath, file->filename, file->data_len);
-        }
+        LogModule(LOG_DEBUG, LIBDSMCC, "[libcache] Writing file %s/%s (%d bytes)\n", file->parent->dirpath, file->filename, file->data_len);
+        
         sprintf(buf, "/tmp/cache/%s/%s/%s", filecache->name, file->parent->dirpath, file->filename);
         data_fd = fopen(buf, "wb");
         if (data_fd != NULL)
@@ -825,11 +786,7 @@ dsmcc_cache_write_file(struct cache *filecache, struct cache_file *file)
     }
     else
     {
-        if (filecache->debug_fd != NULL)
-        {
-            /*    fprintf(filecache->debug_fd,"[libcache] File %s Parent == %p Dirpath == %s\n", file->filename, file->parent, file->parent->dirpath);
-            */
-        }
+        LogModule(LOG_DEBUG, LIBDSMCC, "[libcache] File %s Parent == %p Dirpath == %s\n", file->filename, file->parent, file->parent->dirpath);
     }
 }
 
@@ -919,10 +876,8 @@ dsmcc_cache_file_info(struct cache *filecache, unsigned short mod_id, unsigned i
     struct cache_file *newfile, *last;
     struct cache_dir *dir;
 
-    if (filecache->debug_fd != NULL)
-    {
-        fprintf(filecache->debug_fd, "[libcache] Caching file info\n");
-    }
+    LogModule(LOG_DEBUG, LIBDSMCC, "[libcache] Caching file info\n");
+    
 
     // Check we do not already have file (or file info) cached
     if (dsmcc_cache_file_find(filecache,
@@ -944,10 +899,8 @@ dsmcc_cache_file_info(struct cache *filecache, unsigned short mod_id, unsigned i
 
     if (newfile == NULL)
     {
-        if (filecache->debug_fd != NULL)
-        {
-            fprintf(filecache->debug_fd, "[libcache] Data not arrived for file %s, caching\n", bind->name.comps[0].id);
-        }
+        LogModule(LOG_DEBUG, LIBDSMCC, "[libcache] Data not arrived for file %s, caching\n", bind->name.comps[0].id);
+        
         // Create the file from scratch
         newfile = (struct cache_file*)malloc(sizeof(struct cache_file));
         newfile->carousel_id = bind->ior.body.full.obj_loc.carousel_id;
@@ -960,10 +913,7 @@ dsmcc_cache_file_info(struct cache *filecache, unsigned short mod_id, unsigned i
     }
     else
     {
-        if (filecache->debug_fd != NULL)
-        {
-            fprintf(filecache->debug_fd, "[libcache] Data already arrived for file %s\n", bind->name.comps[0].id);
-        }
+        LogModule(LOG_DEBUG, LIBDSMCC, "[libcache] Data already arrived for file %s\n", bind->name.comps[0].id);
     }
 
     newfile->filename = (char*)malloc(bind->name.comps[0].id_len);
@@ -984,10 +934,8 @@ dsmcc_cache_file_info(struct cache *filecache, unsigned short mod_id, unsigned i
         newfile->p_key = (char *)malloc(newfile->p_key_len);
         memcpy(newfile->p_key, key, key_len);
         newfile->parent = NULL;
-        if (filecache->debug_fd != NULL)
-        {
-            fprintf(filecache->debug_fd, "[libcache] Caching info for file %s with unknown parent dir (file info - %ld/%d/%d/%c%c%c%c)\n", newfile->filename, newfile->carousel_id, newfile->module_id, newfile->key_len, newfile->key[0], newfile->key[1], newfile->key[2], newfile->key[3]);
-        }
+        LogModule(LOG_DEBUG, LIBDSMCC, "[libcache] Caching info for file %s with unknown parent dir (file info - %ld/%d/%d/%c%c%c%c)\n", newfile->filename, newfile->carousel_id, newfile->module_id, newfile->key_len, newfile->key[0], newfile->key[1], newfile->key[2], newfile->key[3]);
+
         dsmcc_cache_unknown_file_info(filecache, newfile);
     }
     else
@@ -1019,10 +967,8 @@ dsmcc_cache_file_info(struct cache *filecache, unsigned short mod_id, unsigned i
             newfile->prev = last;
         }
 
-        if (filecache->debug_fd != NULL)
-        {
-            fprintf(filecache->debug_fd, "[libcache] Caching info for file %s with known parent dir (file info - %ld/%d/%d/%c%c%c)\n", newfile->filename, newfile->carousel_id, newfile->module_id, newfile->key_len, newfile->key[0], newfile->key[1], newfile->key[2]);
-        }
+        LogModule(LOG_DEBUG, LIBDSMCC, "[libcache] Caching info for file %s with known parent dir (file info - %ld/%d/%d/%c%c%c)\n", newfile->filename, newfile->carousel_id, newfile->module_id, newfile->key_len, newfile->key[0], newfile->key[1], newfile->key[2]);
+        
 
         if (newfile->data != NULL)
             dsmcc_cache_write_file(filecache, newfile);
