@@ -401,17 +401,30 @@ bool TSFilterGroupAddPacketFilter(TSFilterGroup_t *group, uint16_t pid, TSPacket
         return FALSE;
     }
     
-    LogModule(LOG_DEBUG, TSREADER, "Adding packet filter 0x%04x for filter group %s", pid, group->name);        
+
     pthread_mutex_lock(&group->tsReader->mutex);
-    packetFilter = PacketFilterListAddFilter(group->tsReader, group, pid, callback, userArg); 
-    if (packetFilter != NULL)
+    for (packetFilter = group->packetFilters; packetFilter; packetFilter = packetFilter->next)
     {
-        packetFilter->next = group->packetFilters;
-        group->packetFilters = packetFilter;
+        if (packetFilter->pid == pid)
+        {
+            LogModule(LOG_DEBUG, TSREADER, "PID 0x%04x is already being packet filtered for filter group %s", pid, group->name);
+            result = FALSE;
+            break;
+        }
     }
-    else
-    {        
-        result = FALSE;
+    if (result)
+    {
+        LogModule(LOG_DEBUG, TSREADER, "Adding packet filter 0x%04x for filter group %s", pid, group->name);
+        packetFilter = PacketFilterListAddFilter(group->tsReader, group, pid, callback, userArg); 
+        if (packetFilter != NULL)
+        {
+            packetFilter->next = group->packetFilters;
+            group->packetFilters = packetFilter;
+        }
+        else
+        {        
+            result = FALSE;
+        }
     }
     pthread_mutex_unlock(&group->tsReader->mutex);
     return result;
