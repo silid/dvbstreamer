@@ -421,7 +421,7 @@ static void ServiceFilterPATRewrite(ServiceFilter_t filter)
 static void ServiceFilterPMTRewrite(ServiceFilter_t state)
 {
     int i;
-    PIDList_t *pids;
+    ProgramInfo_t *info;
     bool vfound = FALSE;
     bool afound = FALSE;
     bool sfound = FALSE;
@@ -438,19 +438,19 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t state)
     state->subPID = INVALID_PID;
     LogModule(LOG_DEBUG, SERVICEFILTER, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     LogModule(LOG_DEBUG, SERVICEFILTER, "Rewriting PMT on PID %x\n", state->service->pmtPid);
-    pids = CachePIDsGet(state->service);
-    for (i = 0; (pids != NULL) && (i < pids->count) && (!vfound || !afound || !sfound); i ++)
+    info = CacheProgramInfoGet(state->service);
+    for (i = 0; (info != NULL) && (i < info->streamInfoList->nrofStreams) && (!vfound || !afound || !sfound); i ++)
     {
-        LogModule(LOG_DEBUG, SERVICEFILTER, "\tpid = %x type =%d subtype = %d\n", pids->pids[i].pid, pids->pids[i].type, pids->pids[i].subType);
+        LogModule(LOG_DEBUG, SERVICEFILTER, "\tpid = %x type =%d\n", info->streamInfoList->streams[i].pid, info->streamInfoList->streams[i].type);
         /* Look for:
          * 0x01 = ISO/IEC 11172 Video
          * 0x02 = ITU-T Rec. H.262 | ISO/IEC 13818-2 Video or ISO/IEC 11172-2 constrained parameter video stream
          */
-        if (!vfound && ((pids->pids[i].type == 1) || (pids->pids[i].type == 2)))
+        if (!vfound && ((info->streamInfoList->streams[i].type == 1) || (info->streamInfoList->streams[i].type == 2)))
         {
             vfound = TRUE;
-            state->videoPID = pids->pids[i].pid;
-            es = dvbpsi_PMTAddES(&pmt, pids->pids[i].type,  pids->pids[i].pid);
+            state->videoPID = info->streamInfoList->streams[i].pid;
+            es = dvbpsi_PMTAddES(&pmt, info->streamInfoList->streams[i].type,  info->streamInfoList->streams[i].pid);
         }
 
         /* Look for:
@@ -458,27 +458,27 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t state)
          * 0x04 = ISO/IEC 13818-3 Audio
          * 0x81 = ATSC AC-3 (User Private in ISO 13818-1 : 2000)
          */
-        if (!afound && ((pids->pids[i].type == 3) || (pids->pids[i].type == 4) || 
-                        (pids->pids[i].type == 0x81)))
+        if (!afound && ((info->streamInfoList->streams[i].type == 3) || (info->streamInfoList->streams[i].type == 4) || 
+                        (info->streamInfoList->streams[i].type == 0x81)))
         {
             afound = TRUE;
-            state->audioPID = pids->pids[i].pid;
-            es = dvbpsi_PMTAddES(&pmt, pids->pids[i].type,  pids->pids[i].pid);
+            state->audioPID = info->streamInfoList->streams[i].pid;
+            es = dvbpsi_PMTAddES(&pmt,info->streamInfoList->streams[i].type,  info->streamInfoList->streams[i].pid);
         }
         /* For DVB, we look at type 0x06 = ITU-T Rec. H.222.0 | ISO/IEC 13818-1 PES packets containing private data
          * which is used for DVB subtitles and AC-3 streams.
          */
-        if (pids->pids[i].type == 6)
+        if (info->streamInfoList->streams[i].type == 6)
         {
-            dvbpsi_descriptor_t *desc = pids->pids[i].descriptors;
+            dvbpsi_descriptor_t *desc = info->streamInfoList->streams[i].descriptors;
             while(desc)
             {
                 /* DVB Subtitles */
                 if (!sfound  && (desc->i_tag == 0x59))
                 {
                     sfound = TRUE;
-                    state->subPID = pids->pids[i].pid;
-                    es = dvbpsi_PMTAddES(&pmt, pids->pids[i].type,  pids->pids[i].pid);
+                    state->subPID = info->streamInfoList->streams[i].pid;
+                    es = dvbpsi_PMTAddES(&pmt, info->streamInfoList->streams[i].type,  info->streamInfoList->streams[i].pid);
                     dvbpsi_PMTESAddDescriptor(es, desc->i_tag, desc->i_length,  desc->p_data);
                     break;
                 }
@@ -487,8 +487,8 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t state)
                 {
 
                     afound = TRUE;
-                    state->audioPID = pids->pids[i].pid;
-                    es = dvbpsi_PMTAddES(&pmt, pids->pids[i].type,  pids->pids[i].pid);
+                    state->audioPID = info->streamInfoList->streams[i].pid;
+                    es = dvbpsi_PMTAddES(&pmt,info->streamInfoList->streams[i].type,  info->streamInfoList->streams[i].pid);
                     dvbpsi_PMTESAddDescriptor(es, desc->i_tag, desc->i_length,  desc->p_data);
                     break;
                 }
@@ -496,7 +496,7 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t state)
             }
         }
     }
-    CachePIDsRelease();
+    ObjectRefDec(info);
     LogModule(LOG_DEBUG, SERVICEFILTER, "videopid = %x audiopid = %x subpid = %x\n", state->videoPID,state->audioPID,state->subPID);
 
     section = dvbpsi_GenPMTSections(&pmt);
@@ -563,30 +563,30 @@ static void ServiceFilterAllocateFilters(ServiceFilter_t filter)
         {
             TSFilterGroupAddPacketFilter(filter->tsgroup, filter->audioPID, ServiceFilterProcessPacket, filter);
         }
-        if ((filter->videoPID != INVALID_PID) && (filter->audioPID != filter->service->pcrPid))
+        if ((filter->videoPID != INVALID_PID) && (filter->videoPID != filter->service->pcrPid))
         {
             TSFilterGroupAddPacketFilter(filter->tsgroup, filter->videoPID, ServiceFilterProcessPacket, filter);
         }
-        if ((filter->subPID != INVALID_PID) && (filter->audioPID != filter->service->pcrPid))
+        if ((filter->subPID != INVALID_PID) && (filter->subPID != filter->service->pcrPid))
         {
             TSFilterGroupAddPacketFilter(filter->tsgroup, filter->subPID, ServiceFilterProcessPacket, filter);
         }
     }
     else
     {
-        PIDList_t *pids = CachePIDsGet(filter->service);
-        if (pids)
+        ProgramInfo_t *info = CacheProgramInfoGet(filter->service);
+        if (info)
         {
             int i;
-            for (i = 0; i < pids->count; i ++)
+            for (i = 0; i < info->streamInfoList->nrofStreams; i ++)
             {
-                if (pids->pids[i].pid != filter->service->pcrPid)
+                if (info->streamInfoList->streams[i].pid != filter->service->pcrPid)
                 {
-                    TSFilterGroupAddPacketFilter(filter->tsgroup, pids->pids[i].pid, ServiceFilterProcessPacket, filter);
+                    TSFilterGroupAddPacketFilter(filter->tsgroup, info->streamInfoList->streams[i].pid, ServiceFilterProcessPacket, filter);
                 }
             }
+            ObjectRefDec(info);            
         }
-        CachePIDsRelease();
     }
     TSReaderUnLock(filter->tsgroup->tsReader);
 }

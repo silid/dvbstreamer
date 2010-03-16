@@ -112,17 +112,13 @@ void CacheServicesRelease(void);
 
 /**
  * Retrieve the PIDs for a given service and locks the cache to prevent updates.
- * CachePIDsRelease() should be called when the list is no longer needed.
+ * ObjectRefDec() should be called on the list when it is no longer needed.
  *
  * @param service Service to retrieve the PIDs for.
- * @return A PIDList_t structure.
+ * @return A ProgramInfo_t structure or NULL if no information is available.
  */
-PIDList_t *CachePIDsGet(Service_t *service);
+ProgramInfo_t* CacheProgramInfoGet(Service_t *service);
 
-/**
- * Releases the PIDs retrieved by CachePIDsGet and allows updates to the cache.
- */
-void CachePIDsRelease(void);
 
 /**
  * Update the specified Multiplex's pat version and TS id.
@@ -189,13 +185,11 @@ void CacheUpdateServiceConditionalAccess(Service_t *service, bool ca);
 void CacheUpdateServiceType(Service_t *service, ServiceType type);
 
 /**
- * Update the PIDs for the specified service.
+ * Update the Program Info for the specified service.
  * @param service The service to update.
- * @param pcrpid The PID the PCR is being sent on.
- * @param pids A PIDList_t structure of new PIDs.
- * @param pmtversion The new PMT version.
+ * @param info A ProgramInfo_t object containing the new information.
  */
-void CacheUpdatePIDs(Service_t *service, int pcrpid, PIDList_t *pids, int pmtversion);
+void CacheUpdateProgramInfo(Service_t *service, ProgramInfo_t *info);
 
 /**
  * Add a new Service to the cache.

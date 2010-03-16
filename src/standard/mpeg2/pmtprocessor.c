@@ -151,31 +151,36 @@ static void PMTProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_
 static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
 {
     Service_t *service = (Service_t*)arg;
-    PIDList_t *pids;
+    ProgramInfo_t *info;
     dvbpsi_pmt_es_t *esentry = newpmt->p_first_es;
     int count = 0;
 
     LogModule(LOG_DEBUG, PMTPROCESSOR, "PMT recieved, version %d on PID %d (old version %d)\n", newpmt->i_version, service->pmtPid, service->pmtVersion);
 
+    EventsFireEventListeners(pmtEvent, newpmt);
+    
     while(esentry)
     {
         esentry = esentry->p_next;
         count ++;
     }
     LogModule(LOG_DEBUGV, PMTPROCESSOR, "%d PIDs in PMT\n", count);
-    pids = PIDListNew(count);
+    info = ProgramInfoNew(count);
 
-    if (pids)
+    if (info)
     {
         int i;
+        info->pcrPID = newpmt->i_pcr_pid;
+        info->descriptors = newpmt->p_first_descriptor;
+        newpmt->p_first_descriptor = NULL;
         esentry = newpmt->p_first_es;
 
         for (i = 0; i < count; i ++)
         {
             LogModule(LOG_DEBUGV, PMTPROCESSOR, "    %u %d\n", esentry->i_pid, esentry->i_type);
-            pids->pids[i].pid = esentry->i_pid;
-            pids->pids[i].type = esentry->i_type;
-            pids->pids[i].descriptors = esentry->p_first_descriptor;
+            info->streamInfoList->streams[i].pid = esentry->i_pid;
+            info->streamInfoList->streams[i].type = esentry->i_type;
+            info->streamInfoList->streams[i].descriptors = esentry->p_first_descriptor;
             {
                 dvbpsi_descriptor_t *desc = esentry->p_first_descriptor;
                 while(desc)
@@ -184,42 +189,13 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
                     desc = desc->p_next;
                 }                
             }
-            if ((esentry->i_type == 3) || (esentry->i_type == 4))
-            {
-                dvbpsi_descriptor_t *desc = esentry->p_first_descriptor;
-                while(desc)
-                {
-                    LogModule(LOG_DEBUGV, PMTPROCESSOR, "        Descriptor 0x%02x\n", desc->i_tag);
-                    if (desc->i_tag == 10) /* ISO 639 Language Descriptor */
-                    {
-                        dvbpsi_iso639_dr_t *iso639 = dvbpsi_DecodeISO639Dr(desc);
-                        if (iso639)
-                        {
-                            pids->pids[i].subType = iso639->code[0].i_audio_type;
-                        }
-                    }
-                    desc = desc->p_next;
-                }
-            }
-            else
-            {
-                pids->pids[i].subType = 0;
-            }
+            esentry->p_first_descriptor = NULL; /* Take over the descriptors */
             esentry = esentry->p_next;
         }
         LogModule(LOG_DEBUGV,PMTPROCESSOR, "About to update cache\n");
-        CacheUpdatePIDs(service, newpmt->i_pcr_pid, pids, newpmt->i_version);
+        CacheUpdateProgramInfo(service, info);
     }
 
-    EventsFireEventListeners(pmtEvent, newpmt);
-
-    /* Take over the descriptors */
-    esentry = newpmt->p_first_es;
-    while(esentry)
-    {
-        esentry->p_first_descriptor = NULL;
-        esentry = esentry->p_next;
-    }
     ObjectRefDec(newpmt);
 }
 

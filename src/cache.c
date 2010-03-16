@@ -50,7 +50,7 @@ enum CacheFlags
 {
     CacheFlag_Clean           = 0x0000,
     CacheFlag_Dirty_PMTPID    = 0x0001,
-    CacheFlag_Dirty_PIDs      = 0x0002, /* Also means PMT Version and PCR PID needs to be updated */
+    CacheFlag_Dirty_ProgramInfo = 0x0002, /* Also means PMT Version and PCR PID needs to be updated */
     CacheFlag_Dirty_Name      = 0x0004,
     CacheFlag_Dirty_Source    = 0x0008,
     CacheFlag_Dirty_CA        = 0x0010,
@@ -105,9 +105,7 @@ typedef struct CacheUpdateMessage_s
         struct
         {
             Service_t *service;
-            PIDList_t *pids;
-            int pcrPid;
-            int pmtVersion;
+            ProgramInfo_t *info;
         }servicePIDs;
 
         struct
@@ -179,7 +177,7 @@ static int cachedServicesCount = 0;
 static pthread_mutex_t cacheUpdateMutex;
 static enum CacheFlags cacheFlags[SERVICES_MAX];
 static Service_t*      cachedServices[SERVICES_MAX];
-static PIDList_t*      cachedPIDs[SERVICES_MAX];
+static ProgramInfo_t*  cachedPIDs[SERVICES_MAX];
 
 /*******************************************************************************
 * Global functions                                                             *
@@ -234,7 +232,7 @@ int CacheLoad(Multiplex_t *multiplex)
         {
             cachedServices[i] = (Service_t*)ListIterator_Current(iterator);
             LogModule(LOG_DEBUG,CACHE, "Loaded 0x%04x %s\n", cachedServices[i]->id, cachedServices[i]->name);
-            cachedPIDs[i] = PIDListGet(cachedServices[i]);
+            cachedPIDs[i] = ProgramInfoGet(cachedServices[i]);
             cacheFlags[i] = CacheFlag_Clean;
         }
         /* Use ListFree with no destructor as we don't want to free the objects 
@@ -333,9 +331,9 @@ void CacheServicesRelease(void)
     pthread_mutex_unlock(&cacheUpdateMutex);
 }
 
-PIDList_t *CachePIDsGet(Service_t *service)
+ProgramInfo_t *CacheProgramInfoGet(Service_t *service)
 {
-    PIDList_t *result = NULL;
+    ProgramInfo_t *result = NULL;
     int i;
     pthread_mutex_lock(&cacheUpdateMutex);
     for (i = 0; i < cachedServicesCount; i ++)
@@ -343,19 +341,12 @@ PIDList_t *CachePIDsGet(Service_t *service)
         if ((cachedServices[i]) && ServiceAreEqual(service, cachedServices[i]))
         {
             result = cachedPIDs[i];
+            ObjectRefInc(result);
             break;
         }
     }
-    if (!result)
-    {
-        pthread_mutex_unlock(&cacheUpdateMutex);
-    }
-    return result;
-}
-
-void CachePIDsRelease(void)
-{
     pthread_mutex_unlock(&cacheUpdateMutex);
+    return result;
 }
 
 void CacheUpdateMultiplex(Multiplex_t *multiplex, int patversion, int tsid)
@@ -654,7 +645,7 @@ void CacheUpdateServiceType(Service_t *service, ServiceType type)
     pthread_mutex_unlock(&cacheUpdateMutex);
 }
 
-void CacheUpdatePIDs(Service_t *service, int pcrpid, PIDList_t *pids, int pmtversion)
+void CacheUpdateProgramInfo(Service_t *service, ProgramInfo_t *info)
 {
     CacheUpdateMessage_t *msg;
     int i;
@@ -666,12 +657,10 @@ void CacheUpdatePIDs(Service_t *service, int pcrpid, PIDList_t *pids, int pmtver
         {
             if (cachedPIDs[i])
             {
-                PIDListFree(cachedPIDs[i]);
+                ObjectRefDec(cachedPIDs[i]);
             }
 
-            cachedPIDs[i] = pids;
-            cachedServices[i]->pcrPid = pcrpid;
-            cachedServices[i]->pmtVersion = pmtversion;
+            cachedPIDs[i] = info;
 
             msg = ObjectCreateType(CacheUpdateMessage_t);
             if (msg)
@@ -679,9 +668,8 @@ void CacheUpdatePIDs(Service_t *service, int pcrpid, PIDList_t *pids, int pmtver
                 msg->type = CacheUpdate_Service_PIDs;
                 ObjectRefInc(service);
                 msg->details.servicePIDs.service = service;
-                msg->details.servicePIDs.pids = PIDListClone(pids);
-                msg->details.servicePIDs.pcrPid = pcrpid;
-                msg->details.servicePIDs.pmtVersion = pmtversion;
+                ObjectRefInc(info);
+                msg->details.servicePIDs.info = info;
                 DeferredProcessingAddJob(CacheProcessUpdateMessage, msg);
                 ObjectRefDec(msg);
             }
@@ -795,7 +783,7 @@ void CacheServiceDelete(Service_t *service)
     {
         LogModule(LOG_DEBUG, CACHE, "Removing service at index %d\n", deletedIndex);
         /* Get rid of the pids as we don't need them any more! */
-        PIDListFree(cachedPIDs[deletedIndex]);
+        ObjectRefDec(cachedPIDs[deletedIndex]);
 
         cachedServicesCount --;
         /* Remove the deleted service from the list */
@@ -838,7 +826,7 @@ static void CacheServicesFree()
         }
         if (cachedPIDs[i])
         {
-            PIDListFree(cachedPIDs[i]);
+            ObjectRefDec(cachedPIDs[i]);
             cachedPIDs[i] = NULL;
         }
     }
@@ -886,11 +874,9 @@ static void CacheProcessUpdateMessage(void *ptr)
         case CacheUpdate_Service_PIDs:
             service = msg->details.servicePIDs.service;
             LogModule(LOG_DEBUG, CACHE, "Updating PIDs for %s\n", service->name);
-            PIDListRemove(service);
-            PIDListSet(service, msg->details.servicePIDs.pids);
-            ServicePMTVersionSet(service, msg->details.servicePIDs.pmtVersion);
-            ServicePCRPIDSet(service, msg->details.servicePIDs.pcrPid);
-            PIDListFree(msg->details.servicePIDs.pids);
+            ProgramInfoRemove(service);
+            ProgramInfoSet(service, msg->details.servicePIDs.info);
+            ObjectRefDec(msg->details.servicePIDs.info);
             break;
 
         case CacheUpdate_Service_Name:
@@ -951,7 +937,7 @@ static void CacheProcessUpdateMessage(void *ptr)
             service = msg->details.serviceDelete.service;
             LogModule(LOG_DEBUG, CACHE, "Deleting service %s (0x%04x)\n", service->name, service->id);
             ServiceDelete(service);
-            PIDListRemove(service);
+            ProgramInfoRemove(service);
             break;
     }
     DBaseTransactionCommit();
