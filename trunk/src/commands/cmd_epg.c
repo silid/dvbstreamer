@@ -106,7 +106,7 @@ static void CommandEPGData(int argc, char **argv)
                                startTimeStr, endTimeStr, msg->data.event.ca ? "yes":"no");
                     break;
                 case EPGChannelMessageType_Detail:
-                    CommandPrintf("<detail lang=\"%s\" name=\"%s\">\n",
+                    CommandPrintf("<detail lang=\"%s\" name=\"%s\">",
                              msg->data.detail.lang,  msg->data.detail.name);
                     PrintXmlified(msg->data.detail.value);
                     CommandPrintf("</detail>\n");
