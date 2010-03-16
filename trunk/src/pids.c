@@ -27,16 +27,22 @@ Manage PIDs.
 #include "services.h"
 #include "pids.h"
 #include "logging.h"
-
+/*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
+#define SPECIAL_PID_PMT 0x2001
+#define SPECIAL_PID_PCR 0x8000
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
 
 static void *RollUpDescriptors(dvbpsi_descriptor_t *descriptors, int *datasize);
 static dvbpsi_descriptor_t *UnRollDescriptors(uint8_t *descriptors, int size);
-static dvbpsi_descriptor_t *CloneDescriptors(dvbpsi_descriptor_t *descriptors);
-static int PIDAdd(Service_t *service, PID_t *pid);
+static int PIDListCount(Service_t *service);
+static int PIDAdd(Service_t *service, StreamInfo_t *pid);
 
+static void ProgramInfoDestructor(void *ptr);
+static void StreamInfoListDestructor(void *ptr);
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
@@ -45,71 +51,53 @@ static bool typeInited = FALSE;
 * Global functions                                                             *
 *******************************************************************************/
 
-PIDList_t *PIDListNew(int count)
+ProgramInfo_t *ProgramInfoNew(int nrofStreams)
 {
+    ProgramInfo_t *info;
     if (!typeInited)
     {
-        ObjectRegisterCollection(TOSTRING(PIDList_t), sizeof(PID_t), NULL);
+        ObjectRegisterTypeDestructor(ProgramInfo_t, ProgramInfoDestructor);
+        ObjectRegisterCollection(TOSTRING(StreamInfoList_t), sizeof(StreamInfo_t), StreamInfoListDestructor);
         typeInited = TRUE;
     }
-    return (PIDList_t *)ObjectCollectionCreate(TOSTRING(PIDList_t), count);
-}
-
-void PIDListFree(PIDList_t *pids)
-{
-    int i;
-    if (pids)
+    info = ObjectCreateType(ProgramInfo_t);
+    if (info)
     {
-        for (i = 0; i < pids->count; i ++)
-        {
-            if (pids->pids[i].descriptors)
-            {
-                dvbpsi_DeleteDescriptors(pids->pids[i].descriptors);
-            }
-        }
-        ObjectRefDec(pids);
+        info->streamInfoList =(StreamInfoList_t *)ObjectCollectionCreate(TOSTRING(StreamInfoList_t), nrofStreams);
     }
+    return info;
 }
 
-PIDList_t *PIDListClone(PIDList_t *pids)
-{
-    int i;
-    PIDList_t *result = PIDListNew(pids->count);
-    if (result)
-    {
-        for (i = 0; i < pids->count; i ++)
-        {
-            result->pids[i] = pids->pids[i];
-            result->pids[i].descriptors = CloneDescriptors(pids->pids[i].descriptors);
-        }
-    }
-    return result;
-}
 
-int PIDListSet(Service_t *service, PIDList_t *pids)
+int ProgramInfoSet(Service_t *service, ProgramInfo_t *info)
 {
     int rc = 0;
     int i;
+    StreamInfo_t pid;
 
-    for (i = 0; i < pids->count; i ++)
+    for (i = 0; i < info->streamInfoList->nrofStreams; i ++)
     {
-        rc = PIDAdd(service, &pids->pids[i]);
+        rc = PIDAdd(service, &info->streamInfoList->streams[i]);
         if (rc)
         {
             break;
         }
     }
+    pid.pid = SPECIAL_PID_PCR | (info->pcrPID & PID_MASK); 
+    pid.type = 0;
+    pid.descriptors = info->descriptors;
+    PIDAdd(service, &pid);
     return rc;
 }
 
-PIDList_t *PIDListGet(Service_t *service)
+ProgramInfo_t *ProgramInfoGet(Service_t *service)
 {
     int count = PIDListCount(service);
-    PIDList_t *result = NULL;
+    ProgramInfo_t *result = NULL;
 
     if (count > 0)
     {
-        result = PIDListNew(count);
+        result = ProgramInfoNew(count);
         if (result)
         {
             int i;
@@ -117,35 +105,51 @@ PIDList_t *PIDListGet(Service_t *service)
             STATEMENT_PREPAREVA("SELECT "
                         PID_PID ","
                         PID_TYPE ","
-                        PID_SUBTYPE ","
-                        PID_PMTVERSION ","
                         PID_DESCRIPTORS " "
-                        "FROM " PIDS_TABLE " WHERE " PID_MULTIPLEXUID "=%d AND " PID_SERVICEID "=%d;",
+                        "FROM " PIDS_TABLE " WHERE " PID_MULTIPLEXUID "=%d AND " PID_SERVICEID "=%d AND "
+                        PID_PID "<8192;",
                         service->multiplexUID, service->id);
             if (rc == SQLITE_OK)
             {
-
                 for (i = 0; i < count; i ++)
                 {
                     STATEMENT_STEP();
                     if (rc == SQLITE_ROW)
                     {
-                        result->pids[i].pid = STATEMENT_COLUMN_INT( 0);
-                        result->pids[i].type = STATEMENT_COLUMN_INT( 1);
-                        result->pids[i].subType = STATEMENT_COLUMN_INT( 2);
-                        result->pids[i].pmtVersion = STATEMENT_COLUMN_INT( 3);
-                        result->pids[i].descriptors = UnRollDescriptors((uint8_t *)sqlite3_column_blob(stmt, 4),sqlite3_column_bytes(stmt, 4));
+                        result->streamInfoList->streams[i].pid = STATEMENT_COLUMN_INT( 0);
+                        result->streamInfoList->streams[i].type = STATEMENT_COLUMN_INT( 1);
+                        result->streamInfoList->streams[i].descriptors = UnRollDescriptors((uint8_t *)sqlite3_column_blob(stmt, 2), 
+                                                                        sqlite3_column_bytes(stmt, 2));
                     }
                     else
                     {
                         break;
                     }
                 }
+
                 STATEMENT_FINALIZE();
+                
+                STATEMENT_PREPAREVA("SELECT "
+                        PID_PID ","
+                        PID_DESCRIPTORS " "
+                        "FROM " PIDS_TABLE " WHERE " PID_MULTIPLEXUID "=%d AND " PID_SERVICEID "=%d AND "
+                        PID_PID ">%d;",
+                        service->multiplexUID, service->id, SPECIAL_PID_PCR);
+                if (rc == SQLITE_OK)
+                {
+                    STATEMENT_STEP();
+                    if (rc == SQLITE_ROW)
+                    {
+                        result->pcrPID = STATEMENT_COLUMN_INT( 0) & PID_MASK;
+                        result->descriptors = UnRollDescriptors((uint8_t *)sqlite3_column_blob(stmt, 1), 
+                                                                        sqlite3_column_bytes(stmt, 1));
+                    }
+                    STATEMENT_FINALIZE();
+                }
             }
             else
             {
-                PIDListFree(result);
+                ObjectRefDec(result);
                 result = NULL;
             }
         }
@@ -153,27 +157,8 @@ PIDList_t *PIDListGet(Service_t *service)
     return result;
 }
 
-int PIDListCount(Service_t *service)
-{
-    STATEMENT_INIT;
-    int result = -1;
 
-    STATEMENT_PREPAREVA("SELECT count () FROM " PIDS_TABLE " "
-                        "WHERE " PID_MULTIPLEXUID "=%d AND " PID_SERVICEID "=%d;",
-                        service->multiplexUID, service->id);
-    RETURN_ON_ERROR(-1);
-
-    STATEMENT_STEP();
-    if (rc == SQLITE_ROW)
-    {
-        result = STATEMENT_COLUMN_INT( 0);
-        rc = 0;
-    }
-    STATEMENT_FINALIZE();
-    return result;
-}
-
-int PIDListRemove(Service_t *service)
+int ProgramInfoRemove(Service_t *service)
 {
     STATEMENT_INIT;
 
@@ -191,17 +176,40 @@ int PIDListRemove(Service_t *service)
 /*******************************************************************************
 * Local Functions                                                              *
 *******************************************************************************/
+static int PIDListCount(Service_t *service)
+{
+    STATEMENT_INIT;
+    int result = -1;
 
-static int PIDAdd(Service_t *service, PID_t *pid)
+    STATEMENT_PREPAREVA("SELECT count () FROM " PIDS_TABLE " "
+                        "WHERE " PID_MULTIPLEXUID "=%d AND " PID_SERVICEID "=%d AND " PID_PID "<8192;",
+                        service->multiplexUID, service->id);
+    RETURN_ON_ERROR(-1);
+
+    STATEMENT_STEP();
+    if (rc == SQLITE_ROW)
+    {
+        result = STATEMENT_COLUMN_INT( 0);
+        rc = 0;
+    }
+    STATEMENT_FINALIZE();
+    return result;
+}
+
+static int PIDAdd(Service_t *service, StreamInfo_t *pid)
 {
     void *descriptorblob;
     int size;
     STATEMENT_INIT;
 
-    STATEMENT_PREPAREVA("INSERT INTO " PIDS_TABLE " "
-                        "VALUES (%d,%d,%d,%d,%d,%d,?);",
+    STATEMENT_PREPAREVA("INSERT INTO " PIDS_TABLE " (" PID_MULTIPLEXUID ","
+                        PID_SERVICEID ","       
+                        PID_PID ","
+                        PID_TYPE ","
+                        PID_DESCRIPTORS ") "
+                        "VALUES (%d,%d,%d,%d,?);",
                         service->multiplexUID, service->id,
-                        pid->pid, pid->type, pid->subType, service->pmtVersion);
+                        pid->pid, pid->type);
     RETURN_RC_ON_ERROR;
     descriptorblob = RollUpDescriptors(pid->descriptors, &size);
     sqlite3_bind_blob(stmt, 1, descriptorblob, size, free);
@@ -279,27 +287,27 @@ static dvbpsi_descriptor_t *UnRollDescriptors(uint8_t *descriptors, int size)
     return result;
 }
 
-static dvbpsi_descriptor_t *CloneDescriptors(dvbpsi_descriptor_t *descriptors)
+static void ProgramInfoDestructor(void *ptr)
 {
-    dvbpsi_descriptor_t *result = NULL;
-
-    if (descriptors)
+    ProgramInfo_t *info = ptr;
+    if (info->descriptors)
     {
-        dvbpsi_descriptor_t *current = NULL;
-        dvbpsi_descriptor_t *prev_copy = NULL;
-        for (current = descriptors; current; current = current->p_next)
+        dvbpsi_DeleteDescriptors(info->descriptors);
+    }
+    ObjectRefDec(info->streamInfoList);
+}
+
+static void StreamInfoListDestructor(void *ptr)
+{
+    StreamInfoList_t *list = ptr;
+    int i;
+    
+    for (i = 0; i < list->nrofStreams; i ++)
+    {
+        if (list->streams[i].descriptors)
         {
-            dvbpsi_descriptor_t *copy = dvbpsi_NewDescriptor(current->i_tag, current->i_length, current->p_data);
-            if (result == NULL)
-            {
-                result = copy;
-            }
-            else
-            {
-                prev_copy->p_next = copy;
-            }
-            prev_copy = copy;
+            dvbpsi_DeleteDescriptors(list->streams[i].descriptors);
         }
     }
-    return result;
 }
+

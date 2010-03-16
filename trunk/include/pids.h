@@ -33,77 +33,69 @@ Manage PIDs.
 #include "multiplexes.h"
 #include "services.h"
 
+#define PID_MASK     (0x1fff)
+#define PID_STUFFING (0x1fff)
+#define PID_ALL      (0x2000)
+#define PID_INVALID  (0xFFFF)
+
 /**
- * Structure describing a PID used by a service.
+ * Structure describing a PID used by a program.
  */
-typedef struct PID_t
+typedef struct StreamInfo_t
 {
     int pid;        /**< PID in question. */
     int type;       /**< Type of data this PID is used to transmit. */
-    int subType;    /**< Additional information on the type (ie language code for audio) */
-    int pmtVersion; /**< Version of the services PMT that this PID appears in */
-    dvbpsi_descriptor_t *descriptors; /**< Linked list of descriptors for this PID */
-}
-PID_t;
+    dvbpsi_descriptor_t *descriptors; /**< Linked list of descriptors for this stream */
+}StreamInfo_t;
 
 /**
- * Structure used to store a collection of PIDs for a specific service.
+ * Structure used to store a collection of streams for a specific program.
  */
-typedef struct PIDList_t
+typedef struct StreamInfoList_t
 {
-    int count;     /**< Number of pids in the pids array */
-    PID_t pids[0]; /**< Array of pids. */
-}
-PIDList_t;
+    int nrofStreams;         /**< Number of streams in the streams array */
+    StreamInfo_t streams[0]; /**< Array of streams. */
+}StreamInfoList_t;
 
 /**
- * Create a PID list with the specified number of pid entries.
- * @param count Number of pids in the list.
- * @return A new PIDList_t structure containing the specified number of entries or null.
+ * Structure describing a program (MPEG2).
  */
-PIDList_t *PIDListNew(int count);
+typedef struct ProgramInfo_s
+{
+    dvbpsi_descriptor_t *descriptors; /**< Linked list of descriptors from PMT */
+    int pcrPID;                       /**< PCR PID */
+    StreamInfoList_t *streamInfoList; /**< List of streams for this program */
+}ProgramInfo_t;
 
 /**
- * Free a list of PIDs and their descriptors.
- * @param pids The PID List to free.
+ * Create a ProgramInfo object with the specified number of entries for streams.
+ * @param nrofStreams Number of streams to allocate.
+ * @return A new ProgramInfo_t structure or null.
  */
-void PIDListFree(PIDList_t *pids);
+ProgramInfo_t *ProgramInfoNew(int nrofStreams);
 
 /**
- * Create a deep copy of a pid list.
- * @param pids The pids list to clone.
- * @return A new PIDList_t object or NULL.
- */
-PIDList_t *PIDListClone(PIDList_t *pids);
-
-/**
- * Set the list of PIDs for the specified service.
+ * Set the ProgramInfo for the specified service.
  *
  * @param service The service the pids belong to.
- * @param pids The list of pids to set for the service.
+ * @param info The program info to set for the service.
  * @return 0 on success otherwise an sqlite3 error code.
  */
-int PIDListSet(Service_t *service, PIDList_t *pids);
+int ProgramInfoSet(Service_t *service, ProgramInfo_t *info);
 
 /**
- * Retrieve the list of pids for the specified service.
+ * Retrieve the ProgramInfo for the specified service.
  * @param service The service to retrieve the pids for.
- * @return A PIDList_t structure or null if no PIDs could be retreieved.
+ * @return A ProgramInfo_t structure or null if no PIDs could be retreieved.
  */
-PIDList_t *PIDListGet(Service_t *service);
+ProgramInfo_t *ProgramInfoGet(Service_t *service);
 
-/**
- * Retrieve the number of pids for the specified service.
- * @param service The service to retrieve the pids for.
- * @return The number of PIDs for the specified service or -1 on error.
- */
-int PIDListCount(Service_t *service);
 
 /**
  * Remove all pids for the specified service.
  * @param service The service to remove pids from.
  * @return 0 on success otherwise an sqlite3 error code.
  */
-int PIDListRemove(Service_t *service);
+int ProgramInfoRemove(Service_t *service);
 
 #endif

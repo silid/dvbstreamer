@@ -327,7 +327,7 @@ static void CommandListServices(int argc, char **argv)
             multiplex = MultiplexFind(argv[i]);
             if (!multiplex)
             {
-                CommandPrintf("Failed to find multiplex \"%s\"\n", argv[i]);
+                CommandError(COMMAND_ERROR_GENERIC, "Failed to find multiplex \"%s\"\n", argv[i]);
                 return;                    
             }
             
@@ -361,7 +361,7 @@ static void CommandListServices(int argc, char **argv)
                 if (dvbIds)
                 {
                     multiplex = MultiplexFindUID(service->multiplexUID);
-                    CommandPrintf("%04x.%04x.%04x : %s\n", 
+                    CommandPrintf("%04x.%04x.%04x : \"%s\"\n", 
                         multiplex->networkId & 0xffff, multiplex->tsId & 0xffff,
                         service->id, service->name);
                     MultiplexRefDec(multiplex);
@@ -492,16 +492,15 @@ static void CommandServiceInfo(int argc, char **argv)
     if (service)
     {
         static const char *serviceType[]= {"Digital TV", "Digital Radio", "Data", "Unknown"};
-        CommandPrintf("Name                : %s\n", service->name);
-        CommandPrintf("Provider            : %s\n", service->provider);
+        CommandPrintf("Name                : \"%s\"\n", service->name);
+        CommandPrintf("Provider            : \"%s\"\n", service->provider);
         CommandPrintf("Type                : %s\n", serviceType[service->type]);
         CommandPrintf("Conditional Access? : %s\n", service->conditionalAccess ? "CA":"Free to Air");
         CommandPrintf("ID                  : %04x.%04x.%04x\n", service->networkId, service->tsId, service->id);
         CommandPrintf("Multiplex UID       : %d\n", service->multiplexUID);
         CommandPrintf("Source              : 0x%04x\n", service->source);
-        CommandPrintf("Default Authority   : %s\n", service->defaultAuthority);
-        CommandPrintf("PMT PID             : 0x%04x\n", service->pmtPid);
-        CommandPrintf("    Version         : %d\n", service->pmtVersion);
+        CommandPrintf("Default Authority   : \"%s\"\n", service->defaultAuthority);
+        CommandPrintf("PMT                 : { PID: 0x%04x, Version: %d }\n", service->pmtPid, service->pmtVersion);
         ServiceRefDec(service);
     }
     else
@@ -556,7 +555,7 @@ static void CommandStats(int argc, char **argv)
     for (typeStats = stats->types; typeStats; typeStats = typeStats->next)
     {
         TSFilterGroupStats_t *groupStats;
-        CommandPrintf("%s\n", typeStats->type);
+        CommandPrintf("%s: \n", typeStats->type);
         for (groupStats = typeStats->groups; groupStats; groupStats = groupStats->next)
         {
             CommandPrintf("    %20s : %lld (%lld)\n", groupStats->name, groupStats->packetsProcessed, groupStats->sectionsProcessed);
@@ -587,7 +586,7 @@ static void CommandFEStatus(int argc, char **argv)
              (status & FESTATUS_HAS_CARRIER)?"Carrier ":"",
              (status & FESTATUS_HAS_VITERBI)?"VITERBI ":"",
              (status & FESTATUS_HAS_SYNC)?"Sync ":"");
-    CommandPrintf("Signal Strength = %d%% SNR = %d%% BER = %x Uncorrected Blocks = %x\n",
+    CommandPrintf("Signal Strength: %d%%\nSNR: %d%%\nBER: %x\nUncorrected Blocks: %x\n",
         (strength * 100) / 0xffff, (snr * 100) / 0xffff, ber, ucblocks);
 }
 
@@ -610,7 +609,7 @@ static void CommandListPids(int argc, char **argv)
     {
         bool cached = TRUE;
         int i;
-        PIDList_t *pids;
+        ProgramInfo_t *info;
         bool numericOutput = FALSE;
             
         if ((argc == 2) && (strcmp(argv[1], "-n") == 0))
@@ -618,37 +617,46 @@ static void CommandListPids(int argc, char **argv)
             numericOutput =TRUE;
         }
         
-        pids = CachePIDsGet(service);
-        if (pids == NULL)
+        info = CacheProgramInfoGet(service);
+        if (info == NULL)
         {
-            pids = PIDListGet(service);
+            info = ProgramInfoGet(service);
             cached = FALSE;
         }
 
-        if (pids)
+        if (info)
         {
-            CommandPrintf("%d PIDs for \"%s\"%s\n", pids->count, argv[0], cached ? " (Cached)":"");
-            for (i = 0; i < pids->count; i ++)
+            bool pcrPresent = FALSE;
+            CommandPrintf("%d PIDs for \"%s\"%s\n", info->streamInfoList->nrofStreams, argv[0], cached ? " (Cached)":"");
+            for (i = 0; i < info->streamInfoList->nrofStreams; i ++)
             {
+                if (info->streamInfoList->streams[i].pid == info->pcrPID)
+                {
+                    pcrPresent = TRUE;
+                }
                 if (numericOutput)
                 {
-                    CommandPrintf("%d %d %d\n",pids->pids[i].pid, pids->pids[i].type, pids->pids[i].subType);
+                    CommandPrintf("%4d: { type: %d }\n",info->streamInfoList->streams[i].pid, info->streamInfoList->streams[i].type);
                 }
                 else
                 {
-                    CommandPrintf("%d %s\n", pids->pids[i].pid, GetStreamTypeString(pids->pids[i].type));
+                    CommandPrintf("%4d: { type: \"%s\" }\n", info->streamInfoList->streams[i].pid, GetStreamTypeString(info->streamInfoList->streams[i].type));
                 }
 
             }
+            if (!pcrPresent)
+            {
+                if (numericOutput)
+                {
+                    CommandPrintf("%4d: { type: -1 }\n",info->pcrPID);
+                }
+                else
+                {
+                    CommandPrintf("%4d: { type: PCR }\n", info->pcrPID);
+                }
+            }
+            ObjectRefDec(info);
 
-            if (cached)
-            {
-                CachePIDsRelease();
-            }
-            else
-            {
-                PIDListFree(pids);
-            }
         }
         else
         {
