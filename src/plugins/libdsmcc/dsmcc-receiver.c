@@ -50,7 +50,7 @@ void dsmcc_init(struct dsmcc_status *status, const char *channel)
         status->carousels[i].filecache = malloc(sizeof(struct cache));
         status->carousels[i].gate = NULL;
         status->carousels[i].id = 0;
-        dsmcc_cache_init(status->carousels[i].filecache, channel, status->debug_fd);
+        dsmcc_cache_init(status->carousels[i].filecache, channel);
     }
 }
 
@@ -365,7 +365,7 @@ void dsmcc_process_section_indication(struct dsmcc_status *status, unsigned char
 
     if (ret != 0)
     {
-        fprintf(status->debug_fd, "[libdsmcc] Indication Section Header error");
+        LogModule(LOG_DEBUG, LIBDSMCC, "[libdsmcc] Indication Section Header error");
         return;
     }
 
@@ -830,20 +830,10 @@ void dsmcc_process_section(struct dsmcc_status *status, unsigned char *Data, int
 
     crc32_decode = dsmcc_crc32(Data, section_len);
 
-// fprintf(dsi_debug, "Length %d CRC - %lX \n",section_len, crc32_decode);
 
     if (crc32_decode != 0)
     {
-            LogModule(LOG_DEBUG, LIBDSMCC, "[libdsmcc] Corrupt CRC for section, dropping");
-            if (status->debug_fd != NULL)
-            {
-                FILE *crcfd;
-                fprintf(status->debug_fd, "[libdsmcc] Dropping corrupt section (Got %lX\n", crc32_decode);
-                fprintf(status->debug_fd, "[libdsmcc] Written packet to crc-error.ts\n");
-                crcfd = fopen("crc-error.ts", "w");
-                fwrite(Data, 1, Length, crcfd);
-                fclose(crcfd);
-            }
+        LogModule(LOG_DEBUG, LIBDSMCC, "[libdsmcc] Corrupt CRC for section, dropping");
         return;
     }
 
@@ -867,6 +857,4 @@ void dsmcc_process_section(struct dsmcc_status *status, unsigned char *Data, int
             break;
     }
     LogModule(LOG_DEBUG, LIBDSMCC, "[libdsmcc] Section Processed\n");
-// fclose(dsi_debug);
-
 }
