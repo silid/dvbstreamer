@@ -341,7 +341,10 @@ ProgramInfo_t *CacheProgramInfoGet(Service_t *service)
         if ((cachedServices[i]) && ServiceAreEqual(service, cachedServices[i]))
         {
             result = cachedPIDs[i];
-            ObjectRefInc(result);
+            if (result)
+            {
+                ObjectRefInc(result);
+            }
             break;
         }
     }
@@ -782,8 +785,11 @@ void CacheServiceDelete(Service_t *service)
     if (deletedIndex != -1)
     {
         LogModule(LOG_DEBUG, CACHE, "Removing service at index %d\n", deletedIndex);
-        /* Get rid of the pids as we don't need them any more! */
-        ObjectRefDec(cachedPIDs[deletedIndex]);
+        if (cachedPIDs[deletedIndex])
+        {
+            /* Get rid of the pids as we don't need them any more! */
+            ObjectRefDec(cachedPIDs[deletedIndex]);
+        }
 
         cachedServicesCount --;
         /* Remove the deleted service from the list */
