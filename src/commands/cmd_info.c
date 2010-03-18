@@ -500,7 +500,7 @@ static void CommandServiceInfo(int argc, char **argv)
         CommandPrintf("Multiplex UID       : %d\n", service->multiplexUID);
         CommandPrintf("Source              : 0x%04x\n", service->source);
         CommandPrintf("Default Authority   : \"%s\"\n", service->defaultAuthority);
-        CommandPrintf("PMT                 : { PID: 0x%04x, Version: %d }\n", service->pmtPid, service->pmtVersion);
+        CommandPrintf("PMT PID             : 0x%04x\n", service->pmtPID);
         ServiceRefDec(service);
     }
     else

@@ -143,7 +143,7 @@ static void PMTProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_
         ServiceRefInc(services[i]);
         state->services[i] = services[i];
         state->pmthandles[i] = dvbpsi_AttachPMT(services[i]->id, PMTHandler, (void*)services[i]);
-        TSFilterGroupAddSectionFilter(state->tsgroup, services[i]->pmtPid, 0, state->pmthandles[i]);
+        TSFilterGroupAddSectionFilter(state->tsgroup, services[i]->pmtPID, 0, state->pmthandles[i]);
     }
     CacheServicesRelease();    
 }
@@ -155,7 +155,7 @@ static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
     dvbpsi_pmt_es_t *esentry = newpmt->p_first_es;
     int count = 0;
 
-    LogModule(LOG_DEBUG, PMTPROCESSOR, "PMT recieved, version %d on PID %d (old version %d)\n", newpmt->i_version, service->pmtPid, service->pmtVersion);
+    LogModule(LOG_DEBUG, PMTPROCESSOR, "PMT recieved, version %d on PID %d\n", newpmt->i_version, service->pmtPID);
 
     EventsFireEventListeners(pmtEvent, newpmt);
     

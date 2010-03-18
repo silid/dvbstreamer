@@ -78,6 +78,7 @@ struct ServiceFilter_s
     uint16_t        serviceVersion;
     uint16_t        pmtVersion;
     uint8_t         pmtPacketCounter;
+    uint16_t        pcrPID;
     uint16_t        videoPID;
     uint16_t        audioPID;
     uint16_t        subPID;
@@ -364,7 +365,7 @@ static void ServiceFilterProcessPacket(void *arg, TSFilterGroup_t *group, TSPack
         packet = &filter->packets[PACKETS_INDEX_PAT];
     }
     
-    if (pid == filter->service->pmtPid)
+    if (pid == filter->service->pmtPID)
     {
         if (filter->avsOnly)
         {
@@ -409,7 +410,7 @@ static void ServiceFilterPATRewrite(ServiceFilter_t filter)
 
     dvbpsi_InitPAT(&pat, filter->multiplex->tsId, filter->patVersion, 1);
     
-    dvbpsi_PATAddProgram(&pat, filter->service->id, filter->service->pmtPid);
+    dvbpsi_PATAddProgram(&pat, filter->service->id, filter->service->pmtPID);
 
     section = dvbpsi_GenPATSections(&pat, 1);
     ServiceFilterInitPacket(&filter->packets[PACKETS_INDEX_PAT], section, "PAT");
@@ -431,77 +432,81 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t state)
 
     state->pmtVersion ++;
     
-    dvbpsi_InitPMT(&pmt, state->service->id, state->pmtVersion, 1, state->service->pcrPid);
-
+    dvbpsi_InitPMT(&pmt, state->service->id, state->pmtVersion, 1, PID_STUFFING);
+    state->pcrPID   = INVALID_PID;
     state->videoPID = INVALID_PID;
     state->audioPID = INVALID_PID;
-    state->subPID = INVALID_PID;
+    state->subPID   = INVALID_PID;
     LogModule(LOG_DEBUG, SERVICEFILTER, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
-    LogModule(LOG_DEBUG, SERVICEFILTER, "Rewriting PMT on PID %x\n", state->service->pmtPid);
+    LogModule(LOG_DEBUG, SERVICEFILTER, "Rewriting PMT on PID %x\n", state->service->pmtPID);
     info = CacheProgramInfoGet(state->service);
-    for (i = 0; (info != NULL) && (i < info->streamInfoList->nrofStreams) && (!vfound || !afound || !sfound); i ++)
+    if (info)
     {
-        LogModule(LOG_DEBUG, SERVICEFILTER, "\tpid = %x type =%d\n", info->streamInfoList->streams[i].pid, info->streamInfoList->streams[i].type);
-        /* Look for:
-         * 0x01 = ISO/IEC 11172 Video
-         * 0x02 = ITU-T Rec. H.262 | ISO/IEC 13818-2 Video or ISO/IEC 11172-2 constrained parameter video stream
-         */
-        if (!vfound && ((info->streamInfoList->streams[i].type == 1) || (info->streamInfoList->streams[i].type == 2)))
+        pmt.i_pcr_pid = state->pcrPID = info->pcrPID;
+        for (i = 0; (i < info->streamInfoList->nrofStreams) && (!vfound || !afound || !sfound); i ++)
         {
-            vfound = TRUE;
-            state->videoPID = info->streamInfoList->streams[i].pid;
-            es = dvbpsi_PMTAddES(&pmt, info->streamInfoList->streams[i].type,  info->streamInfoList->streams[i].pid);
-        }
-
-        /* Look for:
-         * 0x03 = ISO/IEC 11172 Audio
-         * 0x04 = ISO/IEC 13818-3 Audio
-         * 0x81 = ATSC AC-3 (User Private in ISO 13818-1 : 2000)
-         */
-        if (!afound && ((info->streamInfoList->streams[i].type == 3) || (info->streamInfoList->streams[i].type == 4) || 
-                        (info->streamInfoList->streams[i].type == 0x81)))
-        {
-            afound = TRUE;
-            state->audioPID = info->streamInfoList->streams[i].pid;
-            es = dvbpsi_PMTAddES(&pmt,info->streamInfoList->streams[i].type,  info->streamInfoList->streams[i].pid);
-        }
-        /* For DVB, we look at type 0x06 = ITU-T Rec. H.222.0 | ISO/IEC 13818-1 PES packets containing private data
-         * which is used for DVB subtitles and AC-3 streams.
-         */
-        if (info->streamInfoList->streams[i].type == 6)
-        {
-            dvbpsi_descriptor_t *desc = info->streamInfoList->streams[i].descriptors;
-            while(desc)
+            LogModule(LOG_DEBUG, SERVICEFILTER, "\tpid = %x type =%d\n", info->streamInfoList->streams[i].pid, info->streamInfoList->streams[i].type);
+            /* Look for:
+             * 0x01 = ISO/IEC 11172 Video
+             * 0x02 = ITU-T Rec. H.262 | ISO/IEC 13818-2 Video or ISO/IEC 11172-2 constrained parameter video stream
+             */
+            if (!vfound && ((info->streamInfoList->streams[i].type == 1) || (info->streamInfoList->streams[i].type == 2)))
             {
-                /* DVB Subtitles */
-                if (!sfound  && (desc->i_tag == 0x59))
-                {
-                    sfound = TRUE;
-                    state->subPID = info->streamInfoList->streams[i].pid;
-                    es = dvbpsi_PMTAddES(&pmt, info->streamInfoList->streams[i].type,  info->streamInfoList->streams[i].pid);
-                    dvbpsi_PMTESAddDescriptor(es, desc->i_tag, desc->i_length,  desc->p_data);
-                    break;
-                }
-                /* AC3 */
-                if (!afound && (desc->i_tag == 0x6a))
-                {
+                vfound = TRUE;
+                state->videoPID = info->streamInfoList->streams[i].pid;
+                es = dvbpsi_PMTAddES(&pmt, info->streamInfoList->streams[i].type,  info->streamInfoList->streams[i].pid);
+            }
 
-                    afound = TRUE;
-                    state->audioPID = info->streamInfoList->streams[i].pid;
-                    es = dvbpsi_PMTAddES(&pmt,info->streamInfoList->streams[i].type,  info->streamInfoList->streams[i].pid);
-                    dvbpsi_PMTESAddDescriptor(es, desc->i_tag, desc->i_length,  desc->p_data);
-                    break;
+            /* Look for:
+             * 0x03 = ISO/IEC 11172 Audio
+             * 0x04 = ISO/IEC 13818-3 Audio
+             * 0x81 = ATSC AC-3 (User Private in ISO 13818-1 : 2000)
+             */
+            if (!afound && ((info->streamInfoList->streams[i].type == 3) || (info->streamInfoList->streams[i].type == 4) || 
+                            (info->streamInfoList->streams[i].type == 0x81)))
+            {
+                afound = TRUE;
+                state->audioPID = info->streamInfoList->streams[i].pid;
+                es = dvbpsi_PMTAddES(&pmt,info->streamInfoList->streams[i].type,  info->streamInfoList->streams[i].pid);
+            }
+            /* For DVB, we look at type 0x06 = ITU-T Rec. H.222.0 | ISO/IEC 13818-1 PES packets containing private data
+             * which is used for DVB subtitles and AC-3 streams.
+             */
+            if (info->streamInfoList->streams[i].type == 6)
+            {
+                dvbpsi_descriptor_t *desc = info->streamInfoList->streams[i].descriptors;
+                while(desc)
+                {
+                    /* DVB Subtitles */
+                    if (!sfound  && (desc->i_tag == 0x59))
+                    {
+                        sfound = TRUE;
+                        state->subPID = info->streamInfoList->streams[i].pid;
+                        es = dvbpsi_PMTAddES(&pmt, info->streamInfoList->streams[i].type,  info->streamInfoList->streams[i].pid);
+                        dvbpsi_PMTESAddDescriptor(es, desc->i_tag, desc->i_length,  desc->p_data);
+                        break;
+                    }
+                    /* AC3 */
+                    if (!afound && (desc->i_tag == 0x6a))
+                    {
+
+                        afound = TRUE;
+                        state->audioPID = info->streamInfoList->streams[i].pid;
+                        es = dvbpsi_PMTAddES(&pmt,info->streamInfoList->streams[i].type,  info->streamInfoList->streams[i].pid);
+                        dvbpsi_PMTESAddDescriptor(es, desc->i_tag, desc->i_length,  desc->p_data);
+                        break;
+                    }
+                    desc = desc->p_next;
                 }
-                desc = desc->p_next;
             }
         }
+        ObjectRefDec(info);
     }
-    ObjectRefDec(info);
     LogModule(LOG_DEBUG, SERVICEFILTER, "videopid = %x audiopid = %x subpid = %x\n", state->videoPID,state->audioPID,state->subPID);
 
     section = dvbpsi_GenPMTSections(&pmt);
     ServiceFilterInitPacket(&state->packets[PACKETS_INDEX_PMT], section, "PMT");
-    TSPACKET_SETPID(state->packets[PACKETS_INDEX_PMT], state->service->pmtPid);
+    TSPACKET_SETPID(state->packets[PACKETS_INDEX_PMT], state->service->pmtPID);
     LogModule(LOG_DEBUG, SERVICEFILTER, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     dvbpsi_DeletePSISections(section);
     dvbpsi_EmptyPMT(&pmt);
@@ -553,21 +558,23 @@ static void ServiceFilterAllocateFilters(ServiceFilter_t filter)
     
     TSReaderLock(filter->tsgroup->tsReader);
     TSFilterGroupAddPacketFilter(filter->tsgroup, 0x00, ServiceFilterProcessPacket, filter);                    /* PAT */
-    TSFilterGroupAddPacketFilter(filter->tsgroup, filter->service->pmtPid, ServiceFilterProcessPacket, filter); /* PMT */
-    /* Make sure we also stream the PCR PID just in case its not the audio/video */
-    TSFilterGroupAddPacketFilter(filter->tsgroup, filter->service->pcrPid, ServiceFilterProcessPacket, filter); /* PCR */
+    TSFilterGroupAddPacketFilter(filter->tsgroup, filter->service->pmtPID, ServiceFilterProcessPacket, filter); /* PMT */
+
 
     if (filter->avsOnly)
     {
-        if ((filter->audioPID != INVALID_PID) && (filter->audioPID != filter->service->pcrPid))
+        /* Make sure we also stream the PCR PID just in case its not the audio/video */
+        TSFilterGroupAddPacketFilter(filter->tsgroup, filter->pcrPID, ServiceFilterProcessPacket, filter); /* PCR */
+        
+        if ((filter->audioPID != INVALID_PID) && (filter->audioPID != filter->pcrPID))
         {
             TSFilterGroupAddPacketFilter(filter->tsgroup, filter->audioPID, ServiceFilterProcessPacket, filter);
         }
-        if ((filter->videoPID != INVALID_PID) && (filter->videoPID != filter->service->pcrPid))
+        if ((filter->videoPID != INVALID_PID) && (filter->videoPID != filter->pcrPID))
         {
             TSFilterGroupAddPacketFilter(filter->tsgroup, filter->videoPID, ServiceFilterProcessPacket, filter);
         }
-        if ((filter->subPID != INVALID_PID) && (filter->subPID != filter->service->pcrPid))
+        if ((filter->subPID != INVALID_PID) && (filter->subPID != filter->pcrPID))
         {
             TSFilterGroupAddPacketFilter(filter->tsgroup, filter->subPID, ServiceFilterProcessPacket, filter);
         }
@@ -578,9 +585,14 @@ static void ServiceFilterAllocateFilters(ServiceFilter_t filter)
         if (info)
         {
             int i;
+            /* Make sure we also stream the PCR PID just in case its not the audio/video */
+            if (info->pcrPID != PID_STUFFING)
+            {
+                TSFilterGroupAddPacketFilter(filter->tsgroup, info->pcrPID, ServiceFilterProcessPacket, filter); /* PCR */
+            }
             for (i = 0; i < info->streamInfoList->nrofStreams; i ++)
             {
-                if (info->streamInfoList->streams[i].pid != filter->service->pcrPid)
+                if (info->streamInfoList->streams[i].pid != info->pcrPID)
                 {
                     TSFilterGroupAddPacketFilter(filter->tsgroup, info->streamInfoList->streams[i].pid, ServiceFilterProcessPacket, filter);
                 }

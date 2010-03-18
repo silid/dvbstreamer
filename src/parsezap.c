@@ -604,7 +604,7 @@ static int parsezapline(char * str, DVBDeliverySystem_e delSys)
         source = id;
     }
     LogModule(LOG_DEBUGV, PARSEZAP, "Adding service \"%s\" %d\n", name, id);
-    if (ServiceAdd(mux->uid, name, id, source, FALSE, ServiceType_Unknown, -1, 0x1fff, -1))
+    if (ServiceAdd(mux->uid, name, id, source))
     {
         LogModule(LOG_ERROR, PARSEZAP, "Failed to add service \"%s\", possible reason already in database?\n", name);
     }

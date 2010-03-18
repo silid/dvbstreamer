@@ -399,7 +399,7 @@ static void CommandTraffic(int argc, char **argv)
                     {
                         name = service->name;
                     }
-                    if (printServiceInfo && data[i].PID == service->pmtPid)
+                    if (printServiceInfo && data[i].PID == service->pmtPID)
                     {
                         info = " (PMT)";
                     }

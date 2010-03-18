@@ -41,9 +41,7 @@ Manage services and PIDs.
                        SERVICES_TABLE "." SERVICE_CA "," \
                        SERVICES_TABLE "." SERVICE_TYPE "," \
                        SERVICES_TABLE "." SERVICE_NAME "," \
-                       SERVICES_TABLE "." SERVICE_PMTVERSION "," \
                        SERVICES_TABLE "." SERVICE_PMTPID ","\
-                       SERVICES_TABLE "." SERVICE_PCRPID "," \
                        SERVICES_TABLE "." SERVICE_PROVIDER "," \
                        SERVICES_TABLE "." SERVICE_DEFAUTHORITY "," \
                        MULTIPLEXES_TABLE "." MULTIPLEX_NETID ","  \
@@ -131,8 +129,7 @@ int ServiceDeleteAll(Multiplex_t *mux)
     return 0;
 }
 
-int ServiceAdd(int uid, char *name, int id, int source, bool ca, ServiceType type,
-                    int pmtversion, int pmtpid, int pcrpid)
+int ServiceAdd(int uid, char *name, int id, int source)
 {
     Service_t *service = NULL;
 
@@ -144,12 +141,10 @@ int ServiceAdd(int uid, char *name, int id, int source, bool ca, ServiceType typ
                         SERVICE_SOURCE ","
                         SERVICE_CA ","
                         SERVICE_TYPE ","
-                        SERVICE_PMTVERSION ","
                         SERVICE_PMTPID ","
-                        SERVICE_PCRPID ","
                         SERVICE_NAME ")"
                         "VALUES (%d,%d,%d,%d,%d,%d,%d,%d,'%q');",
-                        uid, id, source, ca, type, pmtversion, pmtpid, pcrpid, name);
+                        uid, id, source, FALSE, ServiceType_Unknown, 8191, name);
     RETURN_RC_ON_ERROR;
 
     STATEMENT_STEP();
@@ -163,41 +158,14 @@ int ServiceAdd(int uid, char *name, int id, int source, bool ca, ServiceType typ
     service->id = id;
     service->name = strdup(name);
     service->source = source;
-    service->conditionalAccess = ca;
-    service->type = type;
-    service->pmtVersion = pmtversion;
-    service->pmtPid = pmtpid;
-    service->pcrPid = pcrpid;
+    service->conditionalAccess = FALSE;
+    service->type = ServiceType_Unknown;
+    service->pmtPID = 8191;
     EventsFireEventListeners(serviceAddedEvent, service);
     ServiceRefDec(service);
 
     return 0;
 }
-
-int ServicePMTVersionSet(Service_t  *service, int pmtversion)
-{
-    STATEMENT_INIT;
-
-    STATEMENT_PREPAREVA("UPDATE " SERVICES_TABLE " "
-                        "SET " SERVICE_PMTVERSION "=%d "
-                        "WHERE " SERVICE_MULTIPLEXUID "=%d AND " SERVICE_ID "=%d;",
-                        pmtversion, service->multiplexUID,  service->id);
-    RETURN_RC_ON_ERROR;
-
-    STATEMENT_STEP();
-    if (rc == SQLITE_DONE)
-    {
-        service->pmtVersion = pmtversion;
-        rc = SQLITE_OK;
-    }
-    else
-    {
-        PRINTLOG_SQLITE3ERROR();
-    }
-    STATEMENT_FINALIZE();
-    return rc;
-}
-
 
 int ServicePMTPIDSet(Service_t  *service, int pmtpid)
 {
@@ -212,31 +180,7 @@ int ServicePMTPIDSet(Service_t  *service, int pmtpid)
     STATEMENT_STEP();
     if (rc == SQLITE_DONE)
     {
-        service->pmtPid = pmtpid;
-        rc = SQLITE_OK;
-    }
-    else
-    {
-        PRINTLOG_SQLITE3ERROR();
-    }
-    STATEMENT_FINALIZE();
-    return rc;
-}
-
-int ServicePCRPIDSet(Service_t  *service, int pcrpid)
-{
-    STATEMENT_INIT;
-
-    STATEMENT_PREPAREVA("UPDATE " SERVICES_TABLE " "
-                        "SET " SERVICE_PCRPID "=%d "
-                        "WHERE " SERVICE_MULTIPLEXUID "=%d AND " SERVICE_ID "=%d;",
-                        pcrpid, service->multiplexUID,  service->id);
-    RETURN_RC_ON_ERROR;
-
-    STATEMENT_STEP();
-    if (rc == SQLITE_DONE)
-    {
-        service->pcrPid = pcrpid;
+        service->pmtPID = pmtpid;
         rc = SQLITE_OK;
     }
     else
@@ -536,53 +480,6 @@ ServiceList_t *ServiceGetListForMultiplex(Multiplex_t *multiplex)
     return ServiceGetList(where);
 }
 
-ServiceEnumerator_t ServiceFindByPID(int pid, Multiplex_t *multiplex)
-{
-    STATEMENT_INIT;
-    char * multiplexClause;
-
-    if (multiplex)
-    {
-        multiplexClause = sqlite3_mprintf("AND " SERVICES_TABLE "."
-                                       SERVICE_MULTIPLEXUID "=%d "
-                                       "AND " PIDS_TABLE "."
-                                       PID_MULTIPLEXUID "=%d ",
-                                       multiplex->uid, multiplex->uid);
-    }
-    else
-    {
-        multiplexClause = sqlite3_mprintf("AND " SERVICES_TABLE "."
-                                       SERVICE_MULTIPLEXUID "="
-                                       PIDS_TABLE "." PID_MULTIPLEXUID);
-    }
-
-    if (!multiplexClause)
-    {
-        return NULL;
-    }
-
-
-
-    STATEMENT_PREPAREVA("SELECT DISTINCT " SERVICE_FIELDS
-                        "FROM " SERVICES_TABLE "," MULTIPLEXES_TABLE "," PIDS_TABLE " "
-                        "WHERE " SERVICE_ID "=" PID_SERVICEID " %s AND "
-                        SERVICES_TABLE "." SERVICE_MULTIPLEXUID "=" MULTIPLEXES_TABLE "." MULTIPLEX_UID " AND "
-                        "(" PIDS_TABLE "." PID_PID "=%d "
-                        "OR " SERVICES_TABLE "." SERVICE_PMTPID "=%d "
-                        "OR " SERVICES_TABLE "." SERVICE_PCRPID "=%d );",
-                        multiplexClause, pid, pid, pid);
-    sqlite3_free(multiplexClause);
-
-    RETURN_ON_ERROR(NULL);
-
-    return stmt;
-}
-
-List_t *ServiceListForPID(int pid, Multiplex_t *multiplex)
-{
-    return ServiceCreateList(ServiceFindByPID(pid, multiplex));
-}
-
 
 ServiceEnumerator_t ServiceQueryNameLike(char *query)
 {
@@ -642,21 +539,19 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator)
         {
             service->name = strdup(name);
         }
-        service->pmtVersion = STATEMENT_COLUMN_INT( 6);
-        service->pmtPid = STATEMENT_COLUMN_INT( 7) & 0xffff;
-        service->pcrPid = STATEMENT_COLUMN_INT( 8) & 0xffff;
-        name = STATEMENT_COLUMN_TEXT( 9);
+        service->pmtPID = STATEMENT_COLUMN_INT( 6) & 0xffff;
+        name = STATEMENT_COLUMN_TEXT( 7);
         if (name)
         {
             service->provider = strdup(name);
         }
-        name = STATEMENT_COLUMN_TEXT( 10);
+        name = STATEMENT_COLUMN_TEXT( 8);
         if (name)
         {
             service->defaultAuthority= strdup(name);
         }
-        service->networkId = STATEMENT_COLUMN_INT(11) & 0xffff;
-        service->tsId =  STATEMENT_COLUMN_INT(12) & 0xffff;
+        service->networkId = STATEMENT_COLUMN_INT(9) & 0xffff;
+        service->tsId =  STATEMENT_COLUMN_INT(10) & 0xffff;
         return service;
     }
 
