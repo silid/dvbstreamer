@@ -153,7 +153,7 @@ static void PATHandler(void* arg, dvbpsi_pat_t* newpat)
                 CacheServiceSeen(service, TRUE, TRUE);
             }
 
-            if (service && (service->pmtPid != patentry->i_pid))
+            if (service && (service->pmtPID != patentry->i_pid))
             {
                 CacheUpdateServicePMTPID(service, patentry->i_pid);
             }

@@ -164,7 +164,7 @@ static void FilterPacket(void *arg, TSFilterGroup_t *group, TSPacket_t *packet)
             services = CacheServicesGet(&count);
             for (i = 0; i < count; i ++)
             {
-                if (pid == services[i]->pmtPid)
+                if (pid == services[i]->pmtPID)
                 {
                     result =  1;
                     break;

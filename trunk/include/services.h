@@ -79,11 +79,9 @@ typedef struct Service_t
     int source;             /**< Source id of this service (for DVB this is the same 
                                  as the service ID for ATSC this is the channels 
                                  source id) */
-    bool conditionalAccess; /**< Whether 1 or more streams in for this service are controlled by CA */
+    bool conditionalAccess; /**< Whether 1 or more streams in this service are controlled by CA */
     ServiceType type;       /**< The type of this service (TV, Radio, Data ...) */
-    int pmtVersion;         /**< Last processed version of the PMT. */
-    int pmtPid;             /**< PID the PMT for this service is sent on. */
-    int pcrPid;             /**< PID the PCR for this service is sent on. */
+    int pmtPID;             /**< PID the PMT for this service is sent on. */
 
     char *provider;         /**< Provider of the service */
     char *defaultAuthority; /**< TVAnytime default authority for this service. */
@@ -150,23 +148,9 @@ int ServiceDeleteAll(Multiplex_t *mux);
  * @param name Name of the service.
  * @param id The service/program id of the service.
  * @param source The service/channels source id.
- * @param ca Whether the service is conditional access.
- * @param type The type of the service.
- * @param pmtversion The version of the last PMT processed.
- * @param pmtpid The PID the service's PMT is transmitted on.
- * @param pcrpid The PID the service's PCR is transmitted on.
  * @return 0 on success, otherwise an SQLite error code.
  */
-int ServiceAdd(int multiplexuid, char *name, int id, int source, bool ca, 
-                    ServiceType type, int pmtversion, int pmtpid, int pcrpid);
-
-/**
- * Set the PMT version for the given service.
- * @param service The service to update.
- * @param pmtversion The version of the PMT to set.
- * @return 0 on success, otherwise an SQLite error code.
- */
-int ServicePMTVersionSet(Service_t  *service, int pmtversion);
+int ServiceAdd(int multiplexuid, char *name, int id, int source);
 
 /**
  * Set the PMT PID for the given service.
@@ -175,14 +159,6 @@ int ServicePMTVersionSet(Service_t  *service, int pmtversion);
  * @return 0 on success, otherwise an SQLite error code.
  */
 int ServicePMTPIDSet(Service_t  *service, int pmtpid);
-
-/**
- * Set the PCR PID for the given service.
- * @param service The service to update.
- * @param pcrpid The new PID of the PCR.
- * @return 0 on success, otherwise an SQLite error code.
- */
-int ServicePCRPIDSet(Service_t  *service, int pcrpid);
 
 /**
  * Set the service name for the given service.
@@ -306,26 +282,6 @@ ServiceEnumerator_t ServiceEnumeratorForMultiplex(Multiplex_t *multiplex);
  * free the list and the Service objects.
  */
 List_t *ServiceListForMultiplex(Multiplex_t * multiplex);
-
-/**
- * Retrieve an enumerator for the services known to be assosciated with the
- * given PID.  Optionally restrict the search to a given multiplex.
- * @param pid The PID to search for.
- * @param opt_multiplex Optional. The multiplex the service is broadcast on.
- * @return A service enumerator or NULL if there is not enough memory.
- * @deprecated Please use ServiceListForPID. 
- */
-ServiceEnumerator_t ServiceFindByPID(int pid, Multiplex_t *opt_multiplex);
-
-/**
- * Retrieve a List_t object containing all services  known to be assosciated 
- * with the given PID.  Optionally restrict the search to a given multiplex.
- * @param pid The PID to search for. 
- * @param opt_multiplex Optional. The multiplex the service is broadcast on. 
- * @return A List_t object of Service_t objects, use ObjectListFree() to 
- * free the list and the Service objects.
- */
-List_t *ServiceListForPID(int pid, Multiplex_t *opt_multiplex);
 
 /**
  * Retrieve an enumerator for the names that match the query string.

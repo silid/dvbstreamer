@@ -420,7 +420,7 @@ void CacheUpdateServicePMTPID(Service_t *service, int pmtpid)
     {
         if ((cachedServices[i]) && ServiceAreEqual(service, cachedServices[i]))
         {
-            cachedServices[i]->pmtPid = pmtpid;
+            cachedServices[i]->pmtPID = pmtpid;
             msg = ObjectCreateType(CacheUpdateMessage_t);
             if (msg)
             {
@@ -692,8 +692,7 @@ Service_t *CacheServiceAdd(int id, int source)
     {
         result->id = id;
         result->source = source;
-        result->pmtVersion = -1;
-        result->pmtPid = 8192;
+        result->pmtPID = 8192;
         if (asprintf(&result->name, "%04x", id) == -1)
         {
             LogModule(LOG_ERROR, CACHE, "Failed to allocate memory for default service name (0x%04x).\n", result->id);
@@ -934,8 +933,7 @@ static void CacheProcessUpdateMessage(void *ptr)
             LogModule(LOG_DEBUG, CACHE, "Adding service 0x%04x\n", msg->details.serviceAdd.id);
             ServiceAdd(msg->details.serviceAdd.multiplexUID,
                        msg->details.serviceAdd.name, msg->details.serviceAdd.id,
-                       msg->details.serviceAdd.source, FALSE, ServiceType_Unknown,
-                       -1, 8192, 8192);
+                       msg->details.serviceAdd.source);
             free(msg->details.serviceAdd.name);
             break;
 
