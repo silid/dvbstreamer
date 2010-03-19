@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2006  Adam Charrett
+Copyright (C) 2010  Adam Charrett
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -51,8 +51,10 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 /*******************************************************************************
 * Defines                                                                      *
 *******************************************************************************/
-#define DVB_CMD_TUNE              0
-#define DVB_CMD_FE_ACTIVE_TOGGLE  1
+#define DVB_CMD_TUNE        0
+#define DVB_CMD_FE_ACTIVE   1
+#define DVB_CMD_FE_INACTIVE 2
+
 
 /* Use LinuxDVB Version 3 API */
 /*
@@ -932,7 +934,7 @@ int DVBFrontEndSetActive(DVBAdapter_t *adapter, bool active)
         /* No change in active state */
         return 0;
     }
-    DVBCommandSend(adapter, DVB_CMD_FE_ACTIVE_TOGGLE);
+    DVBCommandSend(adapter, active ? DVB_CMD_FE_ACTIVE:DVB_CMD_FE_INACTIVE);
     return 0;
 }
 
@@ -1180,7 +1182,7 @@ static void DVBCommandCallback(struct ev_loop *loop, ev_io *w, int revents)
                 retune = TRUE;
                 break;
                 
-            case DVB_CMD_FE_ACTIVE_TOGGLE:
+            case DVB_CMD_FE_ACTIVE:
                 if (adapter->frontEndFd == -1)
                 {
                     retune = TRUE;
@@ -1196,7 +1198,9 @@ static void DVBCommandCallback(struct ev_loop *loop, ev_io *w, int revents)
                     ev_io_set(&adapter->frontendWatcher, adapter->frontEndFd, EV_READ);
                     ev_io_start(loop, &adapter->frontendWatcher);
                 }
-                else
+                break;
+            case DVB_CMD_FE_INACTIVE:
+                if (adapter->frontEndFd != -1)
                 {
                     ev_io_stop(loop, &adapter->frontendWatcher);
                      /* Stop all filters */
