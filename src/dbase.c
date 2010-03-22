@@ -215,8 +215,6 @@ static int DBaseCreateTables(void)
                       SERVICE_TYPE ","
                       SERVICE_NAME ","
                       SERVICE_PMTPID " DEFAULT -1,"
-                      SERVICE_PMTVERSION " DEFAULT -1,"
-                      SERVICE_PCRPID " DEFAULT -1,"
                       SERVICE_PROVIDER ","
                       SERVICE_DEFAUTHORITY ","
                       "PRIMARY KEY ( "SERVICE_MULTIPLEXUID "," SERVICE_ID ")"
@@ -245,8 +243,6 @@ static int DBaseCreateTables(void)
                       PID_SERVICEID ","
                       PID_PID ","
                       PID_TYPE ","
-                      PID_SUBTYPE ","
-                      PID_PMTVERSION ","
                       PID_DESCRIPTORS " DEFAULT NULL,"
                       "PRIMARY KEY(" PID_MULTIPLEXUID "," PID_SERVICEID "," PID_PID ")"
                       ");", NULL, NULL, NULL);
