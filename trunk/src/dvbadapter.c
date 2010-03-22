@@ -928,12 +928,6 @@ bool DVBFrontEndIsLocked(DVBAdapter_t *adapter)
 
 int DVBFrontEndSetActive(DVBAdapter_t *adapter, bool active)
 {
-    if ((active && (adapter->frontEndFd != -1)) ||
-        (!active && (adapter->frontEndFd == -1)))
-    {
-        /* No change in active state */
-        return 0;
-    }
     DVBCommandSend(adapter, active ? DVB_CMD_FE_ACTIVE:DVB_CMD_FE_INACTIVE);
     return 0;
 }
@@ -1214,7 +1208,7 @@ static void DVBCommandCallback(struct ev_loop *loop, ev_io *w, int revents)
                 break;
         }
 
-        if (retune)
+        if (retune && (adapter->frontEndFd != -1))
         {
 #if (DVB_API_VERSION < 5)
             adapter->frontEndParams.frequency = adapter->frontEndRequestedFreq;
