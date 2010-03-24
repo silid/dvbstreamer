@@ -9,6 +9,7 @@ pluginsdir = @DVBSTREAMER_PLUGINDIR@
 plugins_LTLIBRARIES = \
 	udpoutput.la \
 	fileoutput.la \
+	pipeoutput.la \
 	outputs.la \
 	manualfilters.la \
 	sicapture.la \
@@ -45,6 +46,11 @@ fileoutput_la_SOURCES = \
     fileoutput.c
 
 fileoutput_la_LDFLAGS = -module -no-undefined -avoid-version
+
+pipeoutput_la_SOURCES = \
+    pipeoutput.c
+
+pipeoutput_la_LDFLAGS = -module -no-undefined -avoid-version
 
 outputs_la_SOURCES = \
     outputs.c
