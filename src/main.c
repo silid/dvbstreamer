@@ -716,6 +716,7 @@ static void sighandler(int signum)
     }
     LogModule(LOG_DEBUG, MAIN, "Got signal %d exiting\n", signum);
     ExitProgram = TRUE;
+    DispatchersExitLoop();
 }
 
 /*******************************************************************************

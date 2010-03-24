@@ -27,6 +27,7 @@ File descriptor monitoring and event dispatching.
 int DispatchersInit(void);
 int DispatchersDeInit(void);
 void DispatchersStart(bool sync);
+void DispatchersExitLoop(void);
 void DispatchersStop(void);
 struct ev_loop * DispatchersGetInput(void);
 struct ev_loop * DispatchersGetNetwork(void);

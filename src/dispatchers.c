@@ -75,6 +75,12 @@ void DispatchersStart(bool sync)
     UserNetSync = sync;
 }
 
+void DispatchersExitLoop(void)
+{
+    ev_unloop(InputEventLoop, 2);
+    ev_unloop(UserNetEventLoop, 2);
+}
+
 void DispatchersStop(void)
 {
     ev_unloop(InputEventLoop, 2);
