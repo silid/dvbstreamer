@@ -62,8 +62,8 @@ void FileSetHeader(struct DeliveryMethodInstance_t *this,
 * Global variables                                                             *
 *******************************************************************************/
 /** Constants for the start of the MRL **/
-#define PREFIX_LEN (sizeof(FilePrefix) - 1)
 const char FilePrefix[] = "file://";
+const char FileAppendPrefix[] = "filea://";
 
 DeliveryMethodInstanceOps_t FileInstanceOps ={
     FileOutputSendPacket,
@@ -89,7 +89,8 @@ PLUGIN_INTERFACE_F(
     "File Delivery method.\nUse file://<file name>\n"
     "File name can be in absolute or relative.\n"
     "For an absolute file name use file:///home/user/myts.ts.\n"
-    "For a relative file name use file://myts.ts.",
+    "For a relative file name use file://myts.ts.\n"
+    "Use the filea:// prefix to append data to an existing file.",
     "charrea6@users.sourceforge.net"
 );
 
@@ -99,21 +100,34 @@ PLUGIN_INTERFACE_F(
 
 bool FileOutputCanHandle(char *mrl)
 {
-    return (strncmp(FilePrefix, mrl, PREFIX_LEN) == 0);
+    return (strncmp(FilePrefix, mrl, sizeof(FilePrefix)-1) == 0) || 
+           (strncmp(FileAppendPrefix, mrl, sizeof(FileAppendPrefix)-1) == 0);
 }
 
 DeliveryMethodInstance_t *FileOutputCreate(char *arg)
 {
     struct FileOutputInstance_t *instance = calloc(1, sizeof(struct FileOutputInstance_t));
-
+    bool append = (strncmp(FileAppendPrefix, arg, sizeof(FileAppendPrefix)-1) == 0);
+    char *mode;
+    int prefixLen;
+    
     if (instance == NULL)
     {
         return NULL;
     }
-
+    if (append)
+    {
+        mode = "ab";
+        prefixLen = sizeof(FileAppendPrefix)-1;
+    }
+    else
+    {
+        mode = "wb";
+        prefixLen = sizeof(FilePrefix)-1;
+    }
     instance->instance.ops = &FileInstanceOps;
 
-    instance->fp = fopen((char*)(arg + PREFIX_LEN), "wb");
+    instance->fp = fopen((char*)(arg + prefixLen), mode);
 
     if (!instance->fp)
     {
