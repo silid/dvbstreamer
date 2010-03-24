@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2006  Adam Charrett
+Copyright (C) 2006, 2010  Adam Charrett
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -85,7 +85,7 @@ PLUGIN_FEATURES(
 PLUGIN_INTERFACE_F(
     PLUGIN_FOR_ALL,
     "FileOutput",
-    "0.1",
+    "0.2",
     "File Delivery method.\nUse file://<file name>\n"
     "File name can be in absolute or relative.\n"
     "For an absolute file name use file:///home/user/myts.ts.\n"
