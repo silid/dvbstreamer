@@ -324,6 +324,11 @@ static void CommandEPGCapStart(int argc, char **argv)
 
 static void CommandEPGCapStop(int argc, char **argv)
 {
+    if (!tsgroup)
+    {
+        CommandError(COMMAND_ERROR_GENERIC, "Not yet started!");
+        return;
+    }
     ClearTableInfo();
     TSFilterGroupDestroy(tsgroup);
     tsgroup = NULL;
