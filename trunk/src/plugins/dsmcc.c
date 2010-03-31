@@ -188,6 +188,7 @@ static void Install(bool installed)
         EventsUnregisterEventListener(muxChangedEvent, HandleTuningMultiplexChanged, NULL);        
         EventsUnregisterEventListener(cachePidsUpdatedEvent, HandleCachePIDsUpdatedChanged, NULL);                
         ObjectListFree(sessions);
+        ObjectListFree(downloadSessions);
     }
 }
 
