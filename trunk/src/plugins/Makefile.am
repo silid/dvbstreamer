@@ -28,7 +28,6 @@ endif
 if ENABLE_DVB
 dvb_plugins=\
 	lcnquery.la \
-	nownext.la \
 	datetime.la \
 	dvbtoepg.la
 else
@@ -61,11 +60,6 @@ lcnquery_la_SOURCES = \
     lcnquery.c
 
 lcnquery_la_LDFLAGS = -module -no-undefined -avoid-version
-
-nownext_la_SOURCES = \
-    nownext.c
-
-nownext_la_LDFLAGS = -module -no-undefined -avoid-version
 
 datetime_la_SOURCES = \
     datetime.c
