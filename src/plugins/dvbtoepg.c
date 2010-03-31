@@ -47,7 +47,7 @@ Plugin to collect EPG schedule information.
 /*******************************************************************************
 * Defines                                                                      *
 *******************************************************************************/
-#define EIT_PID 0x12
+#define PID_FREESAT_EIT 3842
 #define MAX_STRING_LEN 256
 
 #define SHORT_EVENT_DR      0x4d
@@ -69,12 +69,30 @@ typedef struct ExtTextDesc_s
     char *text[16];
 }ExtTextDesc_t;
 
+typedef struct NNEvent_s
+{
+    char name[MAX_STRING_LEN];
+    char description[MAX_STRING_LEN];
+    struct tm startTime;
+    uint32_t duration;
+}NNEvent_t;
+
+typedef struct ServiceNowNextInfo_s
+{
+    uint16_t networkId;
+    uint16_t tsId;
+    uint16_t serviceId;
+    NNEvent_t  now;
+    NNEvent_t  next;
+}ServiceNowNextInfo_t;
+
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
 static void Install(bool installed);
 static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension);
 static void ProcessEIT(void *arg, dvbpsi_eit_t *newEIT);
+static void ProcessPFEIT(void *arg, dvbpsi_eit_t *newEIT);
 static void DeferredProcessEIT(void *arg);
 
 static void CommandEPGCapRestart(int argc, char **argv);
@@ -88,10 +106,22 @@ static void ConvertToTM(struct tm *startTime, uint32_t duration, struct tm *endT
 static char *ResolveCRID(EPGServiceRef_t *serviceRef, char *relativeCRID);
 static void ExtTextDescDestructor(void *ptr);
 
+static void CommandNow(int argc, char **argv);
+static void CommandNext(int argc, char **argv);
+static void PrintEvent(NNEvent_t *event);
+
+static ServiceNowNextInfo_t *FindServiceName(char *name);
+static ServiceNowNextInfo_t *FindService(uint16_t networkId, uint16_t tsId, uint16_t serviceId);
+static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension);
+static void ProcessPFEIT(void *arg, dvbpsi_eit_t *newEIT);
+static void UpdateEvent(NNEvent_t *event, dvbpsi_eit_event_t *eitevent);
+
+
+
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
-static const char DVBTOEPG[] = "DVBTOEPG";
+static const char DVBTOEPG[] = "DVBtoEPG";
 
 static const char ISO639NoLinguisticContent[] = "zxx";
 
@@ -140,7 +170,25 @@ PLUGIN_COMMANDS({
         "Stops the capturing of EPG content.",
         "Stops the capturing of EPG content, for use by EPG capture applications.",
         CommandEPGCapStop
-    }
+    },
+    {
+        "now",
+        1, 1,
+        "Display the current program on the specified service.",
+        "now <service>\n"
+        "Display the current program on the specified service (assuming the data is "
+        "present on the current TS).",
+        CommandNow
+    },
+    {
+        "next",
+        1, 1,
+        "Display the next program on the specified service.",
+        "next <service>\n"
+        "Display the next program on the specified service (assuming the data is "
+        "present on the current TS).",
+        CommandNext
+    }    
 );
     
 PLUGIN_INTERFACE_CF(
@@ -154,7 +202,8 @@ PLUGIN_INTERFACE_CF(
 *******************************************************************************/
 
 static TSFilterGroup_t *tsgroup;
-static dvbpsi_handle demux = NULL;
+static dvbpsi_handle demux = NULL, freesatDemux = NULL;
+static List_t *serviceNowNextInfoList;
 
 /*******************************************************************************
 * Filter Functions                                                             *
@@ -163,6 +212,7 @@ static void Install(bool installed)
 {
     if (installed)
     {
+        serviceNowNextInfoList = ListCreate();
         ObjectRegisterTypeDestructor(ExtTextDesc_t, ExtTextDescDestructor);
     }
     else
@@ -172,6 +222,8 @@ static void Install(bool installed)
             TSFilterGroupDestroy(tsgroup);
             dvbpsi_DetachDemux(demux);
         }
+        ListFree(serviceNowNextInfoList, free);
+        
     }
 }
 
@@ -182,20 +234,32 @@ static void DVBtoEPGFilterGroupEventCallback(void *arg, TSFilterGroup_t *group, 
         if (demux)
         {
             TSFilterGroupRemoveSectionFilter(tsgroup, PID_EIT);
+            TSFilterGroupRemoveSectionFilter(tsgroup, PID_FREESAT_EIT);            
             dvbpsi_DetachDemux(demux);
+            dvbpsi_DetachDemux(freesatDemux);            
         }
         demux = dvbpsi_AttachDemux(SubTableHandler, NULL);
         TSFilterGroupAddSectionFilter(tsgroup, PID_EIT, 3, demux);
+        freesatDemux = dvbpsi_AttachDemux(SubTableHandler, NULL);
+        TSFilterGroupAddSectionFilter(tsgroup, PID_FREESAT_EIT, 3, freesatDemux);        
     }
 }
 
 static void SubTableHandler(void * arg, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension)
 {
-    if ((tableId >= 0x50) && (tableId <= 0x6f))
-    {
-        LogModule(LOG_DEBUG, DVBTOEPG, "Request for Sub-Table handler for %#02x (%#04x)\n", tableId, extension);
+    LogModule(LOG_DEBUG, DVBTOEPG, "Request for Sub-Table handler for %#02x (%#04x)\n", tableId, extension);
 
-        dvbpsi_AttachEIT(demuxHandle, tableId, extension, ProcessEIT, NULL);
+    switch (tableId)
+    {
+        case TABLE_ID_PF_ACTUAL:
+            dvbpsi_AttachEIT(demuxHandle, tableId, extension, ProcessPFEIT, NULL);
+            break;
+        case TABLE_ID_PF_OTHER:
+            dvbpsi_AttachEIT(demuxHandle, tableId, extension, ProcessPFEIT, NULL);
+            break;
+        case 0x50 ... 0x6f:
+            dvbpsi_AttachEIT(demuxHandle, tableId, extension, ProcessEIT, NULL);
+            break;
     }
 }
 
@@ -247,6 +311,7 @@ static void CommandEPGCapStart(int argc, char **argv)
     tsgroup = TSReaderCreateFilterGroup(MainTSReaderGet(), DVBTOEPG, "DVB", DVBtoEPGFilterGroupEventCallback, NULL);
     demux = dvbpsi_AttachDemux(SubTableHandler, NULL);
     TSFilterGroupAddSectionFilter(tsgroup, PID_EIT, 3, demux);
+    TSFilterGroupAddSectionFilter(tsgroup, PID_FREESAT_EIT, 3, demux);    
     
 }
 
@@ -262,6 +327,46 @@ static void CommandEPGCapStop(int argc, char **argv)
     tsgroup = NULL;
 }
 
+static void CommandNow(int argc, char **argv)
+{
+    ServiceNowNextInfo_t *info = FindServiceName(argv[0]);
+    if (info)
+    {
+        PrintEvent(&info->now);
+    }
+    else
+    {
+        CommandError(COMMAND_ERROR_GENERIC, "No info found for \"%s\"", argv[0]);
+    }
+}
+
+static void CommandNext(int argc, char **argv)
+{
+    ServiceNowNextInfo_t *info = FindServiceName(argv[0]);
+    if (info)
+    {
+        PrintEvent(&info->next);
+    }
+    else
+    {
+        CommandError(COMMAND_ERROR_GENERIC, "No info found for \"%s\"", argv[0]);
+    }
+}
+
+static void PrintEvent(NNEvent_t *event)
+{
+    int h,m,s;
+    time_t startTime = timegm(&event->startTime);
+    time_t endTime = startTime + event->duration;
+    CommandPrintf("Name       : %s\n", event->name);
+    CommandPrintf("Start time : %s", ctime(&startTime));
+    CommandPrintf("End time   : %s", ctime(&endTime));    
+    h = event->duration / (60*60);
+    m = (event->duration / 60) - (h * 60);
+    s = event->duration - ((h * 60 * 60) + (m * 60));
+    CommandPrintf("Duration   : %02d:%02d:%02d\n", h, m, s);
+    CommandPrintf("Description:\n%s\n", event->description);
+}
 /*******************************************************************************
 * Helper Functions                                                             *
 *******************************************************************************/
@@ -306,13 +411,29 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *eiteve
                     lang[1] = sed->i_iso_639_code[1];
                     lang[2] = sed->i_iso_639_code[2];
                     lang[3] = 0;
-                    temp = DVBTextToUTF8((char *)sed->i_event_name, sed->i_event_name_length);
+                    if (sed->i_event_name[0] == 0x1f)
+                    {
+                        /* Freesat huffman encoding */   
+                        temp = NULL;
+                    }
+                    else
+                    {
+                        temp = DVBTextToUTF8((char *)sed->i_event_name, sed->i_event_name_length);
+                    }
                     if (temp)
                     {
                         EPGChannelNewDetail(&eventRef, lang, EPG_EVENT_DETAIL_TITLE, temp);
                         free(temp);
                     }
-                    temp = DVBTextToUTF8((char *)sed->i_text, sed->i_text_length);
+                    if (sed->i_text[0] == 0x1f)
+                    {
+                        /* Freesat hufman encoding */   
+                        temp = NULL;
+                    }
+                    else
+                    {
+                        temp = DVBTextToUTF8((char *)sed->i_text, sed->i_text_length);
+                    }
                     if (temp)
                     {
                         EPGChannelNewDetail(&eventRef, lang, EPG_EVENT_DETAIL_DESCRIPTION, temp);
@@ -331,7 +452,15 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *eiteve
                     lang[1] = eed->i_iso_639_code[1];
                     lang[2] = eed->i_iso_639_code[2];
                     lang[3] = 0;
-                    temp = DVBTextToUTF8((char *)eed->i_text, eed->i_text_length);
+                    if (eed->i_text[0] == 0x1f)
+                    {
+                        /* Freesat hufman encoding */   
+                        temp = NULL;
+                    }
+                    else
+                    {
+                        temp = DVBTextToUTF8((char *)eed->i_text, eed->i_text_length);
+                    }
                     if (temp)
                     {
                         for (ListIterator_Init(iterator, extTextDescs); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
@@ -507,3 +636,95 @@ static void ExtTextDescDestructor(void *ptr)
         }
     }
 }
+
+
+static void ProcessPFEIT(void *arg, dvbpsi_eit_t *newEIT)
+{
+    ServiceNowNextInfo_t *info = FindService(newEIT->i_network_id, newEIT->i_ts_id, newEIT->i_service_id);
+    LogModule(LOG_DEBUG, DVBTOEPG, "EIT received (version %d) net id %x ts id %x service id %x info %p\n",
+        newEIT->i_version, newEIT->i_network_id, newEIT->i_ts_id, newEIT->i_service_id, info);
+    if (!info)
+    {
+        info = calloc(1, sizeof(ServiceNowNextInfo_t));
+        if (info)
+        {
+            ListAdd(serviceNowNextInfoList, info);
+            info->networkId = newEIT->i_network_id;
+            info->tsId = newEIT->i_ts_id;
+            info->serviceId = newEIT->i_service_id;
+        }
+    }
+
+    if (info)
+    {
+        memset(&info->now, 0, sizeof(Event_t));
+        memset(&info->next, 0, sizeof(Event_t));
+        if (newEIT->p_first_event)
+        {
+            UpdateEvent(&info->now, newEIT->p_first_event);
+            if (newEIT->p_first_event->p_next)
+            {
+                UpdateEvent(&info->next, newEIT->p_first_event->p_next);
+            }
+        }
+    }
+
+    ObjectRefDec(newEIT);
+}
+
+static void UpdateEvent(NNEvent_t *event, dvbpsi_eit_event_t *eitevent)
+{
+    dvbpsi_descriptor_t *descriptor;
+    dvbpsi_short_event_dr_t * sedescriptor;
+
+    event->startTime = eitevent->t_start_time;
+    event->duration  = eitevent->i_duration;
+
+    for (descriptor = eitevent->p_first_descriptor; descriptor; descriptor = descriptor->p_next)
+    {
+        if (descriptor->i_tag == 0x4d)
+        {
+            sedescriptor = dvbpsi_DecodeShortEventDr(descriptor);
+            memcpy(event->name, sedescriptor->i_event_name, sedescriptor->i_event_name_length);
+            event->name[sedescriptor->i_event_name_length] = 0;
+            memcpy(event->description, sedescriptor->i_text, sedescriptor->i_text_length);
+            event->description[sedescriptor->i_text_length] = 0;
+        }
+    }
+}
+
+/*******************************************************************************
+* Event List Helper Functions                                                  *
+*******************************************************************************/
+static ServiceNowNextInfo_t *FindServiceName(char *name)
+{
+    Service_t *service = ServiceFind(name);
+    ServiceNowNextInfo_t *info;
+    if (!service)
+    {
+        CommandError(COMMAND_ERROR_GENERIC, "Unknown service \"%s\"", name);
+        return NULL;
+    }
+    info = FindService(service->networkId, service->tsId, service->id);
+    ServiceRefDec(service);
+    return info;
+}
+
+static ServiceNowNextInfo_t *FindService(uint16_t networkId, uint16_t tsId, uint16_t serviceId)
+{
+    ListIterator_t iterator;
+
+    for (ListIterator_Init(iterator, serviceNowNextInfoList);
+         ListIterator_MoreEntries(iterator);
+         ListIterator_Next(iterator))
+    {
+        ServiceNowNextInfo_t *info = ListIterator_Current(iterator);
+
+        if ((info->networkId == networkId) && (info->tsId == tsId) && (info->serviceId == serviceId))
+        {
+            return info;
+        }
+    }
+    return NULL;
+}
+

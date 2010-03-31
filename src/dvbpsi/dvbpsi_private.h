@@ -54,19 +54,19 @@
 
 #ifdef DEBUG
 #  define DVBPSI_DEBUG(src, str)                                        \
-          LogModule( LOG_DIARRHEA,  "dvbpsi", "Debug (" src "): " str "\n");
+          LogModule( LOG_DEBUGV,  "dvbpsi", "Debug (" src "): " str "\n");
 #  ifdef HAVE_VARIADIC_MACROS
 #     define DVBPSI_DEBUG_ARG(src, str, x...)                           \
-          LogModule( LOG_DIARRHEA,  "dvbpsi", "Debug (" src "): " str "\n", x);
+          LogModule( LOG_DEBUGV,  "dvbpsi", "Debug (" src "): " str "\n", x);
 #  else
        inline void DVBPSI_DEBUG_ARG( char *src, const char *str, ... )
        {
-            if (LogLevelIsEnabled(LOG_DIARRHEA))
+            if (LogLevelIsEnabled(LOG_DEBUGV))
             {
                 va_list ap; char *line; 
                 va_start( ap, str );
                 asprintf(&line, str, ap); 
-                LogModule( LOG_DIARRHEA, "dvbpsi", "Debug (%s): %s\n", src, line); 
+                LogModule( LOG_DEBUGV, "dvbpsi", "Debug (%s): %s\n", src, line); 
                 free(line); 
                 va_end( ap ); 
             }
