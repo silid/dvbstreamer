@@ -311,7 +311,8 @@ static void CommandEPGCapStart(int argc, char **argv)
     tsgroup = TSReaderCreateFilterGroup(MainTSReaderGet(), DVBTOEPG, "DVB", DVBtoEPGFilterGroupEventCallback, NULL);
     demux = dvbpsi_AttachDemux(SubTableHandler, NULL);
     TSFilterGroupAddSectionFilter(tsgroup, PID_EIT, 3, demux);
-    TSFilterGroupAddSectionFilter(tsgroup, PID_FREESAT_EIT, 3, demux);    
+    freesatDemux = dvbpsi_AttachDemux(SubTableHandler, NULL);
+    TSFilterGroupAddSectionFilter(tsgroup, PID_FREESAT_EIT, 3, freesatDemux);        
     
 }
 
