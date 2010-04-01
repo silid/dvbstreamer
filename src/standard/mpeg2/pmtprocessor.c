@@ -142,10 +142,15 @@ static void PMTProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_
     {
         ServiceRefInc(services[i]);
         state->services[i] = services[i];
+    }
+    CacheServicesRelease();    
+    /* Make sure we don't try and create the filter while we have the cache locked. */
+    for (i = 0; i < count; i ++)
+    {
         state->pmthandles[i] = dvbpsi_AttachPMT(services[i]->id, PMTHandler, (void*)services[i]);
         TSFilterGroupAddSectionFilter(state->tsgroup, services[i]->pmtPID, 0, state->pmthandles[i]);
     }
-    CacheServicesRelease();    
+
 }
 
 static void PMTHandler(void* arg, dvbpsi_pmt_t* newpmt)
