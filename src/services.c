@@ -143,7 +143,7 @@ int ServiceAdd(int uid, char *name, int id, int source)
                         SERVICE_TYPE ","
                         SERVICE_PMTPID ","
                         SERVICE_NAME ")"
-                        "VALUES (%d,%d,%d,%d,%d,%d,%d,%d,'%q');",
+                        "VALUES (%d,%d,%d,%d,%d,%d,'%q');",
                         uid, id, source, FALSE, ServiceType_Unknown, 8191, name);
     RETURN_RC_ON_ERROR;
 
