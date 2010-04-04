@@ -251,7 +251,7 @@ void DVBDispose(DVBAdapter_t *adapter)
     close(adapter->cmdSendFd);
 
     PropertiesRemoveAllProperties(propertyParent);
-
+    ObjectRefDec(adapter->supportedDelSystems);
     ObjectRefDec(adapter);
 }
 
