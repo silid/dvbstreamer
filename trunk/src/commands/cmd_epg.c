@@ -78,22 +78,21 @@ void CommandUnInstallEPG(void)
 *******************************************************************************/
 static void CommandEPGData(int argc, char **argv)
 {
-    bool connected = TRUE;
     MessageQ_t msgQ = MessageQCreate();
     char startTimeStr[25];
     char endTimeStr[25];
+    CommandContext_t *cmdContext = CommandContextGet();
+    int count = 0;
     
     EPGChannelRegisterListener(msgQ);
-    if (CommandPrintf("<epg>\n") < 0)
-    {
-        connected = FALSE;
-    }
-    while (connected && !MessageQIsQuitSet(msgQ) && !ExitProgram)
+    CommandPrintf("<epg>\n");
+    fflush(cmdContext->outfp);
+
+    while (!ferror(cmdContext->outfp) && !MessageQIsQuitSet(msgQ) && !ExitProgram)
     {
         EPGChannelMessage_t *msg = MessageQReceiveTimed(msgQ, 400);
         if (msg != NULL)
         {
-            CommandContext_t *context = CommandContextGet();
             CommandPrintf("<event net=\"0x%04x\" ts=\"0x%04x\" source=\"0x%04x\" event=\"0x%08x\">\n",
                 msg->eventRef.serviceRef.netId, msg->eventRef.serviceRef.tsId, msg->eventRef.serviceRef.serviceId,
                 msg->eventRef.eventId);
@@ -119,13 +118,9 @@ static void CommandEPGData(int argc, char **argv)
 
 
             CommandPrintf("</event>\n");
-            if (fflush(context->outfp) != 0)
-            {
-                connected = FALSE;
-            }
-            LogModule(LOG_INFO, "EPG Data", "connected = %d", connected);
+            fflush(cmdContext->outfp);
             ObjectRefDec(msg);
-        }
+        }    
     }
     
     EPGChannelUnregisterListener(msgQ);
