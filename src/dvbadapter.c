@@ -411,14 +411,15 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
         if (result->frontEndFd == -1)
         {
             LogModule(LOG_ERROR, DVBADAPTER, "Failed to open %s : %s\n",result->frontEndPath, strerror(errno));
-            DVBDispose(result);
+            ObjectRefDec(result);
             return NULL;
         }
 
         if (ioctl(result->frontEndFd, FE_GET_INFO, &result->info) < 0)
         {
             LogModule(LOG_ERROR, DVBADAPTER, "Failed to get front end info: %s\n",strerror(errno));
-            DVBDispose(result);
+            
+            ObjectRefDec(result);
             return NULL;
         }
         result->currentDeliverySystem = DELSYS_MAX_SUPPORTED;
@@ -469,14 +470,19 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
         if (result->dvrFd == -1)
         {
             LogModule(LOG_ERROR, DVBADAPTER, "Failed to open %s : %s\n",result->dvrPath, strerror(errno));
-            DVBDispose(result);
+            ObjectRefDec(result->supportedDelSystems);
+            close(result->frontEndFd);
+            ObjectRefDec(result);
             return NULL;
         }
 
         if (pipe(monitorFds) == -1)
         {
             LogModule(LOG_ERROR, DVBADAPTER, "Failed to create pipe : %s\n", strerror(errno));
-            DVBDispose(result);
+            ObjectRefDec(result->supportedDelSystems);
+            close(result->dvrFd);
+            close(result->frontEndFd);
+            ObjectRefDec(result);
             return NULL;
         }
 
