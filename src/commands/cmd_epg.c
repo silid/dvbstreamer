@@ -82,7 +82,6 @@ static void CommandEPGData(int argc, char **argv)
     char startTimeStr[25];
     char endTimeStr[25];
     CommandContext_t *cmdContext = CommandContextGet();
-    int count = 0;
     
     EPGChannelRegisterListener(msgQ);
     CommandPrintf("<epg>\n");

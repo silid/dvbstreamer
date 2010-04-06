@@ -42,6 +42,7 @@ Plugin to collect EPG schedule information.
 #include "dvbtext.h"
 #include "deferredproc.h"
 
+#include "freesat_huffman.h"
 
 
 /*******************************************************************************
@@ -415,7 +416,7 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *eiteve
                     if (sed->i_event_name[0] == 0x1f)
                     {
                         /* Freesat huffman encoding */   
-                        temp = NULL;
+                        temp = freesat_huffman_to_string(sed->i_event_name, sed->i_event_name_length);
                     }
                     else
                     {
@@ -429,7 +430,7 @@ static void ProcessEvent(EPGServiceRef_t *serviceRef, dvbpsi_eit_event_t *eiteve
                     if (sed->i_text[0] == 0x1f)
                     {
                         /* Freesat hufman encoding */   
-                        temp = NULL;
+                        temp =  freesat_huffman_to_string(sed->i_text, sed->i_text_length);
                     }
                     else
                     {

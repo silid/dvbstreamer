@@ -67,7 +67,8 @@ datetime_la_SOURCES = \
 datetime_la_LDFLAGS = -module -no-undefined -avoid-version
 
 dvbtoepg_la_SOURCES = \
-    dvbtoepg.c
+    dvbtoepg.c \
+    freesat_huffman.c
 
 dvbtoepg_la_LDFLAGS = -module -no-undefined -avoid-version
 
