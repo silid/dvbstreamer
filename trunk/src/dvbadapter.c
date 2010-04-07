@@ -132,6 +132,7 @@ struct DVBAdapter_s
     char frontEndPath[30];            /**< Path to the frontend device */
     int frontEndFd;                   /**< File descriptor for the frontend device */
     bool frontEndLocked;              /**< Whether the frontend is currently locked onto a signal. */
+    bool tuning;                      /**< Whether we have started a tune request */
 
     DVBDeliverySystem_e currentDeliverySystem;
     __u32 frontEndRequestedFreq;      /**< The frequency that the application requested, may be different from one used (ie DVB-S intermediate frequency) */
@@ -611,6 +612,7 @@ int DVBFrontEndTune(DVBAdapter_t *adapter, DVBDeliverySystem_e system, char *par
         ConvertYamlToDTVProperties(system, &document, adapter);
 #endif
         yaml_document_delete(&document);
+        adapter->tuning = TRUE;
         DVBCommandSend(adapter, DVB_CMD_TUNE);
    }
    return 0;
@@ -1036,7 +1038,7 @@ int DVBDemuxAllocateFilter(DVBAdapter_t *adapter, uint16_t pid)
             pesFilterParam.input = DMX_IN_FRONTEND;
             pesFilterParam.output = DMX_OUT_TS_TAP;
             pesFilterParam.pes_type = DMX_PES_OTHER;
-            if (adapter->frontEndLocked)
+            if (adapter->frontEndLocked && !adapter->tuning)
             {
                 LogModule(LOG_DEBUG, DVBADAPTER, "Starting pid filter immediately!\n");
                 pesFilterParam.flags = DMX_IMMEDIATE_START;
@@ -1216,6 +1218,7 @@ static void DVBCommandCallback(struct ev_loop *loop, ev_io *w, int revents)
 
         if (retune && (adapter->frontEndFd != -1))
         {
+            adapter->tuning = TRUE;
 #if (DVB_API_VERSION < 5)
             adapter->frontEndParams.frequency = adapter->frontEndRequestedFreq;
 #else
@@ -1271,6 +1274,8 @@ static void DVBFrontendCallback(struct ev_loop *loop, ev_io *w, int revents)
             adapter->frontEndLocked = feLocked;
             if (adapter->frontEndLocked)
             {
+                adapter->tuning = FALSE;
+                
                 DVBDemuxStartAllFilters(adapter);
 #if (DVB_API_VERSION < 5)
                 adapter->frontEndParams = event.parameters;

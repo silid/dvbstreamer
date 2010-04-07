@@ -203,7 +203,7 @@ PLUGIN_INTERFACE_CF(
 *******************************************************************************/
 
 static TSFilterGroup_t *tsgroup;
-static dvbpsi_handle demux = NULL, freesatDemux = NULL;
+static dvbpsi_handle eitDemux = NULL, freesatDemux = NULL;
 static List_t *serviceNowNextInfoList;
 
 /*******************************************************************************
@@ -221,7 +221,8 @@ static void Install(bool installed)
         if (tsgroup)
         {
             TSFilterGroupDestroy(tsgroup);
-            dvbpsi_DetachDemux(demux);
+            dvbpsi_DetachDemux(eitDemux);
+            dvbpsi_DetachDemux(freesatDemux); 
         }
         ListFree(serviceNowNextInfoList, free);
         
@@ -232,15 +233,15 @@ static void DVBtoEPGFilterGroupEventCallback(void *arg, TSFilterGroup_t *group, 
 {
     if ((event == TSFilterEventType_MuxChanged) && tsgroup)
     {
-        if (demux)
+        if (eitDemux)
         {
             TSFilterGroupRemoveSectionFilter(tsgroup, PID_EIT);
             TSFilterGroupRemoveSectionFilter(tsgroup, PID_FREESAT_EIT);            
-            dvbpsi_DetachDemux(demux);
+            dvbpsi_DetachDemux(eitDemux);
             dvbpsi_DetachDemux(freesatDemux);            
         }
-        demux = dvbpsi_AttachDemux(SubTableHandler, NULL);
-        TSFilterGroupAddSectionFilter(tsgroup, PID_EIT, 3, demux);
+        eitDemux = dvbpsi_AttachDemux(SubTableHandler, NULL);
+        TSFilterGroupAddSectionFilter(tsgroup, PID_EIT, 3, eitDemux);
         freesatDemux = dvbpsi_AttachDemux(SubTableHandler, NULL);
         TSFilterGroupAddSectionFilter(tsgroup, PID_FREESAT_EIT, 3, freesatDemux);        
     }
@@ -310,8 +311,8 @@ static void CommandEPGCapStart(int argc, char **argv)
         return;
     }
     tsgroup = TSReaderCreateFilterGroup(MainTSReaderGet(), DVBTOEPG, "DVB", DVBtoEPGFilterGroupEventCallback, NULL);
-    demux = dvbpsi_AttachDemux(SubTableHandler, NULL);
-    TSFilterGroupAddSectionFilter(tsgroup, PID_EIT, 3, demux);
+    eitDemux = dvbpsi_AttachDemux(SubTableHandler, NULL);
+    TSFilterGroupAddSectionFilter(tsgroup, PID_EIT, 3, eitDemux);
     freesatDemux = dvbpsi_AttachDemux(SubTableHandler, NULL);
     TSFilterGroupAddSectionFilter(tsgroup, PID_FREESAT_EIT, 3, freesatDemux);        
     
@@ -325,7 +326,10 @@ static void CommandEPGCapStop(int argc, char **argv)
         return;
     }
     TSFilterGroupDestroy(tsgroup);
-    dvbpsi_DetachDemux(demux);
+    dvbpsi_DetachDemux(eitDemux);
+    dvbpsi_DetachDemux(freesatDemux); 
+    eitDemux = NULL;
+    freesatDemux = NULL;
     tsgroup = NULL;
 }
 

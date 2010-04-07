@@ -386,6 +386,7 @@ void TSFilterGroupRemoveSectionFilter(TSFilterGroup_t *group, uint16_t pid)
             ObjectRefDec(sectionFilter);
             break;
         }
+        sectionFilterPrev = sectionFilter;
     }
     pthread_mutex_unlock(&group->tsReader->mutex);
 }
