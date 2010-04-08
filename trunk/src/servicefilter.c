@@ -609,11 +609,11 @@ static int ServiceFilterPropertyServiceGet(void *userArg, PropertyValue_t *value
     value->type = PropertyType_String;
     if (state->service)
     {
-        value->u.string = state->service->name;
+        value->u.string = ServiceGetIDNameStr(state->service, NULL);
     }
     else
     {
-        value->u.string = "";
+        value->u.string = strdup("");
     }
     return 0;
 }

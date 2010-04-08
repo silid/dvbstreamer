@@ -326,6 +326,21 @@ Service_t *ServiceGetNext(ServiceEnumerator_t enumerator);
  * @return Pointer to the buffer containing the string or NULL.
  */
 char * ServiceGetIDStr(Service_t * service, char * buffer);
+
+/**
+ * Retrieve a string containing the DVB Id (as returned by ServiceGetIDStr()) 
+ * followed by ' : ' and the name of the service in quotes.
+ *
+ * For example:
+ * 0001.0002.0003 : "A Channel"
+ *
+ * @param service The service to return the id string for.
+ * @param buffer The buffer to store the string in (size must be 
+ * >= (SERVICE_ID_STRING_LENGTH + 5 + service name length)) or NULL to allocate 
+ * a buffer of the correct size.
+ * @return Pointer to the buffer containing the string or NULL.
+ */
+char *ServiceGetIDNameStr(Service_t *service, char *buffer);
     
 /**
  * Create a new service object.

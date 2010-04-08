@@ -575,6 +575,21 @@ char *ServiceGetIDStr(Service_t *service, char *buffer)
     }
     return NULL;
 }
+
+char *ServiceGetIDNameStr(Service_t *service, char *buffer)
+{
+    if (buffer == NULL)
+    {
+        buffer = malloc(SERVICE_ID_STRING_LENGTH + 5 /* : ""*/ + strlen(service->name));
+    }
+    if (buffer)
+    {
+        sprintf(buffer, "%04x.%04x.%04x : \"%s\"", service->networkId & 0xffff, service->tsId & 0xffff, service->id & 0xffff, service->name);
+        return buffer;
+    }
+    return NULL;
+}
+
 /*******************************************************************************
 * Local Functions                                                              *
 *******************************************************************************/

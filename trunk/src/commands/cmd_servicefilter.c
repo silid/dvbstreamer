@@ -135,7 +135,7 @@ Command_t CommandDetailsServiceFilter[] =
     },
     {
         "lssfs",
-        0, 0,
+        0, 1,
         "List all service filters.",
         "List all service filters their names, destinations and currently selected service.",
         CommandListSF
@@ -222,14 +222,12 @@ static void CommandSelect(int argc, char **argv)
     
     if (service)
     {
-        Multiplex_t *multiplex;
+        char *idName;    
         TuningCurrentServiceSet(service);
-        
-        multiplex = TuningCurrentMultiplexGet();
-        CommandPrintf("%04x.%04x.%04x : \"%s\"\n", 
-            multiplex->networkId, multiplex->tsId, service->id, service->name);
+        idName = ServiceGetIDNameStr(service, NULL);
+        CommandPrintf("%s\n",idName);
+        free(idName);
         ServiceRefDec(service);
-        MultiplexRefDec(multiplex);
     }
     else
     {
@@ -298,19 +296,43 @@ static void CommandListSF(int argc, char **argv)
 {
     ListIterator_t iterator;
     TSReader_t *reader = MainTSReaderGet();
+    bool fullListing = FALSE;
     
+    if (argc == 1)
+    {
+        if (strcmp("-l", argv[0]) == 0)
+        {
+            fullListing = TRUE;
+        }
+    }
     ListIterator_ForEach(iterator, reader->groups)
     {
         TSFilterGroup_t *group = ListIterator_Current(iterator);
         if (strcmp(group->type, ServiceFilterGroupType) == 0)
         {
             ServiceFilter_t filter = group->userArg;
-            Service_t *service = ServiceFilterServiceGet(filter);
             char *name = ServiceFilterNameGet(filter);
-            DeliveryMethodInstance_t *dmInstance = ServiceFilterDeliveryMethodGet(filter);
-            CommandPrintf("%10s : %s (%s)\n", name,
-                    DeliveryMethodGetMRL(dmInstance),
-                    service ? service->name:"<NONE>");
+            if (fullListing)
+            {
+                Service_t *service = ServiceFilterServiceGet(filter);
+                char *serviceIdName = NULL;
+                if (service)
+                {
+                    serviceIdName = ServiceGetIDNameStr(service, NULL);
+                }
+                DeliveryMethodInstance_t *dmInstance = ServiceFilterDeliveryMethodGet(filter);
+                CommandPrintf("%-10s : { mrl: \"%s\", service: { %s } }\n", name,
+                        DeliveryMethodGetMRL(dmInstance),
+                        serviceIdName ? serviceIdName:"");
+                if (serviceIdName)
+                {
+                    free(serviceIdName);
+                }
+            }
+            else
+            {
+                CommandPrintf("%s\n", name);
+            }
         }
     }
 }
@@ -321,7 +343,8 @@ static void CommandSetSFService(int argc, char **argv)
     char *outputName = argv[0];
     char *serviceName = argv[1];
     Service_t *service;
-
+    char *idName;
+    
     CommandCheckAuthenticated();
 
     if (strcmp(outputName, PrimaryService) == 0)
@@ -346,7 +369,9 @@ static void CommandSetSFService(int argc, char **argv)
     }
 
     ServiceFilterServiceSet(filter,service);
-
+    idName = ServiceGetIDNameStr(service, NULL);   
+    CommandPrintf("%s\n",idName);
+    free(idName);
     ServiceRefDec(service);
 }
 
@@ -354,17 +379,17 @@ static void CommandGetSFService(int argc, char **argv)
 {
     ServiceFilter_t filter;
     Service_t *service;
-    Multiplex_t *multiplex;
+    char *idName;
  
     FIND_SERVICE_FILTER(argv[0]);
+    
     service = ServiceFilterServiceGet(filter);
-    multiplex = MultiplexFindUID(service->multiplexUID);
-    
-    CommandPrintf("%04x.%04x.%04x : \"%s\"\n",
-        multiplex->networkId & 0xffff, multiplex->tsId & 0xffff, service->id & 0xffff,
-        service->name);
-    
-    MultiplexRefDec(multiplex);
+    if (service)
+    {
+        idName = ServiceGetIDNameStr(service, NULL);   
+        CommandPrintf("%s\n",idName);
+        free(idName);
+    }
 }
 
 static void CommandSetSFMRL(int argc, char **argv)
@@ -428,6 +453,6 @@ static void CommandGetSFAVSOnly(int argc, char **argv)
 
     avsOnly = ServiceFilterAVSOnlyGet(filter);
 
-    CommandPrintf("%s : A/V/S Only = %s", avsOnly ? "On":"Off");
+    CommandPrintf("%s : A/V/S Only = %s\n", argv[0], avsOnly ? "On":"Off");
 }
 

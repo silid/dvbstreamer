@@ -360,11 +360,9 @@ static void CommandListServices(int argc, char **argv)
             {
                 if (dvbIds)
                 {
-                    multiplex = MultiplexFindUID(service->multiplexUID);
-                    CommandPrintf("%04x.%04x.%04x : \"%s\"\n", 
-                        multiplex->networkId & 0xffff, multiplex->tsId & 0xffff,
-                        service->id, service->name);
-                    MultiplexRefDec(multiplex);
+                    char *idName = ServiceGetIDNameStr(service, NULL);
+                    CommandPrintf("%s\n", idName); 
+                    free(idName);
                 }
                 else
                 {
@@ -468,17 +466,10 @@ static void CommandCurrent(int argc, char **argv)
     Service_t *service = TuningCurrentServiceGet();
     if ( service)
     {
-        Multiplex_t *multiplex = TuningCurrentMultiplexGet();
-        
-        CommandPrintf("%04x.%04x.%04x : \"%s\"\n",
-            multiplex->networkId & 0xffff, multiplex->tsId & 0xffff, service->id & 0xffff,
-            service->name);
+        char *idName = ServiceGetIDNameStr(service, NULL);
+        CommandPrintf("%s\n", idName); 
+        free(idName);
         ServiceRefDec(service);
-        MultiplexRefDec(multiplex);
-    }
-    else
-    {
-        CommandPrintf("No current service\n");
     }
 }
 static void CommandServiceInfo(int argc, char **argv)
@@ -578,15 +569,14 @@ static void CommandFEStatus(int argc, char **argv)
         CommandPrintf("Failed to get frontend status!\n");
         return;
     }
-
-    CommandPrintf("Tuner status:  %s%s%s%s%s%s\n",
-             (status & FESTATUS_HAS_SIGNAL)?"Signal ":"",
-             (status & FESTATUS_TIMEDOUT)?"Timed out ":"",
-             (status & FESTATUS_HAS_LOCK)?"Lock ":"",
-             (status & FESTATUS_HAS_CARRIER)?"Carrier ":"",
-             (status & FESTATUS_HAS_VITERBI)?"VITERBI ":"",
+    CommandPrintf("Tuner status: [ %s%s%s%s%s%s ]\n",
+             (status & FESTATUS_HAS_SIGNAL)?"Signal, ":"",
+             (status & FESTATUS_TIMEDOUT)?"Timed out, ":"",
+             (status & FESTATUS_HAS_LOCK)?"Lock, ":"",
+             (status & FESTATUS_HAS_CARRIER)?"Carrier, ":"",
+             (status & FESTATUS_HAS_VITERBI)?"VITERBI, ":"",
              (status & FESTATUS_HAS_SYNC)?"Sync ":"");
-    CommandPrintf("Signal Strength: %d%%\nSNR: %d%%\nBER: %x\nUncorrected Blocks: %x\n",
+    CommandPrintf("Signal Strength: %d%%\nSNR: %d%%\nBER: %d\nUncorrected Blocks: %d\n",
         (strength * 100) / 0xffff, (snr * 100) / 0xffff, ber, ucblocks);
 }
 
@@ -815,11 +805,11 @@ static void CommandPropertyInfo(int argc, char **argv)
     
     if (PropertiesGetInfo(argv[0], &propInfo) == 0)
     {
-        CommandPrintf("Type        : %s\n", GetPropertyTypeString(propInfo.type));
-        CommandPrintf("Readable    : %s\n", propInfo.readable    == TRUE ? "Yes":"No");
-        CommandPrintf("Writeable   : %s\n", propInfo.writeable   == TRUE ? "Yes":"No");
-        CommandPrintf("Has Children: %s\n", propInfo.hasChildren == TRUE ? "Yes":"No");
-        CommandPrintf("Description :\n%s\n", propInfo.desc == NULL ? "":propInfo.desc);
+        CommandPrintf("Type         : %s\n", GetPropertyTypeString(propInfo.type));
+        CommandPrintf("Readable     : %s\n", propInfo.readable    == TRUE ? "Yes":"No");
+        CommandPrintf("Writeable    : %s\n", propInfo.writeable   == TRUE ? "Yes":"No");
+        CommandPrintf("Has Children : %s\n", propInfo.hasChildren == TRUE ? "Yes":"No");
+        CommandPrintf("Description  : |\n    %s\n", propInfo.desc == NULL ? "":propInfo.desc);
     }
     else
     {
