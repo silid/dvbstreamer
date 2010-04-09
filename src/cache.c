@@ -692,7 +692,7 @@ Service_t *CacheServiceAdd(int id, int source)
     {
         result->id = id;
         result->source = source;
-        result->pmtPID = 8192;
+        result->pmtPID = 8191; /* Use the stuffing PID until we have an id */
         if (asprintf(&result->name, "%04x", id) == -1)
         {
             LogModule(LOG_ERROR, CACHE, "Failed to allocate memory for default service name (0x%04x).\n", result->id);
