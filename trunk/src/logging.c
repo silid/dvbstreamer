@@ -52,6 +52,14 @@ typedef struct ThreadName_s
     pthread_t thread;
     char *name;
 }ThreadName_t;
+
+typedef struct ModuleLevel_s
+{
+    char *module;
+    int level;
+    struct struct ModuleLevel_s *next;
+}ModuleLevel_t;
+
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
@@ -64,6 +72,7 @@ static int verbosity = 0;
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 static FILE *logFP = NULL;
 static ThreadName_t threadNames[MAX_THREADS];
+static ModuleLevel_t *moduleLevels = NULL;
 
 /*******************************************************************************
 * Global functions                                                             *
@@ -152,6 +161,7 @@ bool LogLevelIsEnabled(int level)
 void LogRegisterThread(pthread_t thread, const char *name)
 {
     int i;
+    pthread_mutex_lock(&mutex);
     for (i = 0; i < MAX_THREADS; i ++)
     {
         if (threadNames[i].thread == 0)
@@ -161,11 +171,13 @@ void LogRegisterThread(pthread_t thread, const char *name)
             break;
         }
     }
+    pthread_mutex_unlock(&mutex);
 }
 
 void LogUnregisterThread(pthread_t thread)
 {
     int i;
+    pthread_mutex_lock(&mutex);
     for (i = 0; i < MAX_THREADS; i ++)
     {
         if (threadNames[i].thread == thread)
@@ -175,6 +187,7 @@ void LogUnregisterThread(pthread_t thread)
             break;
         }
     }
+    pthread_mutex_unlock(&mutex);
 }
 
 void LogModule(int level, const char *module, char *format, ...)
@@ -191,6 +204,7 @@ void LogModule(int level, const char *module, char *format, ...)
             fprintf(stderr, "\n");
         }
     }
+    level = LogGetModuleLevel(module, level);
     if (level <= verbosity)
     {
         va_start(valist, format);
@@ -260,4 +274,19 @@ static char *LogGetThreadName(pthread_t thread)
     }
     sprintf(numericName, "0x%08lx", (unsigned long)thread);
     return numericName;
+}
+
+static int LogGetModuleLevel(const char *module, int level)
+{
+    int result = level;
+    ModuleLevel_t *modLevel;
+    for (modLevel = moduleLevels; modLevel; modLevel = modLevel->next)
+    {
+        if (strcmp(modLevel->module, module) == 0)
+        {
+            result = (level < modLevel->level) ? level: modLevel->level;
+            break;
+        }
+    }
+    return result;
 }
