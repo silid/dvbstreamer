@@ -247,7 +247,9 @@ int main(int argc, char *argv[])
         }
     }
 
-
+    sprintf(logFilename, "%s/levels-%d.log", DataDirectory, adapterNumber);
+    LogLoadModuleLevels(logFilename);
+    
     if (DaemonMode)
     {
         if (startupFile && (startupFile[0] != '/'))

@@ -120,6 +120,12 @@ void LogLevelDec(void);
 bool LogLevelIsEnabled(int level);
 
 /**
+ * Load module/level settings so that levels can be set for specific modules.
+ * @param path Path to file to load.
+ */
+void LogLoadModuleLevels(const char *path);
+
+/**
  * Register a name for a pthread. The name will be used instead of the numeric 
  * id in the log output.
  * @param thread pthread to register.

@@ -44,6 +44,8 @@ Logging functions.
 static void LoggingInitCommon(int logLevel);
 static void LogImpl(int level, const char *module, const char * format, va_list valist);
 static char *LogGetThreadName(pthread_t thread);
+static int LogGetModuleLevel(const char *module, int level);
+
 /*******************************************************************************
 * Typedefs                                                                     *
 *******************************************************************************/
@@ -57,7 +59,7 @@ typedef struct ModuleLevel_s
 {
     char *module;
     int level;
-    struct struct ModuleLevel_s *next;
+    struct ModuleLevel_s *next;
 }ModuleLevel_t;
 
 /*******************************************************************************
@@ -156,6 +158,34 @@ void LogLevelDec(void)
 bool LogLevelIsEnabled(int level)
 {
     return (level <= verbosity);
+}
+
+void LogLoadModuleLevels(const char *path)
+{
+    FILE *fp;
+    char line[256];
+    char module[128];
+    int level;
+    fp = fopen(path, "r");
+    if (fp)
+    {
+        while(!feof(fp))
+        {
+            if (fgets(line, sizeof(line) - 1, fp))
+            {
+                printf("Module Level Line: %s", line);
+                if (sscanf(line, "%s %d\n", module, &level) == 2)
+                {
+                    ModuleLevel_t *modLevel = malloc(sizeof(ModuleLevel_t));
+                    printf("Module : %s Level %d\n", module, level);
+                    modLevel->module = strdup(module);
+                    modLevel->level = level;
+                    modLevel->next = moduleLevels;
+                    moduleLevels = modLevel;
+                }
+            }
+        }
+    }
 }
 
 void LogRegisterThread(pthread_t thread, const char *name)
@@ -284,7 +314,10 @@ static int LogGetModuleLevel(const char *module, int level)
     {
         if (strcmp(modLevel->module, module) == 0)
         {
-            result = (level < modLevel->level) ? level: modLevel->level;
+            if (level > modLevel->level)
+            {
+                result = verbosity + 1;
+            }
             break;
         }
     }
