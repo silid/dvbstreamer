@@ -27,7 +27,7 @@
 
 
 #include "config.h"
-
+#define DEBUG
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -146,10 +146,8 @@ void dvbpsi_DetachEIT(dvbpsi_demux_t * p_demux, uint8_t i_table_id,
 
   for(i = 0; i <= 255; i++)
   {
-#ifndef PROCESS_SINGLE_SECTION    
     if(p_eit_decoder->ap_sections[i])
       dvbpsi_DeletePSISections(p_eit_decoder->ap_sections[i]);
-#endif
   }
 
   free(p_subdec->p_cb_data);
@@ -387,9 +385,7 @@ void dvbpsi_GatherEITSections(dvbpsi_decoder_t * p_psi_decoder,
     {
       if(p_eit_decoder->ap_sections[i] != NULL)
       {
-#ifndef PROCESS_SINGLE_SECTION        
         dvbpsi_ReleasePSISections(p_psi_decoder, p_eit_decoder->ap_sections[i]);
-#endif
         p_eit_decoder->ap_sections[i] = NULL;
       }
     }
@@ -399,7 +395,9 @@ void dvbpsi_GatherEITSections(dvbpsi_decoder_t * p_psi_decoder,
   if(b_append)
   {
     int b_complete;
-
+#ifdef PROCESS_SINGLE_SECTION
+    int b_already_done = 0;
+#endif
     /* Initialize the structures if it's the first section received */
     if(!p_eit_decoder->p_building_eit)
     {
@@ -422,8 +420,9 @@ void dvbpsi_GatherEITSections(dvbpsi_decoder_t * p_psi_decoder,
     {
       DVBPSI_DEBUG_ARG("EIT decoder", "overwrite section number %d",
                        p_section->i_number);
-#ifndef PROCESS_SINGLE_SECTION
       dvbpsi_ReleasePSISections(p_psi_decoder, p_eit_decoder->ap_sections[p_section->i_number]);
+#ifdef PROCESS_SINGLE_SECTION
+      b_already_done = 1;
 #endif
     }
     p_eit_decoder->ap_sections[p_section->i_number] = p_section;
@@ -432,20 +431,32 @@ void dvbpsi_GatherEITSections(dvbpsi_decoder_t * p_psi_decoder,
     b_complete = 0;
     
 #ifdef PROCESS_SINGLE_SECTION
-    DVBPSI_DEBUG_ARG("EIT decoder", "Decoding section number %d %p",
-                       p_section->i_number, p_section);
-    /* Decode the sections */
-    p_section->p_next = NULL;
-    dvbpsi_DecodeEITSections(p_eit_decoder->p_building_eit,
-                           p_section);
-    /* Delete the sections */
-    dvbpsi_ReleasePSISections(p_psi_decoder, p_section);
-    /* signal the new EIT */
-    p_eit_decoder->pf_callback(p_eit_decoder->p_cb_data,
-                             p_eit_decoder->p_building_eit);
-    /* Reinitialize the structures */
-    p_eit_decoder->p_building_eit = NULL;      
-#else
+    if (!b_already_done)
+    {
+        DVBPSI_DEBUG_ARG("EIT decoder", "Decoding section number %d %p",
+                           p_section->i_number, p_section);
+        /* Decode the sections */
+        p_section->p_next = NULL;
+        p_eit_decoder->current_eit = *p_eit_decoder->p_building_eit;
+        
+        dvbpsi_DecodeEITSections(p_eit_decoder->p_building_eit,
+                               p_section);
+        /* signal the new EIT */
+        p_eit_decoder->pf_callback(p_eit_decoder->p_cb_data,
+                                 p_eit_decoder->p_building_eit);
+        /* create a new EIT */
+        dvbpsi_NewEIT(p_eit_decoder->p_building_eit,
+                     p_section->i_extension,
+                     p_section->i_version,
+                     p_section->b_current_next,
+                     ((uint16_t)(p_section->p_payload_start[0]) << 8)
+                     | p_section->p_payload_start[1],
+                     ((uint16_t)(p_section->p_payload_start[2]) << 8)
+                     | p_section->p_payload_start[3],
+                     p_section->p_payload_start[4],
+                     p_section->p_payload_start[5]);
+    }
+#endif
     /* As there may be gaps in the section_number fields (see below), we
      * have to wait until we have received a section_number twice or
      * until we have a received a section_number which is
@@ -494,7 +505,20 @@ void dvbpsi_GatherEITSections(dvbpsi_decoder_t * p_psi_decoder,
     if(b_complete)
     {
       /* Save the current information */
+#ifdef PROCESS_SINGLE_SECTION
+       dvbpsi_InitEIT(&p_eit_decoder->current_eit,
+                     p_section->i_extension,
+                     p_section->i_version,
+                     p_section->b_current_next,
+                     ((uint16_t)(p_section->p_payload_start[0]) << 8)
+                     | p_section->p_payload_start[1],
+                     ((uint16_t)(p_section->p_payload_start[2]) << 8)
+                     | p_section->p_payload_start[3],
+                     p_section->p_payload_start[4],
+                     p_section->p_payload_start[5]);
+#else
       p_eit_decoder->current_eit = *p_eit_decoder->p_building_eit;
+#endif
       p_eit_decoder->b_current_valid = 1;
       /* Chain the sections */
       if(p_eit_decoder->i_last_section_number)
@@ -511,6 +535,7 @@ void dvbpsi_GatherEITSections(dvbpsi_decoder_t * p_psi_decoder,
           }
         }
       }
+#ifndef PROCESS_SINGLE_SECTION
       /* Decode the sections */
       dvbpsi_DecodeEITSections(p_eit_decoder->p_building_eit,
                                p_eit_decoder->ap_sections[0]);
@@ -519,12 +544,13 @@ void dvbpsi_GatherEITSections(dvbpsi_decoder_t * p_psi_decoder,
       /* signal the new EIT */
       p_eit_decoder->pf_callback(p_eit_decoder->p_cb_data,
                                  p_eit_decoder->p_building_eit);
+#endif    
       /* Reinitialize the structures */
       p_eit_decoder->p_building_eit = NULL;
       for(i = 0; i <= p_eit_decoder->i_last_section_number; i++)
         p_eit_decoder->ap_sections[i] = NULL;
     }
-#endif    
+
   }
   else
   {
