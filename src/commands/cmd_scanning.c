@@ -56,6 +56,10 @@ Command functions related to scanning multiplex and frequency bands.
 #include "yamlutils.h"
 #include "dispatchers.h"
 #include "dvbpsi/dr.h"
+/*******************************************************************************
+* Defines                                                                      *
+*******************************************************************************/
+#define MAX_PMT_COUNT 253
 
 /*******************************************************************************
 * Typedefs                                                                     *
@@ -171,7 +175,8 @@ static void VCTEventListener(void *arg, Event_t event, void *payload);
 #endif
 
 static void ScanNetwork(char *initialdata);
-
+static struct PMTReceived_t* PMTsRecievedFindOrAdd(uint16_t id);
+static void CheckPMTsReceived(void);
 static void PATEventListener(void *arg, Event_t event, void *payload);
 static void PMTEventListener(void *arg, Event_t event, void *payload);
 
@@ -258,7 +263,7 @@ static ScanList_t toScan = {NULL, NULL, NULL, 0, 0};
 
 static List_t *transponderList = NULL;
 static int PMTCount = 0;
-static struct PMTReceived_t *PMTsReceived = NULL;
+static struct PMTReceived_t PMTsReceived[MAX_PMT_COUNT];
 static pthread_mutex_t scanningmutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* Property variables */
@@ -1112,6 +1117,49 @@ static void ScanNetwork(char *initialdata)
     }
 }
 
+
+static struct PMTReceived_t* PMTsRecievedFindOrAdd(uint16_t id)
+{
+    int i;
+    for (i = 0; i < MAX_PMT_COUNT; i ++)
+    {
+        if (id == PMTsReceived[i].id)
+        {
+            LogModule(LOG_INFO, SCANNING, "Found id %d @ %d", id, i);
+            return &PMTsReceived[i];
+        }
+        if (PMTsReceived[i].id == 0)
+        {
+            LogModule(LOG_INFO, SCANNING, "Adding id %d @ %d", id, i);
+            /* reached the end of the table */
+            PMTsReceived[i].id = id;
+            return &PMTsReceived[i];
+        }
+    }
+    LogModule(LOG_INFO, SCANNING, "Out of space while adding PMT");
+    return NULL;
+}
+
+static void CheckPMTsReceived(void)
+{
+    int i;
+    bool all = TRUE;
+    
+    for (i = 0; i < PMTCount; i ++)
+    {
+        if (!PMTsReceived[i].received)
+        {
+            all = FALSE;
+        }
+    }
+
+    if (all)
+    {
+        ScanStateMachine(ScanEvent_PMTsReceived);
+    }
+
+}
+
 static void PATEventListener(void *arg, Event_t event, void *payload)
 {
     dvbpsi_pat_t* newpat = payload;
@@ -1119,36 +1167,27 @@ static void PATEventListener(void *arg, Event_t event, void *payload)
     {
         int i;
         dvbpsi_pat_program_t *patentry = newpat->p_first_program;
-        TSReader_t *tsFilter = MainTSReaderGet();
+        patentry = newpat->p_first_program;
+        i = 0;
         PMTCount = 0;
         while(patentry)
         {
             if (patentry->i_number != 0x0000)
             {
-                PMTCount ++;
-            }
-            patentry = patentry->p_next;
-        }
-        if (PMTsReceived)
-        {
-            ObjectFree(PMTsReceived);
-        }
-        PMTsReceived = ObjectAlloc(sizeof(struct PMTReceived_t) * PMTCount);
-        patentry = newpat->p_first_program;
-        i = 0;
-        while(patentry)
-        {
-            if (patentry->i_number != 0x0000)
-            {
-                PMTsReceived[i].id = patentry->i_number;
-                PMTsReceived[i].pid = patentry->i_pid;
+                struct PMTReceived_t *pr = PMTsRecievedFindOrAdd(patentry->i_number);
+                if (pr)
+                {
+                    pr->pid = patentry->i_pid;
+                    PMTCount ++;
+                }
                 i ++;
             }
             patentry = patentry->p_next;
         }
-        tsFilter->tsStructureChanged = TRUE; /* Force all PMTs to be received again incase we are scanning a mux we have pids for */
 
-        ScanStateMachine(ScanEvent_PATReceived);        
+        ScanStateMachine(ScanEvent_PATReceived);  
+        
+        CheckPMTsReceived();
     }
 }
 
@@ -1157,28 +1196,13 @@ static void PMTEventListener(void *arg, Event_t event, void *payload)
     dvbpsi_pmt_t *newpmt = payload;
     if (currentScanState == ScanState_WaitingForTables)
     {
-        bool all = TRUE;
-        int i;
-        for (i = 0; i < PMTCount; i ++)
+        struct PMTReceived_t *pr = PMTsRecievedFindOrAdd(newpmt->i_program_number);
+        
+        if (pr)
         {
-            if (PMTsReceived[i].id == newpmt->i_program_number)
-            {
-                PMTsReceived[i].received = TRUE;
-            }
+            pr->received = TRUE;
         }
-
-        for (i = 0; i < PMTCount; i ++)
-        {
-            if (!PMTsReceived[i].received)
-            {
-                all = FALSE;
-            }
-        }
-
-        if (all)
-        {
-            ScanStateMachine(ScanEvent_PMTsReceived);
-        }
+        CheckPMTsReceived();
     }
 }
 #if defined(ENABLE_DVB)
@@ -1571,6 +1595,8 @@ static void ScanStateMachine(enum ScanEvent_e event)
                     ev_timer_start(DispatchersGetInput(), &timeoutTimer); 
                     currentService = TuningCurrentServiceGet();
                     TuningCurrentServiceLock();
+                    PMTCount = MAX_PMT_COUNT;
+                    memset(PMTsReceived, 0, sizeof(PMTsReceived));
                     toScan.current = toScan.start;
                     currentScanState = ScanState_NextMux;
                 }
@@ -1745,11 +1771,6 @@ static void ScanStateMachine(enum ScanEvent_e event)
                 {
                     TuningCurrentServiceUnlock();
                     TuningCurrentServiceRetune();
-                    if (PMTsReceived)
-                    {
-                        ObjectFree(PMTsReceived);
-                        PMTsReceived = NULL;
-                    }
                     if (transponderList)
                     {
                         ObjectListFree(transponderList);
