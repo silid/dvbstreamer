@@ -546,8 +546,16 @@ static void ServiceFilterInitPacket(TSPacket_t *packet, dvbpsi_psi_section_t* se
 
 static void ServiceFilterAllocateFilters(ServiceFilter_t filter)
 {
+    int muxUID;
     Multiplex_t *mux = TuningCurrentMultiplexGet();
-    int muxUID = mux->uid;
+
+    /* No mux is selected yet */
+    if (mux == NULL)
+    {
+        return;
+    }
+    
+    muxUID = mux->uid;
     MultiplexRefDec(mux);    
 
     /* Service is not part of the current mux */

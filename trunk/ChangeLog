@@ -1,5 +1,12 @@
-2.0
----
+2.0.0rc2
+------
+* Fix bug in service filters where if no previous primary service/multiplex had
+   been selected dvbstreamer would segfault. Reported by Ivan Asenov
+* Fix bug when scanning same multiplex twice cause dvbstreamer to segfault.
+  Reported by Ivan Asenov
+
+2.0.0rc1
+-------
 * All commands now must have channels names enclosed in quotes if the name 
   includes spaces.
 * New scanning feature
