@@ -22,7 +22,7 @@ File Descriptor monitoring and event dispatching.
 */
 #include <stdlib.h>
 #include <string.h>
-
+#include <unistd.h>
 #include "logging.h"
 #include "dispatchers.h"
 
@@ -31,6 +31,8 @@ File Descriptor monitoring and event dispatching.
 *******************************************************************************/
 static void *InputDispatcher(void*arg);
 static void *UserNetDispatcher(void*arg);
+static void InputExit(struct ev_loop *loop, ev_io *w, int revents);
+static void NetUserExit(struct ev_loop *loop, ev_io *w, int revents);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -41,6 +43,9 @@ static struct ev_loop *UserNetEventLoop = NULL;
 static pthread_t InputDispatcherThread;
 static pthread_t UserNetDispatcherThread;
 static bool UserNetSync = FALSE;
+static int exitPipe[2];
+static ev_io InputExitWatcher;
+static ev_io NetUserExitWatcher;
 
 /*******************************************************************************
 * Global functions                                                             *
@@ -49,13 +54,25 @@ static bool UserNetSync = FALSE;
 
 int DispatchersInit(void)
 {
+    if (pipe(exitPipe) != 0)
+    {
+        return -1;
+    }
+    
     UserNetEventLoop = ev_loop_new(EVFLAG_AUTO);
     InputEventLoop = ev_loop_new(EVFLAG_AUTO);
+    ev_io_init(&InputExitWatcher, InputExit, exitPipe[0], EV_READ);
+    ev_io_init(&NetUserExitWatcher, NetUserExit, exitPipe[0], EV_READ);   
+    ev_io_start(InputEventLoop, &InputExitWatcher);
+    ev_io_start(UserNetEventLoop, &NetUserExitWatcher);
+    
     return 0;
 }
 
 int DispatchersDeInit(void)
 {
+    ev_io_stop(InputEventLoop, &InputExitWatcher);
+    ev_io_stop(UserNetEventLoop, &NetUserExitWatcher);
     ev_loop_destroy(InputEventLoop);
     ev_loop_destroy(UserNetEventLoop);
     return 0;
@@ -77,14 +94,12 @@ void DispatchersStart(bool sync)
 
 void DispatchersExitLoop(void)
 {
-    ev_unloop(InputEventLoop, 2);
-    ev_unloop(UserNetEventLoop, 2);
+    write(exitPipe[1], "e", 1);
 }
 
 void DispatchersStop(void)
 {
-    ev_unloop(InputEventLoop, 2);
-    ev_unloop(UserNetEventLoop, 2);
+    DispatchersExitLoop();
     pthread_join(InputDispatcherThread, NULL);
     if (!UserNetSync)
     {
@@ -105,6 +120,16 @@ struct ev_loop * DispatchersGetNetwork(void)
 struct ev_loop * DispatchersGetUserInput(void)
 {
     return UserNetEventLoop;    
+}
+
+static void InputExit(struct ev_loop *loop, ev_io *w, int revents)
+{
+    ev_unloop(loop, EVUNLOOP_ALL);
+}
+
+static void NetUserExit(struct ev_loop *loop, ev_io *w, int revents)
+{
+    ev_unloop(loop, EVUNLOOP_ALL);    
 }
 
 static void *InputDispatcher(void*arg)
