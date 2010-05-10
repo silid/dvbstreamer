@@ -119,7 +119,7 @@ static int SysPropertyGetUptimeSecs(void *userArg, PropertyValue_t *value);
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
-bool ExitProgram = FALSE;
+volatile bool ExitProgram = FALSE;
 bool DaemonMode = FALSE;
 
 const char PrimaryService[] = "<Primary>";

@@ -34,7 +34,7 @@ Entry point to the application.
 /**
  * Boolean used to signal the program to terminate.
  */
-extern bool ExitProgram;
+extern volatile bool ExitProgram;
 
 /**
  * Boolean indicating whether DVBStreamer is in daemon mode.

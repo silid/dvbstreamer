@@ -4,6 +4,8 @@
    been selected dvbstreamer would segfault. Reported by Ivan Asenov
 * Fix bug when scanning same multiplex twice cause dvbstreamer to segfault.
   Reported by Ivan Asenov
+* Fix bug when attempting to exit dvbstreamer, dvbstreamer hangs. This was 
+  caused by a change in behaviour of libev. Reported by Ivan Asenov
 
 2.0.0rc1
 -------
