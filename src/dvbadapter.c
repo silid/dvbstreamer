@@ -146,6 +146,7 @@ struct DVBAdapter_s
 
     DVBSatelliteSettings_t satelliteSettings; /**< Current DiSEqC settings for DVB-S */
     LNBInfo_t lnbInfo;                /**< LNB Information for DVB-S/S2 receivers */
+    bool lnbSharing;                  /**< Whether this adapter is sharing an LNB so shouldn't use tone/voltage control. */
 
     char demuxPath[30];               /**< Path to the demux device */
     bool hardwareRestricted;          /**< Whether the adapter can only stream a
@@ -359,7 +360,8 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
     DVBAdapter_t *result = NULL;
     int monitorFds[2];
     struct ev_loop *inputLoop;
-
+    bool lnbInput = FALSE;
+    
     if (dvbSource == NULL)
     {
         dvbSource = EventsRegisterSource("DVBAdapter");
@@ -441,6 +443,7 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
                     result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),1);
                     result->supportedDelSystems->systems[0] = DELSYS_DVBS;
                 }
+                lnbInput = TRUE;
                 break;
             case FE_QAM:
                 result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),1);
@@ -545,6 +548,12 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
             PropertyType_String, result, DVBPropertyDeliverySystemsGet, NULL);
         PropertiesAddProperty(propertyParent, "active","Whether the frontend is currently in use.",
             PropertyType_Boolean, result,DVBPropertyActiveGet,DVBPropertyActiveSet);
+        if (lnbInput)
+        {
+            PropertiesAddSimpleProperty(propertyParent, "lnbsharing", 
+                "Whether this adapter is sharing an LNB so shouldn't use tone/voltage control.",
+                PropertyType_Boolean, &result->lnbSharing, SIMPLEPROPERTY_RW);            
+        }
     }
     return result;
 }
@@ -1233,7 +1242,10 @@ static void DVBCommandCallback(struct ev_loop *loop, ev_io *w, int revents)
 
             if ((adapter->currentDeliverySystem == DELSYS_DVBS) || (adapter->currentDeliverySystem == DELSYS_DVBS2))
             {
-                DVBFrontEndSatelliteSetup(adapter);
+                if (!adapter->lnbSharing)
+                {
+                    DVBFrontEndSatelliteSetup(adapter);
+                }
             }
 #if (DVB_API_VERSION < 5)
 
