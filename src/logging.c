@@ -43,6 +43,7 @@ Logging functions.
 *******************************************************************************/
 static void LoggingInitCommon(int logLevel);
 static void LogImpl(int level, const char *module, const char * format, va_list valist);
+static int LogGetModuleLevel(const char *module, int level);
 static char *LogGetThreadName(pthread_t thread);
 static int LogGetModuleLevel(const char *module, int level);
 
@@ -234,8 +235,7 @@ void LogModule(int level, const char *module, char *format, ...)
             fprintf(stderr, "\n");
         }
     }
-    level = LogGetModuleLevel(module, level);
-    if (level <= verbosity)
+    if (LogGetModuleLevel(module, level) <= verbosity)
     {
         va_start(valist, format);
         LogImpl(level, module, format, valist);
@@ -314,7 +314,7 @@ static int LogGetModuleLevel(const char *module, int level)
     {
         if (strcmp(modLevel->module, module) == 0)
         {
-            if (level > modLevel->level)
+            if (level < modLevel->level)
             {
                 result = verbosity + 1;
             }
