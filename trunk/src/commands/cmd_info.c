@@ -79,6 +79,7 @@ static void CommandGetProperty(int argc, char **argv);
 static void CommandSetProperty(int argc, char **argv);
 static void CommandPropertyInfo(int argc, char **argv);
 static void CommandDumpTSReader(int argc, char **argv);
+static void CommandListLNBs(int argc, char **argv);
 static char* GetPropertyTypeString(PropertyType_e type);
 
 /*******************************************************************************
@@ -213,6 +214,13 @@ Command_t CommandDetailsInfo[] =
         "Dump information from the TSReader",
         "Dump information from the TSReader",
         CommandDumpTSReader
+    },
+    {
+        "lslnbs",
+        0,0,
+        "List known LNBs",
+        "List the LNBs that dvbstreamer knows about and the name used to select them",
+        CommandListLNBs 
     },
     COMMANDS_SENTINEL
 };
@@ -888,6 +896,24 @@ static void CommandDumpTSReader(int argc, char **argv)
     }
     TSReaderUnLock(reader);
 }
+
+static void CommandListLNBs(int argc, char **argv)
+{
+    LNBInfo_t *knownLNB;
+    int i = 0;
+    for (i = 0; (knownLNB = LNBEnumerate(i)); i ++)
+    {
+        char **desclines;
+        CommandPrintf("%s :\n", knownLNB->name);
+
+        for (desclines = knownLNB->desc; *desclines; desclines ++)
+        {
+            CommandPrintf("   %s\n", *desclines);
+        }
+        CommandPrintf("\n");
+    }
+}
+
 static char* GetPropertyTypeString(PropertyType_e type)
 {
     char *typeStr = NULL;

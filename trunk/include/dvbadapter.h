@@ -164,9 +164,15 @@ char* DVBFrontEndParametersGet(DVBAdapter_t *adapter, DVBDeliverySystem_e *syste
  * Set the LNB LO frequencies.
  * @param adapter The adapter to set the LNB information on.
  * @param lnbInfo Pointer to an LNBInfo structure.
- * @return 0 on success, non-zero otherwise.
  */
 void DVBFrontEndLNBInfoSet(DVBAdapter_t *adapter, LNBInfo_t *lnbInfo);
+
+/**
+ * Get the LNB LO frequencies.
+ * @param adapter The adapter to get the LNB information on.
+ * @param lnbInfo Pointer to an LNBInfo structure to store the LNB information in.
+ */
+void DVBFrontEndLNBInfoGet(DVBAdapter_t *adapter, LNBInfo_t *lnbInfo);
 
 /**
  * Retrieve the status of the frontend of the specified adapter.

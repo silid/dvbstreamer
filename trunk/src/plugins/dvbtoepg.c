@@ -202,7 +202,7 @@ PLUGIN_INTERFACE_CF(
 * Global variables                                                             *
 *******************************************************************************/
 
-static TSFilterGroup_t *tsgroup;
+static TSFilterGroup_t *tsgroup = NULL;
 static dvbpsi_handle eitDemux = NULL, freesatDemux = NULL;
 static List_t *serviceNowNextInfoList;
 
