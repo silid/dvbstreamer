@@ -307,6 +307,11 @@ void DVBFrontEndLNBInfoSet(DVBAdapter_t *adapter, LNBInfo_t *info)
     adapter->lnbInfo = *info;
 }
 
+void DVBFrontEndLNBInfoGet(DVBAdapter_t *adapter, LNBInfo_t *lnbInfo)
+{
+    *lnbInfo = adapter->lnbInfo;
+}
+
 bool DVBFrontEndIsLocked(DVBAdapter_t *adapter)
 {
     return adapter->frontEndLocked;

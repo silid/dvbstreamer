@@ -230,9 +230,9 @@ int main(int argc, char *argv[])
     if ((channelsFileType == DELSYS_DVBS) || (channelsFileType == DELSYS_DVBS2))
     {
         /* Write out LNB settings. */
-        DBaseMetadataSetInt(METADATA_NAME_LNB_LOW_FREQ, lnbInfo.lowFrequency * 1000);
-        DBaseMetadataSetInt(METADATA_NAME_LNB_HIGH_FREQ, lnbInfo.highFrequency * 1000);
-        DBaseMetadataSetInt(METADATA_NAME_LNB_SWITCH_FREQ, lnbInfo.switchFrequency * 1000);
+        DBaseMetadataSetInt(METADATA_NAME_LNB_LOW_FREQ, lnbInfo.lowFrequency);
+        DBaseMetadataSetInt(METADATA_NAME_LNB_HIGH_FREQ, lnbInfo.highFrequency);
+        DBaseMetadataSetInt(METADATA_NAME_LNB_SWITCH_FREQ, lnbInfo.switchFrequency);
     }
 #endif
 

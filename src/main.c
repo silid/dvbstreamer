@@ -506,6 +506,22 @@ int main(int argc, char *argv[])
     LogModule(LOG_DEBUGV, MAIN, "Processors destroyed\n");
     /* Close the adapter and shutdown the filter etc*/
     DEINIT(TSReaderDestroy(TSReader), "TS filter");
+
+    DVBFrontEndLNBInfoGet(DVBAdapter, &lnbInfo);
+
+    if (lnbInfo.name)
+    {
+        DBaseMetadataSet(METADATA_NAME_LNB, lnbInfo.name);
+    }
+    else
+    {
+        DBaseMetadataDelete(METADATA_NAME_LNB);
+        DBaseMetadataSetInt(METADATA_NAME_LNB_LOW_FREQ, (int)lnbInfo.lowFrequency);
+        DBaseMetadataSetInt(METADATA_NAME_LNB_HIGH_FREQ, (int)lnbInfo.highFrequency);
+        DBaseMetadataSetInt(METADATA_NAME_LNB_SWITCH_FREQ, (int)lnbInfo.switchFrequency);        
+    }
+        
+    
     DEINIT(DVBDispose(DVBAdapter), "DVB adapter");
 
     DEINIT(CacheDeInit(), "cache");
