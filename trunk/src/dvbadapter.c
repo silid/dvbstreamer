@@ -199,6 +199,8 @@ static int DVBPropertyLNBLowFreqGet(void *userArg, PropertyValue_t *value);
 static int DVBPropertyLNBSwitchFreqGet(void *userArg, PropertyValue_t *value);
 static int DVBPropertyLNBNameGet(void *userArg, PropertyValue_t *value);
 static int DVBPropertyLNBNameSet(void *userArg, PropertyValue_t *value);
+static int DVBPropertyLNBSharingGet(void *userArg, PropertyValue_t *value);
+static int DVBPropertyLNBSharingSet(void *userArg, PropertyValue_t *value);
 
 static char * MapValueToString(StringToParamMapping_t *mapping, uint32_t value, char *defaultValue);
 static uint32_t MapStringToValue(StringToParamMapping_t *mapping, const char *str, uint32_t defaultValue);
@@ -562,9 +564,9 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
             PropertiesAddProperty(propertyParent, "lnb",
                 "LNB Name",
                 PropertyType_String, result, DVBPropertyLNBNameGet, DVBPropertyLNBNameSet);
-            PropertiesAddSimpleProperty(lnbPropertyParent, "sharing",
+            PropertiesAddProperty(lnbPropertyParent, "sharing",
                 "Whether this adapter is sharing an LNB so shouldn't use tone/voltage control.",
-                PropertyType_Boolean, &result->lnbSharing, SIMPLEPROPERTY_RW);
+                PropertyType_Boolean, result, DVBPropertyLNBSharingGet,DVBPropertyLNBSharingSet);
             PropertiesAddProperty(lnbPropertyParent, "high",
                 "High frequency",
                 PropertyType_Int, result, DVBPropertyLNBHighFreqGet,DVBPropertyLNBHighFreqSet);
@@ -1451,6 +1453,33 @@ static int DVBPropertyLNBNameSet(void *userArg, PropertyValue_t *value)
 
     adapter->lnbInfo = newInfo;
 
+    return 0;
+}
+
+static int DVBPropertyLNBSharingGet(void *userArg, PropertyValue_t *value)
+{
+    DVBAdapter_t *adapter = userArg;
+    value->u.boolean = adapter->lnbSharing;
+    return 0;
+}
+
+static int DVBPropertyLNBSharingSet(void *userArg, PropertyValue_t *value)
+{
+    DVBAdapter_t *adapter = userArg;
+    adapter->lnbSharing = value->u.boolean;
+    if (adapter->lnbSharing)
+    {
+        if (ioctl(adapter->frontEndFd, FE_SET_TONE, SEC_TONE_OFF) < 0)
+        {
+            LogModule(LOG_ERROR, DVBADAPTER, "Failed to set tone off");
+        }
+
+        if (ioctl(adapter->frontEndFd, FE_SET_VOLTAGE, SEC_VOLTAGE_OFF) < 0)
+        {
+            LogModule(LOG_ERROR, DVBADAPTER, "Failed to set voltage off");
+        }
+
+    }
     return 0;
 }
 
