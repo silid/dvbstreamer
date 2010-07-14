@@ -158,9 +158,9 @@ static void ScanCurrentMultiplexes(void);
 #if defined(ENABLE_DVB)
 static void ScanFullDVBT(void);
 static void ScanFullDVBC(void);
-static void TryTuneDVBC(MultiplexList_t *muxList, MuxFrequencies_t *muxFreqList, 
+static void TryTuneDVBC(MultiplexList_t *muxList, MuxFrequencies_t *muxFreqList,
                              unsigned int freq, char *inversion, char *code_rate,
-                            __u32 *symbolRates, int nrofSymbolRates, 
+                            __u32 *symbolRates, int nrofSymbolRates,
                             char **modulations, int nrofModulations);
 
 static void SDTEventListener(void *arg, Event_t event, void *payload);
@@ -217,10 +217,10 @@ Command_t CommandDetailsScanning[] =
         "Tunes to all known multiplexes and waits for up to 5 seconds on each multiplex to acquire service information.\n"
         "scan full\n"
         "Performs a full spectrum scan looking for available multiplexes. This method only supports DVB-T/C and ATSC.\n"
-        "scan network <initial tuning data>\n"
+        "scan net <initial tuning data>\n"
         "Performs a network scan using the initial tuning data provided this is in the same format as supplied in the initial tuning data files supplied with the dvb-utils from linuxtv.org.\n"
         "The tuning data should be quoted, ie\n"
-        "scan network \"T 489833000 8MHz 3/4 NONE QAM16 2k 1/32 NONE\"\n"
+        "scan net \"T 489833000 8MHz 3/4 NONE QAM16 2k 1/32 NONE\"\n"
         "Networks can be scan by calling this command more than once with different initial tuning data.\n",
         CommandScan
     },
@@ -291,9 +291,9 @@ static bool ATSCScanCable = TRUE;
 int deliverySystemRanges[] = {
      0, /* DELSYS_DVBS  */
      0, /* DELSYS_DVBC  */
-166670, /* DELSYS_DVBT  */    
- 28615, /* DELSYS_ATSC  */    
-     0, /* DELSYS_DVBS2 */    
+166670, /* DELSYS_DVBT  */
+ 28615, /* DELSYS_ATSC  */
+     0, /* DELSYS_DVBS2 */
 };
 
 static enum ScanType_e scanType = ScanType_List;
@@ -326,11 +326,11 @@ void CommandInstallScanning(void)
 
     scanEventSource = EventsRegisterSource("Scan");
     scanStartEvent = EventsRegisterEvent(scanEventSource, "Started", ScanEventToString); /* TODO Add ToString func */
-    scanEndEvent = EventsRegisterEvent(scanEventSource, "Finished", NULL); /* TODO Add ToString func */    
-    scanCanceledEvent = EventsRegisterEvent(scanEventSource, "Cancel", NULL); /* TODO Add ToString func */    
-    scanTryingMuxEvent = EventsRegisterEvent(scanEventSource, "Trying", ScanEventToString); /* TODO Add ToString func */    
-    scanMuxAddedEvent = EventsRegisterEvent(scanEventSource, "Found", NULL); /* TODO Add ToString func */    
-    
+    scanEndEvent = EventsRegisterEvent(scanEventSource, "Finished", NULL); /* TODO Add ToString func */
+    scanCanceledEvent = EventsRegisterEvent(scanEventSource, "Cancel", NULL); /* TODO Add ToString func */
+    scanTryingMuxEvent = EventsRegisterEvent(scanEventSource, "Trying", ScanEventToString); /* TODO Add ToString func */
+    scanMuxAddedEvent = EventsRegisterEvent(scanEventSource, "Found", NULL); /* TODO Add ToString func */
+
     loop = DispatchersGetInput();
     ev_async_init(&scanStartAsync, ScanStartStopWatcher);
     ev_timer_init(&timeoutTimer, TimeoutWatcher, 1.0, 1.0);
@@ -342,12 +342,12 @@ void CommandInstallScanning(void)
         EventsRegisterEventListener(EventsFindEvent("DVB.NIT"),NITEventListener, NULL);
 
     }
-#endif    
+#endif
 
 #if defined(ENABLE_ATSC)
     if (MainIsATSC())
     {
-        EventsRegisterEventListener(EventsFindEvent("ATSC.VCT"),VCTEventListener, NULL);        
+        EventsRegisterEventListener(EventsFindEvent("ATSC.VCT"),VCTEventListener, NULL);
     }
 #endif
 
@@ -363,10 +363,10 @@ void CommandInstallScanning(void)
         PropertyType_Int, &currentScanState, SIMPLEPROPERTY_R);
 
     PropertiesAddSimpleProperty(propertyParent, "position", "Get the current position within the list of frequencies to scan.",
-        PropertyType_Int, &toScan.pos, SIMPLEPROPERTY_R);    
+        PropertyType_Int, &toScan.pos, SIMPLEPROPERTY_R);
     PropertiesAddSimpleProperty(propertyParent, "total", "Get the total number of frequencies to scan.",
-        PropertyType_Int, &toScan.count, SIMPLEPROPERTY_R);    
-    
+        PropertyType_Int, &toScan.count, SIMPLEPROPERTY_R);
+
     PropertiesAddSimpleProperty(propertyParent, "removefailed", "Whether frequencies currently in the database that fail to lock should be removed.",
         PropertyType_Boolean, &removeFailedFreqs, SIMPLEPROPERTY_RW);
 
@@ -379,7 +379,7 @@ void CommandInstallScanning(void)
         PropertyType_Int, &lockTimeoutC, SIMPLEPROPERTY_RW);
     PropertiesAddSimpleProperty(propertyParent, "tablestimeout", "Number of seconds to wait for the required tables.",
         PropertyType_Int, &tablesTimeout, SIMPLEPROPERTY_RW);
-    
+
 #if defined(ENABLE_DVB)
     /* DVB-T Properties */
     sprintf(propertyName, "%s.dvb.t", propertyParent);
@@ -409,7 +409,7 @@ void CommandUnInstallScanning(void)
 {
     struct ev_loop *loop = DispatchersGetInput();
     ev_async_stop(loop, &scanStartAsync);
-    
+
     CommandUnRegisterCommands(CommandDetailsScanning);
     PropertiesRemoveAllProperties(propertyParent);
     EventsUnregisterEventListener(EventsFindEvent("DVBAdapter.Locked"),FELockedEventListener, NULL);
@@ -437,12 +437,12 @@ void CommandUnInstallScanning(void)
 
 static void CommandScan(int argc, char **argv)
 {
-    
+
     Multiplex_t *multiplex;
     int i;
     DVBAdapter_t *adapter;
     DVBSupportedDeliverySys_t *supportedDelSys;
-    
+
     CommandCheckAuthenticated();
     pthread_mutex_lock(&scanningmutex);
     if (currentScanState != ScanState_Stopped)
@@ -506,6 +506,10 @@ static void CommandScan(int argc, char **argv)
                 CommandPrintf("Scanning %d\n", multiplex->uid);
                 ScanListAddEntry(multiplex->deliverySystem, multiplex, NULL);
                 ScanStart(ScanType_List);
+            }
+            else
+            {
+                CommandError(COMMAND_ERROR_GENERIC, "Failed to find multiplex to scan!");
             }
         }
     }
@@ -665,7 +669,7 @@ static void ScanFullDVBT(void)
                                                         constellation,
                                                         transmit_mode,
                                                         guard_interval,
-                                                        hierarchy);                    
+                                                        hierarchy);
                 }
                 ScanListAddEntry(DELSYS_DVBT, NULL, docs);
             }
@@ -712,7 +716,7 @@ static void ScanFullDVBT(void)
                                                         constellation,
                                                         transmit_mode,
                                                         guard_interval,
-                                                        hierarchy);                    
+                                                        hierarchy);
                 }
                 ScanListAddEntry(DELSYS_DVBT, NULL, docs);
             }
@@ -734,7 +738,7 @@ static void ScanFullDVBC(void)
     char *code_rate;
     DVBAdapter_t *adapter = MainDVBAdapterGet();
     MultiplexList_t *muxList = MultiplexGetAll();
-    MuxFrequencies_t *muxFreqList = ParseMuxListFrequencies(muxList);    
+    MuxFrequencies_t *muxFreqList = ParseMuxListFrequencies(muxList);
 
     if (DVBFrontEndParameterSupported(adapter, DELSYS_DVBC, "Inversion", AUTO))
     {
@@ -797,9 +801,9 @@ static void ScanFullDVBC(void)
     ObjectRefDec(muxFreqList);
 }
 
-static void TryTuneDVBC(MultiplexList_t *muxList, MuxFrequencies_t *muxFreqList, 
+static void TryTuneDVBC(MultiplexList_t *muxList, MuxFrequencies_t *muxFreqList,
                              unsigned int freq, char *inversion, char *code_rate,
-                            __u32 *symbolRates, int nrofSymbolRates, 
+                            __u32 *symbolRates, int nrofSymbolRates,
                             char **modulations, int nrofModulations)
 {
     Multiplex_t *mux;
@@ -832,7 +836,7 @@ static void TryTuneDVBC(MultiplexList_t *muxList, MuxFrequencies_t *muxFreqList,
         }
 
     }
-    
+
 
 }
 #endif
@@ -846,12 +850,12 @@ static void ScanFullATSC(void)
     int channel;
     int base_offset = 0;
     unsigned int freq;
-    
+
     if (ATSCScanOTA)
     {
         for (channel = 2; (channel <= 69) && !cancelScan; channel++)
         {
-            
+
 
             if (channel < 5)
             {
@@ -870,7 +874,7 @@ static void ScanFullATSC(void)
                 base_offset = 389028615;
             }
             freq = base_offset + (channel * 6000000);
-            
+
             mux = FindMultiplexFrequency(muxList, muxFreqList, freq, 28615, NULL, 0);
             if (mux)
             {
@@ -930,7 +934,7 @@ static void ScanFullATSC(void)
                                          freq);
                 ScanListAddEntry(DELSYS_ATSC, NULL, docs);
             }
-        } 
+        }
     }
     ObjectRefDec(muxList);
     ObjectRefDec(muxFreqList);
@@ -982,13 +986,13 @@ static void ScanNetwork(char *initialdata)
         case 'C': delSys = DELSYS_DVBC; break;
         case 'A': delSys = DELSYS_ATSC; break;
     }
-    
+
     if (!DVBFrontEndDeliverySystemSupported(adapter, delSys))
     {
         CommandError(COMMAND_ERROR_GENERIC, "Frontend doesn't support the required delivery system!");
         return;
     }
-    
+
     if (DVBFrontEndParameterSupported(adapter, delSys, "Inversion", AUTO))
     {
         inversion = AUTO;
@@ -1002,7 +1006,7 @@ static void ScanNetwork(char *initialdata)
     {
 #if defined(ENABLE_DVB)
         case DELSYS_DVBT:
-            
+
             if (sscanf(initialdata, "T %u %4s %4s %4s %6s %4s %4s %4s",
                     &frequency, bwStr, fecHiStr, fecLoStr, modStr, transModeStr, guardIntStr, hierarchyStr) == 8)
             {
@@ -1033,7 +1037,7 @@ static void ScanNetwork(char *initialdata)
             if (sscanf(initialdata, "C %u %u %4s %6s", &frequency, &symbolRate, fecHiStr, modStr) == 4)
             {
                 sprintf(params, "Frequency: %u\n"
-                                "Inversion: %s\n"   
+                                "Inversion: %s\n"
                                 "Symbol Rate: %u\n"
                                 "FEC: %s\n"
                                 "Modulation: %s\n",
@@ -1144,7 +1148,7 @@ static void CheckPMTsReceived(void)
 {
     int i;
     bool all = TRUE;
-    
+
     for (i = 0; i < PMTCount; i ++)
     {
         if (!PMTsReceived[i].received)
@@ -1185,8 +1189,8 @@ static void PATEventListener(void *arg, Event_t event, void *payload)
             patentry = patentry->p_next;
         }
 
-        ScanStateMachine(ScanEvent_PATReceived);  
-        
+        ScanStateMachine(ScanEvent_PATReceived);
+
         CheckPMTsReceived();
     }
 }
@@ -1197,7 +1201,7 @@ static void PMTEventListener(void *arg, Event_t event, void *payload)
     if (currentScanState == ScanState_WaitingForTables)
     {
         struct PMTReceived_t *pr = PMTsRecievedFindOrAdd(newpmt->i_program_number);
-        
+
         if (pr)
         {
             pr->received = TRUE;
@@ -1223,12 +1227,12 @@ static void NITEventListener(void *arg, Event_t event, void *payload)
     dvbpsi_nit_transport_t *transport = NULL;
     unsigned int frequency;
     char tparams[256];
-    char sparams[256];    
+    char sparams[256];
     char *polarisation = NULL;
     DVBDeliverySystem_e delSys = DELSYS_MAX_SUPPORTED;
     tparams[0] = 0;
     sparams[0] = 0;
-    
+
 #define ADD_TRANSPONDER(_params) \
     do {\
         if (!FindTransponder(frequency, polarisation)) \
@@ -1262,7 +1266,7 @@ static void NITEventListener(void *arg, Event_t event, void *payload)
                         sparams[0] = 0;
                         dvbpsi_sat_deliv_sys_dr_t *satDelSysDr = dvbpsi_DecodeSatDelivSysDr(descriptor);
                         polarisation = polarisationTable[satDelSysDr->i_polarization];
-                        if (DVBFrontEndDeliverySystemSupported(adapter, DELSYS_DVBS) && 
+                        if (DVBFrontEndDeliverySystemSupported(adapter, DELSYS_DVBS) &&
                             (satDelSysDr->i_modulation_system != 1))
                         {
 
@@ -1282,7 +1286,7 @@ static void NITEventListener(void *arg, Event_t event, void *payload)
                             delSys = DELSYS_DVBS;
                             ADD_TRANSPONDER(sparams);
                         }
-                        if (DVBFrontEndDeliverySystemSupported(adapter, DELSYS_DVBS2) && 
+                        if (DVBFrontEndDeliverySystemSupported(adapter, DELSYS_DVBS2) &&
                             (satDelSysDr->i_modulation_system == 1))
                         {
 
@@ -1329,7 +1333,7 @@ static void NITEventListener(void *arg, Event_t event, void *payload)
                                                  ofdmGuardIntTable[terrDelSysDr->i_guard_interval],
                                                  ofdmHierarchyTable[terrDelSysDr->i_hierarchy_information],
                                                  ofdmTransmitModeTable[terrDelSysDr->i_transmission_mode]);
-                                
+
                                 delSys = DELSYS_DVBT;
                                 ADD_TRANSPONDER(tparams);
                                 if (terrDelSysDr->i_other_frequency_flag == 0)
@@ -1339,7 +1343,7 @@ static void NITEventListener(void *arg, Event_t event, void *payload)
                             }
                         }
                         break;
-                        
+
                     case 0x62:
                         {
                             dvbpsi_frequency_list_dr_t *freqListDr = dvbpsi_DecodeFrequencyListDr(descriptor);
@@ -1447,7 +1451,7 @@ static MuxFrequencies_t *ParseMuxListFrequencies(MultiplexList_t *muxList)
                     result->frequencies[i].frequency = strtoul((const char *)node->data.scalar.value, NULL, 10);
                 }
                 if ((muxList->multiplexes[i]->deliverySystem == DELSYS_DVBS) ||
-                    (muxList->multiplexes[i]->deliverySystem == DELSYS_DVBS2)) 
+                    (muxList->multiplexes[i]->deliverySystem == DELSYS_DVBS2))
                 {
                     node = YamlUtils_RootMappingFind(&document, "Polarisation");
                     if (node && (node->type == YAML_SCALAR_NODE))
@@ -1468,8 +1472,8 @@ static MuxFrequencies_t *ParseMuxListFrequencies(MultiplexList_t *muxList)
     return result;
 }
 
-static Multiplex_t *FindMultiplexFrequency(MultiplexList_t *muxList, MuxFrequencies_t *muxFreqList, 
-                                                unsigned long freq, int range, 
+static Multiplex_t *FindMultiplexFrequency(MultiplexList_t *muxList, MuxFrequencies_t *muxFreqList,
+                                                unsigned long freq, int range,
                                                 char *polarisation, int satNumber)
 {
     int i;
@@ -1502,7 +1506,7 @@ static void ProcessTransponderList(void)
     ListIterator_t iterator;
     MultiplexList_t *muxList = MultiplexGetAll();
     MuxFrequencies_t *muxFreqList = ParseMuxListFrequencies(muxList);
-    
+
     if (ListCount(transponderList) > 0)
     {
         for (ListIterator_Init(iterator, transponderList); ListIterator_MoreEntries(iterator); ListIterator_Next(iterator))
@@ -1516,7 +1520,7 @@ static void ProcessTransponderList(void)
             }
             else
             {
-                mux = FindMultiplexFrequency(muxList, muxFreqList, 
+                mux = FindMultiplexFrequency(muxList, muxFreqList,
                                              entry->frequency, deliverySystemRanges[entry->delSys],
                                              entry->polarisation, DVBSSatNumber);
                 if (mux)
@@ -1592,7 +1596,7 @@ static void ScanStateMachine(enum ScanEvent_e event)
                 if (event == ScanEvent_StateEntered)
                 {
                     EventsFireEventListeners(scanStartEvent,NULL);
-                    ev_timer_start(DispatchersGetInput(), &timeoutTimer); 
+                    ev_timer_start(DispatchersGetInput(), &timeoutTimer);
                     currentService = TuningCurrentServiceGet();
                     TuningCurrentServiceLock();
                     PMTCount = MAX_PMT_COUNT;
@@ -1605,7 +1609,7 @@ static void ScanStateMachine(enum ScanEvent_e event)
                 switch (event)
                 {
                     case ScanEvent_StateEntered:
-                        
+
                         EventsFireEventListeners(scanTryingMuxEvent,NULL);
                         currentTuningParams = -1;
                         currentEntry = ScanListNextEntry();
@@ -1619,7 +1623,7 @@ static void ScanStateMachine(enum ScanEvent_e event)
                         }
                         break;
                     case ScanEvent_NextTuningParams:
-                        
+
                         currentTuningParams ++;
                         tuningParams = NULL;
                         if (currentEntry->mux)
@@ -1665,7 +1669,7 @@ static void ScanStateMachine(enum ScanEvent_e event)
                             nextEvent = ScanEvent_StateEntered;
                         }
                         break;
-                        
+
                     case ScanEvent_FELocked:
                         if (currentEntry->mux == NULL)
                         {
@@ -1679,7 +1683,7 @@ static void ScanStateMachine(enum ScanEvent_e event)
                         TuningCurrentMultiplexSet(currentEntry->mux);
                         currentScanState = ScanState_WaitingForTables;
                         break;
-                    case ScanEvent_TimerTick:                        
+                    case ScanEvent_TimerTick:
                         timeout --;
                         if (timeout <= 0)
                         {
@@ -1754,10 +1758,10 @@ static void ScanStateMachine(enum ScanEvent_e event)
                         }
                         break;
                     default:
-                        break;                        
+                        break;
                 }
                 break;
-                
+
             case ScanState_Canceling:
                 if (event == ScanEvent_StateEntered)
                 {
@@ -1766,7 +1770,7 @@ static void ScanStateMachine(enum ScanEvent_e event)
                 }
                 break;
 
-            case ScanState_Stopping: 
+            case ScanState_Stopping:
                 if (event == ScanEvent_StateEntered)
                 {
                     TuningCurrentServiceUnlock();
@@ -1779,7 +1783,7 @@ static void ScanStateMachine(enum ScanEvent_e event)
                     ScanListReset();
                     ev_timer_stop(DispatchersGetInput(), &timeoutTimer);
                     currentScanState = ScanState_Stopped;
-                }   
+                }
                 break;
             case ScanState_Stopped:
                 if (event == ScanEvent_StateEntered)
@@ -1792,12 +1796,12 @@ static void ScanStateMachine(enum ScanEvent_e event)
                 }
                 break;
         }
-        
+
         if (event == ScanEvent_Cancel)
         {
             currentScanState = ScanState_Canceling;
         }
-            
+
         if (currentScanState != previousScanState)
         {
             LogModule(LOG_INFOV,SCANNING,"Previous State (%d) != Current State(%d)", previousScanState, currentScanState);
@@ -1805,7 +1809,7 @@ static void ScanStateMachine(enum ScanEvent_e event)
         }
         LogModule(LOG_INFOV,SCANNING, "State %d Next Event = %d", currentScanState, nextEvent);
     }
-    
+
 }
 
 static void ScanListReset(void)
@@ -1863,7 +1867,7 @@ static void ScanEntryDestructor(void *ptr)
     {
         ObjectRefDec(entry->mux);
     }
-    
+
     if (entry->params)
     {
         ObjectRefDec(entry->params);
@@ -1890,7 +1894,7 @@ static void TuningParamDocsDestructor(void *ptr)
         {
             free(docs->docs[i]);
         }
-    }    
+    }
 }
 
 static int ScanEventToString(yaml_document_t *document, Event_t event, void *payload)
