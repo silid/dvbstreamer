@@ -273,7 +273,7 @@ int PropertiesSetStr(char *path, char *value)
     {
         PropertiesStrToValue(value, node->type, &newValue);
 
-        if (node->type == newValue.type)
+        if ((node->type == newValue.type) && (node->accessors.simple.set != NULL))
         {
             result = node->accessors.simple.set(node->userArg, &newValue);
         }
