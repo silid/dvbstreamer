@@ -852,8 +852,8 @@ static int DVBFrontEndSatelliteSetup(DVBAdapter_t *adapter)
     while(0)
 
 #if (DVB_API_VERSION < 5)
-    adapter->frontEndParams->frequency = LNBTransponderToIntermediateFreq(&adapter->lnbInfo, adapter->frontEndParams->frequency, &tone);
-    CHECK_IFREQ(adapter->frontEndParams->frequency);
+    adapter->frontEndParams.frequency = LNBTransponderToIntermediateFreq(&adapter->lnbInfo, adapter->frontEndParams.frequency, &tone);
+    CHECK_IFREQ(adapter->frontEndParams.frequency);
 #else
     adapter->frontEndPropertyArray[PROP_IDX_FREQ].u.data = LNBTransponderToIntermediateFreq(&adapter->lnbInfo, adapter->frontEndPropertyArray[PROP_IDX_FREQ].u.data, &tone);
     CHECK_IFREQ(adapter->frontEndPropertyArray[PROP_IDX_FREQ].u.data);
