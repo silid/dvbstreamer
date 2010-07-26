@@ -61,6 +61,7 @@ typedef struct ManualFilter_s{
 /*******************************************************************************
 * Prototypes                                                                   *
 *******************************************************************************/
+static void PluginInstall(bool installed);
 static void CommandAddMF(int argc, char **argv);
 static void CommandRemoveMF(int argc, char **argv);
 static void CommandListMF(int argc, char **argv);
@@ -148,13 +149,47 @@ PLUGIN_COMMANDS(
         CommandListMFPIDs
     }
 );
+PLUGIN_FEATURES(
+    PLUGIN_FEATURE_INSTALL(PluginInstall)
+    );
 
-PLUGIN_INTERFACE_C(
+PLUGIN_INTERFACE_CF(
     PLUGIN_FOR_ALL,
     "ManualFilter", "0.1",
     "Plugin to allow manual filtering of PID.",
     "charrea6@users.sourceforge.net"
     );
+
+
+static void PluginInstall(bool installed)
+{
+    if (!installed)
+    {
+        TSReader_t *tsReader = MainTSReaderGet();
+        ListIterator_t iterator;
+        ManualFilter_t *filter;
+
+        pthread_mutex_lock(&manualFiltersMutex);
+        for ( ListIterator_Init(iterator, tsReader->groups);
+              ListIterator_MoreEntries(iterator);
+              )
+        {
+            TSFilterGroup_t *group = (TSFilterGroup_t *)ListIterator_Current(iterator);
+            if (strcmp(group->type, ManualPIDFilterType) == 0)
+            {
+                ListIterator_Next(iterator);
+                filter = group->userArg;
+                TSFilterGroupDestroy(filter->tsgroup);                
+            }
+            else
+            {
+                ListIterator_Next(iterator);
+            }
+        }
+        pthread_mutex_unlock(&manualFiltersMutex);
+
+    }
+}
 
 /*******************************************************************************
 * Command Functions                                                            *
