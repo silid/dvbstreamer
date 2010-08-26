@@ -52,7 +52,7 @@ Generic type definitions.
 /**
  * Boolean type
  */
-typedef int bool;
+#include <stdbool.h>
 
 /** @} */
 #endif
