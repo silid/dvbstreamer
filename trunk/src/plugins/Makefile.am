@@ -15,6 +15,7 @@ plugins_LTLIBRARIES = \
 	sicapture.la \
 	eventsdispatcher.la \
 	dsmcc.la \
+	cam.la \
 	$(atsc_plugins) \
 	$(dvb_plugins)
 
@@ -115,3 +116,9 @@ dsmcc_la_SOURCES = \
 
 dsmcc_la_LIBADD = -lz
 dsmcc_la_LDFLAGS = -module -no-undefined -avoid-version
+
+cam_la_SOURCES = \
+   cam.c \
+   en50221.c
+
+cam_la_LDFLAGS = -module -no-undefined -avoid-version
