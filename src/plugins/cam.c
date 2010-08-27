@@ -29,7 +29,11 @@ Plugin to enable use of a CAM to decrypt content.
 #include "logging.h"
 #include "plugin.h"
 #include "dvbpsi/pmt.h"
+#include "dispatchers.h"
+#include "properties.h"
 
+#include <linux/dvb/ca.h>
+#include "en50221.h"
 
 /*******************************************************************************
 * Prototypes                                                                   *
@@ -40,6 +44,7 @@ static void ProcessPMT(dvbpsi_pmt_t *pmt);
 * Global variables                                                             *
 *******************************************************************************/
 static char CAM[] = "CAM";
+static ev_timer pollTimer;
 /*******************************************************************************
 * Plugin Setup                                                                 *
 *******************************************************************************/
@@ -57,7 +62,7 @@ PLUGIN_INTERFACE_F(
 );
 
 /*******************************************************************************
-* NIT Processing Function                                                      *
+* PMT Processing Function                                                      *
 *******************************************************************************/
 static void ProcessPMT(dvbpsi_pmt_t *pmt)
 {
@@ -65,19 +70,46 @@ static void ProcessPMT(dvbpsi_pmt_t *pmt)
     pmt = pmt;
 }
 
+static void camPollTimer(struct ev_loop *loop, ev_timer *w, int revents)
+{
+    en50221_Poll();
+}
+
 /*******************************************************************************
 * Local Functions                                                              *
 *******************************************************************************/
 static void Install(bool installed)
 {
+
     if (installed)
     {
+        PropertyValue_t adapterProp;
+
         LogModule(LOG_INFO, CAM, "Installing");
         /* Register for service filter events */
+        if (PropertiesGet("adapter.number", &adapterProp))
+        {
+            LogModule(LOG_ERROR, CAM, "Failed to get adapter number!");
+        }
+        else
+        {
+            ev_tstamp timeout = (ev_tstamp)i_ca_timeout / 1000000.0;
+            en50221_Init(adapterProp.u.integer);
+            ev_timer_init(&pollTimer, camPollTimer, timeout, timeout);
+            ev_timer_start(DispatchersGetInput(), &pollTimer);
+        }
     }
     else
     {
         /* Unregister service filter events */
         LogModule(LOG_INFO, CAM, "Uninstalling");
+        ev_timer_stop(DispatchersGetInput(), &pollTimer);
+        en50221_Reset();
     }
+}
+
+
+void demux_ResendCAPMTs(void)
+{
+    /* Resend PMTs */
 }

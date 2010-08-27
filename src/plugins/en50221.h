@@ -109,6 +109,11 @@ struct cmd_mmi_send
 
 extern int i_ca_handle;
 extern int i_ca_type;
+extern int b_slow_cam;
+
+typedef int64_t mtime_t;
+extern mtime_t i_ca_timeout;
+
 
 /*****************************************************************************
  * Prototypes
@@ -128,6 +133,8 @@ uint8_t en50221_GetMMIObject( uint8_t *p_buffer, ssize_t i_size,
                               uint8_t *p_answer, ssize_t *pi_size );
 uint8_t en50221_SendMMIObject( uint8_t *p_buffer, ssize_t i_size );
 
+
+void demux_ResendCAPMTs(void);
 
 /*
  * This is where it gets scary: do not show to < 18 yrs old

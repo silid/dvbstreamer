@@ -70,7 +70,7 @@ static char EN50221[]= "EN50221";
 #define msg_Err(_u, msg...)\
     LogModule(LOG_ERROR, EN50221, msg)
 
-typedef int64_t mtime_t;
+
 int b_slow_cam = 0;
 mtime_t i_ca_timeout = 0;
 
@@ -1372,9 +1372,7 @@ static void ConditionalAccessHandle( access_t * p_access, int i_session_id,
         }
         p_ids->pi_system_ids[i] = 0;
 
-        /* TODO Send PMT to CAM
         demux_ResendCAPMTs();
-        */
         break;
     }
 
