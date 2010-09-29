@@ -200,6 +200,7 @@ static DeliveryMethodInstance_t *OutputsCreate(char *arg)
     }
     state->instance.ops = &OutputInstanceOps;
     state->instance.mrl = output->mrl;
+    state->output = output;
     return &state->instance;
 }
 
