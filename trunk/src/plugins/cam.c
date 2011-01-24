@@ -25,12 +25,15 @@ Plugin to enable use of a CAM to decrypt content.
 #include <stdint.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "logging.h"
 #include "plugin.h"
 #include "dvbpsi/pmt.h"
 #include "dispatchers.h"
 #include "properties.h"
+#include "servicefilter.h"
+#include "main.h"
 
 #include <linux/dvb/ca.h>
 #include "en50221.h"
@@ -40,11 +43,14 @@ Plugin to enable use of a CAM to decrypt content.
 *******************************************************************************/
 static void Install(bool installed);
 static void ProcessPMT(dvbpsi_pmt_t *pmt);
+static bool PMTDoesNeedDecrypting(dvbpsi_pmt_t *pmt);
 /*******************************************************************************
 * Global variables                                                             *
 *******************************************************************************/
 static char CAM[] = "CAM";
 static ev_timer pollTimer;
+static ServiceFilter_t primaryFilter = NULL;
+static dvbpsi_pmt_t *currentPMT = NULL;
 /*******************************************************************************
 * Plugin Setup                                                                 *
 *******************************************************************************/
@@ -62,18 +68,72 @@ PLUGIN_INTERFACE_F(
 );
 
 /*******************************************************************************
+* CAM Processing Function                                                      *
+*******************************************************************************/
+void demux_ResendCAPMTs(void)
+{
+    /* Resend PMTs */
+    if (currentPMT)
+    {
+        en50221_AddPMT(currentPMT);
+    }
+}
+
+/*******************************************************************************
 * PMT Processing Function                                                      *
 *******************************************************************************/
 static void ProcessPMT(dvbpsi_pmt_t *pmt)
 {
-    /* Do nothing */
-    pmt = pmt;
+    bool was_decrypting = false;
+    bool needs_decrypting = false;
+    Service_t *service;
+    
+    if (!primaryFilter)
+    {
+        return;
+    }
+    
+    service = ServiceFilterServiceGet(primaryFilter);
+    
+    if (pmt->i_program_number == service->id)
+    {
+        needs_decrypting = PMTDoesNeedDecypting(pmt);
+        
+        if (currentPMT)
+        {
+            if (needs_decrypting)
+            {
+                en50221_UpdatePMT(pmt);
+            }
+            else
+            {
+                en50221_DeletePMT(currentPMT);
+            }
+            ObjectRefDec(currentPMT);
+            currentPMT = NULL;        
+        }
+        else
+        {
+            if (needs_decrypting)
+            {
+                en50221_AddPMT(currentPMT);
+            }
+        }
+       
+        if (needs_decrypting)
+        {
+            currentPMT = pmt;
+            ObjectRefInc(pmt);
+        }
+    }
+
 }
 
 static void camPollTimer(struct ev_loop *loop, ev_timer *w, int revents)
 {
     en50221_Poll();
 }
+
 
 /*******************************************************************************
 * Local Functions                                                              *
@@ -97,6 +157,11 @@ static void Install(bool installed)
             en50221_Init(adapterProp.u.integer);
             ev_timer_init(&pollTimer, camPollTimer, timeout, timeout);
             ev_timer_start(DispatchersGetInput(), &pollTimer);
+            /* Only bother to retrieve the primary filter if we have a CAM */
+            if (i_ca_handle)
+            {
+                primaryFilter = MainServiceFilterGetPrimary();
+            }
         }
     }
     else
@@ -109,7 +174,27 @@ static void Install(bool installed)
 }
 
 
-void demux_ResendCAPMTs(void)
+static bool PMTDoesNeedDecrypting(dvbpsi_pmt_t *pmt)
 {
-    /* Resend PMTs */
+    dvbpsi_descriptor_t *desc;
+    dvbpsi_pmt_es_t *es;
+    for(desc = pmt->p_first_descriptor; desc; desc = desc->p_next)
+    {
+        if (desc->i_tag == 9)
+        {
+            return true;
+        }
+    }
+    for (es = pmt->p_first_es; es; es = es->p_next)
+    {
+        for(desc = es->p_first_descriptor; desc; desc = desc->p_next)
+        {
+            if (desc->i_tag == 9)
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
