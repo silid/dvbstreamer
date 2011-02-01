@@ -194,7 +194,8 @@ static void FilterPacket(void *arg, TSFilterGroup_t *group, TSPacket_t *packet)
                     break;
             }
         }
-        else
+        
+        if (MainIsATSC())
         {
             if (pid == 0x1ffb)
             {
@@ -229,6 +230,36 @@ static void FilterPacket(void *arg, TSFilterGroup_t *group, TSPacket_t *packet)
                     }
                 }
 
+            }
+        }
+        
+        if (MainIsISDB())
+        {
+            switch(pid)
+            {
+                case 0x10: /* NIT, ST*/
+                case 0x11: /* SDT, BAT, ST*/
+                case 0x12: /* EIT, ST, CIT */
+                case 0x13: /* RST, ST */
+                case 0x14: /* TDT, TOT, ST */
+                case 0x16: /* RNT */
+                case 0x17: /* DCT */
+                case 0x1e: /* DIT */
+                case 0x1f: /* SIT */
+                case 0x20: /* LIT */
+                case 0x21: /* ERT */
+                case 0x22: /* PCAT */
+                case 0x23: /* SDTT */
+                case 0x24: /* BIT */
+                case 0x25: /* NBIT, LDT */
+                case 0x26: /* EIT */
+                case 0x27: /* EIT */
+                case 0x28: /* SDTT */
+                case 0x29: /* CDT */
+                    result = 1;
+                    break;
+                default:
+                    break;
             }
         }
     }
