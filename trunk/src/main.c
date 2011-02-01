@@ -361,7 +361,7 @@ int main(int argc, char *argv[])
     if (MainIsISDB())
     {
         LogModule(LOG_INFO, MAIN, "Starting ISDB filters\n");
-        INIT(MPEG2StandardInit(TSReader), "ATSC Filters");
+        INIT(MPEG2StandardInit(TSReader), "ISDB Filters");
     }
     
     INIT(ServiceFilterInit(), "service filter");
@@ -503,18 +503,26 @@ int main(int argc, char *argv[])
     
     DEINIT(CommandDeInit(), "commands");
     DEINIT(ServiceFilterDeInit(), "service filter");
+
     if (MainIsDVB())
     {
 #if defined(ENABLE_DVB)
         DVBStandardDeinit(TSReader);
 #endif
     }
-    else
+
+    if (MainIsATSC())
     {
 #if defined(ENABLE_ATSC)
         ATSCStandardDeinit(TSReader);
 #endif
     }
+    
+    if (MainIsISDB())
+    {
+        MPEG2StandardDeinit(TSReader);
+    }
+
     LogModule(LOG_DEBUGV, MAIN, "Processors destroyed\n");
     /* Close the adapter and shutdown the filter etc*/
     DEINIT(TSReaderDestroy(TSReader), "TS filter");
