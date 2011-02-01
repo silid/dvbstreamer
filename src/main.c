@@ -433,7 +433,7 @@ int main(int argc, char *argv[])
 
     if (DBaseMetadataGetInt(METADATA_NAME_SCAN_ALL, &scanAll) == 0)
     {
-        if (scanAll)
+        if (scanAll && !forceISDB)
         {
             printf("New setup, performing initial scan to fill in missing details.\n");
             if (!CommandExecuteConsole("scan all"))
