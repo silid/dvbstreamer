@@ -89,6 +89,7 @@ typedef enum DVBDeliverySystem_e {
     DELSYS_ATSC,
     DELSYS_DVBS2,
     DELSYS_DVBT2,
+    DELSYS_ISDBT,
     DELSYS_MAX_SUPPORTED
 } DVBDeliverySystem_e; 
 
@@ -124,9 +125,10 @@ typedef struct DVBAdapter_s DVBAdapter_t;
  * @param adapter The adapter number of the devices to open.
  * @param hwRestricted Whether the adapter can only stream a portion of the 
  *                     transport stream.
+ * @param forceISDB Force only ISDB to be supported.
  * @return a DVBAdapter_t structure or NULL if the adapter could not be opened.
  */
-DVBAdapter_t *DVBInit(int adapter, bool hwRestricted);
+DVBAdapter_t *DVBInit(int adapter, bool hwRestricted, bool forceISDB);
 
 /**
  * Close a DVPAdapter.

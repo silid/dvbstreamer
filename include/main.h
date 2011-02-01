@@ -86,4 +86,10 @@ bool MainIsDVB();
  */
 bool MainIsATSC();
 
+/**
+ * Used to determine whether DVBStreamer is using a ISDB frontend.
+ * @return TRUE if the frontend is a ISDB frontend, FALSE if it is not.
+ */
+bool MainIsISDB();
+
 #endif
