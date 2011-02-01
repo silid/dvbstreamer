@@ -119,7 +119,7 @@ static Event_t feIdleEvent;
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
-DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
+DVBAdapter_t *DVBInit(int adapter, bool hwRestricted, bool forceISDB)
 {
     DVBAdapter_t *result = NULL;
     int monitorFds[2];
@@ -619,6 +619,11 @@ static int DVBOpenAdapterFile(DVBAdapter_t *adapter)
             if (strcasecmp(type, "ATSC") == 0)
             {
                 adapter->supportedDelSystems->systems[0] = DELSYS_ATSC;
+                result = 0;
+            }
+            if (strcasecmp(type, "ISDB-T") == 0)
+            {
+                adapter->supportedDelSystems->systems[0] = DELSYS_ISDBT;
                 result = 0;
             }
         }

@@ -569,7 +569,42 @@ static int parsezapline(char * str, DVBDeliverySystem_e delSys)
             NEXTFIELD();
             PARAMADD("Modulation: %s\n", find_param(modulation_list, field));
             break;
-#endif            
+#endif          
+        case DELSYS_ISDBT:
+            /* DVB-T frequency is in kHz - workaround broken channels.confs */
+            if (freq < 1000000)
+            {
+                freq*=1000;
+            }
+            SETFREQ(freq);
+
+            /* find out the inversion */
+            NEXTFIELD();
+            PARAMADD("Inversion: %s\n", find_param(inversion_list, field));
+
+            /* find out the bandwidth */
+            NEXTFIELD();
+            PARAMADD("Bandwidth: %s\n", find_param(bw_list, field));
+
+            /* find out the fec_hp */
+            NEXTFIELD();
+
+            /* find out the fec_lp */
+            NEXTFIELD();
+
+            /* find out the qam */
+            NEXTFIELD();
+
+            /* find out the transmission mode */
+            NEXTFIELD();
+            PARAMADD("Transmission Mode: %s\n", find_param(transmissionmode_list, field));
+
+            /* guard list */
+            NEXTFIELD();
+            PARAMADD("Guard Interval: %s\n", find_param(guard_list, field));
+
+            NEXTFIELD();
+            break;  
         default:
             break;
     }

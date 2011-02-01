@@ -199,6 +199,13 @@ AC_CHECK_LIB([yaml], [yaml_get_version_string], [], [AC_MSG_FAILURE([libyaml not
 LIBS=""
 
 dnl ---------------------------------------------------------------------------
+dnl Check for ltdl
+dnl ---------------------------------------------------------------------------
+AC_CHECK_HEADER([ltdl.h], [], [AC_MSG_FAILURE([libltdl (libtool) header file not found])])
+AC_CHECK_LIB([ltdl], [lt_dlinit], [], [AC_MSG_FAILURE([libltdl (libtool) not found])])
+LIBS=""
+
+dnl ---------------------------------------------------------------------------
 dnl Check for variadic macros
 dnl ---------------------------------------------------------------------------
 AC_CACHE_CHECK([for variadic cpp macros],

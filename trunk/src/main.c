@@ -61,6 +61,7 @@ Entry point to the application.
 #include "events.h"
 #include "properties.h"
 
+#include "standard/mpeg2.h"
 #include "standard/dvb.h"
 #include "standard/atsc.h"
 
@@ -151,6 +152,7 @@ int main(int argc, char *argv[])
     bool remoteInterface = FALSE;
     bool disableConsoleInput = FALSE;
     bool hwRestricted = FALSE;
+    bool forceISDB = FALSE;
     LNBInfo_t lnbInfo;
     
     DeliveryMethodInstance_t *dmInstance;
@@ -165,7 +167,7 @@ int main(int argc, char *argv[])
     while (!ExitProgram)
     {
         int c;
-        c = getopt(argc, argv, "vVdDro:a:f:u:p:n:F:i:RL:");
+        c = getopt(argc, argv, "vVdDro:a:f:u:p:n:F:i:RL:I");
         if (c == -1)
         {
             break;
@@ -210,6 +212,8 @@ int main(int argc, char *argv[])
                 case 'n': serverName = optarg;
                 break;
                 case 'i': bindAddress = optarg;
+                break;
+                case 'I': forceISDB = TRUE;
                 break;
                 default:
                 usage(argv[0]);
@@ -300,7 +304,7 @@ int main(int argc, char *argv[])
                                                                            MultiplexCount());
 
     /* Initialise the DVB adapter */
-    DVBAdapter = DVBInit(adapterNumber, hwRestricted);
+    DVBAdapter = DVBInit(adapterNumber, hwRestricted, forceISDB);
     if (!DVBAdapter)
     {
         printf("Could not open dvb adapter %d!\n", adapterNumber);
@@ -345,13 +349,21 @@ int main(int argc, char *argv[])
         INIT(DVBStandardInit(TSReader), "DVB Filters");
 #endif
     }
-    else
+    
+    if (MainIsATSC())
     {
 #if defined(ENABLE_ATSC)
         LogModule(LOG_INFO, MAIN, "Starting ATSC filters\n");
         INIT(ATSCStandardInit(TSReader), "ATSC Filters");
 #endif
     }
+    
+    if (MainIsISDB())
+    {
+        LogModule(LOG_INFO, MAIN, "Starting ISDB filters\n");
+        INIT(MPEG2StandardInit(TSReader), "ATSC Filters");
+    }
+    
     INIT(ServiceFilterInit(), "service filter");
     INIT(CommandInit(), "commands");
 
@@ -660,6 +672,21 @@ bool MainIsATSC()
     return FALSE;
 #endif
 }
+
+bool MainIsISDB()
+{
+    int i;
+    DVBSupportedDeliverySys_t *supportedSystems = DVBFrontEndGetDeliverySystems(DVBAdapter);
+    for ( i = 0; i < supportedSystems->nrofSystems; i ++)
+    {
+        if (supportedSystems->systems[i] == DELSYS_ISDBT)
+        {
+            return TRUE;
+        }
+    }
+    return FALSE;    
+}
+
 /*
  * Output command line usage and help.
  */
@@ -676,6 +703,7 @@ static void usage(char *appname)
             "      -f <file>     : Run startup script file before starting the command prompt\n"
             "      -d            : Run as a daemon.\n"
             "      -R            : Use hardware PID filters, only 1 service filter supported.\n"
+            "      -I            : Force use of ISDB-T delivery system\n"
             "\n"
             "      Remote Interface Options\n"
             "      -r            : Start remote interface as well as console shell.\n"

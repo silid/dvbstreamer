@@ -63,6 +63,12 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 */
 
 #if DVB_API_VERSION >= 5
+
+#ifdef DTV_ISDBT_LAYER_ENABLED
+#define HAVE_FULL_ISBDT
+#endif
+
+
 #define PROP_IDX_DELSYS    0
 #define PROP_IDX_FREQ      1
 #define PROP_IDX_INVERSION 2
@@ -94,6 +100,29 @@ Opens/Closes and setups dvb adapter for use in the rest of the application.
 
 #define PROP_IDX_ATSC_MODULATION  3
 #define PROP_COUNT_ATSC           4
+
+#define PROP_IDX_ISDBT_BANDWIDTH         3
+#define PROP_IDX_ISDBT_TRANSMISSION_MODE 4
+#define PROP_IDX_ISDBT_GUARD_INTERVAL    5
+
+#ifdef HAVE_FULL_ISDBT
+#define PROP_IDX_ISDBT_LAYERS            6
+#define PROP_IDX_ISDBT_LAYER_A_FEC       7
+#define PROP_IDX_ISDBT_LAYER_B_FEC       8
+#define PROP_IDX_ISDBT_LAYER_C_FEC       9
+#define PROP_IDX_ISDBT_LAYER_A_MOD      10
+#define PROP_IDX_ISDBT_LAYER_B_MOD      11
+#define PROP_IDX_ISDBT_LAYER_C_MOD      12
+#define PROP_IDX_ISDBT_LAYER_A_SEGS     13
+#define PROP_IDX_ISDBT_LAYER_B_SEGS     14
+#define PROP_IDX_ISDBT_LAYER_C_SEGS     15
+
+#define PROP_COUNT_ISDBT                16
+
+#else
+
+#define PROP_COUNT_ISDBT                 6
+#endif
 
 #endif
 
@@ -161,6 +190,8 @@ struct DVBAdapter_s
     int cmdSendFd;                    /**< File descriptor to send commands to monitor task. */
     ev_io commandWatcher;
     ev_io frontendWatcher;
+    
+    bool forcedISDB;                  /**< Whether we have been forced into ISDB tuning mode */
 } ;
 
 typedef struct StringToParamMapping_s
@@ -366,7 +397,7 @@ static struct dtv_properties ClearFrontEndProperties = {
 /*******************************************************************************
 * Global functions                                                             *
 *******************************************************************************/
-DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
+DVBAdapter_t *DVBInit(int adapter, bool hwRestricted, bool forceISDB)
 {
     DVBAdapter_t *result = NULL;
     int monitorFds[2];
@@ -438,47 +469,55 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted)
         }
         result->currentDeliverySystem = DELSYS_MAX_SUPPORTED;
         LogModule(LOG_INFO, DVBADAPTER, "Caps 0x%08x", result->info.caps);
-        switch (result->info.type)
+        if (forceISDB)
         {
-            case FE_QPSK:
+            result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),1);
+            result->supportedDelSystems->systems[0] = DELSYS_ISDBT;
+        }
+        else
+        {
+            switch (result->info.type)
+            {
+                case FE_QPSK:
 #if HAVE_FE_CAN_2G_MODULATION
-                if (result->info.caps & FE_CAN_2G_MODULATION)
-                {
-                    result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),2);
-                    result->supportedDelSystems->systems[0] = DELSYS_DVBS;
-                    result->supportedDelSystems->systems[1] = DELSYS_DVBS2;
-                }
-                else
+                    if (result->info.caps & FE_CAN_2G_MODULATION)
+                    {
+                        result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),2);
+                        result->supportedDelSystems->systems[0] = DELSYS_DVBS;
+                        result->supportedDelSystems->systems[1] = DELSYS_DVBS2;
+                    }
+                    else
 #endif
-                {
+                    {
+                        result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),1);
+                        result->supportedDelSystems->systems[0] = DELSYS_DVBS;
+                    }
+                    lnbInput = TRUE;
+                    break;
+                case FE_QAM:
                     result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),1);
-                    result->supportedDelSystems->systems[0] = DELSYS_DVBS;
-                }
-                lnbInput = TRUE;
-                break;
-            case FE_QAM:
-                result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),1);
-                result->supportedDelSystems->systems[0] = DELSYS_DVBC;
-                break;
-            case FE_OFDM:
+                    result->supportedDelSystems->systems[0] = DELSYS_DVBC;
+                    break;
+                case FE_OFDM:
 #if HAVE_FE_CAN_2G_MODULATION
-                if (result->info.caps & FE_CAN_2G_MODULATION)
-                {
-                    result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),2);
-                    result->supportedDelSystems->systems[0] = DELSYS_DVBT;
-                    result->supportedDelSystems->systems[1] = DELSYS_DVBT2;
-                }
-                else
+                    if (result->info.caps & FE_CAN_2G_MODULATION)
+                    {
+                        result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),2);
+                        result->supportedDelSystems->systems[0] = DELSYS_DVBT;
+                        result->supportedDelSystems->systems[1] = DELSYS_DVBT2;
+                    }
+                    else
 #endif
-                {
+                    {
+                        result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),1);
+                        result->supportedDelSystems->systems[0] = DELSYS_DVBT;
+                    }
+                    break;
+                case FE_ATSC:
                     result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),1);
-                    result->supportedDelSystems->systems[0] = DELSYS_DVBT;
-                }
-                break;
-            case FE_ATSC:
-                result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),1);
-                result->supportedDelSystems->systems[0] = DELSYS_ATSC;
-                break;
+                    result->supportedDelSystems->systems[0] = DELSYS_ATSC;
+                    break;
+            }
         }
 
         result->dvrFd = open(result->dvrPath, O_RDONLY | O_NONBLOCK);
@@ -1698,6 +1737,15 @@ static void ConvertYamlToDTVProperties(DVBDeliverySystem_e delSys, yaml_document
             SET_U32_PROPERTY(PROP_IDX_ATSC_MODULATION, DTV_MODULATION, MapYamlNode(doc, TAG_MODULATION, modulationMapping, QAM_AUTO));
             adapter->frontEndProperties.num = PROP_COUNT_ATSC;
             break;
+        case DELSYS_ISDBT:
+            SET_U32_PROPERTY(PROP_IDX_DELSYS, DTV_DELIVERY_SYSTEM, SYS_ISDBT);
+            SET_U32_PROPERTY(PROP_IDX_ISDBT_BANDWIDTH, DTV_BANDWIDTH_HZ,ConvertYamlNode(doc, TAG_BANDWIDTH, ConvertStringToBandwith, 0));
+            SET_U32_PROPERTY(PROP_IDX_ISDBT_TRANSMISSION_MODE, DTV_TRANSMISSION_MODE, MapYamlNode(doc, TAG_TRANSMISSION_MODE, transmissonModeMapping, TRANSMISSION_MODE_AUTO));
+            SET_U32_PROPERTY(PROP_IDX_ISDBT_GUARD_INTERVAL, DTV_GUARD_INTERVAL, MapYamlNode(doc,TAG_GUARD_INTERVAL, guardIntervalMapping, GUARD_INTERVAL_AUTO));
+            #ifdef HAVE_FULL_ISDBT
+            /* TODO: Fill in when full isdb-t support is available. */
+            #endif
+            adapter->frontEndProperties.num = PROP_COUNT_ISDBT;
         default:
             break;
     }
@@ -1769,6 +1817,14 @@ static void ConvertDTVPropertiesToYaml(DVBDeliverySystem_e delSys, struct dtv_pr
         case DELSYS_ATSC:
             YamlUtils_MappingAdd(doc, 1, TAG_MODULATION,
                 MapValueToString(modulationMapping, GET_U32_PROP(PROP_IDX_ATSC_MODULATION), "AUTO"));
+            break;
+        case DELSYS_ISDBT:
+            sprintf(temp,"%u", GET_U32_PROP(PROP_IDX_DVBT_BANDWIDTH));
+            YamlUtils_MappingAdd(doc, 1, TAG_BANDWIDTH, temp);
+            YamlUtils_MappingAdd(doc, 1, TAG_GUARD_INTERVAL,
+                MapValueToString(guardIntervalMapping, GET_U32_PROP(PROP_IDX_DVBT_GUARD_INTERVAL), "AUTO"));
+            YamlUtils_MappingAdd(doc, 1, TAG_TRANSMISSION_MODE,
+                MapValueToString(transmissonModeMapping, GET_U32_PROP(PROP_IDX_DVBT_TRANSMISSION_MODE), "AUTO"));
             break;
         default:
             break;

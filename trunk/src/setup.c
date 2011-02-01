@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
     while (TRUE)
     {
         int c;
-        c = getopt(argc, argv, "vVdro:a:t:s:S:c:A:l:hL:");
+        c = getopt(argc, argv, "vVdro:a:t:s:S:c:A:l:hL:i:");
         if (c == -1)
         {
             break;
@@ -142,7 +142,11 @@ int main(int argc, char *argv[])
                 channelsFileType = DELSYS_ATSC;
                 break;
 #endif
-
+            case 'i':
+                channelsFile = optarg;
+                channelsFileType = DELSYS_ISDBT;
+                break;
+                
 #if defined(ENABLE_DVB)
             case 'l': /* LNB settings */
                 if (LNBDecode(optarg, &lnbInfo))
@@ -276,7 +280,7 @@ static void usage(char *appname)
             "      -s <file>     : Satellite channels.conf file to import services and \n"
             "                      multiplexes from.(DVB-S)\n"
             "      -S <file>     : DVB-S/S2 Satellite  channels.conf file to import services and \n"
-            "                      multiplexes from. NOTE: File must be in VDR format!"
+            "                      multiplexes from. NOTE: File must be in VDR format!\n"
             "      -l <LNB Type> : (DVB-S Only) Set LNB type being used\n"
             "                      (Use -l help to print types) or \n"
             "      -l <low>,<high>,<switch> Specify LO frequencies in MHz\n"
@@ -285,9 +289,13 @@ static void usage(char *appname)
             "                      multiplexes from. (DVB-C)\n"
             "\n"
 #endif
+            "      -i <file>     : ISDB channels.conf file to import services and \n"
+            "                      multiplexes from. (ISDB-T)  (EXPERIMENTAL)\n"
+            "                      NOTE: The file should be in dvb-t format\n"
+            "\n"
 #if defined(ENABLE_ATSC)
             "      -A <file>     : ATSC channels.conf file to import services and \n"
-            "                      multiplexes from. (ATSC) (EXPERIMENTAL)\n"
+            "                      multiplexes from. (ATSC)\n"
 #endif
             ,appname );
 }
