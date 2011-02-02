@@ -192,6 +192,7 @@ struct DVBAdapter_s
     ev_io frontendWatcher;
     
     bool forcedISDB;                  /**< Whether we have been forced into ISDB tuning mode */
+    struct dvb_frontend_parameters isdbFEParams;
 } ;
 
 typedef struct StringToParamMapping_s
@@ -332,7 +333,6 @@ static StringToParamMapping_t transmissonModeMapping[] = {
     STRINGTOPARAMMAPPING_SENTINEL
 };
 
-#if (DVB_API_VERSION < 5)
 static StringToParamMapping_t bandwidthMapping[] = {
     {"8Mhz", BANDWIDTH_8_MHZ}, {"8000000", BANDWIDTH_8_MHZ}, {"8Mhz", BANDWIDTH_8_MHZ},
     {"7Mhz", BANDWIDTH_7_MHZ}, {"7000000", BANDWIDTH_7_MHZ},
@@ -340,7 +340,7 @@ static StringToParamMapping_t bandwidthMapping[] = {
     {"AUTO", BANDWIDTH_AUTO},
     STRINGTOPARAMMAPPING_SENTINEL
 };
-#endif
+
 
 static StringToParamMapping_t guardIntervalMapping[] = {
     {"1/32", GUARD_INTERVAL_1_32},
@@ -473,6 +473,7 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted, bool forceISDB)
         {
             result->supportedDelSystems = (DVBSupportedDeliverySys_t*)ObjectCollectionCreate(TOSTRING(DVBSupportedDeliverySys_t),1);
             result->supportedDelSystems->systems[0] = DELSYS_ISDBT;
+            result->forcedISDB = forceISDB;
         }
         else
         {
@@ -549,6 +550,7 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted, bool forceISDB)
             FILE *fp;
             char sysPath[PATH_MAX];
             int speed;
+            char text[256] = {0};
 
             sprintf(sysPath, "/sys/class/dvb/dvb%d.demux0/device/speed", adapter);
 
@@ -564,6 +566,24 @@ DVBAdapter_t *DVBInit(int adapter, bool hwRestricted, bool forceISDB)
                     }
                 }
                 fclose(fp);
+            }
+            
+            sprintf(sysPath, "/sys/class/dvb/dvb%d.demux0/device/manufacturer", adapter);
+            fp = fopen(sysPath, "r");
+            if (fp)
+            {
+                fread(text, sizeof(text) - 1,1, fp);
+                fclose(fp);
+                LogModule(LOG_INFO, DVBADAPTER,"Device Manufacturer: %s\n", text);
+            }
+            
+            sprintf(sysPath, "/sys/class/dvb/dvb%d.demux0/device/product", adapter);
+            fp = fopen(sysPath, "r");
+            if (fp)
+            {
+                fread(text, sizeof(text) - 1,1, fp);
+                fclose(fp);
+                LogModule(LOG_INFO, DVBADAPTER,"Device Product: %s\n", text);
             }
         }
 
@@ -1295,34 +1315,46 @@ static void DVBCommandCallback(struct ev_loop *loop, ev_io *w, int revents)
         if (retune && (adapter->frontEndFd != -1))
         {
             adapter->tuning = TRUE;
+            if (adapter->forcedISDB)
+            {
+                adapter->isdbFEParams.frequency = adapter->frontEndRequestedFreq;            
+                LogModule(LOG_DEBUG, DVBADAPTER, "ISDB Tuning to %d", adapter->frontEndRequestedFreq);
+                if (ioctl(adapter->frontEndFd, FE_SET_FRONTEND, &adapter->isdbFEParams) < 0)
+                {
+                    LogModule(LOG_ERROR, DVBADAPTER, "FE_SET_FRONTEND: %s\n", strerror(errno));
+                }                
+            }
+            else
+            {
 #if (DVB_API_VERSION < 5)
-            adapter->frontEndParams.frequency = adapter->frontEndRequestedFreq;
+                adapter->frontEndParams.frequency = adapter->frontEndRequestedFreq;
 #else
-            adapter->frontEndPropertyArray[PROP_IDX_FREQ].u.data = adapter->frontEndRequestedFreq;
+                adapter->frontEndPropertyArray[PROP_IDX_FREQ].u.data = adapter->frontEndRequestedFreq;
 
-            if (ioctl(adapter->frontEndFd, FE_SET_PROPERTY, &ClearFrontEndProperties) < 0)
-            {
-                LogModule(LOG_ERROR, DVBADAPTER, "Clear FE_SET_PROPERTY: %s\n", strerror(errno));
-            }
+                if (ioctl(adapter->frontEndFd, FE_SET_PROPERTY, &ClearFrontEndProperties) < 0)
+                {
+                    LogModule(LOG_ERROR, DVBADAPTER, "Clear FE_SET_PROPERTY: %s\n", strerror(errno));
+                }
 #endif
-            LogModule(LOG_DEBUG, DVBADAPTER, "Tuning to %d", adapter->frontEndRequestedFreq);
+                LogModule(LOG_DEBUG, DVBADAPTER, "Tuning to %d", adapter->frontEndRequestedFreq);
 
-            if ((adapter->currentDeliverySystem == DELSYS_DVBS) || (adapter->currentDeliverySystem == DELSYS_DVBS2))
-            {
-                DVBFrontEndSatelliteSetup(adapter);
-            }
+                if ((adapter->currentDeliverySystem == DELSYS_DVBS) || (adapter->currentDeliverySystem == DELSYS_DVBS2))
+                {
+                    DVBFrontEndSatelliteSetup(adapter);
+                }
 #if (DVB_API_VERSION < 5)
 
-            if (ioctl(adapter->frontEndFd, FE_SET_FRONTEND, &adapter->frontEndParams) < 0)
-            {
-                LogModule(LOG_ERROR, DVBADAPTER, "FE_SET_FRONTEND: %s\n", strerror(errno));
-            }
+                if (ioctl(adapter->frontEndFd, FE_SET_FRONTEND, &adapter->frontEndParams) < 0)
+                {
+                    LogModule(LOG_ERROR, DVBADAPTER, "FE_SET_FRONTEND: %s\n", strerror(errno));
+                }
 #else
-            if (ioctl(adapter->frontEndFd, FE_SET_PROPERTY, &adapter->frontEndProperties) < 0)
-            {
-                LogModule(LOG_ERROR, DVBADAPTER, "Tune FE_SET_PROPERTY: %s\n", strerror(errno));
-            }
+                if (ioctl(adapter->frontEndFd, FE_SET_PROPERTY, &adapter->frontEndProperties) < 0)
+                {
+                    LogModule(LOG_ERROR, DVBADAPTER, "Tune FE_SET_PROPERTY: %s\n", strerror(errno));
+                }
 #endif
+            }
         }
     }
 }
@@ -1746,6 +1778,17 @@ static void ConvertYamlToDTVProperties(DVBDeliverySystem_e delSys, yaml_document
             /* TODO: Fill in when full isdb-t support is available. */
             #endif
             adapter->frontEndProperties.num = PROP_COUNT_ISDBT;
+            /* For old style tuning */
+            adapter->isdbFEParams.frequency = ConvertYamlNode(doc, TAG_FREQUENCY,  ConvertStringToUInt32, 0);
+            adapter->isdbFEParams.inversion = MapYamlNode(doc, TAG_INVERSION, inversionMapping, INVERSION_AUTO);
+
+            adapter->isdbFEParams.u.ofdm.bandwidth = MapYamlNode(doc, TAG_BANDWIDTH, bandwidthMapping, BANDWIDTH_AUTO);
+            adapter->isdbFEParams.u.ofdm.code_rate_HP = MapYamlNode(doc, TAG_FEC_HP, fecMapping, FEC_AUTO);
+            adapter->isdbFEParams.u.ofdm.code_rate_LP = MapYamlNode(doc, TAG_FEC_LP, fecMapping, FEC_AUTO);
+            adapter->isdbFEParams.u.ofdm.constellation = MapYamlNode(doc, TAG_CONSTELLATION, modulationMapping, QAM_AUTO);
+            adapter->isdbFEParams.u.ofdm.guard_interval = MapYamlNode(doc,TAG_GUARD_INTERVAL, guardIntervalMapping, GUARD_INTERVAL_AUTO);
+            adapter->isdbFEParams.u.ofdm.transmission_mode = MapYamlNode(doc, TAG_TRANSMISSION_MODE, transmissonModeMapping, TRANSMISSION_MODE_AUTO);
+            adapter->isdbFEParams.u.ofdm.hierarchy_information = MapYamlNode(doc, TAG_HIERARCHY, hierarchyMapping, HIERARCHY_AUTO);
         default:
             break;
     }
