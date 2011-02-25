@@ -36,41 +36,26 @@ Date and Time decoding functions.
 #include "datetime.h"
 #include "string.h"
 
+#define MJD_UNIX_EPOCH 40587
+#define SECS_PER_MIN 60
+#define SECS_PER_HOUR (SECS_PER_MIN * 60)
+#define SECS_PER_DAY (SECS_PER_HOUR * 24)
 
 void dvbpsi_DecodeMJDUTC(uint8_t *p_mjdutc, struct tm *p_date_time)
 {
     #define BCD_CHAR_TO_INT(_bcd) (((_bcd >> 4) * 10) + (_bcd & 0x0f))
-    struct tm temp_time;
     time_t secs;
-
     uint16_t i_mjd = (((uint16_t)p_mjdutc[0] << 8) | (uint16_t)(p_mjdutc[1] & 0xff));
-    double d_mjd = (double)i_mjd;
-    /*
-        To find Y, M, D from MJD
-        Y' = int [ (MJD - 15 078,2) / 365,25 ]
-        M' = int { [ MJD - 14 956,1 - int (Y' × 365,25) ] / 30,6001 }
-        D = MJD - 14 956 - int (Y' × 365,25) - int (M' × 30,6001)
-        If M' = 14 or M' = 15, then K = 1; else K = 0
-        Y = Y' + K
-        M = M' - 1 - K × 12
-    */
-    int i_temp_y, i_temp_m, i_k = 0;
-    i_temp_y = (int) ((d_mjd - 15078.2)/ 365.25);
-    i_temp_m = (int) (((d_mjd - 14956.1) - ((double)i_temp_y * 365.25)) / 30.6001);
 
-    if ((i_temp_m == 14) || (i_temp_m == 15))
-    {
-        i_k = 1;
-    }
+    
+    secs = (time_t)(((uint32_t)i_mjd - MJD_UNIX_EPOCH) * SECS_PER_DAY);
 
-    temp_time.tm_year = i_temp_y + i_k;
-    temp_time.tm_mon = ((i_temp_m - 1) - (i_k * 12)) - 1;
-    temp_time.tm_mday = (((i_mjd - 14956) - (int)((double)i_temp_y * 365.25)) - (int)((double)i_temp_m * 30.6001));
-    temp_time.tm_hour = BCD_CHAR_TO_INT(p_mjdutc[2]);
-    temp_time.tm_min = BCD_CHAR_TO_INT(p_mjdutc[3]);
-    temp_time.tm_sec = BCD_CHAR_TO_INT(p_mjdutc[4]);
-    secs = timegm(&temp_time);
+    secs += (BCD_CHAR_TO_INT(p_mjdutc[2])) * SECS_PER_HOUR+
+                (BCD_CHAR_TO_INT(p_mjdutc[3])) * SECS_PER_MIN+
+                (BCD_CHAR_TO_INT(p_mjdutc[4]));
+
     memcpy(p_date_time, gmtime(&secs), sizeof(struct tm));
+
     
 }
 
