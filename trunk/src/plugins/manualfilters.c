@@ -273,7 +273,7 @@ static void CommandListMF(int argc, char **argv)
 static void CommandSetOutputMRL(int argc, char **argv)
 {
     ManualFilter_t *filter;
-    DeliveryMethodInstance_t *instance;
+    DeliveryMethodInstance_t *instance, *old_instance;
 
     CommandCheckAuthenticated();
 
@@ -284,8 +284,9 @@ static void CommandSetOutputMRL(int argc, char **argv)
     if (instance)
     {
         pthread_mutex_lock(&manualFiltersMutex);
-        DeliveryMethodDestroy(filter->dmInstance);
+        old_instance = filter->dmInstance;
         filter->dmInstance = instance;
+        DeliveryMethodDestroy(old_instance);
         pthread_mutex_unlock(&manualFiltersMutex);
         CommandPrintf("MRL set to \"%s\" for %s\n", DeliveryMethodGetMRL(filter->dmInstance), argv[0]);
     }
