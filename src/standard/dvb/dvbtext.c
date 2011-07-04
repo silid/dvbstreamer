@@ -219,6 +219,7 @@ char *DVBTextToUTF8(char *toConvert, size_t toConvertLen)
     }
     if ((long)cd == -1)
     {
+        pthread_mutex_unlock(&ResultBufferMutex);
         LogModule(LOG_ERROR, DVBTEXT, "Failed to open conversion descriptor!\n");
         return NULL;
     }
