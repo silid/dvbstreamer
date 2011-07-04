@@ -9,9 +9,9 @@ dnl
 dnl     Exception to this rule is the Major version 0, minor version will be
 dnl     incremented until we are ready to say DVBStreamer is no longer alpha.
 dnl ---------------------------------------------------------------------------
-AC_INIT(dvbstreamer, 2.0.0)
+AC_INIT(dvbstreamer, 2.1.0)
 DVBSTREAMER_MAJOR=2
-DVBSTREAMER_MINOR=0
+DVBSTREAMER_MINOR=1
 DVBSTREAMER_MICRO=0
 
 AC_SUBST(DVBSTREAMER_MAJOR)
@@ -188,7 +188,7 @@ dnl ---------------------------------------------------------------------------
 dnl Check for libev
 dnl ---------------------------------------------------------------------------
 AC_CHECK_HEADER([ev.h], [], [AC_MSG_FAILURE([libev header file not found])])
-AC_CHECK_LIB([ev], [ev_loop], [], [AC_MSG_FAILURE([libev not found])])
+AC_CHECK_DECL([ev_loop()], [], [AC_MSG_FAILURE([libev doesn't provide ev_loop])], [[#include <ev.h>]])
 LIBS=""
 
 dnl ---------------------------------------------------------------------------
