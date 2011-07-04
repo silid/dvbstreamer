@@ -1125,6 +1125,7 @@ int DVBDemuxAllocateFilter(DVBAdapter_t *adapter, uint16_t pid)
         else
         {
             struct dmx_pes_filter_params pesFilterParam;
+			memset(&pesFilterParam,0,sizeof(pesFilterParam));
 
             LogModule(LOG_DEBUG, DVBADAPTER, "Filter fd %d\n", adapter->filters[idxToUse].demuxFd);
 

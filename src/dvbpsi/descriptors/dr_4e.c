@@ -69,6 +69,7 @@ dvbpsi_extended_event_dr_t * dvbpsi_DecodeExtendedEventDr(dvbpsi_descriptor_t * 
     DVBPSI_ERROR("dr_4e decoder", "out of memory");
     return NULL;
   }
+  memset(p_decoded->i_buffer,0,sizeof(p_decoded->i_buffer));
 
   /* Decode */
   p_decoded->i_descriptor_number = (p_descriptor->p_data[0] >> 4)&0xf;

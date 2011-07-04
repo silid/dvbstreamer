@@ -76,6 +76,8 @@ dvbpsi_short_event_dr_t * dvbpsi_DecodeShortEventDr(dvbpsi_descriptor_t * p_desc
     DVBPSI_ERROR("dr_4d decoder", "out of memory");
     return NULL;
   }
+  p_decoded->i_event_name[0]=0;
+  p_decoded->i_text[0]=0;
 
   /* Decode data and check the length */
   memcpy( p_decoded->i_iso_639_code, &p_descriptor->p_data[0], 3 );
