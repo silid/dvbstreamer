@@ -39,7 +39,10 @@ Object memory management.
  * A collection of entries with a count.
  */
 typedef struct ObjectCollection_s{
+    union{
     unsigned int nrofEntries; /**< Number of entries in the collection */
+    void *__forceAlignment; /* Used to fix issues of alignment on 64bit systems */
+    };
 }ObjectCollection_t;
 
 /**
