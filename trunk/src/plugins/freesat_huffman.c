@@ -146,5 +146,5 @@ char *freesat_huffman_to_string(const unsigned char *src, uint size)
         uncompressed[p] = 0;
         return uncompressed;
     }
-    return "";
+    return strdup("");
 }
