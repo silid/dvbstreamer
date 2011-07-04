@@ -204,7 +204,7 @@ int ServiceNameSet(Service_t  *service, char *name)
     STATEMENT_STEP();
     if (rc == SQLITE_DONE)
     {
-        if (name != service->name)
+        if (!service->name || strcmp(name,service->name))
         {
             if (service->name)
             {
@@ -307,7 +307,7 @@ int ServiceProviderSet(Service_t  *service, char *provider)
     STATEMENT_STEP();
     if (rc == SQLITE_DONE)
     {
-        if (provider != service->provider)
+        if (!service->provider || strcmp(provider,service->provider))
         {
             if (service->provider)
             {
@@ -338,7 +338,7 @@ int ServiceDefaultAuthoritySet(Service_t  *service, char *defaultAuthority)
     STATEMENT_STEP();
     if (rc == SQLITE_DONE)
     {
-        if (defaultAuthority != service->defaultAuthority)
+        if (!service->defaultAuthority || strcmp(defaultAuthority,service->defaultAuthority))
         {
             if (service->defaultAuthority)
             {
