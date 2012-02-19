@@ -149,11 +149,7 @@ dnl Check for libreadline
 dnl ---------------------------------------------------------------------------
 AC_CHECK_HEADER([readline/readline.h], [], [AC_MSG_FAILURE([readline header file not found])])
 
-AC_CHECK_LIB([readline], [readline], [READLINE_TERMCAP="-lncurses"],
-    [AC_CHECK_LIB([readline], [readline], [READLINE_TERMCAP="-ltermcap"],
-        [AC_MSG_FAILURE([readline not found])],
-        [-ltermcap])],
-    [-lncurses])
+AC_CHECK_LIB([readline], [readline], [], [])
 
 AC_SUBST(READLINE_TERMCAP)
 
