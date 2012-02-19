@@ -75,6 +75,7 @@ static void SDTProcessorFilterEventCallback(void *userArg, struct TSFilterGroup_
 static void SubTableHandler(void * state, dvbpsi_handle demuxHandle, uint8_t tableId, uint16_t extension);
 static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT);
 static ServiceType ConvertDVBServiceType(int type);
+static void removeControlCodes(char *str);
 
 /*******************************************************************************
 * Global variables                                                             *
@@ -173,6 +174,7 @@ static void SDTHandler(void* arg, dvbpsi_sdt_t* newSDT)
 
                     if (name)
                     {
+                        removeControlCodes(name);
                         /* Only update the name if it has changed */
                         if (strcmp(name, service->name))
                         {
@@ -282,4 +284,28 @@ static ServiceType ConvertDVBServiceType(int type)
             break;
     }
     return result;
+}
+
+static void removeControlCodes(char *str)
+{
+    // + 1 to also copy the terminating NULL character! otherwise the loop may go
+    // beyond the new end of the string
+    int len = strlen(str) + 1;
+    int i = 0, prev_i = 0;
+    u_int32_t ch;
+
+    do
+    {
+        ch = UTF8_nextchar(str, &i);
+        if ((ch >= 0x80) && (ch <= 0x9f))
+        {
+            memmove(&str[prev_i], &str[i], len - i);
+            len -= i - prev_i;
+            i = prev_i;
+        }
+        else
+        {
+            prev_i = i;
+        }
+    } while(ch != 0u);
 }

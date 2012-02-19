@@ -339,6 +339,7 @@ Samuli Suominen  - Patch to remove use of in-tree libltdl and use the system cop
                    instead.
 Issa Gorissen    - Donated a TeVII S660 for help with DVB-S2 - Many thanks
 Luca Dasseto     - Also donated a TeVII S660 for help with DVB-S2 - Many thanks
+Manuel Borchers  - Testing of service name markup characters removal.
 
 VideoLan libdvbpsi Team for the excellent libdvbpsi. 
 (http://www.videolan.org/developers/libdvbpsi.html)
