@@ -790,6 +790,7 @@ void CacheServiceDelete(Service_t *service)
             ObjectRefDec(cachedPIDs[deletedIndex]);
         }
 
+        
         cachedServicesCount --;
         /* Remove the deleted service from the list */
         for (i = deletedIndex; i < cachedServicesCount; i ++)
@@ -942,6 +943,7 @@ static void CacheProcessUpdateMessage(void *ptr)
             LogModule(LOG_DEBUG, CACHE, "Deleting service %s (0x%04x)\n", service->name, service->id);
             ServiceDelete(service);
             ProgramInfoRemove(service);
+            ServiceRefDec(service);
             break;
     }
     DBaseTransactionCommit();
