@@ -5,7 +5,7 @@
 ## 	Please disable it in the Anjuta project configuration
 
 
-pkginclude_DATA = \
+pkginclude_HEADERS = \
     types.h \
     cache.h \
     objects.h \
@@ -30,5 +30,5 @@ pkginclude_DATA = \
     events.h
 
 
-EXTRA_DIST = $(pkginclude_DATA)
+EXTRA_DIST = $(pkginclude_HEADERS)
 
