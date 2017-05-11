@@ -82,6 +82,7 @@ struct ServiceFilter_s
     uint16_t        videoPID;
     uint16_t        audioPID;
     uint16_t        subPID;
+    uint16_t        ttPID;
     int             pmtPacketCount;
     TSPacket_t      pmtPackets[PMT_PACKETS];
 
@@ -426,6 +427,7 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t state)
     bool vfound = FALSE;
     bool afound = FALSE;
     bool sfound = FALSE;
+    bool tfound = FALSE;
     dvbpsi_pmt_t pmt;
     dvbpsi_pmt_es_t *es;
     dvbpsi_psi_section_t* section;
@@ -437,13 +439,14 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t state)
     state->videoPID = INVALID_PID;
     state->audioPID = INVALID_PID;
     state->subPID   = INVALID_PID;
+    state->ttPID    = INVALID_PID;
     LogModule(LOG_DEBUG, SERVICEFILTER, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
     LogModule(LOG_DEBUG, SERVICEFILTER, "Rewriting PMT on PID %x\n", state->service->pmtPID);
     info = CacheProgramInfoGet(state->service);
     if (info)
     {
         pmt.i_pcr_pid = state->pcrPID = info->pcrPID;
-        for (i = 0; (i < info->streamInfoList->nrofStreams) && (!vfound || !afound || !sfound); i ++)
+        for (i = 0; (i < info->streamInfoList->nrofStreams) && (!vfound || !afound || !sfound || !tfound); i ++)
         {
             LogModule(LOG_DEBUG, SERVICEFILTER, "\tpid = %x type =%d\n", info->streamInfoList->streams[i].pid, info->streamInfoList->streams[i].type);
             /* Look for:
@@ -486,6 +489,15 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t state)
                         dvbpsi_PMTESAddDescriptor(es, desc->i_tag, desc->i_length,  desc->p_data);
                         break;
                     }
+                    /* Teletext */
+                    if (!tfound  && (desc->i_tag == 0x56))
+                    {
+                        tfound = TRUE;
+                        state->ttPID = info->streamInfoList->streams[i].pid;
+                        es = dvbpsi_PMTAddES(&pmt, info->streamInfoList->streams[i].type,  info->streamInfoList->streams[i].pid);
+                        dvbpsi_PMTESAddDescriptor(es, desc->i_tag, desc->i_length,  desc->p_data);
+                        break;
+                    }
                     /* AC3 */
                     if (!afound && (desc->i_tag == 0x6a))
                     {
@@ -502,7 +514,7 @@ static void ServiceFilterPMTRewrite(ServiceFilter_t state)
         }
         ObjectRefDec(info);
     }
-    LogModule(LOG_DEBUG, SERVICEFILTER, "videopid = %x audiopid = %x subpid = %x\n", state->videoPID,state->audioPID,state->subPID);
+    LogModule(LOG_DEBUG, SERVICEFILTER, "videopid = %x audiopid = %x subpid = %x ttpid = %x\n", state->videoPID,state->audioPID,state->subPID,state->ttPID);
 
     section = dvbpsi_GenPMTSections(&pmt);
     ServiceFilterInitPacket(&state->packets[PACKETS_INDEX_PMT], section, "PMT");
@@ -585,6 +597,10 @@ static void ServiceFilterAllocateFilters(ServiceFilter_t filter)
         if ((filter->subPID != INVALID_PID) && (filter->subPID != filter->pcrPID))
         {
             TSFilterGroupAddPacketFilter(filter->tsgroup, filter->subPID, ServiceFilterProcessPacket, filter);
+        }
+        if ((filter->ttPID != INVALID_PID) && (filter->ttPID != filter->pcrPID))
+        {
+            TSFilterGroupAddPacketFilter(filter->tsgroup, filter->ttPID, ServiceFilterProcessPacket, filter);
         }
     }
     else
